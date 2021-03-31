@@ -7,10 +7,7 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 import "envoy/type/matcher/v3/path.proto";
 
-import "google/protobuf/duration.proto";
-
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.oauth2.v3alpha";
@@ -44,7 +41,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message OAuth2Config {
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
@@ -79,6 +76,10 @@ message OAuth2Config {
   // defaults to "user" scope.
   // OAuth RFC https://tools.ietf.org/html/rfc6749#section-3.3
   repeated string auth_scopes = 9;
+
+  // Optional resource parameter for authorization request
+  // RFC: https://tools.ietf.org/html/rfc8707
+  repeated string resources = 10;
 }
 
 // Filter config.

@@ -149,24 +149,17 @@ private:
    * Wraps a single active stream on the connection. These are either full request/response pairs
    * or pushes.
    */
-  struct ActiveStream : LinkedObject<ActiveStream>,
-                        public Event::DeferredDeletable,
-                        public StreamCallbacks,
-                        public RequestDecoder,
-                        public Tracing::Config,
-                        public ScopeTrackedObject,
-                        public FilterManagerCallbacks {
+  struct ActiveStream final : LinkedObject<ActiveStream>,
+                              public Event::DeferredDeletable,
+                              public StreamCallbacks,
+                              public RequestDecoder,
+                              public Tracing::Config,
+                              public ScopeTrackedObject,
+                              public FilterManagerCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
     void completeRequest();
 
     const Network::Connection* connection();
-    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
-                        const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                        absl::string_view details) override {
-      return filter_manager_.sendLocalReply(is_grpc_request, code, body, modify_headers,
-                                            grpc_status, details);
-    }
     uint64_t streamId() { return stream_id_; }
 
     // This is a helper function for encodeHeaders and responseDataTooLarge which allows for
@@ -191,6 +184,16 @@ private:
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
+    const StreamInfo::StreamInfo& streamInfo() const override {
+      return filter_manager_.streamInfo();
+    }
+    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+                        const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details) override {
+      return filter_manager_.sendLocalReply(is_grpc_request, code, body, modify_headers,
+                                            grpc_status, details);
+    }
 
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;

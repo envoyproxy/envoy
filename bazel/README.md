@@ -62,7 +62,8 @@ for how to update or override dependencies.
        ninja-build \
        curl \
        unzip \
-       virtualenv
+       virtualenv \
+       patch
     ```
 
     ### Fedora
@@ -135,7 +136,7 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    Another option to shorten the output root for Bazel is to set the `USERNAME` environment variable in your shell
     session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
     is set.
 
@@ -173,6 +174,8 @@ for how to update or override dependencies.
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
+
+    The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
 
     Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
     Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
@@ -561,7 +564,7 @@ bazel test -c dbg --config=docker-tsan //test/...
 Alternatively, you can build a local copy of TSAN-instrumented libc++. Follow the [quick start](#quick-start-bazel-build-for-developers) instruction to setup Clang+LLVM environment. Download LLVM sources from the [LLVM official site](https://github.com/llvm/llvm-project)
 
 ```
-curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-10.0.0.tar.gz" | tar zx
+curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-11.0.1.tar.gz" | tar zx
 
 ```
 
@@ -572,7 +575,7 @@ mkdir tsan
 pushd tsan
 
 cmake -GNinja -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx" -DLLVM_USE_LINKER=lld -DLLVM_USE_SANITIZER=Thread -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-10.0.0/llvm"
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-11.0.1/llvm"
 ninja install-cxx install-cxxabi
 
 rm -rf /opt/libcxx_tsan/include
@@ -616,6 +619,10 @@ bazel test //test/integration:protocol_integration_test --test_output=streamed \
   --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
 
+Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
+environment where `n` is the desired verbosity level (e.g.
+`--test_env="ENVOY_QUICHE_VERBOSITY=2"`.
+
 ## Disabling optional features
 
 The following optional features can be disabled on the Bazel build command-line:
@@ -627,7 +634,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
-
+* http3/quic with --//bazel:http3=False
 
 ## Enabling optional features
 
@@ -641,7 +648,7 @@ The following optional features can be enabled on the Bazel build command-line:
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
   (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details).
 * ASSERT() can be configured to log failures and increment a stat counter in a release build with
-  `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
+  `--define log_fast_debug_assert_in_release=enabled`. SLOW_ASSERT()s can be included with `--define log_debug_assert_in_release=enabled`. The default behavior is to compile all debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
   `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL and
@@ -860,7 +867,7 @@ also have 'buildifier' installed from the bazel distribution.
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 

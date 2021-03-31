@@ -58,7 +58,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //        .... [further cluster config]
 // [#next-free-field: 6]
 message HttpProtocolOptions {
-  // If this is used, the cluster will only operate on one of the possible upstream protocols (HTTP/1.1, HTTP/2).
+  // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 should generally be used for upstream clusters doing gRPC.
   message ExplicitHttpConfig {
     oneof protocol_config {
@@ -67,6 +67,9 @@ message HttpProtocolOptions {
       config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
 
       config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
+
+      // [#not-implemented-hide:]
+      config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
     }
   }
 
@@ -76,6 +79,9 @@ message HttpProtocolOptions {
     config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
 
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
+
+    // [#not-implemented-hide:]
+    config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
   }
 
   // If this is used, the cluster can use either HTTP/1 or HTTP/2, and will use whichever

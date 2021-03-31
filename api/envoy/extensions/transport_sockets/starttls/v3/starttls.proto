@@ -5,10 +5,7 @@ package envoy.extensions.transport_sockets.starttls.v3;
 import "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.starttls.v3";

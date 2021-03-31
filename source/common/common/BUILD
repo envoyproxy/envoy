@@ -90,6 +90,11 @@ envoy_cc_library(
     hdrs = ["enum_to_int.h"],
 )
 
+envoy_cc_library(
+    name = "safe_memcpy_lib",
+    hdrs = ["safe_memcpy.h"],
+)
+
 # fmt_lib is automatically a dependency of all envoy_cc_library definitions.
 envoy_basic_cc_library(
     name = "fmt_lib",
@@ -107,6 +112,10 @@ envoy_cc_library(
     srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
+    deps = [
+        ":macros",
+        ":safe_memcpy_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -148,6 +157,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "fancy_logger.h",
+        "json_escape_string.h",
         "logger.h",
     ],
     external_deps = ["abseil_synchronization"],
@@ -316,6 +326,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "thread_lib",
+    srcs = ["thread.cc"],
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
@@ -403,6 +414,19 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/common:token_bucket_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "shared_token_bucket_impl_lib",
+    srcs = ["shared_token_bucket_impl.cc"],
+    hdrs = ["shared_token_bucket_impl.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//source/common/common:thread_lib",
+        "//source/common/common:thread_synchronizer_lib",
+        "//source/common/common:token_bucket_impl_lib",
         "//source/common/common:utility_lib",
     ],
 )

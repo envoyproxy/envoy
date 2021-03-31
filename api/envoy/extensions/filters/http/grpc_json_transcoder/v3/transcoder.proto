@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -69,6 +69,25 @@ message GrpcJsonTranscoder {
     bool preserve_proto_field_names = 4;
   }
 
+  message RequestValidationOptions {
+    // By default, a request that cannot be mapped to any specified gRPC
+    // :ref:`services <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.services>`
+    // will pass-through this filter.
+    // When set to true, the request will be rejected with a ``HTTP 404 Not Found``.
+    bool reject_unknown_method = 1;
+
+    // By default, a request with query parameters that cannot be mapped to the gRPC request message
+    // will pass-through this filter.
+    // When set to true, the request will be rejected with a ``HTTP 400 Bad Request``.
+    //
+    // The fields
+    // :ref:`ignore_unknown_query_parameters <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignore_unknown_query_parameters>`
+    // and
+    // :ref:`ignored_query_parameters <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignored_query_parameters>`
+    // have priority over this strict validation behavior.
+    bool reject_unknown_query_parameters = 2;
+  }
+
   oneof descriptor_set {
     option (validate.required) = true;
 
@@ -88,7 +107,12 @@ message GrpcJsonTranscoder {
   // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
   // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
   // the service names specified here, but they won't be translated.
+  //
+  // By default, the filter will pass through requests that do not map to any specified services.
   // If the list of services is empty, filter is considered disabled.
+  // However, this behavior changes if
+  // :ref:`reject_unknown_method <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions.reject_unknown_method>`
+  // is enabled.
   repeated string services = 2;
 
   // Control options for response JSON. These options are passed directly to
@@ -192,4 +216,20 @@ message GrpcJsonTranscoder {
   // For a path with `/foo/first/bar/prefix/second/third/fourth`, `x=first`, `y=prefix/second`, `z=third/fourth`.
   // If this setting is not specified, the value defaults to :ref:`ALL_CHARACTERS_EXCEPT_RESERVED<envoy_api_enum_value_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec.ALL_CHARACTERS_EXCEPT_RESERVED>`.
   UrlUnescapeSpec url_unescape_spec = 10 [(validate.rules).enum = {defined_only: true}];
+
+  // Configure the behavior when handling requests that cannot be transcoded.
+  //
+  // By default, the transcoder will silently pass through HTTP requests that are malformed.
+  // This includes requests with unknown query parameters, unregister paths, etc.
+  //
+  // Set these options to enable strict HTTP request validation, resulting in the transcoder rejecting
+  // such requests with a ``HTTP 4xx``. See each individual option for more details on the validation.
+  // gRPC requests will still silently pass through without transcoding.
+  //
+  // The benefit is a proper error message to the downstream.
+  // If the upstream is a gRPC server, it cannot handle the passed-through HTTP requests and will reset
+  // the TCP connection. The downstream will then
+  // receive a ``HTTP 503 Service Unavailable`` due to the upstream connection reset.
+  // This incorrect error message may conflict with other Envoy components, such as retry policies.
+  RequestValidationOptions request_validation_options = 11;
 }

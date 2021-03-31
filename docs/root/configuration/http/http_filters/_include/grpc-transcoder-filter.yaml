@@ -1,5 +1,4 @@
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address: { address: 0.0.0.0, port_value: 9901 }
 
@@ -24,7 +23,7 @@ static_resources:
               # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
               # Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
               - match: { prefix: "/helloworld.Greeter" }
-                route: { cluster: grpc, timeout: { seconds: 60 } }
+                route: { cluster: grpc, timeout: 60s }
           http_filters:
           - name: envoy.filters.http.grpc_json_transcoder
             typed_config:
@@ -41,8 +40,8 @@ static_resources:
   clusters:
   - name: grpc
     connect_timeout: 1.25s
-    type: logical_dns
-    lb_policy: round_robin
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
     dns_lookup_family: V4_ONLY
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:

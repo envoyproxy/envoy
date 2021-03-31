@@ -28,6 +28,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    category = "envoy.filters.network",
     security_posture = "unknown",
     deps = [
         ":filter",

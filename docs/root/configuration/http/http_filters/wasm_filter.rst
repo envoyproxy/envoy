@@ -12,6 +12,10 @@ Wasm
 
 The HTTP Wasm filter is used implement an HTTP filter with a Wasm plugin.
 
+.. note::
+
+ This filter is not supported on Windows.
+
 Example configuration
 ---------------------
 
@@ -31,6 +35,6 @@ Example filter configuration:
             local:
               filename: "/etc/envoy_filter_http_wasm_example.wasm"
           allow_precompiled: true
- 
+
 
 The preceding snippet configures a filter from a Wasm binary on local disk.

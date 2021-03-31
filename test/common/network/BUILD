@@ -86,7 +86,6 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
@@ -301,8 +300,8 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
+        "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_lib",
         "//test/common/network:listener_impl_test_base_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
@@ -386,8 +385,10 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -448,6 +449,16 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:filter_state_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "win32_redirect_records_option_test",
+    srcs = ["win32_redirect_records_option_test.cc"],
+    deps = [
+        ":socket_option_test",
+        "//source/common/network:address_lib",
+        "//source/common/network:win32_redirect_records_option_lib",
     ],
 )
 

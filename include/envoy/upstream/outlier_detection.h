@@ -7,7 +7,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
-#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
+#include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 
 #include "absl/types/optional.h"
 
@@ -169,8 +169,7 @@ public:
    * @param enforced is true if the ejection took place; false, if only logging took place.
    */
   virtual void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                        envoy::data::cluster::v2alpha::OutlierEjectionType type,
-                        bool enforced) PURE;
+                        envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) PURE;
 
   /**
    * Log an unejection event.

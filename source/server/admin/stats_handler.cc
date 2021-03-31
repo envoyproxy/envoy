@@ -167,7 +167,7 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
     mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
     mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
     mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
-    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
+    response.add(MessageUtil::getJsonStringFromMessageOrError(mutex_stats, true, true));
   } else {
     response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
                  "--enable-mutex-tracing.");
@@ -253,7 +253,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   auto* document_fields = document.mutable_fields();
   (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
 
-  return MessageUtil::getJsonStringFromMessage(document, pretty_print, true);
+  return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
 }
 
 } // namespace Server

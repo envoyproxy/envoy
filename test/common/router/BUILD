@@ -313,6 +313,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/http/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",
@@ -429,6 +430,7 @@ envoy_cc_test(
     srcs = ["upstream_request_test.cc"],
     deps = [
         "//source/common/router:router_lib",
+        "//test/common/http:common_lib",
         "//test/mocks/router:router_filter_interface",
     ],
 )
@@ -453,7 +455,6 @@ envoy_cc_benchmark_binary(
         "//source/common/router:config_lib",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

@@ -358,6 +358,9 @@ following features are available:
   :ref:`config_http_conn_man_headers_x-envoy-force-trace` and
   :ref:`config_http_conn_man_headers_x-client-trace-id` headers.
 
+See the architecture overview on
+:ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
+
 .. _config_http_conn_man_headers_x-ot-span-context:
 
 x-ot-span-context
@@ -605,11 +608,17 @@ Supported variable names are:
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_start>`.
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_end>`.
 
 %HOSTNAME%
     The system hostname.

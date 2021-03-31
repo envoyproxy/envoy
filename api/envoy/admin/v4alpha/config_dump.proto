@@ -17,6 +17,31 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#protodoc-title: ConfigDump]
 
+// Resource status from the view of a xDS client, which tells the synchronization
+// status between the xDS client and the xDS server.
+enum ClientResourceStatus {
+  // Resource status is not available/unknown.
+  UNKNOWN = 0;
+
+  // Client requested this resource but hasn't received any update from management
+  // server. The client will not fail requests, but will queue them until update
+  // arrives or the client times out waiting for the resource.
+  REQUESTED = 1;
+
+  // This resource has been requested by the client but has either not been
+  // delivered by the server or was previously delivered by the server and then
+  // subsequently removed from resources provided by the server. For more
+  // information, please refer to the :ref:`"Knowing When a Requested Resource
+  // Does Not Exist" <xds_protocol_resource_not_existed>` section.
+  DOES_NOT_EXIST = 2;
+
+  // Client received this resource and replied with ACK.
+  ACKED = 3;
+
+  // Client received this resource and replied with NACK.
+  NACKED = 4;
+}
+
 // The :ref:`/config_dump <operations_admin_interface_config_dump>` admin endpoint uses this wrapper
 // message to maintain and serve arbitrary configuration information from any component in Envoy.
 message ConfigDump {
@@ -111,7 +136,7 @@ message ListenersConfigDump {
   }
 
   // Describes a dynamically loaded listener via the LDS API.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message DynamicListener {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v3.ListenersConfigDump.DynamicListener";
@@ -140,6 +165,10 @@ message ListenersConfigDump {
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
     UpdateFailureState error_state = 5;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 6;
   }
 
   // This is the :ref:`version_info <envoy_api_field_service.discovery.v4alpha.DiscoveryResponse.version_info>` in the
@@ -173,6 +202,7 @@ message ClustersConfigDump {
   }
 
   // Describes a dynamically loaded cluster via the CDS API.
+  // [#next-free-field: 6]
   message DynamicCluster {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v3.ClustersConfigDump.DynamicCluster";
@@ -195,6 +225,10 @@ message ClustersConfigDump {
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
     UpdateFailureState error_state = 4;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 5;
   }
 
   // This is the :ref:`version_info <envoy_api_field_service.discovery.v4alpha.DiscoveryResponse.version_info>` in the
@@ -235,6 +269,7 @@ message RoutesConfigDump {
     google.protobuf.Timestamp last_updated = 2;
   }
 
+  // [#next-free-field: 6]
   message DynamicRouteConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v3.RoutesConfigDump.DynamicRouteConfig";
@@ -256,6 +291,10 @@ message RoutesConfigDump {
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
     UpdateFailureState error_state = 4;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 5;
   }
 
   // The statically loaded route configs.
@@ -287,7 +326,7 @@ message ScopedRoutesConfigDump {
     google.protobuf.Timestamp last_updated = 3;
   }
 
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message DynamicScopedRouteConfigs {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v3.ScopedRoutesConfigDump.DynamicScopedRouteConfigs";
@@ -312,6 +351,10 @@ message ScopedRoutesConfigDump {
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
     UpdateFailureState error_state = 5;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 6;
   }
 
   // The statically loaded scoped route configs.
@@ -326,7 +369,7 @@ message SecretsConfigDump {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.SecretsConfigDump";
 
   // DynamicSecret contains secret information fetched via SDS.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message DynamicSecret {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v3.SecretsConfigDump.DynamicSecret";
@@ -351,6 +394,10 @@ message SecretsConfigDump {
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
     UpdateFailureState error_state = 5;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 6;
   }
 
   // StaticSecret specifies statically loaded secret in bootstrap.
@@ -399,6 +446,7 @@ message EndpointsConfigDump {
     google.protobuf.Timestamp last_updated = 2;
   }
 
+  // [#next-free-field: 6]
   message DynamicEndpointConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v3.EndpointsConfigDump.DynamicEndpointConfig";
@@ -420,6 +468,10 @@ message EndpointsConfigDump {
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
     UpdateFailureState error_state = 4;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 5;
   }
 
   // The statically loaded endpoint configs.

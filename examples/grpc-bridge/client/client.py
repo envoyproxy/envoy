@@ -21,65 +21,65 @@ grpc-client usage [{host}]:
 
 class KVClient():
 
-  def get(self, key):
-    r = kv.GetRequest(key=key)
+    def get(self, key):
+        r = kv.GetRequest(key=key)
 
-    # Build the gRPC frame
-    data = r.SerializeToString()
-    data = pack('!cI', b'\0', len(data)) + data
+        # Build the gRPC frame
+        data = r.SerializeToString()
+        data = pack('!cI', b'\0', len(data)) + data
 
-    resp = requests.post(HOST + "/kv.KV/Get", data=data, headers=HEADERS)
+        resp = requests.post(HOST + "/kv.KV/Get", data=data, headers=HEADERS)
 
-    return kv.GetResponse().FromString(resp.content[5:])
+        return kv.GetResponse().FromString(resp.content[5:])
 
-  def set(self, key, value):
-    r = kv.SetRequest(key=key, value=value)
-    data = r.SerializeToString()
-    data = pack('!cI', b'\0', len(data)) + data
+    def set(self, key, value):
+        r = kv.SetRequest(key=key, value=value)
+        data = r.SerializeToString()
+        data = pack('!cI', b'\0', len(data)) + data
 
-    return requests.post(HOST + "/kv.KV/Set", data=data, headers=HEADERS)
+        return requests.post(HOST + "/kv.KV/Set", data=data, headers=HEADERS)
 
 
 def run():
-  if len(sys.argv) == 1:
-    print(USAGE)
+    if len(sys.argv) == 1:
+        print(USAGE)
 
-    sys.exit(0)
+        sys.exit(0)
 
-  cmd = sys.argv[1]
+    cmd = sys.argv[1]
 
-  client = KVClient()
+    client = KVClient()
 
-  if cmd == "get":
-    # ensure a key was provided
-    if len(sys.argv) != 3:
-      print(USAGE)
-      sys.exit(1)
+    if cmd == "get":
+        # ensure a key was provided
+        if len(sys.argv) != 3:
+            print(USAGE)
+            sys.exit(1)
 
-    # get the key to fetch
-    key = sys.argv[2]
+        # get the key to fetch
+        key = sys.argv[2]
 
-    # send the request to the server
-    response = client.get(key)
+        # send the request to the server
+        response = client.get(key)
 
-    print(response.value)
-    sys.exit(0)
+        print(response.value)
+        sys.exit(0)
 
-  elif cmd == "set":
-    # ensure a key and value were provided
-    if len(sys.argv) < 4:
-      print(USAGE)
-      sys.exit(1)
+    elif cmd == "set":
+        # ensure a key and value were provided
+        if len(sys.argv) < 4:
+            print(USAGE)
+            sys.exit(1)
 
-    # get the key and the full text of value
-    key = sys.argv[2]
-    value = " ".join(sys.argv[3:])
+        # get the key and the full text of value
+        key = sys.argv[2]
+        value = " ".join(sys.argv[3:])
 
-    # send the request to the server
-    response = client.set(key, value)
+        # send the request to the server
+        response = client.set(key, value)
 
-    print("setf %s to %s" % (key, value))
+        print("setf %s to %s" % (key, value))
 
 
 if __name__ == '__main__':
-  run()
+    run()

@@ -13,6 +13,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -131,34 +132,30 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   Buffer::InstancePtr body(new Buffer::OwnedImpl());
   const uint32_t size = message.ByteSize();
   const uint32_t alloc_size = size + 5;
-  Buffer::RawSlice iovec;
-  body->reserve(alloc_size, &iovec, 1);
-  ASSERT(iovec.len_ >= alloc_size);
-  iovec.len_ = alloc_size;
-  uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
+  auto reservation = body->reserveSingleSlice(alloc_size);
+  ASSERT(reservation.slice().len_ >= alloc_size);
+  uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   *current++ = 0; // flags
   const uint32_t nsize = htonl(size);
-  std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  safeMemcpyUnsafeDst(current, &nsize);
   current += sizeof(uint32_t);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
   message.SerializeWithCachedSizes(&codec_stream);
-  body->commit(&iovec, 1);
+  reservation.commit(alloc_size);
   return body;
 }
 
 Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   auto body = std::make_unique<Buffer::OwnedImpl>();
   const uint32_t size = message.ByteSize();
-  Buffer::RawSlice iovec;
-  body->reserve(size, &iovec, 1);
-  ASSERT(iovec.len_ >= size);
-  iovec.len_ = size;
-  uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
+  auto reservation = body->reserveSingleSlice(size);
+  ASSERT(reservation.slice().len_ >= size);
+  uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
   message.SerializeWithCachedSizes(&codec_stream);
-  body->commit(&iovec, 1);
+  reservation.commit(size);
   return body;
 }
 
@@ -292,7 +289,7 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
   header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
-  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  safeMemcpyUnsafeDst(&header[1], &nsize);
   buffer.prepend(absl::string_view(&header[0], 5));
 }
 
