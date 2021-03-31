@@ -101,6 +101,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbMaglevConfig()).WillByDefault(ReturnRef(lb_maglev_config_));
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
+  ON_CALL(*this, loadBalancingPolicy()).WillByDefault(ReturnRef(load_balancing_policy_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));

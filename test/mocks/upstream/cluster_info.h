@@ -103,6 +103,7 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
+  MOCK_METHOD(const envoy::config::cluster::v3::LoadBalancingPolicy&, loadBalancingPolicy, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
@@ -114,8 +115,6 @@ public:
               lbMaglevConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
-  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LbShuffleShardConfig>&,
-              lbShuffleShardConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
               lbOriginalDstConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&, upstreamConfig,
@@ -190,6 +189,7 @@ public:
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
+  envoy::config::cluster::v3::LoadBalancingPolicy load_balancing_policy;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
