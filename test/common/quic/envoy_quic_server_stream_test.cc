@@ -595,7 +595,7 @@ TEST_P(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
 // watermark buffer accounting.
 TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false).ok());
   std::string response(16 * 1024 + 1, 'a');
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .Times(testing::AtLeast(1u))
@@ -647,7 +647,7 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
             return quic::QuicConsumedData{0, false};
           }));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+  EXPECT_TRUE(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true).ok());
 }
 
 } // namespace Quic

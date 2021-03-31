@@ -1175,7 +1175,7 @@ TEST_P(EnvoyQuicServerSessionTest, OnCanWriteUpdateWatermarkGquic) {
                               request_headers);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  stream1->encodeHeaders(response_headers, false);
+  EXPECT_TRUE(stream1->encodeHeaders(response_headers, false).ok());
   // Make connection congestion control blocked.
   EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(false));
   // Buffer a response slightly smaller than connection level watermark, but
