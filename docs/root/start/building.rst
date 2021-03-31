@@ -6,8 +6,8 @@ Building
 
 The Envoy build system uses `Bazel <https://bazel.build/>`_.
 
-In order to ease initial building and for a quick start, we provide an Ubuntu 16 and a Windows based docker container
-that has everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
+In order to ease initial building and for a quick start, we provide an Ubuntu 16 and a Windows based docker containers
+that have everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
 
 In order to build without using the Docker container, follow the instructions at :repo:`bazel/README.md`.
 
