@@ -11,6 +11,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -230,7 +231,8 @@ message FilterChain {
   // This field is deprecated. Add a
   // :ref:`PROXY protocol listener filter <config_listener_filters_proxy_protocol>`
   // explicitly instead.
-  google.protobuf.BoolValue use_proxy_proto = 4 [deprecated = true];
+  google.protobuf.BoolValue use_proxy_proto = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:] filter chain metadata.
   core.v3.Metadata metadata = 5;

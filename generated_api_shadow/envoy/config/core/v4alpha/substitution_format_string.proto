@@ -7,6 +7,7 @@ import "envoy/config/core/v4alpha/extension.proto";
 
 import "google/protobuf/struct.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -45,7 +46,8 @@ message SubstitutionFormatString {
     //   upstream connect error:503:path=/foo
     //
     // Deprecated in favor of :ref:`text_format_source <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format_source>`. To migrate text format strings, use the :ref:`inline_string <envoy_v3_api_field_config.core.v3.DataSource.inline_string>` field.
-    string hidden_envoy_deprecated_text_format = 1 [deprecated = true];
+    string hidden_envoy_deprecated_text_format = 1
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Specify a format with command operators to form a JSON string.
     // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.

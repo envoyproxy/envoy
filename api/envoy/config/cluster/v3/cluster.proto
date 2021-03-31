@@ -21,6 +21,7 @@ import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -758,7 +759,8 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46 [deprecated = true];
+  core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
@@ -770,7 +772,8 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.HttpProtocolOptions common_http_protocol_options = 29 [deprecated = true];
+  core.v3.HttpProtocolOptions common_http_protocol_options = 29
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP1 requests.
   // This has been deprecated in favor of http_protocol_options fields in the in the
@@ -780,7 +783,8 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.Http1ProtocolOptions http_protocol_options = 13 [deprecated = true];
+  core.v3.Http1ProtocolOptions http_protocol_options = 13
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Even if default HTTP2 protocol options are desired, this field must be
   // set so that Envoy will assume that the upstream supports HTTP/2 when
@@ -795,8 +799,11 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.Http2ProtocolOptions http2_protocol_options = 14
-      [deprecated = true, (udpa.annotations.security).configure_for_untrusted_upstream = true];
+  core.v3.Http2ProtocolOptions http2_protocol_options = 14 [
+    deprecated = true,
+    (udpa.annotations.security).configure_for_untrusted_upstream = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
@@ -932,7 +939,8 @@ message Cluster {
   // <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
-  ClusterProtocolSelection protocol_selection = 26 [deprecated = true];
+  ClusterProtocolSelection protocol_selection = 26
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional options for upstream connections.
   UpstreamConnectionOptions upstream_connection_options = 30;
@@ -993,7 +1001,8 @@ message Cluster {
   //
   //   This field has been deprecated in favor of `timeout_budgets`, part of
   //   :ref:`track_cluster_stats <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
-  bool track_timeout_budgets = 47 [deprecated = true];
+  bool track_timeout_budgets = 47
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //

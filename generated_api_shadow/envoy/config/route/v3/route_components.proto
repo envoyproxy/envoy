@@ -187,7 +187,7 @@ message VirtualHost {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 
   map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 12
-      [deprecated = true];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // A filter-defined action type.
@@ -296,7 +296,7 @@ message Route {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
 
   map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 8
-      [deprecated = true];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
@@ -375,7 +375,7 @@ message WeightedCluster {
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
 
     map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 8
-        [deprecated = true];
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // Specifies one or more upstream clusters associated with the route.
@@ -463,6 +463,7 @@ message RouteMatch {
     string hidden_envoy_deprecated_regex = 3 [
       deprecated = true,
       (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
       (envoy.annotations.disallowed_by_default) = true
     ];
   }
@@ -548,8 +549,11 @@ message CorsPolicy {
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.v3.RuntimeFractionalPercent filter_enabled = 9;
 
-    google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7
-        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+    google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7 [
+      deprecated = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
@@ -563,11 +567,17 @@ message CorsPolicy {
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 
-  repeated string hidden_envoy_deprecated_allow_origin = 1
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  repeated string hidden_envoy_deprecated_allow_origin = 1 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 
-  repeated string hidden_envoy_deprecated_allow_origin_regex = 8
-      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
+  repeated string hidden_envoy_deprecated_allow_origin_regex = 8 [
+    deprecated = true,
+    (validate.rules).repeated = {items {string {max_bytes: 1024}}},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 }
 
 // [#next-free-field: 37]
@@ -623,8 +633,11 @@ message RouteAction {
     // Determines if the trace span should be sampled. Defaults to true.
     google.protobuf.BoolValue trace_sampled = 4;
 
-    string hidden_envoy_deprecated_runtime_key = 2
-        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+    string hidden_envoy_deprecated_runtime_key = 2 [
+      deprecated = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
@@ -1032,7 +1045,8 @@ message RouteAction {
   // request.
   //
   // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
-  google.protobuf.BoolValue include_vh_rate_limits = 14 [deprecated = true];
+  google.protobuf.BoolValue include_vh_rate_limits = 14
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to
@@ -1071,7 +1085,8 @@ message RouteAction {
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   //    :ref:`retry overview <arch_overview_http_routing_retry>`.
-  google.protobuf.Duration max_grpc_timeout = 23 [deprecated = true];
+  google.protobuf.Duration max_grpc_timeout = 23
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Deprecated by :ref:`grpc_timeout_header_offset <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`.
   // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
@@ -1081,7 +1096,8 @@ message RouteAction {
   // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
   // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
   // infinity).
-  google.protobuf.Duration grpc_timeout_offset = 28 [deprecated = true];
+  google.protobuf.Duration grpc_timeout_offset = 28
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   repeated UpgradeConfig upgrade_configs = 25;
 
@@ -1091,7 +1107,8 @@ message RouteAction {
   // <envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`.
   InternalRedirectPolicy internal_redirect_policy = 34;
 
-  InternalRedirectAction internal_redirect_action = 26 [deprecated = true];
+  InternalRedirectAction internal_redirect_action = 26
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // An internal redirect is handled, iff the number of previous internal redirects that a
   // downstream request has encountered is lower than this value, and
@@ -1107,7 +1124,8 @@ message RouteAction {
   // will pass the redirect back to downstream.
   //
   // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value max_internal_redirects = 31 [deprecated = true];
+  google.protobuf.UInt32Value max_internal_redirects = 31
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
@@ -1117,7 +1135,8 @@ message RouteAction {
   // Specifies the maximum stream duration for this route.
   MaxStreamDuration max_stream_duration = 36;
 
-  RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10 [deprecated = true];
+  RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
@@ -1140,7 +1159,8 @@ message RetryPolicy {
     oneof config_type {
       google.protobuf.Any typed_config = 3;
 
-      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+      google.protobuf.Struct hidden_envoy_deprecated_config = 2
+          [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
     }
   }
 
@@ -1154,7 +1174,8 @@ message RetryPolicy {
     oneof config_type {
       google.protobuf.Any typed_config = 3;
 
-      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+      google.protobuf.Struct hidden_envoy_deprecated_config = 2
+          [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
     }
   }
 
@@ -1559,11 +1580,15 @@ message VirtualCluster {
   string hidden_envoy_deprecated_pattern = 1 [
     deprecated = true,
     (validate.rules).string = {max_bytes: 1024},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
     (envoy.annotations.disallowed_by_default) = true
   ];
 
-  core.v3.RequestMethod hidden_envoy_deprecated_method = 3
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  core.v3.RequestMethod hidden_envoy_deprecated_method = 3 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
@@ -1764,8 +1789,11 @@ message RateLimit {
       //
       // .. attention::
       //   This field has been deprecated in favor of the :ref:`metadata <envoy_api_field_config.route.v3.RateLimit.Action.metadata>` field
-      DynamicMetaData dynamic_metadata = 7
-          [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+      DynamicMetaData dynamic_metadata = 7 [
+        deprecated = true,
+        (envoy.annotations.deprecated_at_minor_version) = "3.0",
+        (envoy.annotations.disallowed_by_default) = true
+      ];
 
       // Rate limit on metadata.
       MetaData metadata = 8;
@@ -1910,6 +1938,7 @@ message HeaderMatcher {
     string hidden_envoy_deprecated_regex_match = 5 [
       deprecated = true,
       (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
       (envoy.annotations.disallowed_by_default) = true
     ];
   }
@@ -1942,11 +1971,17 @@ message QueryParameterMatcher {
     bool present_match = 6;
   }
 
-  string hidden_envoy_deprecated_value = 3
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  string hidden_envoy_deprecated_value = 3 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 
-  google.protobuf.BoolValue hidden_envoy_deprecated_regex = 4
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  google.protobuf.BoolValue hidden_envoy_deprecated_regex = 4 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.

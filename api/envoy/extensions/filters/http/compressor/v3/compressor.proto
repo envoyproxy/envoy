@@ -7,6 +7,7 @@ import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -66,18 +67,21 @@ message Compressor {
   }
 
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
-  google.protobuf.UInt32Value content_length = 1 [deprecated = true];
+  google.protobuf.UInt32Value content_length = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Set of strings that allows specifying which mime-types yield compression; e.g.,
   // application/json, text/html, etc. When this field is not defined, compression will be applied
   // to the following mime-types: "application/javascript", "application/json",
   // "application/xhtml+xml", "image/svg+xml", "text/css", "text/html", "text/plain", "text/xml"
   // and their synonyms.
-  repeated string content_type = 2 [deprecated = true];
+  repeated string content_type = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // If true, disables compression when the response contains an etag header. When it is false, the
   // filter will preserve weak etags and remove the ones that require strong validation.
-  bool disable_on_etag_header = 3 [deprecated = true];
+  bool disable_on_etag_header = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // If true, removes accept-encoding from the request headers before dispatching it to the upstream
   // so that responses do not get compressed before reaching the filter.
@@ -86,11 +90,13 @@ message Compressor {
   //
   //    To avoid interfering with other compression filters in the same chain use this option in
   //    the filter closest to the upstream.
-  bool remove_accept_encoding_header = 4 [deprecated = true];
+  bool remove_accept_encoding_header = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Runtime flag that controls whether the filter is enabled or not. If set to false, the
   // filter will operate as a pass-through filter. If not specified, defaults to enabled.
-  config.core.v3.RuntimeFeatureFlag runtime_enabled = 5 [deprecated = true];
+  config.core.v3.RuntimeFeatureFlag runtime_enabled = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // A compressor library to use for compression. Currently only
   // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`

@@ -2,12 +2,10 @@
 """Parses a file containing the API version (X.Y.Z format), and outputs (to
 stdout) a C++ header file with the ApiVersion value.
 """
-from collections import namedtuple
-import pathlib
 import string
 import sys
 
-ApiVersion = namedtuple('ApiVersion', ['major', 'minor', 'patch'])
+import utils
 
 FILE_TEMPLATE = string.Template(
     """#pragma once
@@ -31,12 +29,8 @@ def generate_header_file(input_path):
     Returns:
         the header file contents.
     """
-    lines = pathlib.Path(input_path).read_text().splitlines()
-    assert (len(lines) == 1)
-
-    # Mapping each field to int verifies it is a valid version
-    version = ApiVersion(*map(int, lines[0].split('.')))
-    oldest_version = compute_oldest_api_version(version)
+    version = utils.get_api_version(input_path)
+    oldest_version = utils.compute_oldest_api_version(version)
 
     header_file_contents = FILE_TEMPLATE.substitute({
         'major': version.major,
@@ -47,24 +41,6 @@ def generate_header_file(input_path):
         'oldest_patch': oldest_version.patch
     })
     return header_file_contents
-
-
-def compute_oldest_api_version(current_version: ApiVersion):
-    """Computest the oldest API version the client supports. According to the
-    specification (see: api/API_VERSIONING.md), Envoy supports up to 2 most
-    recent minor versions. Therefore if the latest API version "X.Y.Z", Envoy's
-    oldest API version is "X.Y-1.0". Note that the major number is always the
-    same as the latest version, and the patch number is always 0. In addition,
-    the minor number is at least 0, and the oldest api version cannot be set
-    to a previous major number.
-
-    Args:
-        current_version: the current API version.
-
-    Returns:
-        the oldest supported API version.
-    """
-    return ApiVersion(current_version.major, max(current_version.minor - 1, 0), 0)
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.frozen.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -15,5 +16,6 @@ message Frozen {
 
   int32 foo = 1;
 
-  int32 hidden_envoy_deprecated_bar = 2 [deprecated = true];
+  int32 hidden_envoy_deprecated_bar = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
 }

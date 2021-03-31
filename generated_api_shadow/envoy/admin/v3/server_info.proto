@@ -192,9 +192,15 @@ message CommandLineOptions {
   // See :option:`--enable-core-dump` for details.
   bool enable_core_dump = 37;
 
-  uint64 hidden_envoy_deprecated_max_stats = 20
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  uint64 hidden_envoy_deprecated_max_stats = 20 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 
-  uint64 hidden_envoy_deprecated_max_obj_name_len = 21
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  uint64 hidden_envoy_deprecated_max_obj_name_len = 21 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }

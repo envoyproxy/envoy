@@ -13,6 +13,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -47,7 +48,8 @@ message Filter {
     // [#not-implemented-hide:]
     core.v3.ExtensionConfigSource config_discovery = 5;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 }
 
@@ -228,7 +230,8 @@ message FilterChain {
   // This field is deprecated. Add a
   // :ref:`PROXY protocol listener filter <config_listener_filters_proxy_protocol>`
   // explicitly instead.
-  google.protobuf.BoolValue use_proxy_proto = 4 [deprecated = true];
+  google.protobuf.BoolValue use_proxy_proto = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:] filter chain metadata.
   core.v3.Metadata metadata = 5;
@@ -257,7 +260,8 @@ message FilterChain {
   OnDemandConfiguration on_demand_configuration = 8;
 
   envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-      hidden_envoy_deprecated_tls_context = 2 [deprecated = true];
+      hidden_envoy_deprecated_tls_context = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Listener filter chain match configuration. This is a recursive structure which allows complex
@@ -338,7 +342,8 @@ message ListenerFilter {
     // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
     google.protobuf.Any typed_config = 3;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // Optional match predicate used to disable the filter. The filter is enabled when this field is empty.

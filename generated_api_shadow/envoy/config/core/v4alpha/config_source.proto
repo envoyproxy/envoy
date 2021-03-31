@@ -27,10 +27,12 @@ enum ApiVersion {
   // When not specified, we assume v2, to ease migration to Envoy's stable API
   // versioning. If a client does not support v2 (e.g. due to deprecation), this
   // is an invalid value.
-  hidden_envoy_deprecated_AUTO = 0 [deprecated = true];
+  hidden_envoy_deprecated_AUTO = 0
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
 
   // Use xDS v2 API.
-  hidden_envoy_deprecated_V2 = 1 [deprecated = true];
+  hidden_envoy_deprecated_V2 = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
 
   // Use xDS v3 API.
   V3 = 2;
@@ -47,8 +49,11 @@ message ApiConfigSource {
   enum ApiType {
     // Ideally this would be 'reserved 0' but one can't reserve the default
     // value. Instead we throw an exception if this is ever used.
-    hidden_envoy_deprecated_DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0
-        [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
+    hidden_envoy_deprecated_DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [
+      deprecated = true,
+      (envoy.annotations.disallowed_by_default_enum) = true,
+      (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"
+    ];
 
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for

@@ -9,6 +9,7 @@ import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -32,7 +33,8 @@ message TapConfig {
   // Exactly one of :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` and
   // :ref:`match_config <envoy_api_field_config.tap.v3.TapConfig.match_config>` must be set. If both
   // are set, the :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` will be used.
-  MatchPredicate match_config = 1 [deprecated = true];
+  MatchPredicate match_config = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The match configuration. If the configuration matches the data source being tapped, a tap will
   // occur, with the result written to the configured output.

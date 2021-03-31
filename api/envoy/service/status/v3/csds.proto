@@ -8,6 +8,7 @@ import "envoy/type/matcher/v3/node.proto";
 
 import "google/api/annotations.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -102,7 +103,8 @@ message PerXdsConfig {
   //   This field is deprecated. Use :ref:`ClientResourceStatus
   //   <envoy_v3_api_enum_admin.v3.ClientResourceStatus>` for per-resource
   //   config status instead.
-  ClientConfigStatus client_status = 7 [deprecated = true];
+  ClientConfigStatus client_status = 7
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   oneof per_xds_config {
     admin.v3.ListenersConfigDump listener_config = 2;
