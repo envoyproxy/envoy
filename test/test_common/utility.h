@@ -46,6 +46,12 @@ using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
 
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#define TSAN_TIMEOUT_FACTOR 3
+#else
+#define TSAN_TIMEOUT_FACTOR 1
+#endif
+
 /*
   Macro to use for validating that a statement throws the specified type of exception, and that
   the exception's what() method returns a string which is matched by the specified matcher.
@@ -1013,6 +1019,10 @@ public:
     header_map_->verifyByteSizeInternalForTest();
     return rc;
   }
+  StatefulHeaderKeyFormatterOptConstRef formatter() const override {
+    return StatefulHeaderKeyFormatterOptConstRef(header_map_->formatter());
+  }
+  StatefulHeaderKeyFormatterOptRef formatter() override { return header_map_->formatter(); }
 
   std::unique_ptr<Impl> header_map_{Impl::create()};
 };

@@ -12,6 +12,9 @@ envoy_cc_library(
     name = "header_formatter_lib",
     srcs = ["header_formatter.cc"],
     hdrs = ["header_formatter.h"],
+    deps = [
+        "//include/envoy/http:header_formatter_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -78,6 +81,19 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "settings_lib",
+    srcs = ["settings.cc"],
+    hdrs = ["settings.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//source/common/config:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
