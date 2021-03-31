@@ -25,8 +25,9 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
               stats_scope, getConfig(transport_socket_factory), time_source))) {}
 
 namespace {
-// TODO(mattklein123): This is mutable static info that is required for the QUICHE code. This was
-// preexisting but should be removed as we shouldn't be using global mutable static data.
+// TODO(alyssawilk, danzh2010): This is mutable static info that is required for the QUICHE code.
+// This was preexisting but should either be removed or potentially moved inside
+// PersistentQuicInfoImpl.
 struct StaticInfo {
   quic::QuicConfig quic_config_;
   quic::QuicClientPushPromiseIndex push_promise_index_;
