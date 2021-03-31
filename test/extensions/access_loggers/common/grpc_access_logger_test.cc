@@ -52,7 +52,7 @@ class MockGrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
                                       ProtobufWkt::Struct> {
 public:
-  MockGrpcAccessLoggerImpl(Grpc::RawAsyncClientSharedPtr client,
+  MockGrpcAccessLoggerImpl(Grpc::RawAsyncClientSharedPtr const& client,
                            std::chrono::milliseconds buffer_flush_interval_msec,
                            uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                            Stats::Scope& scope, std::string access_log_prefix,
@@ -327,7 +327,7 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Grpc::RawAsyncClientSharedPtr client,
+               Grpc::RawAsyncClientSharedPtr const& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(

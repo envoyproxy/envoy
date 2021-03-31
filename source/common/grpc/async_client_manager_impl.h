@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -74,17 +72,17 @@ private:
   class ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
   public:
     void setCache(const envoy::config::core::v3::GrpcService& config,
-                  RawAsyncClientSharedPtr client) {
+                  const RawAsyncClientSharedPtr& client) {
       const std::uint64_t key = MessageUtil::hash(config.google_grpc());
       cache_[key] = client;
     }
-    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) {
+    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) const {
       const std::uint64_t key = MessageUtil::hash(config.google_grpc());
       auto it = cache_.find(key);
       if (it == cache_.end()) {
         return nullptr;
       }
-      return cache_[key];
+      return it->second;
     }
 
   private:
