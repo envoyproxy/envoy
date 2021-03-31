@@ -110,6 +110,7 @@ Removed Config or Runtime
 * access_logs: removed legacy unbounded access logs and runtime guard `envoy.reloadable_features.disallow_unbounded_access_logs`.
 * dns: removed legacy buggy wildcard matching path and runtime guard `envoy.reloadable_features.fix_wildcard_matching`.
 * dynamic_forward_proxy: removed `envoy.reloadable_features.enable_dns_cache_circuit_breakers` and legacy code path.
+* http: removed legacy connect behavior and runtime guard `envoy.reloadable_features.stop_faking_paths`.
 * http: removed legacy connection close behavior and runtime guard `envoy.reloadable_features.fixed_connection_close`.
 * http: removed legacy HTTP/1.1 error reporting path and runtime guard `envoy.reloadable_features.early_errors_via_hcm`.
 * http: removed legacy sanitization path for upgrade response headers and runtime guard `envoy.reloadable_features.fix_upgrade_response`.

@@ -862,10 +862,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
-  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
-    request_headers_->setPath("/");
-  }
 
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
