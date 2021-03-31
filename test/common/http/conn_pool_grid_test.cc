@@ -131,7 +131,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
 }
 
 // Test both connections happening in parallel and the second connecting.
-TEST_F(ConnectivityGridTest, FailureThenSuccessParallelSecondConnects) {
+TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
@@ -158,7 +158,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessParallelSecondConnects) {
 }
 
 // Test both connections happening in parallel and the first connecting.
-TEST_F(ConnectivityGridTest, FailureThenSuccessParallelFirstConnects) {
+TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
@@ -211,7 +211,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
 }
 
 // Test both connections happening in parallel and both failing.
-TEST_F(ConnectivityGridTest, DoubleFailureParallel) {
+TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.

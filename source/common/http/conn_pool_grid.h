@@ -32,9 +32,10 @@ public:
                      ConnectionPool::Callbacks& callbacks);
 
     // This holds state for a single connection attempt to a specific pool.
-    struct ConnectionAttemptState : public ConnectionPool::Callbacks,
-                                    public LinkedObject<ConnectionAttemptState> {
-      ConnectionAttemptState(WrapperCallbacks& parent, PoolIterator it);
+    class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
+                                       public LinkedObject<ConnectionAttemptCallbacks> {
+    public:
+      ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
 
       // ConnectionPool::Callbacks
       void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -54,7 +55,7 @@ public:
       // This is owned by the pool which created it.
       Cancellable* cancellable_;
     };
-    using ConnectionAttemptStatePtr = std::unique_ptr<ConnectionAttemptState>;
+    using ConnectionAttemptCallbacksPtr = std::unique_ptr<ConnectionAttemptCallbacks>;
 
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
@@ -67,8 +68,9 @@ public:
     // attempted, false if all pools have been tried.
     bool tryAnotherConnection();
 
+  private:
     // Tracks all the connection attempts which currently in flight.
-    std::list<ConnectionAttemptStatePtr> connection_attempts_;
+    std::list<ConnectionAttemptCallbacksPtr> connection_attempts_;
 
     // The owning grid.
     ConnectivityGrid& grid_;
@@ -78,7 +80,7 @@ public:
     // onPoolReady unless there is call to cancel().
     ConnectionPool::Callbacks& inner_callbacks_;
     // The timer which tracks when new connections should be attempted.
-    Event::TimerPtr failover_timer_;
+    Event::TimerPtr next_attempt_timer_;
     // The iterator to the last pool which had a connection attempt.
     PoolIterator current_;
   };
