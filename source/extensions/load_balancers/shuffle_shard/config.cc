@@ -21,11 +21,11 @@ namespace ShuffleShard {
 std::string LoadBalancerFactory::name() const { return "envoy.load_balancers.shuffle_shard"; }
 
 
-Upstream::LoadBalancerPtr LoadBalancerFactory::createLoadBalancerWithConfig(Upstream::LoadBalancerType lb_type, const Upstream::PrioritySet& priority_set,
+Upstream::LoadBalancerPtr LoadBalancerFactory::createLoadBalancerWithConfig(Upstream::LoadBalancerType, const Upstream::PrioritySet& priority_set,
      const Upstream::PrioritySet* local_priority_set, Upstream::ClusterStats& stats,
      Runtime::Loader& runtime, Random::RandomGenerator& random, const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
      const envoy::extensions::load_balancers::shuffle_shard::v3::ShuffleShardConfig& config) {
-       return std::make_unique<ShuffleShardLoadBalancer>(lb_type, priority_set, local_priority_set, stats, runtime, random, common_config, config);
+       return std::make_unique<ShuffleShardLoadBalancer>(priority_set, local_priority_set, stats, runtime, random, common_config, config);
 }
 
 

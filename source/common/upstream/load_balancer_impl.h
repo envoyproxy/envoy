@@ -36,7 +36,6 @@ template <class ConfigProto> class ConfigurableTypedLoadBalancerFactory : public
       const PrioritySet& priority_set, const PrioritySet* local_priority_set,
       ClusterStats& cluster_stats, Runtime::Loader& loader, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) override {
-    std::cout << "ConfigurableTypedLoadBalancerFactory::create::start" << std::endl;
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
 
     Envoy::Config::Utility::translateOpaqueConfig(

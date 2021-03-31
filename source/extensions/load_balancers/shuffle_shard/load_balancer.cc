@@ -8,31 +8,27 @@ namespace LoadBalancer {
 namespace ShuffleShard {
 
 ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
-    Upstream::LoadBalancerType , const Upstream::PrioritySet& priority_set,
+    const Upstream::PrioritySet& priority_set,
     const Upstream::PrioritySet* local_priority_set, Upstream::ClusterStats& stats, Runtime::Loader& runtime,
     Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     const envoy::extensions::load_balancers::shuffle_shard::v3::ShuffleShardConfig& config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
-      // lb_type_(lb_type),
       endpoints_per_cell_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, endpoints_per_cell, 2)),
       use_zone_as_dimension_(config.use_zone_as_dimension()),
       use_dimensions_(config.dimensions().size()),
       least_request_choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, least_request_choice_count, 1)),
-      shuffle_sharder_(ShuffleSharder<Upstream::HostConstSharedPtr>(12345)) {
-
-  // ENVOY_LOG(debug, "endpoints_per_cell: {}", endpoints_per_cell_);
-  // ENVOY_LOG(debug, "use_zone_as_dimension: {}", use_zone_as_dimension_);
+      shuffle_sharder_(ShuffleSharder<Upstream::HostConstSharedPtr>(SEED)) {
 
   for (auto dimension : config.dimensions())
     dimensions_.push_back(dimension);
   if (use_zone_as_dimension_)
     dimensions_.push_back("_envoy_zone");
-  if (!dimensions_.size())
+  if (dimensions_.empty())
     dimensions_.push_back("_envoy_unit_coord");
 
-  lattice_ = new Lattice<Upstream::HostConstSharedPtr>(dimensions_);
+  lattice_ = std::make_shared<HostLattice>(dimensions_);
 
   priority_update_cb_ =
       priority_set_.addPriorityUpdateCb([this](uint32_t /*priority*/, const Upstream::HostVector& hosts_added,
@@ -44,7 +40,6 @@ ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
 
 
 Upstream::HostConstSharedPtr ShuffleShardLoadBalancer::chooseHostOnce(Upstream::LoadBalancerContext* context) {
-  std::cout << "ShuffleShardLoadBalancer::chooseHostOnce" << std::endl;
   absl::optional<uint64_t> hash;
   if (context) {
     hash = context->computeHashKey();
@@ -60,7 +55,7 @@ Upstream::HostConstSharedPtr ShuffleShardLoadBalancer::chooseHostOnce(Upstream::
 
   // Least Request
   Upstream::HostConstSharedPtr candidate_host = nullptr;
-  for (uint32_t choice_idx = 0; choice_idx < 2; ++choice_idx) {
+  for (uint32_t choice_idx = 0; choice_idx < least_request_choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % endpoints.size();
     Upstream::HostConstSharedPtr sampled_host = endpoints[rand_idx];
 
@@ -112,23 +107,22 @@ ShuffleShardLoadBalancer::get_coord(const Upstream::HostConstSharedPtr& host) {
 
   if (use_dimensions_) {
     if (!host->metadata()) {
-      // ENVOY_LOG(warn, "ignoring host {} because it has no metadata", host->hostname());
-      return {};
+      ENVOY_LOG_MISC(warn, fmt::format("ignoring host {} because it has no metadata", host->hostname()));
+      return absl::nullopt;
     }
     const envoy::config::core::v3::Metadata& metadata = *host->metadata();
     const auto& filter_it =
         metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it == metadata.filter_metadata().end()) {
-      // ENVOY_LOG(warn, "ignoring host {} because it has no envoy.lb metadata", host->hostname());
-      return {};
+      ENVOY_LOG_MISC(warn, fmt::format("ignoring host {} because it has no envoy.lb metadata", host->hostname()));
+      return absl::nullopt;
     }
     const auto& fields = filter_it->second.fields();
     for (const auto& key : dimensions_) {
       const auto it = fields.find(key);
       if (it == fields.end()) {
-        // ENVOY_LOG(warn, "ignoring host {} because it has no envoy.lb tag {}", host->hostname(),
-        // key);
-        return {};
+        ENVOY_LOG_MISC(warn, "ignoring host {} because it has no envoy.lb tag {}", host->hostname(), key);
+        return absl::nullopt;
       }
       std::ostringstream buf;
       buf << MessageUtil::getJsonStringFromMessageOrDie(it->second);

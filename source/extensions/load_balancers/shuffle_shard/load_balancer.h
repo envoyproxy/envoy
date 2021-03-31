@@ -12,9 +12,12 @@ namespace Extensions {
 namespace LoadBalancer {
 namespace ShuffleShard {
 
+using HostLattice = Lattice<Upstream::HostConstSharedPtr>;
+using LatticeSharedPtr = std::shared_ptr<HostLattice>;
+
 class ShuffleShardLoadBalancer : public Upstream::ZoneAwareLoadBalancerBase {
 public:
-  ShuffleShardLoadBalancer(Upstream::LoadBalancerType lb_type, const Upstream::PrioritySet& priority_set,
+  ShuffleShardLoadBalancer(const Upstream::PrioritySet& priority_set,
                            const Upstream::PrioritySet* local_priority_set, Upstream::ClusterStats& stats,
                            Runtime::Loader& runtime, Random::RandomGenerator& random,
                            const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
@@ -37,9 +40,10 @@ private:
   std::vector<std::string> dimensions_;
   const bool use_dimensions_;
   const uint32_t least_request_choice_count_;
-  Lattice<Upstream::HostConstSharedPtr>* lattice_;
+  LatticeSharedPtr lattice_;
   ShuffleSharder<Upstream::HostConstSharedPtr> shuffle_sharder_;
   ::Envoy::Common::CallbackHandlePtr priority_update_cb_;
+  static const uint64_t SEED = 12345;
 };
 
 } // namespace ShuffleShard

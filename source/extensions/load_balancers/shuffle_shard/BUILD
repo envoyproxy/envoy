@@ -11,13 +11,8 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "shuffle_shard_lb",
-    srcs = [
-        "load_balancer.cc",
-        "load_balancer.h",
-    ],
-    hdrs = [
-      "load_balancer.h",
-    ],
+    srcs = ["load_balancer.cc"],
+    hdrs = ["load_balancer.h"],
     deps = [
       "//source/common/config:well_known_names",
       "//source/common/upstream:load_balancer_lib",
