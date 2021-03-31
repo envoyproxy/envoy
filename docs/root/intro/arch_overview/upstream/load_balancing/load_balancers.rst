@@ -123,6 +123,17 @@ likely a superior drop in replacement for ring hash. The advanced reader can use
 :repo:`this benchmark </test/common/upstream/load_balancer_benchmark.cc>` to compare ring hash
 versus Maglev with different parameters.
 
+.. _arch_overview_load_balancing_types_:
+
+Shuffle Shard
+^^^^^^^^^^^^^
+The Shuffle Shard load balancer implements semi-consistent to upstream hosts. Like Maglev and
+Ring Hash, it is only effective when protocol routing is used that specifies a value to hash on.
+
+Shuffle Shard is an extension load balancer whose :ref:`config
+<envoy_v3_api_msg_extensions.load_balancers.shuffle_shard.v3.ShuffleShardConfig>`
+can be created with the LoadBalancingPolicyConfig cluster setting.
+
 .. _arch_overview_load_balancing_types_random:
 
 Random
@@ -131,4 +142,3 @@ Random
 The random load balancer selects a random available host. The random load balancer generally performs
 better than round robin if no health checking policy is configured. Random selection avoids bias
 towards the host in the set that comes after a failed host.
-

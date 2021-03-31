@@ -134,7 +134,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "cpp-infima-{version}",
         urls = ["https://github.com/cgetzen/cpp-infima/releases/download/{version}/cpp-infima-{version}.tar.gz"],
         use_category = ["other"],
-        release_date = "2021-03-07",
+        release_date = "2021-03-10",
         cpe = "N/A",
     ),
     com_github_circonus_labs_libcircllhist = dict(
