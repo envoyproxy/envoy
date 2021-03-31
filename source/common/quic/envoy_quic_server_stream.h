@@ -67,8 +67,8 @@ public:
   void clearWatermarkBuffer();
 
   // EnvoyQuicStream
-  HeaderValidationResult validateHeader(const std::string& header_name,
-                                        absl::string_view header_value) override;
+  Http::HeaderUtility::HeaderValidationResult
+  validateHeader(const std::string& header_name, absl::string_view header_value) override;
 
 protected:
   // EnvoyQuicStream
@@ -88,8 +88,6 @@ private:
 
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
-
-  HeaderValidationResult checkHeaderNameForUnderscores(const std::string& header_name);
 
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

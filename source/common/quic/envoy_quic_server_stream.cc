@@ -172,8 +172,10 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list, *this);
   if (headers == nullptr) {
-    if (close_connection_upon_invalid_header_) {
+    if (details_.empty()) {
       details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+    }
+    if (close_connection_upon_invalid_header_) {
       stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
     } else {
       Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -334,33 +336,22 @@ QuicFilterManagerConnectionImpl* EnvoyQuicServerStream::filterManagerConnection(
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
 }
 
-HeaderValidationResult EnvoyQuicServerStream::validateHeader(const std::string& header_name,
-                                                             absl::string_view header_value) {
-  HeaderValidationResult result = EnvoyQuicStream::validateHeader(header_name, header_value);
-  if (result != HeaderValidationResult::ACCEPT) {
+Http::HeaderUtility::HeaderValidationResult
+EnvoyQuicServerStream::validateHeader(const std::string& header_name,
+                                      absl::string_view header_value) {
+  Http::HeaderUtility::HeaderValidationResult result =
+      EnvoyQuicStream::validateHeader(header_name, header_value);
+  if (result != Http::HeaderUtility::HeaderValidationResult::ACCEPT) {
     return result;
   }
-  return checkHeaderNameForUnderscores(header_name);
-}
-
-HeaderValidationResult
-EnvoyQuicServerStream::checkHeaderNameForUnderscores(const std::string& header_name) {
-  if (headers_with_underscores_action_ == envoy::config::core::v3::HttpProtocolOptions::ALLOW ||
-      !Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
-    return HeaderValidationResult::ACCEPT;
+  // Do request specific checks.
+  result = Http::HeaderUtility::checkHeaderNameForUnderscores(
+      header_name, headers_with_underscores_action_, stats_.dropped_headers_with_underscores_,
+      stats_.requests_rejected_with_underscores_in_headers_);
+  if (result != Http::HeaderUtility::HeaderValidationResult::ACCEPT) {
+    details_ = Http3ResponseCodeDetailValues::invalid_underscore;
   }
-  details_ = Http3ResponseCodeDetailValues::invalid_underscore;
-  if (headers_with_underscores_action_ ==
-      envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
-    ENVOY_STREAM_LOG(debug, "Dropping header with invalid characters in its name: {}", *this,
-                     header_name);
-    stats_.dropped_headers_with_underscores_.inc();
-    return HeaderValidationResult::DROP;
-  }
-  ENVOY_STREAM_LOG(debug, "Rejecting request due to header name with underscores: {}", *this,
-                   header_name);
-  stats_.requests_rejected_with_underscores_in_headers_.inc();
-  return HeaderValidationResult::INVALID;
+  return result;
 }
 
 } // namespace Quic

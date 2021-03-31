@@ -24,6 +24,7 @@
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
+#include "common/http/header_utility.h"
 
 #include "openssl/ssl.h"
 
@@ -37,17 +38,11 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 
 quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip);
 
-enum class HeaderValidationResult {
-  ACCEPT = 0,
-  DROP,
-  INVALID,
-};
-
 class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
-  virtual HeaderValidationResult validateHeader(const std::string& header_name,
-                                                absl::string_view header_value) = 0;
+  virtual Http::HeaderUtility::HeaderValidationResult
+  validateHeader(const std::string& header_name, absl::string_view header_value) = 0;
 };
 
 // The returned header map has all keys in lower case.
@@ -56,12 +51,14 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
                                              HeaderValidator& validator) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
-    HeaderValidationResult result = validator.validateHeader(entry.first, entry.second);
-    if (result == HeaderValidationResult::INVALID) {
+    Http::HeaderUtility::HeaderValidationResult result =
+        validator.validateHeader(entry.first, entry.second);
+    switch (result) {
+    case Http::HeaderUtility::HeaderValidationResult::REJECT:
       return nullptr;
-    }
-
-    if (result == HeaderValidationResult::ACCEPT) {
+    case Http::HeaderUtility::HeaderValidationResult::DROP:
+      continue;
+    case Http::HeaderUtility::HeaderValidationResult::ACCEPT:
       auto key = Http::LowerCaseString(entry.first);
       if (key != Http::Headers::get().Cookie) {
         // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.

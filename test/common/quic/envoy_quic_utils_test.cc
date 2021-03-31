@@ -48,7 +48,7 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
 class MockHeaderValidator : public HeaderValidator {
 public:
   ~MockHeaderValidator() override = default;
-  MOCK_METHOD(HeaderValidationResult, validateHeader,
+  MOCK_METHOD(Http::HeaderUtility::HeaderValidationResult, validateHeader,
               (const std::string& header_name, absl::string_view header_value));
 };
 
@@ -83,9 +83,9 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](const std::string& header_name, absl::string_view) {
         if (header_name == "key-to-drop") {
-          return HeaderValidationResult::DROP;
+          return Http::HeaderUtility::HeaderValidationResult::DROP;
         }
-        return HeaderValidationResult::ACCEPT;
+        return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
   auto envoy_headers2 =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator);
@@ -101,9 +101,9 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](const std::string& header_name, absl::string_view) {
         if (header_name == "invalid_key") {
-          return HeaderValidationResult::INVALID;
+          return Http::HeaderUtility::HeaderValidationResult::REJECT;
         }
-        return HeaderValidationResult::ACCEPT;
+        return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
   EXPECT_EQ(nullptr,
             quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers2, validator));

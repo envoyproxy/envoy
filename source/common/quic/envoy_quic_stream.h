@@ -107,49 +107,17 @@ public:
     filter_manager_connection_.updateBytesBuffered(old_buffered_bytes, new_buffered_bytes);
   }
 
-  HeaderValidationResult validateHeader(const std::string& header_name,
-                                        absl::string_view header_value) override {
+  Http::HeaderUtility::HeaderValidationResult
+  validateHeader(const std::string& header_name, absl::string_view header_value) override {
     bool override_stream_error_on_invalid_http_message =
         http3_options_.has_override_stream_error_on_invalid_http_message() &&
         http3_options_.override_stream_error_on_invalid_http_message().value();
     if (header_name == "content-length") {
-      return validateContentLength(header_value, override_stream_error_on_invalid_http_message);
+      return Http::HeaderUtility::validateContentLength(
+          header_value, override_stream_error_on_invalid_http_message,
+          close_connection_upon_invalid_header_);
     }
-    return HeaderValidationResult::ACCEPT;
-  }
-
-  HeaderValidationResult validateContentLength(absl::string_view header_value,
-                                               bool override_stream_error_on_invalid_http_message) {
-    std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
-    absl::optional<uint64_t> content_length;
-    for (const absl::string_view& value : values) {
-      uint64_t new_value;
-      if (!absl::SimpleAtoi(value, &new_value) ||
-          !std::all_of(value.begin(), value.end(), absl::ascii_isdigit)) {
-        ENVOY_STREAM_LOG(debug, "Content length was either unparseable or negative", *this);
-        // TODO(danzh) set value according to override_stream_error_on_invalid_http_message from
-        // configured http3 options.
-        if (!override_stream_error_on_invalid_http_message) {
-          close_connection_upon_invalid_header_ = true;
-        }
-        return HeaderValidationResult::INVALID;
-      }
-      if (!content_length.has_value()) {
-        content_length = new_value;
-        continue;
-      }
-      if (new_value != content_length.value()) {
-        ENVOY_STREAM_LOG(
-            debug,
-            "Parsed content length {} is inconsistent with previously detected content length {}",
-            *this, new_value, content_length.value());
-        if (!override_stream_error_on_invalid_http_message) {
-          close_connection_upon_invalid_header_ = true;
-        }
-        return HeaderValidationResult::INVALID;
-      }
-    }
-    return HeaderValidationResult::ACCEPT;
+    return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
   }
 
   absl::string_view responseDetails() override { return details_; }
