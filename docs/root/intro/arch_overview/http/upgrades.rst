@@ -14,10 +14,10 @@ pass through the default HTTP filter chain. To avoid the use of HTTP-only filter
 one can set up custom
 :ref:`filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.filters>`
 for the given upgrade type, up to and including only using the router filter to send the HTTP
-data upstream. Note that the :ref:`Buffer filter <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>` breaks
-upgrades, so if you have that filter configured in your default HTTP filter chain you'll need to define
-:ref:`upgrade filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.filters>`
-and exclude the Buffer filter from that list.
+data upstream. Note that buffering is generally not compatible with upgrades, so if you have
+the :ref:`Buffer filter <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>` configured in
+your default HTTP filter chain you'll need to exclude it from the list of
+:ref:`upgrade filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.filters>`.
 
 Upgrades can be enabled or disabled on a :ref:`per-route <envoy_v3_api_field_config.route.v3.RouteAction.upgrade_configs>` basis.
 Any per-route enabling/disabling automatically overrides HttpConnectionManager configuration as
