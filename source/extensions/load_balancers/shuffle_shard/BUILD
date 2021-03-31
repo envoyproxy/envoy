@@ -42,7 +42,6 @@ envoy_cc_extension(
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/grpc_credentials:well_known_names",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
