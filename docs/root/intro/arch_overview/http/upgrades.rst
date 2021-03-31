@@ -16,7 +16,7 @@ one can set up custom
 for the given upgrade type, up to and including only using the router filter to send the HTTP
 data upstream. Note that buffering is generally not compatible with upgrades, so if the
 :ref:`Buffer filter <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>` is configured in
-the default HTTP filter chain it'll have to be excluded from the list of
+the default HTTP filter chain it should probably be excluded from the list of
 :ref:`upgrade filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.filters>`.
 
 Upgrades can be enabled or disabled on a :ref:`per-route <envoy_v3_api_field_config.route.v3.RouteAction.upgrade_configs>` basis.
