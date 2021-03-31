@@ -740,7 +740,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
-      lb_shuffle_shard_config_(config.lb_shuffle_shard_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
       lb_maglev_config_(config.maglev_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()),
@@ -751,6 +750,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
+      load_balancing_policy_(config.load_balancing_policy()),
       common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
@@ -805,6 +805,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
 
     lb_type_ = LoadBalancerType::ClusterProvided;
+    break;
+  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG:
+    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

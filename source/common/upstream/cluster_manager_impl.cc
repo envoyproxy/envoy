@@ -250,6 +250,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
+      validation_context_(validation_context),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
       cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
@@ -1316,10 +1317,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
         cluster->lbLeastRequestConfig(), cluster->lbConfig());
-  } else if (auto config = cluster->lbShuffleShardConfig()) {
-    lb_ = std::make_unique<ShuffleShardLoadBalancer>(
-        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
-        parent.parent_.runtime_, parent.parent_.random_, cluster->lbConfig(), *config);
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -1341,6 +1338,26 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
                                                      cluster->stats(), parent.parent_.runtime_,
                                                      parent.parent_.random_, cluster->lbConfig());
+      break;
+    }
+    case LoadBalancerType::LoadBalancingPolicyConfig: {
+      ASSERT(lb_factory_ == nullptr);
+      for (auto policy : cluster->loadBalancingPolicy().policies()) {
+        LoadBalancerFactoryContextImpl context(parent_.parent_.validation_context_.staticValidationVisitor());
+        TypedLoadBalancerFactory* factory = Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(policy.name());
+
+        if (factory == nullptr) {
+          ENVOY_LOG(warn, fmt::format("Didn't find a registered implementation for name: '{}'", policy.name()));
+          continue;
+        }
+
+        lb_ = factory->create(policy, cluster->lbType(), context, priority_set_, parent_.local_priority_set_, cluster->stats(),
+                              parent.parent_.runtime_, parent.parent_.random_, cluster->lbConfig());
+        break;
+      }
+      if (lb_ == nullptr) { // This doesn't seem to work yet.
+        ExceptionUtil::throwEnvoyException("Didn't find any registered implementation.");
+      }
       break;
     }
     case LoadBalancerType::ClusterProvided:

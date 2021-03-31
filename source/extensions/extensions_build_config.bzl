@@ -109,6 +109,12 @@ EXTENSIONS = {
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
 
     #
+    # Load balancers
+    #
+
+    "envoy.load_balancers.shuffle_shard":               "//source/extensions/load_balancers/shuffle_shard:config",
+
+    #
     # Network filters
     #
 

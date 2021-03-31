@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 54]
+// [#next-free-field: 53]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -443,17 +443,6 @@ message Cluster {
     bool use_http_header = 1;
   }
 
-  message LbShuffleShardConfig {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.cluster.v3.Cluster.LbShuffleShardConfig";
-
-    google.protobuf.UInt32Value endpoints_per_cell = 1;
-
-    bool use_zone_as_dimension = 2;
-
-    repeated string dimensions = 3;
-  }
-
   // Common configuration for all load balancer implementations.
   // [#next-free-field: 8]
   message CommonLbConfig {
@@ -738,7 +727,7 @@ message Cluster {
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
   // [#comment:TODO: Remove enum constraint :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>` when implemented.]
-  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true not_in: 7}];
+  LbPolicy lb_policy = 6;
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_config.cluster.v4alpha.Cluster.DiscoveryType.STATIC>`,
@@ -909,9 +898,6 @@ message Cluster {
 
   // Configuration for load balancing subsetting.
   LbSubsetConfig lb_subset_config = 22;
-
-  // Configuration for the ShuffleShard.
-  LbShuffleShardConfig lb_shuffle_shard_config = 53;
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only

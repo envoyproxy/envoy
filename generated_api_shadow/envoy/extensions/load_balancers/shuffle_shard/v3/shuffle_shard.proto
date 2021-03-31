@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancers.shuffle_shard.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+import "google/protobuf/wrappers.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancers.shuffle_shard.v3";
+option java_outer_classname = "ShuffleShardConfigProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+
+message ShuffleShardConfig {
+  google.protobuf.UInt32Value endpoints_per_cell = 1;
+  bool use_zone_as_dimension = 2;
+  repeated string dimensions = 3;
+  google.protobuf.UInt32Value least_request_choice_count = 4;
+}

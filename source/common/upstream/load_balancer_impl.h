@@ -6,6 +6,7 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include <exception>
 
 #include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
@@ -14,17 +15,59 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"
 #include "common/upstream/edf_scheduler.h"
-
-#include "infima/infima.h"
 
 namespace Envoy {
 namespace Upstream {
 
 // Priority levels and localities are considered overprovisioned with this factor.
 static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
+
+template <class ConfigProto> class ConfigurableTypedLoadBalancerFactory : public TypedLoadBalancerFactory {
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() {
+    return std::make_unique<ConfigProto>();
+  }
+
+  LoadBalancerPtr create(const envoy::config::cluster::v3::LoadBalancingPolicy::Policy& policy,
+      LoadBalancerType load_balancer_type, LoadBalancerFactoryContext& context,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterStats& cluster_stats, Runtime::Loader& loader, Random::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) override {
+    std::cout << "ConfigurableTypedLoadBalancerFactory::create::start" << std::endl;
+    ProtobufTypes::MessagePtr config = createEmptyConfigProto();
+
+    Envoy::Config::Utility::translateOpaqueConfig(
+        policy.typed_config(), ProtobufWkt::Struct::default_instance(),
+        context.messageValidationVisitor(), *config);
+
+    return createLoadBalancerWithConfig(load_balancer_type, priority_set, local_priority_set,
+                                cluster_stats, loader, random, common_config,
+                                MessageUtil::downcastAndValidate<const ConfigProto&>(*config, context.messageValidationVisitor()));
+
+  }
+
+  virtual LoadBalancerPtr createLoadBalancerWithConfig(LoadBalancerType, const PrioritySet&,
+     const PrioritySet*, ClusterStats&, Runtime::Loader&, Random::RandomGenerator&,
+     const envoy::config::cluster::v3::Cluster::CommonLbConfig&, const ConfigProto&) PURE;
+};
+
+class LoadBalancerFactoryContextImpl : public LoadBalancerFactoryContext {
+
+public:
+  LoadBalancerFactoryContextImpl(ProtobufMessage::ValidationVisitor& validation_visitor)
+      : validation_visitor_(validation_visitor) {}
+
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
+
+private:
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
 
 /**
  * Base class for all LB implementations.
@@ -587,35 +630,6 @@ public:
 
 protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
-};
-
-class ShuffleShardLoadBalancer : public ZoneAwareLoadBalancerBase {
-public:
-  ShuffleShardLoadBalancer(LoadBalancerType lb_type, const PrioritySet& priority_set,
-                           const PrioritySet* local_priority_set, ClusterStats& stats,
-                           Runtime::Loader& runtime, Random::RandomGenerator& random,
-                           const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-                           const envoy::config::cluster::v3::Cluster::LbShuffleShardConfig& config);
-
-  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
-
-  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
-
-private:
-  void remove_hosts(const HostVector&);
-
-  void add_hosts(const HostVector&);
-
-  absl::optional<std::vector<std::string>> get_coord(const HostConstSharedPtr&);
-
-  const LoadBalancerType lb_type_;
-  const uint32_t endpoints_per_cell_;
-  const bool use_zone_as_dimension_;
-  std::vector<std::string> dimensions_;
-  const bool use_dimensions_;
-  Lattice<Upstream::HostConstSharedPtr>* lattice_;
-  ShuffleSharder<Upstream::HostConstSharedPtr> shuffle_sharder_;
-  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 /**

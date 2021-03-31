@@ -785,6 +785,12 @@ public:
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
    * all load balancers for this cluster.
    */
+  virtual const envoy::config::cluster::v3::LoadBalancingPolicy& loadBalancingPolicy() const PURE;
+
+  /**
+   * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
+   * all load balancers for this cluster.
+   */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
   /**
@@ -808,12 +814,6 @@ public:
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
   lbLeastRequestConfig() const PURE;
-
-  /**
-   * @return configuration for shuffle shard load balancing.
-   */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::LbShuffleShardConfig>&
-  lbShuffleShardConfig() const PURE;
 
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.

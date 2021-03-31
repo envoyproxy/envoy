@@ -775,7 +775,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
-
+  case LoadBalancerType::LoadBalancingPolicyConfig:
   case LoadBalancerType::OriginalDst:
   case LoadBalancerType::ClusterProvided:
     // LoadBalancerType::OriginalDst is blocked in the factory. LoadBalancerType::ClusterProvided
