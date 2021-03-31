@@ -4323,7 +4323,7 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl response_data("1234567890");
-  response_decoder_->decodeData(response_data, true);
+  response_decoder_->decodeData(response_data, false);
   EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
