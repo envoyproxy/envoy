@@ -175,9 +175,8 @@ Deprecated
   tool have been deprecated in favor of `request_header_fields`, `response_header_fields`,
   `additional_request_headers`, and `additional_response_headers`.
 * The `content_length`, `content_type`, `disable_on_etag_header` and `remove_accept_encoding_header`
-  fields in :ref:`HTTP Gzip filter config <envoy_api_msg_config.filter.http.gzip.v2.Gzip>` have
-  been deprecated in favor of `compressor`.
-* The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
+  fields in HTTP Gzip filter config have been deprecated in favor of `compressor`.
+* The statistics counter `header_gzip` in HTTP Gzip filter
   has been deprecated in favor of `header_compressor_used`.
 * Support for the undocumented HTTP/1.1 `:no-chunks` pseudo-header has been removed. If an extension
   was using this it can achieve the same behavior via the new `http1StreamEncoderOptions()` API.

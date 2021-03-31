@@ -7,10 +7,6 @@ from an upstream service upon client request. Compression is useful in
 situations when bandwidth is scarce and large payloads can be effectively compressed
 at the expense of higher CPU load or offloading it to a compression accelerator.
 
-.. note::
-
- This filter deprecates the :ref:`HTTP Gzip filter <config_http_filters_gzip>`.
-
 Configuration
 -------------
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`

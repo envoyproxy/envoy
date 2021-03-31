@@ -40,7 +40,7 @@ Changes
 * ext-authz filter: added support to gRPC responses to carry HTTP attributes.
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
-* gzip filter: added :ref:`stats <gzip-statistics>` to the filter.
+* gzip filter: added stats to the filter.
 * gzip filter: sending *accept-encoding* header as *identity* no longer compresses the payload.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
