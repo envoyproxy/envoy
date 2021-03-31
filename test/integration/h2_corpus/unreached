@@ -1,0 +1,107 @@
+events {
+  downstream_send_event {
+    h2_frames {
+      settings {
+      }
+    }
+    h2_frames {
+      post_request {
+        stream_index: 1
+        host: "nnnnnnnnnn~nnnnn"
+        path: "/"
+      }
+    }
+  }
+}
+events {
+  downstream_send_event {
+    h2_frames {
+      settings {
+      }
+    }
+    h2_frames {
+      post_request {
+        stream_index: 1
+        host: "nnnnnnnnnn~nnnnn"
+        path: "/"
+      }
+    }
+  }
+}
+events {
+}
+events {
+}
+events {
+}
+events {
+}
+events {
+  upstream_send_event {
+    h2_frames {
+      settings {
+      }
+    }
+    h2_frames {
+      go_away {
+        last_stream_index: 174531389
+      }
+    }
+  }
+}
+events {
+  upstream_send_event {
+    h2_frames {
+      generic {
+        frame_bytes: "\000\000<\004"
+      }
+    }
+    h2_frames {
+      data {
+        stream_index: 257
+      }
+    }
+    h2_frames {
+      headers {
+        flags: END_HEADERS
+        stream_index: 1
+      }
+    }
+    h2_frames {
+      headers {
+      }
+    }
+    h2_frames {
+      reset_stream {
+        error_code: FLOW_CONTROL_ERROR
+      }
+    }
+    h2_frames {
+      malformed_request {
+        stream_index: 1
+      }
+    }
+    h2_frames {
+      request {
+      }
+    }
+  }
+}
+events {
+  downstream_send_event {
+    h2_frames {
+    }
+    h2_frames {
+      request {
+        stream_index: 16777215
+        host: "503~1"
+        path: "/"
+      }
+    }
+    h2_frames {
+      request {
+        stream_index: 1
+      }
+    }
+  }
+}

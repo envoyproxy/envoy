@@ -34,14 +34,6 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
-namespace Http {
-namespace Utility {
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data) {
-  return dispatch(data);
-}
-} // namespace Utility
-} // namespace Http
 namespace Http2 {
 namespace Utility {
 
