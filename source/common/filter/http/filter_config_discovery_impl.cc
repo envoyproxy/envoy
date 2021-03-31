@@ -38,11 +38,8 @@ DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
       tls_(factory_context.threadLocal()),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
-        // This init target is used to activate
-        // the subscription but not wait for a
-        // response. It is used whenever a default
-        // config is provided to be used while
-        // waiting for a response.
+        // This init target is used to activate the subscription but not wait for a response. It is
+        // used whenever a default config is provided to be used while waiting for a response.
         init_target_.ready();
       }) {
   subscription_->filter_config_providers_.insert(this);
