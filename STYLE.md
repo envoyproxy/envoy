@@ -159,7 +159,7 @@ A few general notes on our error handling philosophy:
   continue seems ridiculous because *"this should never happen"*, it's a very good indication that
   the appropriate behavior is to terminate the process and not handle the error. When in doubt,
   please discuss.
-  
+
 # Macro Usage
 
 * The following macros are available:
@@ -175,7 +175,7 @@ A few general notes on our error handling philosophy:
   detectability on probable conditions or invariants.
 
 * Per above it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
-  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios. 
+  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios.
 * Do not `ASSERT` on conditions imposed by the external environment. Either add error handling
   (potentially with an `ENVOY_BUG` for detectability) or `RELEASE_ASSERT` if the condition indicates
   that the process is unrecoverable.
