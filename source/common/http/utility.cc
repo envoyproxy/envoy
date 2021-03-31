@@ -517,7 +517,18 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
 
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (local_reply_data.is_grpc_) {
-    response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
+    // If desired, pass status code from remote service back to the caller
+    // https://github.com/envoyproxy/envoy/issues/11079
+    // this is stupid  TODO
+    // why isn't there a boolean 'has header' ???
+    auto before = response_headers->size();
+    response_headers->remove(LowerCaseString(std::string("x-grpc-to-http-response-code")));
+    auto after = response_headers->size();
+
+    response_headers->setStatus(before > after // TODO smarter test
+                                    ? response_headers->getStatusValue()
+                                    : std::to_string(enumToInt(Code::OK)));
+
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
     if (response_headers->getGrpcStatusValue().empty()) {

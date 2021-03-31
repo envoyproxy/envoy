@@ -31,6 +31,8 @@ static_resources:
                   cluster_name: ext_authz-opa-service
                 timeout: 0.250s
               transport_api_version: V3
+              http_status_for_grpc: true
+              #http_status_for_grpc: false
           - name: envoy.filters.http.router
             typed_config: {}
 

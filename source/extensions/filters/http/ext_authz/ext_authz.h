@@ -78,6 +78,7 @@ public:
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
+        http_status_for_grpc_(config.http_status_for_grpc()),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -125,6 +126,7 @@ public:
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  bool httpStatusForGrpc() const { return http_status_for_grpc_; }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -171,6 +173,7 @@ private:
   const std::vector<std::string> metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
+  const bool http_status_for_grpc_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;

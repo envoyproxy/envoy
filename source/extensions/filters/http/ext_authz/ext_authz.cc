@@ -302,6 +302,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->httpContext().codeStats().chargeResponseStat(info);
     }
 
+    // Pass requirement for response code override as a header
+    // TODO can this be done with less casting???
+    if (config_->httpStatusForGrpc()) {
+      response->headers_to_set.push_back(std::pair(
+          Http::LowerCaseString(std::string("x-grpc-to-http-response-code")), std::string("true")));
+    }
+
+    // From here we know it's 403, so if desired add flag so that Utility::sendLocalReply
+    // can pass the server's HTTP status along //TODO text update //marker dclendenan
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
