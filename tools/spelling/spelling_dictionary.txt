@@ -47,6 +47,7 @@ CHMOD
 CHLOS
 CHLOs
 CIDR
+CITT
 CLA
 CLI
 CMSG
@@ -315,6 +316,7 @@ STL
 STRLEN
 STS
 SVG
+SVID
 Symbolizer
 TBD
 TCLAP
@@ -488,7 +490,7 @@ ci
 ciphersuite
 ciphersuites
 circllhist
-CITT
+clientcert
 cloneable
 cloneability
 cmd
@@ -521,6 +523,7 @@ coverity
 cplusplus
 cpuset
 creds
+cRLSign
 crypto
 cryptographic
 cryptographically
@@ -969,6 +972,7 @@ readonly
 readv
 realloc
 rebalanced
+rebalancer
 rebalancing
 rebuffer
 rebuilder
@@ -1163,6 +1167,7 @@ timeval
 tmp
 tmpfile
 tokenize
+tokenized
 tokenizes
 tokenizing
 toolchain

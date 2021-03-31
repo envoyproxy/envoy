@@ -8,14 +8,16 @@
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/config/api_version.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
@@ -92,6 +94,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
 }
 
 void BaseIntegrationTest::initialize() {
+  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
@@ -121,11 +124,22 @@ common_tls_context:
   } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context_);
-  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+  if (upstream_config_.upstream_protocol_ != FakeHttpConnection::Type::HTTP3) {
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
+    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+  } else {
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+    quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+
+    std::vector<std::string> server_names;
+    auto& config_factory = Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(
+        "envoy.transport_sockets.quic");
+    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names);
+  }
 }
 
 void BaseIntegrationTest::createUpstreams() {
@@ -172,7 +186,7 @@ void BaseIntegrationTest::createEnvoy() {
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) lds;
+    envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
       ProtobufWkt::Any* resource = lds.add_resources();
@@ -211,13 +225,36 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
-  } else {
-    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
           ConfigHelper::HttpProtocolOptions protocol_options;
           protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  } else {
+    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP3, "");
+    setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
+    upstream_tls_ = true;
+    config_helper_.configureUpstreamTls(false, true);
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          // Docker doesn't allow writing to the v6 address returned by
+          // Network::Utility::getLocalAddress.
+          if (version_ == Network::Address::IpVersion::v6) {
+            auto* bind_config_address = bootstrap.mutable_static_resources()
+                                            ->mutable_clusters(0)
+                                            ->mutable_upstream_bind_config()
+                                            ->mutable_source_address();
+            bind_config_address->set_address("::1");
+            bind_config_address->set_port_value(0);
+          }
+
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http3_protocol_options();
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
@@ -389,7 +426,7 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
   for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    std::string contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
       return contents.substr(index);

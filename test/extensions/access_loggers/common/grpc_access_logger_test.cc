@@ -327,7 +327,7 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Grpc::RawAsyncClientPtr&& client,
+               envoy::config::core::v3::ApiVersion, Grpc::RawAsyncClientPtr&& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(
@@ -368,31 +368,36 @@ TEST_F(GrpcAccessLoggerCacheTest, Deduplication) {
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
 
   expectClientCreation();
-  MockGrpcAccessLoggerImpl::SharedPtr logger1 =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope);
+  MockGrpcAccessLoggerImpl::SharedPtr logger1 = logger_cache_.getOrCreateLogger(
+      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope);
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Do not deduplicate different types of logger
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::TCP, scope));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   config.set_log_name("log-1");
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 }
 
 } // namespace

@@ -1,5 +1,9 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 
+#include "envoy/buffer/buffer.h"
+
+#include "common/common/logger.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -10,7 +14,7 @@ namespace MySQLProxy {
 
 Command::Cmd Command::parseCmd(Buffer::Instance& data) {
   uint8_t cmd;
-  if (BufferHelper::readUint8(data, cmd) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(data, cmd) != DecodeStatus::Success) {
     return Command::Cmd::Null;
   }
   return static_cast<Command::Cmd>(cmd);
@@ -18,13 +22,13 @@ Command::Cmd Command::parseCmd(Buffer::Instance& data) {
 
 void Command::setCmd(Command::Cmd cmd) { cmd_ = cmd; }
 
-void Command::setDb(std::string db) { db_ = db; }
+void Command::setDb(const std::string& db) { db_ = db; }
 
-int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
+DecodeStatus Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   Command::Cmd cmd = parseCmd(buffer);
   setCmd(cmd);
   if (cmd == Command::Cmd::Null) {
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
 
   switch (cmd) {
@@ -49,19 +53,25 @@ int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
     break;
   }
 
-  return MYSQL_SUCCESS;
+  return DecodeStatus::Success;
 }
 
-void Command::setData(std::string& data) { data_.assign(data); }
+void Command::setData(const std::string& data) { data_.assign(data); }
 
-std::string Command::encode() {
-  Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-
-  BufferHelper::addUint8(*buffer, static_cast<int>(cmd_));
-  BufferHelper::addString(*buffer, data_);
-  std::string e_string = buffer->toString();
-  return e_string;
+void Command::encode(Buffer::Instance& out) const {
+  BufferHelper::addUint8(out, static_cast<int>(cmd_));
+  BufferHelper::addString(out, data_);
 }
+
+DecodeStatus CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {
+  if (BufferHelper::readStringBySize(buffer, len, data_) != DecodeStatus::Success) {
+    ENVOY_LOG(debug, "error when parsing command response");
+    return DecodeStatus::Failure;
+  }
+  return DecodeStatus::Success;
+}
+
+void CommandResponse::encode(Buffer::Instance& out) const { BufferHelper::addString(out, data_); }
 
 } // namespace MySQLProxy
 } // namespace NetworkFilters

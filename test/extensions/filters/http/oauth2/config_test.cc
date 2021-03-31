@@ -47,10 +47,14 @@ config:
   signout_path:
     path:
       exact: /signout
-  auth_scopes: 
+  auth_scopes:
   - user
   - openid
   - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
     )EOF";
 
   OAuth2Config factory;
@@ -91,10 +95,14 @@ config:
   signout_path:
     path:
       exact: /signout
-  auth_scopes: 
+  auth_scopes:
   - user
   - openid
   - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
     )EOF";
 
   OAuth2Config factory;

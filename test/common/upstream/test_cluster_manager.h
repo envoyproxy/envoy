@@ -82,7 +82,7 @@ public:
                    std::vector<Http::Protocol>&,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   ClusterConnectivityState& state) override {
+                   TimeSource&, ClusterConnectivityState& state) override {
     return Http::ConnectionPool::InstancePtr{
         allocateConnPool_(host, options, transport_socket_options, state)};
   }
@@ -103,7 +103,8 @@ public:
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&,
+                      const xds::core::v3::ResourceLocator*, ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 

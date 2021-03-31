@@ -29,9 +29,9 @@ HTTP_CONN_NETWORK_FILTER_BLOB = {
 
 def test(writer):
 
-  writer.write_test_file(
-      'Valid',
-      schema='HTTP_CONN_NETWORK_FILTER_SCHEMA',
-      data=get_blob(HTTP_CONN_NETWORK_FILTER_BLOB),
-      throws=False,
-  )
+    writer.write_test_file(
+        'Valid',
+        schema='HTTP_CONN_NETWORK_FILTER_SCHEMA',
+        data=get_blob(HTTP_CONN_NETWORK_FILTER_BLOB),
+        throws=False,
+    )

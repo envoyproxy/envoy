@@ -1,10 +1,10 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/version_converter.h"
@@ -30,8 +30,7 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 
@@ -151,7 +150,7 @@ protected:
 
   void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& listener_configs,
                        const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
@@ -173,7 +172,7 @@ protected:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     const auto route_configuration =
@@ -213,6 +212,52 @@ TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
     typed_config->set_type_url("type.googleapis.com/unknown.type.url");
     typed_config->set_value("non-empty config contents");
     sendLdsResponse({listener}, "1");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
+TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+      name: fake_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+      filter_chains:
+        - filters:
+          - name: http
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: HTTP2
+              stat_prefix: config_test
+              route_config:
+                name: route_config_0
+                virtual_hosts:
+                  - name: integration
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: /
+                        route:
+                          cluster: cluster_0
+                    typed_per_filter_config:
+                      envoy.filters.http.health_check:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+                        pass_through_mode: false
+              http_filters:
+                - name: envoy.filters.http.health_check
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+                    pass_through_mode: false
+          - name: envoy.filters.http.router
+        )EOF");
+    sendLdsResponse({listener}, "2");
   };
   initialize();
   registerTestServerPorts({listener_name_});
