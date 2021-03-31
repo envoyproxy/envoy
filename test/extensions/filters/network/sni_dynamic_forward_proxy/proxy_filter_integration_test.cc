@@ -117,9 +117,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, UpstreamTls) {
 
   codec_client_ = makeHttpConnection(
       makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, fake_upstream_connection_, TestUtility::DefaultTimeout, max_request_headers_kb_,
-      max_request_headers_count_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
 
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},

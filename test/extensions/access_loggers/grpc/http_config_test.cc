@@ -33,8 +33,7 @@ public:
     ASSERT_NE(nullptr, message_);
 
     EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                            Grpc::AsyncClientFactoryClusterChecks) {
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
         }));
 
@@ -46,7 +45,7 @@ public:
   }
 
   AccessLog::FilterPtr filter_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig http_grpc_access_log_;
   ProtobufTypes::MessagePtr message_;
   Server::Configuration::AccessLogInstanceFactory* factory_{};

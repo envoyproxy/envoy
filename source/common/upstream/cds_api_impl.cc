@@ -21,19 +21,28 @@ namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
+                             const xds::core::v3::ResourceLocator* cds_resources_locator,
                              ClusterManager& cm, Stats::Scope& scope,
                              ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
+  return CdsApiPtr{
+      new CdsApiImpl(cds_config, cds_resources_locator, cm, scope, validation_visitor)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
-                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
+CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
+                       const xds::core::v3::ResourceLocator* cds_resources_locator,
+                       ClusterManager& cm, Stats::Scope& scope,
+                       ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
           cds_config.resource_api_version(), validation_visitor, "name"),
       cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
-  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, false);
+  if (cds_resources_locator == nullptr) {
+    subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+  } else {
+    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
+        *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_);
+  }
 }
 
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -75,9 +84,11 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   std::vector<std::string> exception_msgs;
   absl::flat_hash_set<std::string> cluster_names(added_resources.size());
   bool any_applied = false;
+  uint32_t added_or_updated = 0;
+  uint32_t skipped = 0;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;
-    try {
+    TRY_ASSERT_MAIN_THREAD {
       cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
@@ -85,20 +96,27 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
       }
       if (cm_.addOrUpdateCluster(cluster, resource.get().version())) {
         any_applied = true;
-        ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster.name());
+        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
+        ++added_or_updated;
       } else {
         ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
+        ++skipped;
       }
-    } catch (const EnvoyException& e) {
+    }
+    END_TRY
+    catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
     }
   }
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
-      ENVOY_LOG(info, "cds: remove cluster '{}'", resource_name);
+      ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
     }
   }
+
+  ENVOY_LOG(info, "cds: added/updated {} cluster(s), skipped {} unmodified cluster(s)",
+            added_or_updated, skipped);
 
   if (any_applied) {
     system_version_info_ = system_version_info;

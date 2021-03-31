@@ -9,6 +9,7 @@
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http1/settings.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
@@ -423,33 +424,34 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
   Protobuf::BoolValue hcm_value;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
-  EXPECT_FALSE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   hcm_value.set_value(false);
-  EXPECT_TRUE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                   .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
   hcm_value.set_value(true);
-  EXPECT_FALSE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
 
   http1_options.clear_override_stream_error_on_invalid_http_message();
 
   // fallback to HCM.stream_error
   hcm_value.set_value(true);
-  EXPECT_TRUE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                   .stream_error_on_invalid_http_message_);
 
   // fallback to HCM.stream_error (flip boolean value)
   hcm_value.set_value(false);
-  EXPECT_FALSE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
 }
 
@@ -631,6 +633,55 @@ TEST(HttpUtility, SendLocalGrpcReply) {
   Utility::sendLocalReply(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
+}
+
+TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, streamInfo());
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.getGrpcStatusValue(),
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::InvalidArgument)));
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        EXPECT_EQ(headers.getGrpcMessageValue(), "large");
+      }));
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
+                              Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
+}
+
+TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusPreserved) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  auto encode_functions =
+      Utility::EncodeFunctions{[&](ResponseHeaderMap& headers) -> void {
+                                 headers.setGrpcStatus(std::to_string(
+                                     enumToInt(Grpc::Status::WellKnownGrpcStatus::NotFound)));
+                               },
+                               nullptr,
+                               [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, "");
+                               },
+                               nullptr};
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.getGrpcStatusValue(),
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::NotFound)));
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        EXPECT_EQ(headers.getGrpcMessageValue(), "large");
+      }));
+  Utility::sendLocalReply(
+      is_reset, encode_functions,
+      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
+                              Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {

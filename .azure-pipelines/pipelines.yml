@@ -13,8 +13,22 @@ pr: none
 stages:
   - stage: precheck
     jobs:
+      - job: format_pre
+        dependsOn: []
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+            displayName: "Run format pre-checks"
+
       - job: format
-        dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+        dependsOn: ["format_pre"]
         pool:
           vmImage: "ubuntu-18.04"
         steps:

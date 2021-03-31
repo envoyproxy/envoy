@@ -56,7 +56,8 @@ protected:
                        const std::string& expected_response_body, bool full_response = true,
                        bool always_send_trailers = false,
                        const std::string expected_upstream_request_body = "",
-                       bool expect_connection_to_upstream = true) {
+                       bool expect_connection_to_upstream = true,
+                       bool expect_response_complete = true) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response;
@@ -135,7 +136,7 @@ protected:
     }
 
     response->waitForEndStream();
-    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(response->complete(), expect_response_complete);
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
         !absl::StartsWith(response->headers()
@@ -152,8 +153,12 @@ protected:
           if (entry.value() == UnexpectedHeaderValue) {
             EXPECT_TRUE(response->headers().get(lower_key).empty());
           } else {
-            EXPECT_EQ(entry.value().getStringView(),
-                      response->headers().get(lower_key)[0]->value().getStringView());
+            if (response->headers().get(lower_key).empty()) {
+              ADD_FAILURE() << "Header " << lower_key.get() << " not found.";
+            } else {
+              EXPECT_EQ(entry.value().getStringView(),
+                        response->headers().get(lower_key)[0]->value().getStringView());
+            }
           }
           return Http::HeaderMap::Iterate::Continue;
         });
@@ -1106,6 +1111,124 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableRequestValidationIgnoreQueryPara
       "Could not resolve /unknown/path to a method.", true, false, "", false);
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
+  // Request body is more than 8 bytes.
+  config_helper_.setBufferLimits(2 << 20, 8);
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme" : "Children"})", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "413"}},
+      "Request rejected because the transcoder's internal buffer size exceeds the configured "
+      "limit.",
+      true, false, "", true);
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
+  // Request body is less than 35 bytes.
+  // Response body is more than 35 bytes.
+  config_helper_.setBufferLimits(2 << 20, 35);
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
+      {R"(id: 20 theme: "Children 0123456789 0123456789 0123456789 0123456789" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "99"}},
+      "Response not transcoded because the transcoder's internal buffer size exceeds the "
+      "configured limit.");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostHttpBodyRequestExceedsBufferLimit) {
+  // Request body is more than 8 bytes.
+  config_helper_.setBufferLimits(2 << 20, 8);
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<google::api::HttpBody, google::api::HttpBody>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/echoRawBody"},
+                                     {":authority", "host"},
+                                     {"content-type", "text/plain"}},
+      R"(hello world!)", {}, {}, Status(), Http::TestResponseHeaderMapImpl{{":status", "413"}},
+      "Request rejected because the transcoder's internal buffer size exceeds the configured "
+      "limit.",
+      true, false, "", true);
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) {
+  config_helper_.setBufferLimits(2 << 20, 60);
+  HttpIntegrationTest::initialize();
+
+  // Under limit: A single response message is less than 60 bytes.
+  // Messages transcoded successfully.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"}, {R"(id: 1 author: "Neal Stephenson" title: "Readme")"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"}])");
+
+  // Over limit: The server streams two response messages. Even through the transcoder
+  // handles them independently, portions of the first message are still in the
+  // internal buffers while the second one is processed.
+  //
+  // Because the headers and body is already sent, the stream is closed with
+  // an incomplete response.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"},
+      {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
+       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      // Incomplete response, not valid JSON.
+      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", true, false, "", true,
+      /*expect_response_complete=*/false);
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
+  const int num_messages = 20;
+  config_helper_.setBufferLimits(2 << 20, 80);
+  HttpIntegrationTest::initialize();
+
+  // Craft multiple response messages. IF combined together, they exceed the buffer limit.
+  std::vector<std::string> grpc_response_messages;
+  grpc_response_messages.reserve(num_messages);
+  for (int i = 0; i < num_messages; i++) {
+    grpc_response_messages.push_back(R"(id: 1 author: "Neal Stephenson" title: "Readme")");
+  }
+
+  // Craft expected response.
+  std::vector<std::string> expected_json_messages;
+  expected_json_messages.reserve(num_messages);
+  for (int i = 0; i < num_messages; i++) {
+    expected_json_messages.push_back(R"({"id":"1","author":"Neal Stephenson","title":"Readme"})");
+  }
+  std::string expected_json_response =
+      absl::StrCat("[", absl::StrJoin(expected_json_messages, ","), "]");
+
+  // Under limit: Even though multiple messages are sent from the upstream, they are transcoded
+  // while streaming. The buffer limit is never hit. At most two messages are ever in the internal
+  // buffers. Transcoding succeeds.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"}, grpc_response_messages, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      expected_json_response);
+}
+
+// TODO(nareddyt): Refactor testTranscoding and add a test case for client streaming under/over
+// buffer limit. Will do in a separate PR to minimize diff.
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
   overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");
   HttpIntegrationTest::initialize();
@@ -1168,6 +1291,73 @@ TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
                                       {"grpc-status", "0"}},
       R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
 };
+
+// Tests to ensure transcoding buffer limits do not apply when the runtime feature is disabled.
+class BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest
+    : public GrpcJsonTranscoderIntegrationTest {
+public:
+  void SetUp() override {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    const std::string filter =
+        R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+            )EOF";
+    config_helper_.addFilter(
+        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+
+    // Disable runtime feature.
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits", "false");
+  }
+};
+INSTANTIATE_TEST_SUITE_P(IpVersions, BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
+  // Request body is more than 20 bytes.
+  config_helper_.setBufferLimits(2 << 20, 20);
+  HttpIntegrationTest::initialize();
+
+  // Transcoding succeeds.
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme": "Children 0123456789 0123456789 0123456789 0123456789"})",
+      {R"(shelf { theme: "Children 0123456789 0123456789 0123456789 0123456789" })"}, {R"(id: 1)"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "10"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"1"})");
+}
+
+TEST_P(BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
+  // Request body is less than 35 bytes.
+  // Response body is more than 35 bytes.
+  config_helper_.setBufferLimits(2 << 20, 35);
+  HttpIntegrationTest::initialize();
+
+  // Transcoding succeeds. However, the downstream client is unable to buffer the full response.
+  // We can tell these errors are NOT from the transcoder because the response body is too generic.
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
+      {R"(id: 20 theme: "Children 0123456789 0123456789 0123456789 0123456789" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "21"}},
+      R"(Internal Server Error)");
+}
 
 } // namespace
 } // namespace Envoy

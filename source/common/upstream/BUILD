@@ -56,6 +56,7 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:version_converter_lib",
+        "//source/common/config:xds_resource_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http:mixed_conn_pool",
@@ -340,6 +341,9 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

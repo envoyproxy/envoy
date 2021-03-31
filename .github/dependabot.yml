@@ -1,0 +1,72 @@
+version: 2
+updates:
+
+  - package-ecosystem: "pip"
+    directory: "/test/extensions/filters/network/thrift_proxy"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/source/extensions/filters/network/kafka"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/examples/grpc-bridge/client"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/docs"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/github"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/config_validation"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/dependency"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/deprecate_version"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/protodoc"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/deprecate_features"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/code_format"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/envoy_headersplit"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/ci/flaky_test"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/configs"
+    schedule:
+      interval: "daily"

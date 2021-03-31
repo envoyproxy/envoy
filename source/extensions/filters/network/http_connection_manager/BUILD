@@ -41,6 +41,7 @@ envoy_cc_extension(
         "//source/common/http:request_id_extension_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/http/http1:settings_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/local_reply:local_reply_lib",
@@ -66,6 +67,9 @@ envoy_cc_library(
     name = "dependency_manager",
     srcs = ["dependency_manager.cc"],
     hdrs = ["dependency_manager.h"],
+    external_deps = [
+        "abseil_status",
+    ],
     deps = [
         "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
     ],

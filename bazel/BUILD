@@ -2,6 +2,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 licenses(["notice"])  # Apache 2
 
@@ -11,6 +12,7 @@ exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
+    "repository_locations.bzl",
 ])
 
 genrule(
@@ -285,6 +287,18 @@ config_setting(
     values = {"define": "deprecated_features=disabled"},
 )
 
+bool_flag(
+    name = "http3",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "disable_http3",
+    flag_values = {
+        ":http3": "False",
+    },
+)
+
 config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
@@ -364,11 +378,6 @@ config_setting(
         "@bazel_tools//platforms:linux",
     ],
     values = {"define": "zlib=ng"},
-)
-
-config_setting(
-    name = "enable_quiche",
-    values = {"define": "quiche=enabled"},
 )
 
 # TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
