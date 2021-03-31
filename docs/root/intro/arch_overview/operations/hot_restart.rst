@@ -5,8 +5,9 @@ Hot restart
 
 Ease of operation is one of the primary goals of Envoy. In addition to robust statistics and a local
 administration interface, Envoy has the ability to “hot” or “live” restart itself. This means that
-Envoy can fully reload itself (both code and configuration) without dropping any connections. The
-hot restart functionality has the following general architecture:
+Envoy can fully reload itself (both code and configuration) without dropping existing connections
+during the :ref:`drain process <arch_overview_draining>`. The hot restart functionality has the
+following general architecture:
 
 * Statistics and some locks are kept in a shared memory region. This means that gauges will be
   consistent across both processes as restart is taking place.
@@ -32,3 +33,7 @@ a given host: an active Envoy server process and, potentially, a draining Envoy 
 will exit as described above. The :option:`--base-id` or :option:`--use-dynamic-base-id` options
 may be used to allow multiple, distinctly configured Envoys to run on the same host and hot restart
 independently.
+
+.. note::
+
+ This feature is not supported on Windows.

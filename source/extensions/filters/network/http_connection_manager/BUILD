@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -40,6 +41,7 @@ envoy_cc_extension(
         "//source/common/http:request_id_extension_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/http/http1:settings_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/local_reply:local_reply_lib",
@@ -55,7 +57,20 @@ envoy_cc_extension(
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "dependency_manager",
+    srcs = ["dependency_manager.cc"],
+    hdrs = ["dependency_manager.h"],
+    external_deps = [
+        "abseil_status",
+    ],
+    deps = [
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
     ],
 )

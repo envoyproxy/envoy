@@ -3,22 +3,25 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common/api:75.4"
-"source/common/api/posix:74.0"
+"source/common:96.3" # Raise when QUIC coverage goes up
+"source/common/api:74.5"
+"source/common/api/posix:73.0"
 "source/common/common:96.3"
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
 "source/common/event:93.4" # Emulated edge events guards don't report LCOV
+"source/common/filesystem/posix:96.2"
 "source/common/filter:96.5"
 "source/common/filter/http:96.5"
 "source/common/http/http3:50.0"
 "source/common/json:90.6"
-"source/common/network:95.2"
+"source/common/network:95.0"  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
 "source/common/protobuf:94.6"
 "source/common/signal:84.5" # Death tests don't report LCOV
 "source/common/singleton:95.1"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/matcher:93.3"
+"source/common/quic:85.1"
 "source/common/tracing:94.9"
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.8"
@@ -43,7 +46,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/common/redis:96.3"
 "source/extensions/filters/network/dubbo_proxy:96.1"
 "source/extensions/filters/network/dubbo_proxy/router:95.1"
-"source/extensions/filters/network/mongo_proxy:94.1"
+"source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/sni_cluster:90.3"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:90.9"
 "source/extensions/health_checkers:95.9"
@@ -51,7 +54,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/io_socket:96.0" # Death tests don't report LCOV
 "source/extensions/io_socket/user_space:96.0" # Death tests don't report LCOV
 "source/extensions/quic_listeners:85.1"
-"source/extensions/quic_listeners/quiche:85.1"
 "source/extensions/stat_sinks/statsd:85.2"
 "source/extensions/tracers:96.4"
 "source/extensions/tracers/opencensus:91.6"
@@ -65,7 +67,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wavm:0.0" # Noe enabled in coverage build
 "source/extensions/watchdog:85.7" # Death tests within extensions
 "source/extensions/watchdog/profile_action:85.7"
-"source/server:94.5" # flaky: be careful adjusting
+"source/server:94.4" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:95.1"
 "source/server/config_validation:75.6"
 )

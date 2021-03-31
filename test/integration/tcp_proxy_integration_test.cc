@@ -104,6 +104,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   // Any time an associated connection is destroyed, it increments both counters.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  tcp_client2->close();
 }
 
 // Test TLS upstream.
@@ -403,11 +408,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
-    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");
@@ -507,11 +511,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
-    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
@@ -531,11 +534,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
-    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
@@ -564,9 +566,7 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithNoData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
     auto tcp_proxy_config =
         MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             *config_blob);
@@ -589,9 +589,7 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithLargeOuts
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
     auto tcp_proxy_config =
         MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             *config_blob);

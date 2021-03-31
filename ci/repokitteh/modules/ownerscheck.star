@@ -34,7 +34,7 @@
 # owner team set as reviewer or assignee for the PR.
 
 load("text", "match")
-load("time", "now")
+load("random", "randint")
 load("github.com/repokitteh/modules/lib/utils.star", "react")
 
 def _store_partial_approval(who, files):
@@ -204,9 +204,9 @@ def _comment(config, results, assignees, sender, force=False):
         if assignee in members:
           api_assignee = assignee
           break
-      # Otherwise, pick at "random" (we just use timestamp).
+      # Otherwise, pick at random.
       if not api_assignee:
-        api_assignee = members[now().second % len(members)]
+        api_assignee = members[randint(len(members))]
       lines.append('API shepherd assignee is @%s' % api_assignee)
       github.issue_assign(api_assignee)
 

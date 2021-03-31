@@ -143,7 +143,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/common/quic/platform)[/:],//include[/:]"
 build:test-coverage --test_arg="-l trace"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -174,7 +174,7 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/10.0.0/lib/linux
+build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/11.0.1/lib/linux
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
 
@@ -246,7 +246,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:c8fa4235714003ba0896287ee2f91cae06e0e407
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

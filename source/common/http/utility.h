@@ -39,6 +39,7 @@ public:
   const std::string Http11 = "http/1.1";
   const std::string Http2 = "h2";
   const std::string Http2c = "h2c";
+  const std::string Http3 = "h3";
 };
 
 using AlpnNames = ConstSingleton<AlpnNameValues>;
@@ -278,15 +279,6 @@ bool isH2UpgradeRequest(const RequestHeaderMap& headers);
  * - Upgrade: websocket
  */
 bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
-
-/**
- * @return Http1Settings An Http1Settings populated from the
- * envoy::config::core::v3::Http1ProtocolOptions config.
- */
-Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
-
-Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                                 const Protobuf::BoolValue& hcm_stream_error);
 
 struct EncodeFunctions {
   // Function to modify locally generated response headers.

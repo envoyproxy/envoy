@@ -1,7 +1,5 @@
 """Envoy API annotations."""
 
-from collections import namedtuple
-
 import re
 
 # Key-value annotation regex.
@@ -50,70 +48,72 @@ INHERITED_ANNOTATIONS = set([
 
 
 class AnnotationError(Exception):
-  """Base error class for the annotations module."""
+    """Base error class for the annotations module."""
 
 
-def ExtractAnnotations(s, inherited_annotations=None):
-  """Extract annotations map from a given comment string.
+def extract_annotations(s, inherited_annotations=None):
+    """Extract annotations map from a given comment string.
 
-  Args:
-    s: string that may contains annotations.
-    inherited_annotations: annotation map from file-level inherited annotations
-      (or None) if this is a file-level comment.
+    Args:
+        s: string that may contains annotations.
+        inherited_annotations: annotation map from file-level inherited annotations
+           (or None) if this is a file-level comment.
 
-  Returns:
-    Annotation map.
-  """
-  annotations = {
-      k: v for k, v in (inherited_annotations or {}).items() if k in INHERITED_ANNOTATIONS
-  }
-  # Extract annotations.
-  groups = re.findall(ANNOTATION_REGEX, s)
-  for group in groups:
-    annotation = group[0]
-    if annotation not in VALID_ANNOTATIONS:
-      raise AnnotationError('Unknown annotation: %s' % annotation)
-    annotations[group[0]] = group[1].lstrip()
-  return annotations
-
-
-def XformAnnotation(s, annotation_xforms):
-  """Return transformed string with annotation transformers.
-
-  The annotation will be replaced with the new value returned by the transformer.
-  If the transformer returns None, then the annotation will be removed.
-  If the annotation presented in transformers doesn't exist in the original string,
-  a new annotation will be appended to the end of string.
-
-  Args:
-    annotation_xforms: a dict of transformers for annotations.
-
-  Returns:
-    transformed string.
-  """
-  present_annotations = set()
-
-  def xform(match):
-    annotation, content, trailing = match.groups()
-    present_annotations.add(annotation)
-    annotation_xform = annotation_xforms.get(annotation)
-    if annotation_xform:
-      value = annotation_xform(annotation)
-      return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
-    else:
-      return match.group(0)
-
-  def append(s, annotation, content):
-    return '%s [#%s: %s]\n' % (s, annotation, content)
-
-  xformed = re.sub(ANNOTATION_REGEX, xform, s)
-  for annotation, xform in sorted(annotation_xforms.items()):
-    if annotation not in present_annotations:
-      value = xform(None)
-      if value is not None:
-        xformed = append(xformed, annotation, value)
-  return xformed
+    Returns:
+        Annotation map.
+    """
+    annotations = {
+        k: v
+        for k, v in (inherited_annotations or {}).items()
+        if k in INHERITED_ANNOTATIONS
+    }
+    # Extract annotations.
+    groups = re.findall(ANNOTATION_REGEX, s)
+    for group in groups:
+        annotation = group[0]
+        if annotation not in VALID_ANNOTATIONS:
+            raise AnnotationError('Unknown annotation: %s' % annotation)
+        annotations[group[0]] = group[1].lstrip()
+    return annotations
 
 
-def WithoutAnnotations(s):
-  return re.sub(ANNOTATION_REGEX, '', s)
+def xform_annotation(s, annotation_xforms):
+    """Return transformed string with annotation transformers.
+
+    The annotation will be replaced with the new value returned by the transformer.
+    If the transformer returns None, then the annotation will be removed.
+    If the annotation presented in transformers doesn't exist in the original string,
+    a new annotation will be appended to the end of string.
+
+    Args:
+        annotation_xforms: a dict of transformers for annotations.
+
+    Returns:
+        transformed string.
+    """
+    present_annotations = set()
+
+    def xform(match):
+        annotation, content, trailing = match.groups()
+        present_annotations.add(annotation)
+        annotation_xform = annotation_xforms.get(annotation)
+        if annotation_xform:
+            value = annotation_xform(annotation)
+            return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
+        else:
+            return match.group(0)
+
+    def append(s, annotation, content):
+        return '%s [#%s: %s]\n' % (s, annotation, content)
+
+    xformed = re.sub(ANNOTATION_REGEX, xform, s)
+    for annotation, xform in sorted(annotation_xforms.items()):
+        if annotation not in present_annotations:
+            value = xform(None)
+            if value is not None:
+                xformed = append(xformed, annotation, value)
+    return xformed
+
+
+def without_annotations(s):
+    return re.sub(ANNOTATION_REGEX, '', s)

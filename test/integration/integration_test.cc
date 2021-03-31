@@ -509,31 +509,49 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
 
 TEST_P(IntegrationTest, TestSmuggling) {
   initialize();
-  const std::string smuggled_request = "GET / HTTP/1.1\r\nHost: disallowed\r\n\r\n";
-  ASSERT_EQ(smuggled_request.length(), 36);
+
   // Make sure the http parser rejects having content-length and transfer-encoding: chunked
   // on the same request, regardless of order and spacing.
   {
     std::string response;
-    const std::string full_request =
-        "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\ntransfer-encoding: chunked\r\n\r\n" +
-        smuggled_request;
+    const std::string full_request = "GET / HTTP/1.1\r\n"
+                                     "Host: host\r\ncontent-length: 0\r\n"
+                                     "transfer-encoding: chunked\r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
+
+  // Check with a non-zero content length as well.
+  {
+    std::string response;
+    const std::string full_request = "GET / HTTP/1.1\r\n"
+                                     "Host: host\r\ncontent-length: 36\r\n"
+                                     "transfer-encoding: chunked\r\n\r\n";
+    sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+  }
+
+  // Make sure transfer encoding is still treated as such with leading whitespace.
+  {
+    std::string response;
+    const std::string full_request = "GET / HTTP/1.1\r\n"
+                                     "Host: host\r\ncontent-length: 0\r\n"
+                                     "\ttransfer-encoding: chunked\r\n\r\n";
+    sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  }
+
   {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked "
-                                "\r\ncontent-length: 36\r\n\r\n" +
-                                smuggled_request;
+                                "\r\ncontent-length: 36\r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
-                                "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
-                                smuggled_request;
+                                "identity,chunked \r\ncontent-length: 36\r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
@@ -543,8 +561,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
     std::string response;
     const std::string request =
         "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
-        "identity\r\ncontent-length: 36\r\ntransfer-encoding: chunked \r\n\r\n" +
-        smuggled_request;
+        "identity\r\ncontent-length: 36\r\ntransfer-encoding: chunked \r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
@@ -1011,6 +1028,52 @@ TEST_P(IntegrationTest, AbsolutePath) {
   EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
+TEST_P(IntegrationTest, UnknownSchemeRejected) {
+  // Sent an HTTPS request over non-TLS. It should be rejected.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET hps://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_use_remote_address()->set_value(true); });
+  // Sent an HTTPS request over non-TLS. It should be rejected.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 403 Forbidden\r\n"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
+  // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
+  // and match the configured redirect.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
+}
+
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
 TEST_P(IntegrationTest, TestHostWithAddress) {
   useAccessLog("%REQ(Host)%\n");
@@ -1098,26 +1161,16 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-TEST_P(IntegrationTest, UpstreamProtocolError) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+// Test that Envoy by default returns HTTP code 502 on upstream protocol error.
+TEST_P(IntegrationTest, UpstreamProtocolErrorDefault) {
+  testRouterUpstreamProtocolError("502", "UPE");
+}
 
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "host"}});
-  auto response = std::move(encoder_decoder.second);
-
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
-  // be fixed.
-  std::string data;
-  ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
-  ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
+// Test runtime overwrite to return 503 on upstream protocol error.
+TEST_P(IntegrationTest, UpstreamProtocolErrorRuntimeOverwrite) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.return_502_for_upstream_protocol_errors", "false");
+  testRouterUpstreamProtocolError("503", "UC");
 }
 
 TEST_P(IntegrationTest, TestHead) {
@@ -1484,6 +1537,7 @@ TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
 // Send continuous pipelined requests while not reading responses, to check
 // HTTP/1.1 response flood protection.
 TEST_P(IntegrationTest, TestFlood) {
+  config_helper_.setListenerSendBufLimits(1024);
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1522,6 +1576,7 @@ TEST_P(IntegrationTest, TestFlood) {
 }
 
 TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
+  config_helper_.setListenerSendBufLimits(1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
@@ -1764,7 +1819,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIs
       {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
   auto response = std::move(encoder_decoder.second);
 
-  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
@@ -1783,7 +1838,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNot
       {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
   auto response = std::move(encoder_decoder.second);
 
-  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
 }

@@ -64,7 +64,6 @@ TEST_P(HeaderCasingIntegrationTest, VerifyCasedHeaders) {
 
   EXPECT_TRUE(absl::StrContains(upstream_request, "My-Header: foo"));
   EXPECT_TRUE(absl::StrContains(upstream_request, "Host: host"));
-  EXPECT_TRUE(absl::StrContains(upstream_request, "Content-Length: 0"));
 
   // Verify that the downstream response has proper cased headers.
   auto response =

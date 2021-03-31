@@ -277,7 +277,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 
 Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
                                                             socklen_t ss_len, os_fd_t fd) {
-  try {
+  // TODO(chaoqin-li1123): remove exception catching and make Address::addressFromSockAddr return
+  // null on error.
+  TRY_NEEDS_AUDIT {
     // Set v6only to false so that mapped-v6 address can be normalize to v4
     // address. Though dual stack may be disabled, it's still okay to assume the
     // address is from a dual stack socket. This is because mapped-v6 address
@@ -287,7 +289,8 @@ Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_stora
     // regarded as a v6 address from dual stack socket. However, this address is not going to be
     // used to create socket. Wrong knowledge of dual stack support won't hurt.
     return Address::addressFromSockAddr(ss, ss_len, /*v6only=*/false);
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, e.what()));
   }
 }
@@ -569,6 +572,14 @@ Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, cons
 Api::SysCallIntResult IoSocketHandleImpl::getOption(int level, int optname, void* optval,
                                                     socklen_t* optlen) {
   return Api::OsSysCallsSingleton::get().getsockopt(fd_, level, optname, optval, optlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::ioctl(unsigned long control_code, void* in_buffer,
+                                                unsigned long in_buffer_len, void* out_buffer,
+                                                unsigned long out_buffer_len,
+                                                unsigned long* bytes_returned) {
+  return Api::OsSysCallsSingleton::get().ioctl(fd_, control_code, in_buffer, in_buffer_len,
+                                               out_buffer, out_buffer_len, bytes_returned);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {

@@ -260,3 +260,20 @@ generate_x509_cert_nosubject no_subject ca
 # Generate unit test certificate
 generate_rsa_key unittest
 generate_selfsigned_x509_cert unittest
+
+generate_rsa_key keyusage_cert_sign
+generate_x509_cert keyusage_cert_sign ca
+
+generate_rsa_key keyusage_crl_sign
+generate_x509_cert keyusage_crl_sign ca
+
+generate_rsa_key spiffe_san
+generate_x509_cert spiffe_san ca
+
+generate_rsa_key non_spiffe_san
+generate_x509_cert non_spiffe_san ca
+
+cp -f spiffe_san_cert.cfg expired_spiffe_san_cert.cfg
+generate_rsa_key expired_spiffe_san
+generate_x509_cert expired_spiffe_san ca -365
+rm -f expired_spiffe_san_cert.cfg

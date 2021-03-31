@@ -21,6 +21,27 @@ static bool skip_expensive_benchmarks = false;
 // separated by --.
 // TODO(pgenera): convert this to abseil/flags/ when benchmark also adopts abseil.
 int main(int argc, char** argv) {
+
+  bool contains_help_flag = false;
+
+  // Checking if any of the command-line arguments contains `--help`
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "--help") == 0) {
+      contains_help_flag = true;
+      break;
+    }
+  }
+
+  // if the `--help` flag isn't considered separately, it runs "benchmark --help"
+  // (Google Benchmark Help) and the help output doesn't contains details about
+  // custom defined flags like `--skip_expensive_benchmarks`, `--runtime_feature`, etc
+  if (!contains_help_flag) {
+    // Passing the arguments of the program to Google Benchmark.
+    // That way Google benchmark options would also be supported, along with the
+    // custom defined custom flags
+    ::benchmark::Initialize(&argc, argv);
+  }
+
   TestEnvironment::initializeTestMain(argv[0]);
 
   // Suppressing non-error messages in benchmark tests. This hides warning
@@ -76,8 +97,6 @@ int main(int argc, char** argv) {
     const auto feature_val = runtime_feature_split[1];
     Runtime::LoaderSingleton::getExisting()->mergeValues({{feature_name, feature_val}});
   }
-
-  ::benchmark::Initialize(&argc, argv);
 
   if (skip_expensive_benchmarks) {
     ENVOY_LOG_MISC(

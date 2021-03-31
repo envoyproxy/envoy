@@ -33,6 +33,11 @@ public:
   using HttpConnectionManager =
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
   struct ServerSslOptions {
+    ServerSslOptions& setAllowExpiredCertificate(bool allow) {
+      allow_expired_certificate_ = allow;
+      return *this;
+    }
+
     ServerSslOptions& setRsaCert(bool rsa_cert) {
       rsa_cert_ = rsa_cert;
       return *this;
@@ -68,6 +73,20 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setCustomValidatorConfig(
+        envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
+      custom_validator_config_ = custom_validator_config;
+      return *this;
+    }
+
+    ServerSslOptions&
+    setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
+      san_matchers_ = san_matchers;
+      return *this;
+    }
+
+    bool allow_expired_certificate_{};
+    envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
@@ -75,6 +94,7 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
+    std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
   };
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
@@ -83,7 +103,7 @@ public:
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
   ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-               const std::string& config = httpProxyConfig());
+               const std::string& config = httpProxyConfig(false));
 
   static void
   initializeTls(const ServerSslOptions& options,
@@ -104,7 +124,7 @@ public:
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
-  static std::string httpProxyConfig();
+  static std::string httpProxyConfig(bool downstream_use_quic = false);
   // A basic configuration for L7 proxying with QUIC transport.
   static std::string quicHttpProxyConfig();
   // A string for a basic buffer filter, which can be used with addFilter()
@@ -173,6 +193,9 @@ public:
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
 
+  // Sets a small kernel buffer for the listener send buffer
+  void setListenerSendBufLimits(uint32_t limit);
+
   // Set the idle timeout on downstream connections through the HttpConnectionManager.
   void setDownstreamHttpIdleTimeout(std::chrono::milliseconds idle_timeout);
 
@@ -209,6 +232,9 @@ public:
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
+
+  // Add the default SSL configuration for QUIC downstream.
+  void addQuicDownstreamTransportSocketConfig(bool resuse_port);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
@@ -259,7 +285,7 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false);
+  void configureUpstreamTls(bool use_alpn = false, bool http3 = false);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
