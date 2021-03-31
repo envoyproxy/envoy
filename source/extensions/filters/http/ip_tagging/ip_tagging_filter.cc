@@ -28,24 +28,24 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // to be implemented.
   // TODO(ccaraman): Remove size check once file system support is implemented.
   // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
-  if (config.ip_tags().empty()) {
-    throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
+  if (config.ip_tags().empty() && config.path().empty()) {
+    throw EnvoyException("HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
   }
 
-  if (!config.path().empty() && !config.ip_tags().empty()) {
-    throw EnvoyException("IP tags list is accepted either via list or file path");
-  }
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
 
-  // getIPTagsFromFile(config) - parse the file content and validate it as per IPTagFile
-  // pass content to below
-  // file is being watched for updates by envoy
-
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
-      IpTaggingFilterSetTagData(config);
+  // if (!config.ip_tags().empty()) {
+  //   tag_data = IpTaggingFilterSetTagData(config);
+  // else if (!config.path().empty()) {
+  //   tag_from_file = getIPTagsFromFile(file_config)
+  //   tag_data = IpTaggingFilterSetTagData(file_config);
+  // else
+  //   throw EnvoyException("Only one of path or ip_tags can be specified");
+  // }
+  tag_data = IpTaggingFilterSetTagData(config);
   trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
-// move the common code
 std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
 IpTaggingFilterConfig::IpTaggingFilterSetTagData(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config) {
