@@ -303,7 +303,7 @@ selects.config_setting_group(
     name = "disable_http3_all_reasons",
     match_any = [
         ":disable_http3",
-        "boringssl_fips",
+        ":boringssl_fips",
     ],
 )
 
