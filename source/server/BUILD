@@ -158,12 +158,43 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "active_stream_socket",
+    srcs = ["active_stream_socket.cc"],
+    hdrs = [
+        "active_stream_socket.h",
+    ],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:exception_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/stats:timespan_interface",
+        "//source/common/common:linked_object",
+        "//source/common/common:non_copyable",
+        "//source/common/event:deferred_task",
+        "//source/common/network:connection_lib",
+        "//source/common/stats:timespan_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/transport_sockets:well_known_names",
+        "//source/server:connection_handler_impl",
+    ],
+)
+
+envoy_cc_library(
     name = "active_internal_listener",
     srcs = ["active_internal_listener.cc"],
     hdrs = [
         "active_internal_listener.h",
     ],
     deps = [
+        ":active_stream_socket",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
