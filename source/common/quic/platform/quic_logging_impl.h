@@ -154,6 +154,23 @@ enum {
 
 using QuicLogLevel = spdlog::level::level_enum;
 
+// NullGuard exists such that NullGuard<T>::guard(v) returns v, unless passed
+// a nullptr_t, or a null char* or const char*, in which case it returns
+// "(null)". This allows streaming NullGuard<T>::guard(v) to an output stream
+// without hitting undefined behavior for null values.
+template <typename T> struct NullGuard {
+  static const T& guard(const T& v) { return v; }
+};
+template <> struct NullGuard<char*> {
+  static const char* guard(const char* v) { return v ? v : "(null)"; }
+};
+template <> struct NullGuard<const char*> {
+  static const char* guard(const char* v) { return v ? v : "(null)"; }
+};
+template <> struct NullGuard<std::nullptr_t> {
+  static const char* guard(const std::nullptr_t&) { return "(null)"; }
+};
+
 class QuicLogEmitter {
 public:
   // |file_name| and |function_name| MUST be valid for the lifetime of the QuicLogEmitter. This is
@@ -168,7 +185,22 @@ public:
     return *this;
   }
 
-  std::ostringstream& stream() { return stream_; }
+  template <typename T> QuicLogEmitter& operator<<(const T& v) {
+    stream_ << NullGuard<T>::guard(v);
+    return *this;
+  }
+
+  // Handle stream manipulators such as std::endl.
+  QuicLogEmitter& operator<<(std::ostream& (*m)(std::ostream& os)) {
+    stream_ << m;
+    return *this;
+  }
+  QuicLogEmitter& operator<<(std::ios_base& (*m)(std::ios_base& os)) {
+    stream_ << m;
+    return *this;
+  }
+
+  QuicLogEmitter& stream() { return *this; }
 
 private:
   const QuicLogLevel level_;
@@ -180,14 +212,15 @@ private:
   std::ostringstream stream_;
 };
 
-class NullLogStream : public std::ostream {
+class NullLogStream {
 public:
-  NullLogStream() : std::ostream(nullptr) {}
-
   NullLogStream& stream() { return *this; }
 };
 
 template <typename T> inline NullLogStream& operator<<(NullLogStream& s, const T&) { return s; }
+// Handle stream manipulators such as std::endl.
+inline NullLogStream& operator<<(NullLogStream& s, std::ostream& (*)(std::ostream&)) { return s; }
+inline NullLogStream& operator<<(NullLogStream& s, std::ios_base& (*)(std::ios_base&)) { return s; }
 
 inline spdlog::logger& GetLogger() {
   return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::quic);
