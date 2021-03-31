@@ -42,7 +42,6 @@ namespace Compressor {
 #define RESPONSE_COMPRESSOR_STATS(COUNTER)                                                         \
   COUNTER(no_accept_header)                                                                        \
   COUNTER(header_identity)                                                                         \
-  COUNTER(header_gzip)                                                                             \
   COUNTER(header_compressor_used)                                                                  \
   COUNTER(header_compressor_overshadowed)                                                          \
   COUNTER(header_wildcard)                                                                         \
