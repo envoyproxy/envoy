@@ -44,22 +44,18 @@ public:
 
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
+      std::vector<std::string> rewrited_header_values;
+      std::vector<absl::string_view> header_values;
+      header_values.reserve(header.size());
       if (regex_rewrite_ != nullptr) {
-        std::vector<std::string> header_values;
-        header_values.reserve(header.size());
-        for (size_t i = 0; i < header.size(); i++) {
-          header_values.push_back(regex_rewrite_->replaceAll(header[i]->value().getStringView(),
-                                                             regex_rewrite_substitution_));
-        }
-        // Ensure generating same hash value for different order header values.
-        // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
-        std::sort(header_values.begin(), header_values.end());
-        absl::Hash<const std::vector<std::string>> hasher;
-        hash = hasher(header_values);
-      } else {
-        std::vector<absl::string_view> header_values;
-        header_values.reserve(header.size());
-        for (size_t i = 0; i < header.size(); i++) {
+        rewrited_header_values.reserve(header.size());
+      }
+      for (size_t i = 0; i < header.size(); i++) {
+        if (regex_rewrite_ != nullptr) {
+          rewrited_header_values.push_back(regex_rewrite_->replaceAll(
+              header[i]->value().getStringView(), regex_rewrite_substitution_));
+          header_values.push_back(rewrited_header_values.back());
+        } else {
           header_values.push_back(header[i]->value().getStringView());
         }
         // Ensure generating same hash value for different order header values.

@@ -2383,10 +2383,10 @@ virtual_hosts:
     return *config_;
   }
 
-  absl::optional<uint64_t> generateHash(const std::vector<std::string>& header_values) {
+  absl::optional<uint64_t> generateHash(const std::vector<absl::string_view>& header_values) {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    for (auto value : header_values) {
-      headers.addCopy("foo_header", value);
+    for (auto& value : header_values) {
+      headers.addCopy("foo_header", std::string(value));
     }
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     return route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
@@ -2404,11 +2404,9 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   firstRouteHashPolicy()->mutable_header()->set_header_name("foo_header");
   {
     EXPECT_FALSE(generateHash({}));
-    EXPECT_TRUE(generateHash({
-        "bar",
-    }));
+    EXPECT_TRUE(generateHash({"bar"}));
 
-    absl::Hash<const std::vector<std::string>> hasher;
+    absl::Hash<const std::vector<absl::string_view>> hasher;
     EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"bar", "foo"}));
     EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"foo", "bar"}));
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"abc", "def"}));
@@ -2423,21 +2421,20 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
 TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
   // Apply a regex substitution before hashing.
   auto* header = firstRouteHashPolicy()->mutable_header();
-  header->set_header_name(":path");
+  header->set_header_name("foo_header");
   auto* regex_spec = header->mutable_regex_rewrite();
   regex_spec->set_substitution("\\1");
   auto* pattern = regex_spec->mutable_pattern();
   pattern->mutable_google_re2();
   pattern->set_regex("^/(\\w+)$");
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_FALSE(generateHash({}));
+    EXPECT_TRUE(generateHash({"/bar"}));
+
     absl::Hash<const std::vector<absl::string_view>> hasher;
-    EXPECT_EQ(route->routeEntry()
-                  ->hashPolicy()
-                  ->generateHash(nullptr, headers, add_cookie_nop_, nullptr)
-                  .value(),
-              hasher(std::vector<absl::string_view>{"foo"}));
+    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"/bar", "/foo"}));
+    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"/foo", "/bar"}));
+    EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"/abc", "/def"}));
   }
 }
 
