@@ -299,6 +299,14 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "disable_http3_all_reasons",
+    match_any = [
+        ":disable_http3",
+        ":boringssl_fips",
+    ],
+)
+
 config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},

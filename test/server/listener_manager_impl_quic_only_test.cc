@@ -1,7 +1,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
+#if defined(ENVOY_ENABLE_QUIC)
 #include "common/quic/quic_transport_socket_factory.h"
+#endif
 
 #include "test/server/listener_manager_impl_test.h"
 #include "test/server/utility.h"

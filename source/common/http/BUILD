@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -65,10 +66,10 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
         "//source/common/network:filter_lib",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:codec_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -259,8 +260,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
         "//source/common/http/match_wrapper:config",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",

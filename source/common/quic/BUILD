@@ -152,8 +152,6 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/registry",
         "//source/common/http/http3:quic_client_connection_factory_lib",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
@@ -170,8 +168,6 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         "//include/envoy/http:codec_interface",
         "//include/envoy/registry",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )

@@ -10,11 +10,14 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/codec_impl.h"
+#endif
 
 #include "server/connection_handler_impl.h"
 
@@ -339,11 +342,12 @@ FakeHttpConnection::FakeHttpConnection(
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     ASSERT(type == Type::HTTP3);
-    envoy::config::core::v3::Http3ProtocolOptions http3_options;
-    codec_ = std::unique_ptr<Http::ServerConnection>(
-        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(shared_connection_.connection(), *this));
+#ifdef ENVOY_ENABLE_QUIC
+    codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this);
+#else
+    ASSERT(false, "running a QUIC integration test without compiling QUIC");
+#endif
   }
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});

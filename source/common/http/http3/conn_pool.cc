@@ -7,11 +7,16 @@
 
 #include "common/config/utility.h"
 #include "common/http/http3/quic_client_connection_factory.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_features.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/client_connection_factory_impl.h"
+#else
+#error "http3 conn pool should not be built with QUIC disabled"
+#endif
 
 namespace Envoy {
 namespace Http {
@@ -36,11 +41,9 @@ public:
       source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
     }
     Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
-    quic_info_ =
-        Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche)
-            .createNetworkConnectionInfo(dispatcher, transport_socket_factory,
-                                         host->cluster().statsScope(), time_source, source_address);
+    quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
+        dispatcher, transport_socket_factory, host->cluster().statsScope(), time_source,
+        source_address);
   }
 
   // Make sure all connections are torn down before quic_info_ is deleted.
@@ -68,11 +71,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         if (!source_address.get()) {
           source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
         }
-        data.connection_ =
-            Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-                Http::QuicCodecNames::get().Quiche)
-                .createQuicNetworkConnection(*h3_pool->quic_info_, pool->dispatcher(), host_address,
-                                             source_address);
+        data.connection_ = Quic::createQuicNetworkConnection(
+            *h3_pool->quic_info_, pool->dispatcher(), host_address, source_address);
         return std::make_unique<ActiveClient>(*pool, data);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
