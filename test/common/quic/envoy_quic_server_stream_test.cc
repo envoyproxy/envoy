@@ -520,8 +520,6 @@ TEST_P(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   // Buffering more trailers will cause stream to reach high watermark, but
   // because trailers closes the stream, no callback should be triggered.
   quic_stream_->encodeTrailers(response_trailers_);
-
-  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_P(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
@@ -591,6 +589,65 @@ TEST_P(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
                                      spdy_trailers);
   }
   EXPECT_TRUE(quic_stream_->rst_sent());
+}
+
+// Tests that closing connection is QUICHE write call stack doesn't mess up
+// watermark buffer accounting.
+TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  std::string response(16 * 1024 + 1, 'a');
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .Times(testing::AtLeast(1u))
+      .WillRepeatedly(
+          Invoke([this](quic::QuicStreamId, size_t data_size, quic::QuicStreamOffset,
+                        quic::StreamSendingState, bool, absl::optional<quic::EncryptionLevel>) {
+            if (data_size < 10) {
+              // Ietf QUIC sends a small data frame header before sending the data frame payload.
+              return quic::QuicConsumedData{data_size, false};
+            }
+            // Mimic write failure while writing data frame payload.
+            quic_connection_.CloseConnection(
+                quic::QUIC_INTERNAL_ERROR, "Closed in WriteHeaders",
+                quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+            // This will cause the payload to be buffered.
+            return quic::QuicConsumedData{0, false};
+          }));
+
+  // Bump the stream flow control window.
+  quic::QuicWindowUpdateFrame window_update(quic::kInvalidControlFrameId, quic_stream_->id(),
+                                            20 * 1024);
+  quic_stream_->OnWindowUpdateFrame(window_update);
+
+  // Send a response which causes connection to close.
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+
+  Buffer::OwnedImpl buffer(response);
+  // Though the stream send buffer is above high watermark, onAboveWriteBufferHighWatermark())
+  // shouldn't be called because the connection is closed.
+  quic_stream_->encodeData(buffer, false);
+  EXPECT_GT(quic_session_.bytesToSend(), 0u);
+  // Clearing watermark buffer accounting takes effect is the next event loop.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(quic_session_.bytesToSend(), 0u);
+}
+
+// Tests that after end_stream is encoded, closing connection shouldn't call
+// onResetStream() callbacks.
+TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillOnce(
+          Invoke([this](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
+                        quic::StreamSendingState, bool, absl::optional<quic::EncryptionLevel>) {
+            quic_connection_.CloseConnection(
+                quic::QUIC_INTERNAL_ERROR, "Closed in WriteHeaders",
+                quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+            return quic::QuicConsumedData{0, false};
+          }));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 
 } // namespace Quic
