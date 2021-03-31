@@ -24,6 +24,7 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/settings.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
@@ -207,8 +208,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
-      http1_settings_(Http::Utility::parseHttp1Settings(
-          config.http_protocol_options(), config.stream_error_on_invalid_http_message(),
+      http1_settings_(Http::Http1::parseHttp1Settings(
+          config.http_protocol_options(), context.messageValidationVisitor(),
+          config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),

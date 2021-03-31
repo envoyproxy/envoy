@@ -8,7 +8,7 @@ Wasm C++ filter
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 .. sidebar:: Compatibility
 
@@ -36,7 +36,7 @@ Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the compo
     $ docker-compose up -d
     $ docker-compose ps
 
-	Name                     Command                State             Ports
+        Name                     Command                State             Ports
     -----------------------------------------------------------------------------------------------
     wasm_proxy_1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     wasm_web_service_1   node ./index.js                Up

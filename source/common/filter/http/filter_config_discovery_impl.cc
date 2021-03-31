@@ -7,6 +7,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/containers.h"
+#include "common/common/thread.h"
 #include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/utility.h"
@@ -113,7 +114,7 @@ FilterConfigSubscription::FilterConfigSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_,
-          false);
+          {});
 }
 
 void FilterConfigSubscription::start() {
@@ -283,10 +284,11 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   // and the applied config eventually converges once ECDS update arrives.
   bool last_config_valid = false;
   if (subscription->lastConfig().has_value()) {
-    try {
+    TRY_ASSERT_MAIN_THREAD {
       provider->validateTypeUrl(subscription->lastTypeUrl());
       last_config_valid = true;
-    } catch (const EnvoyException& e) {
+    }
+    END_TRY catch (const EnvoyException& e) {
       ENVOY_LOG(debug, "ECDS subscription {} is invalid in a listener context: {}.",
                 filter_config_name, e.what());
       subscription->incrementConflictCounter();
