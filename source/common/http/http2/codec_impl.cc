@@ -646,9 +646,7 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
   connection_.close(Network::ConnectionCloseType::NoFlush);
 }
 
-Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) { return innerDispatch(data); }
-
-Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
@@ -1703,12 +1701,10 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
       is_outbound_flood_monitored_control_frame);
 }
 
-Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) { return innerDispatch(data); }
-
-Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  return ConnectionImpl::innerDispatch(data);
+  return ConnectionImpl::dispatch(data);
 }
 
 absl::optional<int>

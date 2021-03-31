@@ -538,8 +538,6 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   return true;
 }
 
-Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) { return innerDispatch(data); }
-
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {
@@ -550,7 +548,7 @@ Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   return status;
 }
 
-Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   // Add self to the Dispatcher's tracked object stack.
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
