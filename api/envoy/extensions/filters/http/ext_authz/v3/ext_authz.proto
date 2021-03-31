@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -121,6 +121,13 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  // Specifies if HTTP status codes for gRPC calls reflect gRPC status
+  // https://github.com/envoyproxy/envoy/issues/11079
+  //
+  // When this field is true, Envoy will send an HTTP response code appropriate to
+  // the response seen
+  bool http_status_for_grpc_deny = 15;
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured *ext_authz* filters in an HTTP filter chain. For example:

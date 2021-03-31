@@ -795,6 +795,136 @@ body_format:
   cleanup();
 }
 
+// If http_status_for_grpc_deny is true, rejected authz requests send an HTTP
+// code that reflects the rejection. If false (or unset) then the caller must
+// check the GRPC code explicitly, as the HTTP code will reflect the fact that
+// the call was made successfully regardless of auth result.
+TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedStatusPropagationPositiveTest) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+    const std::string ext_authz_config = R"EOF(
+  transport_api_version: V3
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 300s
+  http_status_for_grpc_deny: true
+  )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config);
+
+    envoy::config::listener::v3::Filter ext_authz_filter;
+    ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
+    config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"content-type", "application/grpc"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  FakeStreamPtr ext_authz_request;
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "403"},
+      {"content-type", "application/grpc"},
+  };
+  ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  auto code_header = response->headers().get(Http::Headers::get().ExtAuthzGrpcHttpDeny);
+  EXPECT_TRUE(code_header.empty()); // should be removed before caller sees it
+
+  EXPECT_EQ(response->headers().getGrpcStatusValue(),
+            std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::PermissionDenied)));
+  EXPECT_EQ(response->headers().getStatusValue(), "403");
+  cleanup();
+}
+
+TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedStatusPropagationNegativeTest) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+    const std::string ext_authz_config = R"EOF(
+  transport_api_version: V3
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 300s
+  http_status_for_grpc_deny: false
+  )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config);
+
+    envoy::config::listener::v3::Filter ext_authz_filter;
+    ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
+    config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"content-type", "application/grpc"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  FakeStreamPtr ext_authz_request;
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "403"},
+      {"content-type", "fake-type"},
+  };
+  ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  auto code_header = response->headers().get(Http::Headers::get().ExtAuthzGrpcHttpDeny);
+  ASSERT_TRUE(code_header.empty()); // should be removed before caller sees it
+  EXPECT_EQ(response->headers().getGrpcStatusValue(),
+            std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::PermissionDenied)));
+  EXPECT_EQ(response->headers().getStatusValue(),
+            "200"); // Unless overridden, GRPC calls are always HTTP/200
+  cleanup();
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initializeConfig();

@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message ExtAuthz {
   // External authorization service configuration.
   oneof services {
@@ -109,6 +109,13 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  // Specifies if HTTP status codes for gRPC calls reflect gRPC status
+  // https://github.com/envoyproxy/envoy/issues/11079
+  //
+  // When this field is true, Envoy will send an HTTP response code appropriate to
+  // the response seen
+  bool http_status_for_grpc_deny = 12;
 }
 
 // Configuration for buffering the request data.

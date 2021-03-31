@@ -517,7 +517,10 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
 
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (local_reply_data.is_grpc_) {
-    response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
+    response_headers->setStatus(httpCodeForGrpcDeny(response_headers)
+                                    ? response_headers->getStatusValue()
+                                    : std::to_string(enumToInt(Code::OK)));
+
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
 
     if (response_headers->getGrpcStatusValue().empty()) {
@@ -568,6 +571,21 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     Buffer::OwnedImpl buffer(body_text);
     encode_functions.encode_data_(buffer, true);
   }
+}
+
+bool Utility::httpCodeForGrpcDeny(ResponseHeaderMapPtr& response_headers) {
+  // Check for whether to pass status code from remote service back to the caller
+  // https://github.com/envoyproxy/envoy/issues/11079
+  bool propagate_http_code = false;
+  auto code_header = response_headers->get(Http::Headers::get().ExtAuthzGrpcHttpDeny);
+  if (!code_header.empty()) {
+    if (code_header[0]->value().getStringView() == "true") {
+      propagate_http_code = true;
+    }
+    response_headers->remove(Http::Headers::get().ExtAuthzGrpcHttpDeny);
+  }
+
+  return propagate_http_code;
 }
 
 Utility::GetLastAddressFromXffInfo

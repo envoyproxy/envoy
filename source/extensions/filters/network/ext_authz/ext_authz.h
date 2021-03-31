@@ -54,6 +54,7 @@ public:
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
         include_peer_certificate_(config.include_peer_certificate()),
+        http_status_for_grpc_deny_(config.http_status_for_grpc_deny()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
@@ -63,6 +64,7 @@ public:
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  bool httpStatusForGrpcDeny() const { return http_status_for_grpc_deny_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
   }
@@ -72,6 +74,7 @@ private:
   const InstanceStats stats_;
   bool failure_mode_allow_;
   const bool include_peer_certificate_;
+  const bool http_status_for_grpc_deny_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
 
