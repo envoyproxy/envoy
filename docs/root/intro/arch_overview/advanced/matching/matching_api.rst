@@ -78,7 +78,7 @@ happens when it sees the trailers), resulting in a gRPC-Web response with an emp
 Match Tree Validation
 =====================
 
-As the match tree structure is very flexible, some filters migth need to impose additional restrictions
+As the match tree structure is very flexible, some filters might need to impose additional restrictions
 on what kind of match trees can be used. This system is somewhat inflexible at the moment, only supporting
 limiting the input sources to a specific set. For example, a filter might specify that it only works with
 request headers: in this case a match tree that attempts to match on request trailers or response headers
@@ -88,3 +88,13 @@ This is done for example to limit the issues talked about in
 :ref:`the above section <arch_overview_matching_api_iteration_impact>` or to help users understand in what
 context a match tree can be used for a specific filter. Due to the limitations of the validations framework
 at the current time, it is not used for all filters.
+
+For HTTP filters, the restrictions are specified by the filter implementation, so consult the individual
+filter documentation to understand whether there are restrictions in place.
+
+For example, in the example below, the match tree could not be used with a filter that restricts the the
+match tree to only use
+:ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>`.
+
+.. literalinclude:: _include/request_response.yaml
+    :language: yaml
