@@ -136,16 +136,6 @@ public:
     }
   }
 
-  /**
-   * An inner dispatch call that executes the dispatching logic. While exception removal is in
-   * migration (#10878), this function may either throw an exception or return an error status.
-   * Exceptions are caught and translated to their corresponding statuses in the outer level
-   * dispatch.
-   * This needs to be virtual so that ServerConnectionImpl can override.
-   * TODO(#10878): Remove this when exception removal is complete.
-   */
-  virtual Http::Status innerDispatch(Buffer::Instance& data);
-
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
@@ -654,7 +644,6 @@ private:
   // ServerConnectionImpl objects is called only when processing data from the downstream client in
   // the ConnectionManagerImpl::onData method.
   Http::Status dispatch(Buffer::Instance& data) override;
-  Http::Status innerDispatch(Buffer::Instance& data) override;
 
   ServerConnectionCallbacks& callbacks_;
 
