@@ -58,9 +58,15 @@ do
     # `$CLANG_FORMAT` and `$BUILDIFY` are defined, or that the default values it
     # assumes for these variables correspond to real binaries on the system. If
     # either of these things aren't true, the check fails.
-    for i in $(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1); do
-      echo -ne "  Checking format for $i - "
+    for i in $(git diff --name-only $RANGE --diff-filter=ACMR --ignore-submodules=all 2>&1); do
+      if [[ -n "$BUILDIFIER_PATH" ]]; then
+       echo -ne "  Checking format for $i - "
       "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
+      else
+        echo -e "\nMissing \$BUILDIFIER_PATH, skipping code_format/check_format.py\n" >&2
+      fi
+
+      ./tools/code_format/glint.sh "$i"
 
       echo "  Checking spelling for $i"
       "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
