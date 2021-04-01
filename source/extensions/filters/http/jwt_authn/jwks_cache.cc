@@ -31,7 +31,8 @@ class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger:
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api)
       : jwt_provider_(jwt_provider), time_source_(time_source) {
-    jwt_cache_ = JwtCache::create(jwt_provider.enable_jwt_cache(), jwt_provider.jwt_cache_size());
+    jwt_cache_ = JwtCache::create(jwt_provider.enable_jwt_cache(), jwt_provider.jwt_cache_size(),
+                                  time_source_);
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);

@@ -56,6 +56,7 @@ Minor Behavior Changes
 * http: upstream flood and abuse checks increment the count of opened HTTP/2 streams when Envoy sends
   initial HEADERS frame for the new stream. Before the counter was incrementred when Envoy received
   response HEADERS frame with the END_HEADERS flag set from upstream server.
+* jwt_authn: added support for :ref:`Jwt Cache <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider.enable_jwt_cache>` and its size can be specified by :ref:`jwt_cache_size <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider.jwt_cache_size>`.
 * lua: added function `timestamp` to provide millisecond resolution timestamps by passing in `EnvoyTimestampResolution.MILLISECOND`.
 * oauth filter: added the optional parameter :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. Enables this value to be overridden in the Authorization request to the OAuth provider.
 * perf: allow reading more bytes per operation from raw sockets to improve performance.

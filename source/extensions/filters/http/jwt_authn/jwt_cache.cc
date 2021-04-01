@@ -13,7 +13,8 @@ constexpr int kJwtCacheDefaultSize = 100;
 
 class JwtCacheImpl : public JwtCache {
 public:
-  JwtCacheImpl(bool enable_cache, int cache_size) {
+  JwtCacheImpl(bool enable_cache, int cache_size, TimeSource& time_source)
+      : time_source_(time_source) {
     if (enable_cache) {
       // if cache_size is 0, it is not specified in the config, use default
       if (cache_size == 0) {
@@ -40,7 +41,7 @@ public:
     if (lookup.found()) {
       found_jwt = lookup.value();
       ASSERT(found_jwt != nullptr);
-      if (found_jwt->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now())) ==
+      if (found_jwt->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
           ::google::jwt_verify::Status::JwtExpired) {
         jwt_cache_->remove(token);
         found_jwt = nullptr;
@@ -58,11 +59,12 @@ public:
 
 private:
   std::unique_ptr<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>> jwt_cache_;
+  TimeSource& time_source_;
 };
 } // namespace
 
-JwtCachePtr JwtCache::create(bool enable_cache, int cache_size) {
-  return std::make_unique<JwtCacheImpl>(enable_cache, cache_size);
+JwtCachePtr JwtCache::create(bool enable_cache, int cache_size, TimeSource& time_source) {
+  return std::make_unique<JwtCacheImpl>(enable_cache, cache_size, time_source);
 }
 
 } // namespace JwtAuthn

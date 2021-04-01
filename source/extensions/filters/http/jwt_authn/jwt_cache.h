@@ -3,9 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/time.h"
+#include "common/common/utility.h"
 
-#include "absl/types/optional.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
 #include "simple_lru_cache/simple_lru_cache_inl.h"
@@ -36,7 +35,7 @@ public:
                       std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) PURE;
 
   // JwtCache factory function.
-  static JwtCachePtr create(bool enable_cache, int cache_size);
+  static JwtCachePtr create(bool enable_cache, int cache_size, TimeSource& time_source);
 };
 
 } // namespace JwtAuthn
