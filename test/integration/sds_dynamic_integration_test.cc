@@ -15,6 +15,10 @@
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/client_connection_factory_impl.h"
+#endif
+
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
@@ -235,6 +239,7 @@ public:
           address, Network::Address::InstanceConstSharedPtr(),
           client_ssl_ctx_->createTransportSocket(nullptr), nullptr);
     }
+#ifdef ENVOY_ENABLE_QUIC
     std::string url = "udp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
                       std::to_string(port);
     Network::Address::InstanceConstSharedPtr local_address;
@@ -244,10 +249,11 @@ public:
       // Docker only works with loopback v6 address.
       local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
     }
-    return Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-               Http::QuicCodecNames::get().Quiche)
-        .createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
+    return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
                                      Network::Utility::resolveUrl(url), local_address);
+#else
+  NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   }
 
 protected:
