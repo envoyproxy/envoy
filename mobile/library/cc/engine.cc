@@ -23,7 +23,7 @@ void c_on_exit(void* context) {
 
 Engine::Engine(envoy_engine_t engine, const std::string& configuration, LogLevel log_level,
                EngineCallbacksSharedPtr callbacks)
-    : engine_(engine), callbacks_(callbacks) {
+    : engine_(engine), callbacks_(callbacks), terminated_(false) {
   envoy_engine_callbacks envoy_callbacks{
       .on_engine_running = &c_on_engine_running,
       .on_exit = &c_on_exit,
@@ -37,10 +37,22 @@ Engine::Engine(envoy_engine_t engine, const std::string& configuration, LogLevel
   this->pulse_client_ = std::make_shared<PulseClient>();
 }
 
-Engine::~Engine() { terminate_engine(this->engine_); }
+Engine::~Engine() {
+  if (!this->terminated_) {
+    terminate_engine(this->engine_);
+  }
+}
 
 StreamClientSharedPtr Engine::stream_client() { return this->stream_client_; }
 PulseClientSharedPtr Engine::pulse_client() { return this->pulse_client_; }
+
+void Engine::terminate() {
+  if (this->terminated_) {
+    throw std::runtime_error("attempting to double terminate Engine");
+  }
+  terminate_engine(this->engine_);
+  this->terminated_ = true;
+}
 
 } // namespace Platform
 } // namespace Envoy
