@@ -30,6 +30,8 @@ public:
   StreamClientSharedPtr stream_client();
   PulseClientSharedPtr pulse_client();
 
+  void terminate();
+
 private:
   Engine(envoy_engine_t engine, const std::string& configuration, LogLevel log_level,
          EngineCallbacksSharedPtr callbacks);
@@ -40,6 +42,7 @@ private:
   EngineCallbacksSharedPtr callbacks_;
   StreamClientSharedPtr stream_client_;
   PulseClientSharedPtr pulse_client_;
+  bool terminated_;
 };
 
 using EngineSharedPtr = std::shared_ptr<Engine>;
