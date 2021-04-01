@@ -18,8 +18,8 @@ public:
     setUpstreamCount(2);
 
     // Tests with ORIGINAL_DST cluster because the first use case of the setRoute / DelegatingRoute
-    // route mutability functionality will be for Lyft's internal filter that re-routes requests to
-    // an ORIGINAL_DST cluster on a per-request basis.
+    // route mutability functionality will be for a filter that re-routes requests to an
+    // ORIGINAL_DST cluster on a per-request basis.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       std::string cluster_yaml = R"EOF(
               name: cluster_override
