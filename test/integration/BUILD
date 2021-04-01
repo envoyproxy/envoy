@@ -453,7 +453,6 @@ envoy_cc_test_library(
         "//test/integration/filters:local_reply_during_encoding_data_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
-        "//test/integration/filters:set_route_filter_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -1654,5 +1653,16 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "set_delegating_route_test",
+    srcs = [
+        "set_delegating_route_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/integration/filters:set_route_filter_lib",
     ],
 )
