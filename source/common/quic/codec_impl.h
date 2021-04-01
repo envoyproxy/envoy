@@ -5,8 +5,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/http/http3/quic_codec_factory.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/quic/envoy_quic_client_session.h"
 #include "common/quic/envoy_quic_server_session.h"
 
@@ -70,29 +68,6 @@ public:
 private:
   EnvoyQuicClientSession& quic_client_session_;
 };
-
-// A factory to create QuicHttpClientConnection.
-class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectionFactory {
-public:
-  std::unique_ptr<Http::ClientConnection>
-  createQuicClientConnection(Network::Connection& connection,
-                             Http::ConnectionCallbacks& callbacks) override;
-
-  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
-};
-
-// A factory to create QuicHttpServerConnection.
-class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectionFactory {
-public:
-  std::unique_ptr<Http::ServerConnection>
-  createQuicServerConnection(Network::Connection& connection,
-                             Http::ConnectionCallbacks& callbacks) override;
-
-  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
-};
-
-DECLARE_FACTORY(QuicHttpClientConnectionFactoryImpl);
-DECLARE_FACTORY(QuicHttpServerConnectionFactoryImpl);
 
 } // namespace Quic
 } // namespace Envoy
