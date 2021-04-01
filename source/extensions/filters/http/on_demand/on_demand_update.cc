@@ -88,7 +88,9 @@ void OnDemandRouteUpdate::handleOnDemandCDS(const Router::Route& route) {
   auto cluster_name = entry->clusterName();
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
   cluster_discovery_callback_ = std::make_shared<Upstream::ClusterDiscoveryCallback>(
-      [this](bool cluster_exists) { onClusterDiscoveryCompletion(cluster_exists); });
+      [this](Upstream::ClusterDiscoveryStatus cluster_status) {
+        onClusterDiscoveryCompletion(cluster_status);
+      });
   cluster_discovery_handle_ =
       cm.requestOnDemandClusterDiscovery(odcds, cluster_name, cluster_discovery_callback_);
 }
@@ -149,11 +151,13 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   callbacks_->continueDecoding();
 }
 
-void OnDemandRouteUpdate::onClusterDiscoveryCompletion(bool cluster_exists) {
+void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
+    Upstream::ClusterDiscoveryStatus cluster_status) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_callback_.reset();
   cluster_discovery_handle_.reset();
-  if (cluster_exists && !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
+  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available &&
+      !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
       callbacks_->clearRouteCache();

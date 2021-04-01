@@ -133,7 +133,7 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterNotFound) {
   EXPECT_CALL(decoder_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  filter_->onClusterDiscoveryCompletion(false);
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Missing);
 }
 
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFound) {
@@ -141,7 +141,7 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFound) {
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  filter_->onClusterDiscoveryCompletion(true);
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRecreateStreamFailed) {
@@ -149,7 +149,7 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRecreateStrea
   EXPECT_CALL(decoder_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(false));
-  filter_->onClusterDiscoveryCompletion(true);
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithBody) {
@@ -157,7 +157,7 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithB
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(&buffer));
-  filter_->onClusterDiscoveryCompletion(true);
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
 } // namespace OnDemand

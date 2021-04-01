@@ -288,7 +288,8 @@ public:
   ClusterDiscoveryCallbackHandlePtr
   requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds, const std::string& name,
                                   ClusterDiscoveryCallbackWeakPtr callback) override;
-  void notifyOnDemandCluster(const std::string& name, bool cluster_exists) override;
+  void notifyOnDemandCluster(const std::string& name,
+                             ClusterDiscoveryStatus cluster_status) override;
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
@@ -348,7 +349,7 @@ private:
     ClusterDiscoveryManager(ThreadLocalClusterManagerImpl& parent);
 
     void ensureCallbacksAreInstalled();
-    void processClusterName(const std::string& name, bool cluster_exists);
+    void processClusterName(const std::string& name, ClusterDiscoveryStatus cluster_status);
 
     struct Pair {
       ClusterDiscoveryCallbackHandlePtr handle_ptr_;

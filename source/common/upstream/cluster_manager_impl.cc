@@ -1053,14 +1053,15 @@ void ClusterManagerImpl::ClusterDiscoveryManager::ensureCallbacksAreInstalled() 
   if (callbacks_handle_) {
     return;
   }
-  auto cb = ClusterAddedCb(
-      [this](ThreadLocalCluster& cluster) { processClusterName(cluster.info()->name(), true); });
+  auto cb = ClusterAddedCb([this](ThreadLocalCluster& cluster) {
+    processClusterName(cluster.info()->name(), ClusterDiscoveryStatus::Available);
+  });
   callbacks_ = std::make_unique<ClusterCallbacks>(cb);
   callbacks_handle_ = parent_.parent_.addThreadLocalClusterUpdateCallbacks(*callbacks_);
 }
 
-void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(const std::string& name,
-                                                                     bool cluster_exists) {
+void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(
+    const std::string& name, ClusterDiscoveryStatus cluster_status) {
   auto map_node_handle = pending_clusters_.extract(name);
   if (map_node_handle.empty()) {
     return;
@@ -1068,7 +1069,7 @@ void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(const std::
   for (const auto& weak_callback : map_node_handle.mapped()) {
     auto callback = weak_callback.lock();
     if (callback != nullptr) {
-      (*callback)(cluster_exists);
+      (*callback)(cluster_status);
     }
   }
   maybePostResetCallbacks();
@@ -1162,7 +1163,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds,
           // If this gets called here, it means that we requested a
           // discovery of a cluster without checking if that cluster
           // is already known by cluster manager.
-          (*callback)(true);
+          (*callback)(ClusterDiscoveryStatus::Available);
         }
       });
       return;
@@ -1191,7 +1192,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds,
           // point. Request is still being paused, but the route entry
           // for this request got dropped, and thus its ODCDS was also
           // dropped.
-          (*callback)(false);
+          (*callback)(ClusterDiscoveryStatus::Missing);
         }
       });
     }
@@ -1200,13 +1201,14 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds,
   return std::move(handle);
 }
 
-void ClusterManagerImpl::notifyOnDemandCluster(const std::string& name, bool cluster_exists) {
+void ClusterManagerImpl::notifyOnDemandCluster(const std::string& name,
+                                               ClusterDiscoveryStatus cluster_status) {
   tls_.runOnAllThreads(
       [name, cluster_exists](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         if (!cluster_manager.has_value()) {
           return;
         }
-        cluster_manager->cdm_.processClusterName(name, cluster_exists);
+        cluster_manager->cdm_.processClusterName(name, cluster_status);
       },
       [this, name] { pending_cluster_creations_.erase(name); });
 }

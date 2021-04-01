@@ -72,7 +72,25 @@ public:
 
 using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHandle>;
 
-using ClusterDiscoveryCallback = std::function<void(bool)>;
+/**
+ * Status enum for the result of an attempted cluster discovery.
+ */
+enum class ClusterDiscoveryStatus {
+  /**
+   * Cluster was not found during the discovery process.
+   */
+  Missing,
+  /**
+   * Cluster found and currently available through ClusterManager.
+   */
+  Available,
+};
+
+/**
+ * ClusterDiscoveryCallback is a callback called at the end of the on-demand cluster discovery
+ * process. The status of the discovery is sent as a parameter.
+ */
+using ClusterDiscoveryCallback = std::function<void(ClusterDiscoveryStatus)>;
 using ClusterDiscoveryCallbackWeakPtr = std::weak_ptr<ClusterDiscoveryCallback>;
 using ClusterDiscoveryCallbackSharedPtr = std::shared_ptr<ClusterDiscoveryCallback>;
 
@@ -353,7 +371,8 @@ public:
    *
    * @param name is the cluster's name.
    */
-  virtual void notifyOnDemandCluster(const std::string& name, bool cluster_exists) PURE;
+  virtual void notifyOnDemandCluster(const std::string& name,
+                                     ClusterDiscoveryStatus cluster_status) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

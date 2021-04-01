@@ -37,7 +37,7 @@ public:
   OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
   void onRouteConfigUpdateCompletion(bool route_exists);
-  void onClusterDiscoveryCompletion(bool cluster_exists);
+  void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
   void handleOnDemandCDS(const Router::Route& route);
   const OnDemandFilterConfig* getConfig(const Router::RouteEntry& entry);
 

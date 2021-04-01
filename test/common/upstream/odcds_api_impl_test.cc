@@ -97,7 +97,7 @@ TEST_F(OdCdsApiImplTest, CmIsNotifiedOnUpdateFailure) {
 
   odcds_->updateOnDemand("fake_cluster");
 
-  EXPECT_CALL(cm_, notifyOnDemandCluster("fake_cluster", false));
+  EXPECT_CALL(cm_, notifyOnDemandCluster("fake_cluster", ClusterDiscoveryStatus::Missing));
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                          nullptr);
 }
@@ -108,7 +108,7 @@ TEST_F(OdCdsApiImplTest, CmIsNotifiedOnMissingCluster) {
   odcds_->updateOnDemand("fake_cluster");
   odcds_callbacks_->onConfigUpdate({}, {}, "0");
   odcds_callbacks_->onConfigUpdate({}, {}, "0");
-  EXPECT_CALL(cm_, notifyOnDemandCluster("fake_cluster", false));
+  EXPECT_CALL(cm_, notifyOnDemandCluster("fake_cluster", ClusterDiscoveryStatus::Missing));
   odcds_callbacks_->onConfigUpdate({}, {}, "0");
 }
 
