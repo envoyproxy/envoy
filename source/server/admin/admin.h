@@ -88,7 +88,8 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
+  void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
+                         const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;
@@ -115,7 +116,9 @@ public:
   }
 
   // Http::ConnectionManagerConfig
-  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
+    return request_id_extension_;
+  }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -344,14 +347,8 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    Network::UdpListenerConfigOptRef udpListenerConfig() override {
+      return Network::UdpListenerConfigOptRef();
     }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;

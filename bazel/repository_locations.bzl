@@ -81,13 +81,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-88.0.4324.96
-        version = "fbbf8781456c38a90f674d4771126ed39132855b",
-        sha256 = "76a571c1c3f6f6618d538384319ccc2b7ba9f7ae3f60087ba67894faba11a6b6",
+        # chromium-90.0.4395.0(linux/dev)
+        version = "b049eae83d25977661556dcd913b35fbafb3a93a",
+        sha256 = "d78f7b11b8665feea1b6def8e6f235ad8671db8de950f5429f1bf2b3503b3894",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-11-04",
+        release_date = "2021-01-25",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -518,6 +518,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-08-06",
         cpe = "cpe:2.3:a:json_project:json:*",
     ),
+    # This is an external dependency needed while running the
+    # envoy docker image. A bazel target has been created since
+    # there is no binary package available for the utility on Ubuntu
+    # which is the base image used to build an envoy container.
+    # This is not needed to build an envoy binary or run tests.
+    com_github_ncopa_suexec = dict(
+        project_name = "su-exec",
+        project_desc = "Utility to switch user and group id, setgroups and exec",
+        project_url = "https://github.com/ncopa/su-exec",
+        version = "212b75144bbc06722fbd7661f651390dc47a43d1",
+        sha256 = "939782774079ec156788ea3e04dd5e340e993544f4296be76a9c595334ca1779",
+        strip_prefix = "su-exec-{version}",
+        urls = ["https://github.com/ncopa/su-exec/archive/{version}.tar.gz"],
+        use_category = ["other"],
+        release_date = "2019-09-18",
+        cpe = "N/A",
+    ),
     com_github_twitter_common_lang = dict(
         project_name = "twitter.common.lang (Thrift)",
         project_desc = "twitter.common Python language and compatibility facilities",
@@ -632,12 +649,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Python rules for Bazel",
         project_desc = "Bazel rules for the Python language",
         project_url = "https://github.com/bazelbuild/rules_python",
-        # TODO(htuch): revert back to a point releases when pip3_import appears.
-        version = "a0fbf98d4e3a232144df4d0d80b577c7a693b570",
-        sha256 = "76a8fd4e7eca2a3590f816958faa0d83c9b2ce9c32634c5c375bcccf161d3bb5",
-        strip_prefix = "rules_python-{version}",
-        urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
-        release_date = "2020-04-09",
+        version = "0.1.0",
+        sha256 = "b6d46438523a3ec0f3cead544190ee13223a52f6a6765a29eae7b7cc24cc83a0",
+        release_date = "2020-10-15",
+        urls = ["https://github.com/bazelbuild/rules_python/releases/download/{version}/rules_python-{version}.tar.gz"],
         use_category = ["build"],
     ),
     six = dict(
@@ -740,27 +755,26 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "8.9.255.6",
+        version = "9.0.257.13",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "34c41e1f62a68f94cc0715fa3dc02e8bdcd35b5ca45a038975d9aa6a3e2688b5",
+        sha256 = "163e592a9e75da8e561b498861c2d13e653f4d39aed51e0eff9f4d5ff60c8a37",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2021-01-18",
+        release_date = "2021-03-16",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ecc28c0d7428f3323ea26eb1ddb98a5e06b23dea.tar.gz
-        version = "ecc28c0d7428f3323ea26eb1ddb98a5e06b23dea",
-        sha256 = "52680dea984dbe899c27176155578b97276e1f1516b7c3a63fb16ba593061859",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2475cc8246d3e77e391347ae319f0ab9db132fb4.tar.gz
+        version = "6fec8e97a1ab1a945b86bd6b7252666294448ddb",
+        sha256 = "3045254cbf03c29ee7166fb01b1072a463c58df405669b8573677d4638869290",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
-        use_category = ["dataplane_ext"],
-        extensions = ["envoy.transport_sockets.quic", "envoy.listener.quic"],
-        release_date = "2020-11-10",
+        use_category = ["dataplane_core"],
+        release_date = "2021-02-24",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -898,8 +912,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk",
-        version = "956f0d500c380cc1656a2d861b7ee12c2515a664",
-        sha256 = "b97e3e716b1f38dc601487aa0bde72490bbc82b8f3ad73f1f3e69733984955df",
+        version = "258b4c6974dba5255a9c433450971a56b29228ff",
+        sha256 = "8ff6231a5f0cc07bc865293e56eb37f60f5fd8d5a3889455c4e4ad9dbe54a5f7",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -914,15 +928,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2020-11-20",
+        release_date = "2021-03-10",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "d1a2a7db59a72edacc9a6286b64280b72767d2d0",
-        sha256 = "3e81235c963291bd01f9425ed6e34d6b44ca0adc9f281b0cafc5cba6ad3bcc6d",
+        version = "217320a45ef21db1bf79e7bd8e0190f9a9750b94",
+        sha256 = "cc1eac37f92dad52c0091bb53503f735e5412f61d04693cc0426a92e7f6eae46",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -937,7 +951,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-02-19",
+        release_date = "2021-03-08",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

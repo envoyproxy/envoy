@@ -155,7 +155,7 @@ public:
   createInputMatcher(const Protobuf::Message& config,
                      Server::Configuration::FactoryContext& factory_context) PURE;
 
-  std::string category() const override { return "envoy.matching.input_matcher"; }
+  std::string category() const override { return "envoy.matching.input_matchers"; }
 };
 
 // The result of retrieving data from a DataInput. As the data is generally made available

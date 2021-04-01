@@ -38,6 +38,7 @@ protected:
   testing::NiceMock<Random::MockRandomGenerator> random_generator_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
 };
 
 TEST_F(KillRequestFilterTest, KillRequestCrashEnvoy) {
@@ -171,6 +172,36 @@ TEST_F(KillRequestFilterTest, EncodeMetadataReturnsContinue) {
   setUpTest(kill_request);
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
+}
+
+TEST_F(KillRequestFilterTest, CanKillOnResponse) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(1);
+  kill_request.set_direction(
+      envoy::extensions::filters::http::kill_request::v3::KillRequest::RESPONSE);
+  setUpTest(kill_request);
+
+  // We should crash on the OUTBOUND request
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  response_headers_.addCopy("x-envoy-kill-request", "true");
+  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false), "");
+}
+
+TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(1);
+  kill_request.set_direction(
+      envoy::extensions::filters::http::kill_request::v3::KillRequest::RESPONSE);
+  setUpTest(kill_request);
+
+  // We shouldn't crash on the REQUEST direction kill request
+  request_headers_.addCopy("x-envoy-kill-request", "true");
+  ASSERT_EQ(filter_->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
+
+  // We should crash on the RESPONSE kill request
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  response_headers_.addCopy("x-envoy-kill-request", "true");
+  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false), "");
 }
 
 } // namespace

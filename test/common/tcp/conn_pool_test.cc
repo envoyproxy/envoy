@@ -859,30 +859,6 @@ TEST_P(TcpConnPoolImplTest, MaxConnections) {
 /**
  * Test when we reach max requests per connection.
  */
-// TEST_P(TcpConnPoolImplTest, DEPRECATED_FEATURE_TEST(MaxRequestsPerConnection)) {
-//   initialize();
-
-//   cluster_->max_requests_per_connection_ = 1;
-
-//   // Request 1 should kick off a new connection.
-//   ConnPoolCallbacks callbacks;
-//   conn_pool_->expectConnCreate();
-//   Tcp::ConnectionPool::Cancellable* handle = conn_pool_->newConnection(callbacks);
-
-//   EXPECT_NE(nullptr, handle);
-
-//   EXPECT_CALL(callbacks.pool_ready_, ready());
-//   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-
-//   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
-//   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
-//   callbacks.conn_data_.reset();
-//   dispatcher_.clearDeferredDeleteList();
-
-//   EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
-//   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_max_requests_.value());
-// }
-
 TEST_P(TcpConnPoolImplTest, MaxRequestsConnection) {
   initialize();
 

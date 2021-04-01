@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -22,6 +23,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -344,6 +346,26 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    const std::string observable_cluster_name = "observability_name";
+    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
+    // Make sure that cluster info is obtained without calling upstreamHost.
+    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(*cluster_info_mock, observabilityName())
+        .WillRepeatedly(ReturnRef(observable_cluster_name));
+    EXPECT_EQ("observability_name", upstream_format.format(request_headers, response_headers,
+                                                           response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("observability_name")));
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     const std::string upstream_cluster_name = "cluster_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
@@ -1330,6 +1352,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   stream_info.filter_state_->setData("key-no-serialization",
                                      std::make_unique<StreamInfo::FilterState::Object>(),
                                      StreamInfo::FilterState::StateType::ReadOnly);
+
   stream_info.filter_state_->setData(
       "key-serialization-error",
       std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
@@ -1603,6 +1626,14 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
         ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
@@ -2750,7 +2781,8 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
 TEST(SubstitutionFormatterTest, ParserSuccesses) {
   SubstitutionFormatParser parser;
 
-  std::vector<std::string> test_cases = {"%START_TIME(%E4n%)%", "%START_TIME(%O4n%)%"};
+  std::vector<std::string> test_cases = {"%START_TIME(%E4n%)%", "%START_TIME(%O4n%)%",
+                                         "%DOWNSTREAM_PEER_FINGERPRINT_256%"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_NO_THROW(parser.parse(test_case));

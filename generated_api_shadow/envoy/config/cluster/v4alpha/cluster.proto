@@ -21,6 +21,7 @@ import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -693,11 +694,16 @@ message Cluster {
   // Any ``:`` in the cluster name will be converted to ``_`` when emitting statistics.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // An optional alternative to the cluster name to be used while emitting stats.
-  // Any ``:`` in the name will be converted to ``_`` when emitting statistics. This should not be
-  // confused with :ref:`Router Filter Header
-  // <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
-  string alt_stat_name = 28;
+  // An optional alternative to the cluster name to be used for observability. This name is used
+  // emitting stats for the cluster and access logging the cluster name. This will appear as
+  // additional information in configuration dumps of a cluster's current status as
+  // :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>`
+  // and as an additional tag "upstream_cluster.name" while tracing. Note: access logging using
+  // this field is presently enabled with runtime feature
+  // `envoy.reloadable_features.use_observable_cluster_name`. Any ``:`` in the name will be
+  // converted to ``_`` when emitting statistics. This should not be confused with :ref:`Router
+  // Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
+  string observability_name = 28;
 
   oneof cluster_discovery_type {
     // The :ref:`service discovery type <arch_overview_service_discovery_types>`
@@ -767,7 +773,7 @@ message Cluster {
   // <envoy_api_field_extensions.upstreams.http.v4alpha.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
   core.v4alpha.UpstreamHttpProtocolOptions hidden_envoy_deprecated_upstream_http_protocol_options =
-      46 [deprecated = true];
+      46 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
@@ -780,7 +786,7 @@ message Cluster {
   // <envoy_api_field_extensions.upstreams.http.v4alpha.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
   core.v4alpha.HttpProtocolOptions hidden_envoy_deprecated_common_http_protocol_options = 29
-      [deprecated = true];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP1 requests.
   // This has been deprecated in favor of http_protocol_options fields in the in the
@@ -791,7 +797,7 @@ message Cluster {
   // <envoy_api_field_extensions.upstreams.http.v4alpha.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
   core.v4alpha.Http1ProtocolOptions hidden_envoy_deprecated_http_protocol_options = 13
-      [deprecated = true];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Even if default HTTP2 protocol options are desired, this field must be
   // set so that Envoy will assume that the upstream supports HTTP/2 when
@@ -806,8 +812,11 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v4alpha.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v4alpha.Http2ProtocolOptions hidden_envoy_deprecated_http2_protocol_options = 14
-      [deprecated = true, (udpa.annotations.security).configure_for_untrusted_upstream = true];
+  core.v4alpha.Http2ProtocolOptions hidden_envoy_deprecated_http2_protocol_options = 14 [
+    deprecated = true,
+    (udpa.annotations.security).configure_for_untrusted_upstream = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
@@ -943,7 +952,8 @@ message Cluster {
   // <envoy_api_msg_extensions.upstreams.http.v4alpha.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v4alpha.Cluster.typed_extension_protocol_options>`.
-  ClusterProtocolSelection hidden_envoy_deprecated_protocol_selection = 26 [deprecated = true];
+  ClusterProtocolSelection hidden_envoy_deprecated_protocol_selection = 26
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional options for upstream connections.
   UpstreamConnectionOptions upstream_connection_options = 30;
@@ -1004,7 +1014,8 @@ message Cluster {
   //
   //   This field has been deprecated in favor of `timeout_budgets`, part of
   //   :ref:`track_cluster_stats <envoy_api_field_config.cluster.v4alpha.Cluster.track_cluster_stats>`.
-  bool hidden_envoy_deprecated_track_timeout_budgets = 47 [deprecated = true];
+  bool hidden_envoy_deprecated_track_timeout_budgets = 47
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //

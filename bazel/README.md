@@ -62,7 +62,8 @@ for how to update or override dependencies.
        ninja-build \
        curl \
        unzip \
-       virtualenv
+       virtualenv \
+       patch
     ```
 
     ### Fedora
@@ -135,7 +136,7 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    Another option to shorten the output root for Bazel is to set the `USERNAME` environment variable in your shell
     session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
     is set.
 
@@ -618,6 +619,10 @@ bazel test //test/integration:protocol_integration_test --test_output=streamed \
   --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
 
+Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
+environment where `n` is the desired verbosity level (e.g.
+`--test_env="ENVOY_QUICHE_VERBOSITY=2"`.
+
 ## Disabling optional features
 
 The following optional features can be disabled on the Bazel build command-line:
@@ -629,7 +634,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
-
+* http3/quic with --//bazel:http3=False
 
 ## Enabling optional features
 
@@ -643,7 +648,7 @@ The following optional features can be enabled on the Bazel build command-line:
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
   (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details).
 * ASSERT() can be configured to log failures and increment a stat counter in a release build with
-  `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
+  `--define log_fast_debug_assert_in_release=enabled`. SLOW_ASSERT()s can be included with `--define log_debug_assert_in_release=enabled`. The default behavior is to compile all debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
   `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL and
@@ -839,7 +844,9 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [clangd](https://clangd.llvm.org/) with supported editors.
 
-For example, use following command to prepare a compilation database:
+This requires Python 3.8.0+, download from [here](https://www.python.org/downloads/) if you do not have it installed already.
+
+Use the following command to prepare a compilation database:
 
 ```
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py

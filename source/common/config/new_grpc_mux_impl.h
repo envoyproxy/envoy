@@ -37,13 +37,12 @@ public:
                  Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
-  ~NewGrpcMuxImpl() override { dynamic_update_callback_handle_->remove(); }
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
-                           const bool use_namespace_matching = false) override;
+                           const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
@@ -91,8 +90,9 @@ public:
 private:
   class WatchImpl : public GrpcMuxWatch {
   public:
-    WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent)
-        : type_url_(type_url), watch_(watch), parent_(parent) {}
+    WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent,
+              const SubscriptionOptions& options)
+        : type_url_(type_url), watch_(watch), parent_(parent), options_(options) {}
 
     ~WatchImpl() override { remove(); }
 
@@ -104,13 +104,14 @@ private:
     }
 
     void update(const absl::flat_hash_set<std::string>& resources) override {
-      parent_.updateWatch(type_url_, watch_, resources);
+      parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
   private:
     const std::string type_url_;
     Watch* watch_;
     NewGrpcMuxImpl& parent_;
+    const SubscriptionOptions options_;
   };
 
   void removeWatch(const std::string& type_url, Watch* watch);
@@ -120,9 +121,9 @@ private:
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
-                   bool creating_namespace_watch = false);
+                   const SubscriptionOptions& options);
 
-  void addSubscription(const std::string& type_url, const bool use_namespace_matching);
+  void addSubscription(const std::string& type_url, bool use_namespace_matching);
 
   void trySendDiscoveryRequests();
 
@@ -158,7 +159,7 @@ private:
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
-  Common::CallbackHandle* dynamic_update_callback_handle_;
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
 

@@ -35,15 +35,6 @@ public:
   virtual absl::optional<FactoryCallback> config() PURE;
 
   /**
-   * Validate that the configuration is applicable in the context of the provider. If an exception
-   * is thrown by any of the config providers for an update, the extension configuration update is
-   * rejected.
-   * @param proto_config is the candidate configuration update.
-   * @param factory used to instantiate an extension config.
-   */
-  virtual void validateConfig(const ProtobufWkt::Any& proto_config, Factory& factory) PURE;
-
-  /**
    * Update the provider with a new configuration.
    * @param config is an extension factory callback to replace the existing configuration.
    * @param version_info is the version of the new extension configuration.

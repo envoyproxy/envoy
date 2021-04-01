@@ -9,6 +9,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -26,13 +27,8 @@ message StatsSink {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.metrics.v2.StatsSink";
 
   // The name of the stats sink to instantiate. The name must match a supported
-  // stats sink. The built-in stats sinks are:
-  //
-  // * :ref:`envoy.stat_sinks.statsd <envoy_api_msg_config.metrics.v3.StatsdSink>`
-  // * :ref:`envoy.stat_sinks.dog_statsd <envoy_api_msg_config.metrics.v3.DogStatsdSink>`
-  // * :ref:`envoy.stat_sinks.metrics_service <envoy_api_msg_config.metrics.v3.MetricsServiceConfig>`
-  // * :ref:`envoy.stat_sinks.hystrix <envoy_api_msg_config.metrics.v3.HystrixSink>`
-  //
+  // stats sink.
+  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.stats_sinks>` for the default list of available stats sink.
   // Sinks optionally support tagged/multiple dimensional metrics.
   string name = 1;
 
@@ -42,7 +38,8 @@ message StatsSink {
   oneof config_type {
     google.protobuf.Any typed_config = 3;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 }
 

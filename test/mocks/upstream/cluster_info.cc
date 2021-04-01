@@ -64,9 +64,11 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
   ON_CALL(*this, edsServiceName()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
+  ON_CALL(*this, http3Options()).WillByDefault(ReturnRef(http3_options_));
   ON_CALL(*this, commonHttpProtocolOptions())
       .WillByDefault(ReturnRef(common_http_protocol_options_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
