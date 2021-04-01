@@ -49,7 +49,7 @@ typed_config:
       value: ""
     vm_config:
       vm_id: "my_vm_id"
-      environment_variables: 
+      environment_variables:
         host_env_keys: ["NON_EXIST"]
         key_values:
           KEY: VALUE

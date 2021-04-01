@@ -299,6 +299,14 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "disable_http3_all_reasons",
+    match_any = [
+        ":disable_http3",
+        ":boringssl_fips",
+    ],
+)
+
 config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
@@ -378,11 +386,6 @@ config_setting(
         "@bazel_tools//platforms:linux",
     ],
     values = {"define": "zlib=ng"},
-)
-
-config_setting(
-    name = "enable_quiche",
-    values = {"define": "quiche=enabled"},
 )
 
 # TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)

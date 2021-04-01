@@ -696,7 +696,8 @@ private:
 
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
-              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options) {
+              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options,
+              ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (options) {
     return std::move(options);
   }
@@ -717,7 +718,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                  config.upstream_http_protocol_options())
            : absl::nullopt),
       config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-      config.has_http2_protocol_options());
+      config.has_http2_protocol_options(), validation_visitor);
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -730,8 +731,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
-          createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
-                                    "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"))),
+          createOptions(config,
+                        extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
+                            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
+                        factory_context.messageValidationVisitor())),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -968,11 +971,17 @@ ClusterImplBase::ClusterImplBase(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
   }
-  // TODO(#12829) clean up (e.g. move tests out of extensions) once QUIC is no longer an extension.
-  if ((info_->features() & ClusterInfoImpl::Features::HTTP3) &&
-      (cluster.transport_socket().name() != "envoy.transport_sockets.quic")) {
-    throw EnvoyException(fmt::format("HTTP3 requires a QuicUpstreamTransport tranport socket: {}",
-                                     cluster.name(), cluster.DebugString()));
+
+  if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
+#if defined(ENVOY_ENABLE_QUIC)
+    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+      throw EnvoyException(
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
+                      cluster.DebugString()));
+    }
+#else
+    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+#endif
   }
 
   // Create the default (empty) priority set before registering callbacks to
@@ -1165,9 +1174,9 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
 
 const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
-  try {
-    return Network::Address::resolveProtoAddress(address);
-  } catch (EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
+  END_TRY
+  catch (EnvoyException& e) {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
         info_->type() == envoy::config::cluster::v3::Cluster::EDS) {
       throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "

@@ -176,6 +176,40 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, Http3Configured) {
+  const std::string yaml_string = R"EOF(
+codec_type: http3
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+#ifdef ENVOY_ENABLE_QUIC
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException, "HTTP3 configured but not enabled in the build.");
+#endif
+}
+
 TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
