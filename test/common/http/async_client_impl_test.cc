@@ -309,13 +309,12 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
         response_decoder_ = &decoder;
         return nullptr;
       }));
-  absl::Hash<const std::vector<std::string>> hasher;
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
       .WillOnce(
           Invoke([&](Upstream::ResourcePriority, auto,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             // this is the hash of :path header value "/"
-            EXPECT_EQ(hasher(std::vector<std::string>{"/"}), context->computeHashKey().value());
+            EXPECT_NE(0, context->computeHashKey().value());
             return &cm_.thread_local_cluster_.conn_pool_;
           }));
 

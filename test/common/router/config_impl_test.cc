@@ -2405,9 +2405,9 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"bar"}));
 
-    absl::Hash<const std::vector<absl::string_view>> hasher;
-    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"bar", "foo"}));
-    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"foo", "bar"}));
+    EXPECT_NE(0, generateHash({"bar", "foo"}));
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"bar", "foo"})); // deterministic
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"foo", "bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"abc", "def"}));
   }
   {
@@ -2430,9 +2430,9 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"/bar"}));
 
-    absl::Hash<const std::vector<absl::string_view>> hasher;
-    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"/bar", "/foo"}));
-    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"/foo", "/bar"}));
+    EXPECT_NE(0, generateHash({"/bar", "/foo"}));
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/bar", "/foo"})); // deterministic
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/foo", "/bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"/abc", "/def"}));
   }
 }
