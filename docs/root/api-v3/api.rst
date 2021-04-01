@@ -10,6 +10,7 @@ v3 API reference
   bootstrap/bootstrap
   listeners/listeners
   clusters/clusters
+  load_balancers/load_balancers
   http_routes/http_routes
   config/config
   admin/admin
