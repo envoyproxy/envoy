@@ -27,6 +27,10 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/client_connection_factory_impl.h"
+#endif
+
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
@@ -220,16 +224,18 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   if (downstream_protocol_ <= Http::CodecClient::Type::HTTP2) {
     return BaseIntegrationTest::makeClientConnectionWithOptions(port, options);
   }
+#ifdef ENVOY_ENABLE_QUIC
   // Setting socket options is not supported for HTTP3.
   ASSERT(!options);
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  return Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-             Http::QuicCodecNames::get().Quiche)
-      .createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_, server_addr,
-                                   local_addr);
+  return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
+                                           server_addr, local_addr);
+#else
+  ASSERT(false, "running a QUIC integration test without compiling QUIC");
+#endif
 }
 
 IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port) {
@@ -310,6 +316,7 @@ void HttpIntegrationTest::initialize() {
   if (downstream_protocol_ != Http::CodecClient::Type::HTTP3) {
     return BaseIntegrationTest::initialize();
   }
+#ifdef ENVOY_ENABLE_QUIC
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
   quic_transport_socket_factory_ =
@@ -325,11 +332,11 @@ void HttpIntegrationTest::initialize() {
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
-  quic_connection_persistent_info_ =
-      Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-          Http::QuicCodecNames::get().Quiche)
-          .createNetworkConnectionInfo(*dispatcher_, *quic_transport_socket_factory_, stats_store_,
-                                       timeSystem(), server_addr);
+  quic_connection_persistent_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      *dispatcher_, *quic_transport_socket_factory_, stats_store_, timeSystem(), server_addr);
+#else
+  ASSERT(false, "running a QUIC integration test without compiling QUIC");
+#endif
 }
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {

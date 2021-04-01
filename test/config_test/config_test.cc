@@ -174,7 +174,7 @@ void testMerge() {
               }
             }
           },
-          static_resources: { 
+          static_resources: {
             clusters: [
               {
                 name: 'foo'

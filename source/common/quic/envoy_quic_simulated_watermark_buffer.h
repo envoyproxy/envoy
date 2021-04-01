@@ -27,6 +27,8 @@ public:
 
   uint32_t highWatermark() const { return high_watermark_; }
 
+  uint32_t lowWatermark() const { return low_watermark_; }
+
   void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_full_ && bytes_buffered > high_watermark_) {
       // Transitioning from below low watermark to above high watermark.
