@@ -7,13 +7,10 @@
 #include "common/common/linked_object.h"
 #include "common/stream_info/stream_info_impl.h"
 
-<<<<<<< HEAD
-#include "server/active_listener_base.h"
-=======
 #include "server/active_stream_socket.h"
 #include "server/connection_handler_impl.h"
->>>>>>> 30201e97c4 (use active_stream_socket in active tcp listener)
-
+#include "server/active_listener_base.h"
+#include "server/active_stream_socket.h"
 namespace Envoy {
 namespace Server {
 
@@ -34,11 +31,7 @@ using RebalancedSocketSharedPtr = std::shared_ptr<RebalancedSocket>;
  * Wrapper for an active tcp listener owned by this handler.
  */
 class ActiveTcpListener final : public Network::TcpListenerCallbacks,
-<<<<<<< HEAD
-                                public ActiveListenerImplBase,
-=======
                                 public ActiveStreamListenerBase,
->>>>>>> 30201e97c4 (use active_stream_socket in active tcp listener)
                                 public Network::BalancedConnectionHandler,
                                 Logger::Loggable<Logger::Id::conn_handler> {
 public:
@@ -110,16 +103,7 @@ public:
    */
   void updateListenerConfig(Network::ListenerConfig& config);
 
-<<<<<<< HEAD
-  Network::TcpConnectionHandler& parent_;
-  Network::ListenerPtr listener_;
-  const std::chrono::milliseconds listener_filters_timeout_;
-  const bool continue_on_listener_filters_timeout_;
-  std::list<ActiveTcpSocketPtr> sockets_;
-  absl::flat_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
-=======
   absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
->>>>>>> 30201e97c4 (use active_stream_socket in active tcp listener)
 
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for

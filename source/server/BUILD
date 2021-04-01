@@ -101,9 +101,6 @@ envoy_cc_library(
     name = "active_listener_base",
     hdrs = [
         "active_listener_base.h",
-        "active_stream_socket.h",
-        "active_tcp_listener.h",
-        "connection_handler_impl.h",
     ],
     deps = [
         "//include/envoy/network:connection_handler_interface",
@@ -168,6 +165,7 @@ envoy_cc_library(
         "active_stream_socket.h",
     ],
     deps = [
+        ":active_listener_base",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
@@ -187,7 +185,6 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "//source/server:connection_handler_impl",
     ],
 )
 

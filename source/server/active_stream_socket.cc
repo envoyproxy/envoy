@@ -5,8 +5,6 @@
 
 #include "common/stats/timespan_impl.h"
 
-#include "server/connection_handler_impl.h"
-
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -16,9 +14,8 @@ ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& p
                                                    Event::Dispatcher& dispatcher,
                                                    Network::ListenerPtr&& listener,
                                                    Network::ListenerConfig& config)
-    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config), parent_(parent),
-      dispatcher_(dispatcher), listener_(std::move(listener)),
-      listener_filters_timeout_(config.listenerFiltersTimeout()),
+    : ActiveListenerImplBase(parent, &config), parent_(parent), dispatcher_(dispatcher),
+      listener_(std::move(listener)), listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {}
 
 void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,

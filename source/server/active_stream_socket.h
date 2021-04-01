@@ -22,7 +22,7 @@
 #include "common/common/non_copyable.h"
 #include "common/stream_info/stream_info_impl.h"
 
-#include "server/connection_handler_impl.h"
+#include "server/active_listener_base.h"
 
 #include "spdlog/spdlog.h"
 
@@ -31,7 +31,7 @@ namespace Server {
 
 struct ActiveStreamSocket;
 
-class ActiveStreamListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase {
+class ActiveStreamListenerBase : public ActiveListenerImplBase {
 public:
   ActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                            Network::ListenerPtr&& listener, Network::ListenerConfig& config);
