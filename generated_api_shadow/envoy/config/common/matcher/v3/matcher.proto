@@ -50,6 +50,7 @@ message Matcher {
       // Predicate for a single input field.
       message SinglePredicate {
         // Protocol-specific specification of input field to match on.
+        // [#extension-category: envoy.matching.common_inputs]
         core.v3.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
 
         oneof matcher {

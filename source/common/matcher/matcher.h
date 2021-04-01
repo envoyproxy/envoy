@@ -155,12 +155,38 @@ private:
     return absl::nullopt;
   }
 
+  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
+  class CommonProtocolInputWrapper : public DataInput<DataType> {
+  public:
+    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
+        : common_protocol_input_(std::move(common_protocol_input)) {}
+
+    DataInputGetResult get(const DataType&) override {
+      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
+                                common_protocol_input_->get()};
+    }
+
+  private:
+    const CommonProtocolInputPtr common_protocol_input_;
+  };
+
   DataInputPtr<DataType>
   createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
-    auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory<DataType>>(config);
+    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
+    if (factory != nullptr) {
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          config.typed_config(), factory_context_.messageValidationVisitor(), *factory);
+      return factory->createDataInput(*message, factory_context_);
+    }
+
+    // If the provided config doesn't match a typed input, assume that this is one of the common
+    // inputs.
+    auto& common_input_factory =
+        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), factory_context_.messageValidationVisitor(), factory);
-    return factory.createDataInput(*message, factory_context_);
+        config.typed_config(), factory_context_.messageValidationVisitor(), common_input_factory);
+    return std::make_unique<CommonProtocolInputWrapper>(
+        common_input_factory.createCommonProtocolInput(*message, factory_context_));
   }
 
   InputMatcherPtr createInputMatcher(
