@@ -19,11 +19,13 @@
 
 namespace Envoy {
 
-class TerminalServerTlsFilter : public Network::Filter {
+class TerminalServerTlsFilter : public Network::ReadFilter {
 public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buf, bool) override {
     auto message = buf.toString();
+
+    std::cout << "Terminal filter read: " << message << std::endl;
 
     if (message != "usetls") {
       // Just echo anything other than the 'usetls' command.
@@ -33,7 +35,7 @@ public:
         // Wait until 6 bytes long "usetls" has been sent.
         if (bytes >= 6) {
           // TODO: fix me.
-          // read_callbacks_->connection().startSecureTransport();
+          read_callbacks_->connection().startSecureTransport();
           // Unsubscribe the callback.
           // Switch to tls has been completed.
           return false;
@@ -57,14 +59,6 @@ public:
     read_callbacks_ = &callbacks;
   }
 
-  // Network::WriteFilter
-  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks&) override {}
-  
-  Network::FilterStatus onWrite(Buffer::Instance&, bool) override {
-    // shouldn't get here.
-    return Network::FilterStatus::StopIteration;
-  }
-
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
@@ -76,8 +70,10 @@ private:
 // If it receives a data which is not known keyword it means that transport socket has not been
 // successfully converted to use TLS and filter receives either encrypted data or TLS handshake
 // messages.
-class StartTlsSwitchFilter : public Network::Filter {
+class StartTlsSwitchFilter : public Network::ReadFilter {
 public:
+  void upstreamWrite(Buffer::Instance& data, bool end_stream);
+
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
@@ -85,32 +81,74 @@ public:
     read_callbacks_ = &callbacks;
   }
 
-  // Network::WriteFilter
-  Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
-  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) override {
-    write_callbacks_ = &callbacks;
+  static std::shared_ptr<StartTlsSwitchFilter> newInstance(Upstream::ClusterManager& cluster_manager) {
+    auto p = std::shared_ptr<StartTlsSwitchFilter>(new StartTlsSwitchFilter(cluster_manager));
+    p->self_ = p;
+    return p;
   }
 
+  struct UpstreamReadFilter : public Network::ReadFilter {
+
+    UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
+
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      std::cout << "StartTlsSwitchFilter received '" << data.toString() << "' from upstream" << std::endl; 
+      if (auto parent = parent_.lock()) {
+        parent->upstreamWrite(data, end_stream);
+        return Network::FilterStatus::Continue;
+      } else {
+        read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+        return Network::FilterStatus::StopIteration;
+      }
+    }
+
+    Network::FilterStatus onNewConnection() override {
+      return Network::FilterStatus::Continue;
+    }
+
+    void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+      read_callbacks_ = &callbacks;
+    }
+
+    std::weak_ptr<StartTlsSwitchFilter> parent_{};
+    Network::ReadFilterCallbacks* read_callbacks_{};
+  };
+
+private:
+  StartTlsSwitchFilter(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
+
+  std::weak_ptr<StartTlsSwitchFilter> self_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
-  Network::WriteFilterCallbacks* write_callbacks_{};
-  // Filter will allow only the following messages to pass.
-  std::set<std::string> allowed_messages_{"hello", "switch", "hola", "usetls", "bye"};
+  Network::ClientConnectionPtr upstream_connection_{};
+  Upstream::ClusterManager& cluster_manager_;
 };
 
 Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
+  auto c = cluster_manager_.getThreadLocalCluster("dummy_cluster");
+  auto h = c->loadBalancer().chooseHost(nullptr);
+
+  // This is progress.
+  std::cout << "Backend host port: " << h->address()->ip()->port() << std::endl;
+
+  upstream_connection_ = h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
+  upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
+  
+  upstream_connection_->connect();
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance&, bool) {
+Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool end_stream) {
+  std::cout << "Data: " << data.toString() << std::endl;
+  upstream_connection_->write(data, end_stream);
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus StartTlsSwitchFilter::onWrite(Buffer::Instance& buf, bool) {
+void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream) {
   const std::string message = buf.toString();
   if (message == "switch") {
-    write_callbacks_->connection().startSecureTransport();
+    upstream_connection_->startSecureTransport();
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
-      // Wait until 6 bytes long "usetls" has been sent.
+      // Wait until 6 bytes long "switch" has been sent.
       if (bytes >= 6) {
         read_callbacks_->connection().startSecureTransport();
         // Unsubscribe the callback.
@@ -120,7 +158,8 @@ Network::FilterStatus StartTlsSwitchFilter::onWrite(Buffer::Instance& buf, bool)
       return true;
     });
   }
-  return Network::FilterStatus::Continue;
+  // Finally just forward the data downstream.
+  read_callbacks_->connection().write(buf, end_stream);
 }
 
 // Config factory for StartTlsSwitchFilter.
@@ -131,9 +170,9 @@ public:
 
   Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
-                                    Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<StartTlsSwitchFilter>());
+                                    Server::Configuration::FactoryContext& context) override {
+    return [&](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(context.clusterManager()));
     };
   }
 
@@ -172,7 +211,7 @@ public:
 class StartTlsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
-  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig(true)), stream_info_(time_system_, nullptr) {}
+  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig(true)), stream_info_(timeSystem(), nullptr) {}
   void initialize() override;
   void addStartTlsSwitchFilter(ConfigHelper& config_helper);
 
@@ -196,7 +235,6 @@ public:
   Network::ServerConnectionPtr server_connection_;
 
   // Technically unused.
-  Event::SimulatedTimeSystem time_system_;
   StreamInfo::StreamInfoImpl stream_info_;
 };
 
@@ -216,10 +254,11 @@ void StartTlsIntegrationTest::initialize() {
       }))
       // Connection constructor will also create read buffer, but the test does
       // not track received bytes.
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+      .WillRepeatedly(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
+
   config_helper_.renameListener("tcp_proxy");
   addStartTlsSwitchFilter(config_helper_);
 
@@ -244,7 +283,9 @@ void StartTlsIntegrationTest::initialize() {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
     .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
       
-      // TODO: use a real socket.
+      std::cout << "Received socket. " << std::endl;
+      
+      // TODO: use a StartTls transport socket instead of a RawBufferSocket.
       // Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_),
       //                                                               move(tls_context_))
       //     .createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -253,10 +294,14 @@ void StartTlsIntegrationTest::initialize() {
 
       server_connection_ = dispatcher_->createServerConnection(
           std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
-      server_connection_->addFilter(std::make_shared<TerminalServerTlsFilter>());
+      server_connection_->addReadFilter(std::make_shared<TerminalServerTlsFilter>());
     }));
   
   listener_ = dispatcher_->createListener(socket, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+
+  std::cout << "Server socket info: " << 
+  socket->addressProvider().localAddress()->ip()->addressAsString() << 
+  ":" << socket->addressProvider().localAddress()->ip()->port() << std::endl;
 
   // Add a start_tls cluster
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -266,6 +311,8 @@ void StartTlsIntegrationTest::initialize() {
   });
 
   BaseIntegrationTest::initialize();
+
+  std::cout << "Client port: " << lookupPort("tcp_proxy") << std::endl;
 
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
@@ -312,57 +359,62 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  
   ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
 
-  Buffer::OwnedImpl buffer;
-  buffer.add("hello");
-  conn_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != 5) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-  // Make sure the data makes it upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Send a message to switch to tls on the receiver side.
   // StartTlsSwitchFilter will switch transport socket on the
-  // receiver side upon receiving "switch" message and send
-  // back the message "usetls".
-  payload_reader_->set_data_to_wait_for("usetls");
-  buffer.add("switch");
+  // receiver side upon receiving "switch" message and forward
+  // back the message "switch".
+  payload_reader_->set_data_to_wait_for("switch");
+  Buffer::OwnedImpl buffer;
+  buffer.add("usetls");
   conn_->write(buffer, false);
-
-  // Wait for confirmation
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-
-  // Without closing the connection, switch to tls.
-  // conn_->setTransportSocket(
-  //     tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-  //         absl::string_view(""), std::vector<std::string>(),
-  //         std::vector<std::string>{"envoyalpn"})));
-  // connect_callbacks_.reset();
-
-  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+  while (client_write_buffer_->bytesDrained() != 6) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  // Send few messages over encrypted connection.
-  buffer.add("hola");
-  conn_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != 15) {
+  for (size_t i = 0; i < 100; i++) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  // Make sure the data makes it upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(9));
+  // // Make sure the data makes it upstream.
+  // // ASSERT_TRUE(fake_upstream_connection->waitForData(6));
 
-  buffer.add("bye");
-  conn_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != 18) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-  // Make sure the data makes it upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(12));
+  // // Wait for confirmation
+  // dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // // Without closing the connection, switch to tls.
+  // // conn_->setTransportSocket(
+  // //     tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+  // //         absl::string_view(""), std::vector<std::string>(),
+  // //         std::vector<std::string>{"envoyalpn"})));
+  // // connect_callbacks_.reset();
+
+  // while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+  //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // }
+
+  // // Send few messages over encrypted connection.
+  // buffer.add("hola");
+  // conn_->write(buffer, false);
+  // while (client_write_buffer_->bytesDrained() != 15) {
+  //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // }
+  // // Make sure the data makes it upstream.
+  // ASSERT_TRUE(fake_upstream_connection->waitForData(9));
+
+  // buffer.add("bye");
+  // conn_->write(buffer, false);
+  // while (client_write_buffer_->bytesDrained() != 18) {
+  //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // }
+  // // Make sure the data makes it upstream.
+  // ASSERT_TRUE(fake_upstream_connection->waitForData(12));
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
+  std::cout << "Test finished." << std::endl;
 }
 
 
