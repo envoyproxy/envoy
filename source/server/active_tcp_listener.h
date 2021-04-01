@@ -6,7 +6,6 @@
 
 #include "common/common/linked_object.h"
 #include "common/stream_info/stream_info_impl.h"
-
 #include "server/active_listener_base.h"
 
 namespace Envoy {
