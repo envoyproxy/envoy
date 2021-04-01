@@ -1,7 +1,6 @@
 .. _common_configuration_zipkin_tracing:
 
-How do I configure Zipkin tracing?
+如何配置 Zipkin 追踪？
 ==================================
 
-Refer to the :ref:`zipkin sandbox setup <install_sandboxes_zipkin_tracing>`
-for an example of zipkin tracing configuration.
+有关 Zipkin 追踪配置的示例，请参考 :ref:`Zipkin 沙盒安装 <install_sandboxes_zipkin_tracing>`
