@@ -35,7 +35,9 @@ public:
         // Wait until 6 bytes long "usetls" has been sent.
         if (bytes >= 6) {
           // TODO: fix me.
-          read_callbacks_->connection().startSecureTransport();
+          if (!read_callbacks_->connection().startSecureTransport()) {
+            std::cout << "Failed to start secure transport on terminal server" << std::endl;
+          }
           // Unsubscribe the callback.
           // Switch to tls has been completed.
           return false;
@@ -146,11 +148,15 @@ Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool 
 void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream) {
   const std::string message = buf.toString();
   if (message == "switch") {
-    upstream_connection_->startSecureTransport();
+    if (!upstream_connection_->startSecureTransport()) {
+      std::cout << "Failed to start upstream secure transport in StartTlsSwitchFilter" << std::endl;
+    }
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "switch" has been sent.
       if (bytes >= 6) {
-        read_callbacks_->connection().startSecureTransport();
+        if (!read_callbacks_->connection().startSecureTransport()) {
+          std::cout << "Failed to start secure downstream transport in StartTlsSwitchFilter" << std::endl;
+        }
         // Unsubscribe the callback.
         // Switch to tls has been completed.
         return false;
@@ -372,46 +378,47 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   Buffer::OwnedImpl buffer;
   buffer.add("usetls");
   conn_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != 6) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  for (size_t i = 0; i < 100; i++) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-  // // Make sure the data makes it upstream.
-  // // ASSERT_TRUE(fake_upstream_connection->waitForData(6));
-
-  // // Wait for confirmation
-  // dispatcher_->run(Event::Dispatcher::RunType::Block);
-
-  // // Without closing the connection, switch to tls.
-  // // conn_->setTransportSocket(
-  // //     tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-  // //         absl::string_view(""), std::vector<std::string>(),
-  // //         std::vector<std::string>{"envoyalpn"})));
-  // // connect_callbacks_.reset();
-
-  // while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+  // while (client_write_buffer_->bytesDrained() != 6) {
   //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // }
 
+  ASSERT_TRUE(payload_reader_->waitForLength(6, std::chrono::milliseconds(100)));
+
+  std::cout << "Client recieved data: " << payload_reader_->data() << std::endl;
+
+  // Make sure we receieved the 'switch' command from the upstream.
+  ASSERT_EQ("switch", payload_reader_->data());
+  payload_reader_->clearData();
+  
+  // Without closing the connection, switch to tls.
+  conn_->setTransportSocket(
+      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(),
+          std::vector<std::string>{"envoyalpn"})));
+  connect_callbacks_.reset();
+
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
   // // Send few messages over encrypted connection.
-  // buffer.add("hola");
-  // conn_->write(buffer, false);
+  buffer.add("hola");
+  conn_->write(buffer, false);
+  
+  // Make sure we get our echo back
+  ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(100)));
+  ASSERT_EQ("hola", payload_reader_->data());
+  payload_reader_->clearData();
+
   // while (client_write_buffer_->bytesDrained() != 15) {
   //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // }
-  // // Make sure the data makes it upstream.
-  // ASSERT_TRUE(fake_upstream_connection->waitForData(9));
 
   // buffer.add("bye");
   // conn_->write(buffer, false);
   // while (client_write_buffer_->bytesDrained() != 18) {
   //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // }
-  // // Make sure the data makes it upstream.
-  // ASSERT_TRUE(fake_upstream_connection->waitForData(12));
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   std::cout << "Test finished." << std::endl;
