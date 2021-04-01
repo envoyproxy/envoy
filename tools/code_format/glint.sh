@@ -12,6 +12,7 @@ ERRORS=
 MISSING_NEWLINE=0
 MIXED_TABS_AND_SPACES=0
 TRAILING_WHITESPACE=0
+FILEPATH="${1:-}"
 
 
 # Checks whether a file has a mixture of indents starting with tabs and spaces
@@ -52,15 +53,24 @@ find_text_files () {
     git grep --cached -Il '' | grep -vE "$NOLINT_RE"
 }
 
+run_file_checks () {
+    check_new_line "$1"
+    check_mixed_tabs_spaces "$1"
+    check_trailing_whitespace "$1"
+}
+
 # Recurse text files linting language-independent checks
 #
 # note: we may want to use python if this grows in complexity
 #
-for file in $(find_text_files); do
-    check_new_line "$file"
-    check_mixed_tabs_spaces "$file"
-    check_trailing_whitespace "$file"
-done
+if [[ -n "$FILEPATH" ]]; then
+    run_file_checks "$FILEPATH"
+else
+    for file in $(find_text_files); do
+        run_file_checks "$file"
+    done
+fi
+
 
 if [[ -n "$ERRORS" ]]; then
     echo >&2

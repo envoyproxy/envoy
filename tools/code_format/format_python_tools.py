@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import fnmatch
 import os
@@ -14,7 +16,6 @@ def collect_files():
     Returns: A collection of python files in the tools directory excluding
        any directories in the EXCLUDE_LIST constant.
     """
-    # TODO: Add ability to collect a specific file or files.
     matches = []
     path_parts = os.getcwd().split('/')
     dirname = '.'
@@ -31,7 +32,7 @@ def collect_files():
     return matches
 
 
-def validate_format(fix=False):
+def validate_format(fix=False, path=None):
     """Check the format of python files in the tools directory.
 
     Arguments:
@@ -40,7 +41,8 @@ def validate_format(fix=False):
     fixes_required = False
     failed_update_files = set()
     successful_update_files = set()
-    for python_file in collect_files():
+    paths = ([path] if path else collect_files())
+    for python_file in paths:
         reformatted_source, encoding, changed = FormatFile(
             python_file, style_config='.style.yapf', in_place=fix, print_diff=not fix)
         if not fix:
@@ -70,6 +72,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool to format python files.')
     parser.add_argument(
         'action', choices=['check', 'fix'], default='check', help='Fix invalid syntax in files.')
+    parser.add_argument('path', nargs='?', default=None, help='Path to a specific file.')
     args = parser.parse_args()
-    is_valid = validate_format(args.action == 'fix')
+    is_valid = validate_format(fix=(args.action == "fix"), path=args.path)
     sys.exit(0 if is_valid else 1)

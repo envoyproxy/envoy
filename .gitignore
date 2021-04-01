@@ -13,6 +13,7 @@ cscope.*
 .deps
 .devcontainer.json
 /docs/landing_source/.bundle
+.envoypush
 /generated
 .idea/
 .project

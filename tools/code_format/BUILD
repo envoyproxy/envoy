@@ -22,3 +22,12 @@ envoy_py_binary(
         requirement("yapf"),
     ],
 )
+
+py_binary(
+    name = "python_yapf",
+    srcs = ["python_yapf.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("yapf"),
+    ],
+)

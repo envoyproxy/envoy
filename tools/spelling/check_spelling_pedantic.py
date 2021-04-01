@@ -755,9 +755,12 @@ def execute(files, dictionary_file, fix):
 
     checker.stop()
 
-    print(
-        "Checked %d file(s) and %d comment(s), found %d error(s)." %
-        (total_files, total_comments, total_errors))
+    if total_files:
+        print(
+            "Checked %d file(s) and %d comment(s), found %d error(s)." %
+            (total_files, total_comments, total_errors))
+        if not fix and not total_errors:
+            print("PASS")
 
     return total_errors == 0
 
@@ -840,5 +843,3 @@ if __name__ == "__main__":
                 "ERROR: spell check failed. Run 'tools/spelling/check_spelling_pedantic.py fix and/or add new "
                 "words to tools/spelling/spelling_dictionary.txt'")
             sys.exit(1)
-
-        print("PASS")

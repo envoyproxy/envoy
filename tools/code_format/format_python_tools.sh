@@ -6,11 +6,16 @@
 
 . tools/shell_utils.sh
 
+FORMAT_ACTION="$1"
+FORMAT_PATH="${2:-}"
+
 set -e
 
+# TODO(phlax): move these to bazel
 echo "Running Python format check..."
-python_venv format_python_tools "$1"
+python_venv format_python_tools "$FORMAT_ACTION" "$FORMAT_PATH"
 
 echo "Running Python3 flake8 check..."
 python3 -m flake8 --version
-python3 -m flake8 . --exclude=*/venv/* --count --select=E9,F63,F72,F82 --show-source --statistics
+# uses .flake8 in repo root
+python3 -m flake8 . --count --show-source --statistics

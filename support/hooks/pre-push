@@ -11,74 +11,367 @@
 
 DUMMY_SHA=0000000000000000000000000000000000000000
 
-echo "Running pre-push check; to skip this step use 'push --no-verify'"
+# Set non-empty value to quieten push hook
+SKIP_PUSH_MESSAGE="${SKIP_PUSH_MESSAGE:-}"
 
-# shellcheck disable=SC2034
-while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA
-do
-  if [ "$LOCAL_SHA" = $DUMMY_SHA ]
-  then
-    # Branch deleted. Do nothing.
-    exit 0
-  else
-    if [ "$REMOTE_SHA" = $DUMMY_SHA ]
-    then
-      # New branch. Verify the last commit, since this is very likely where the new code is
-      # (though there is no way to know for sure). In the extremely uncommon case in which someone
-      # pushes more than 1 new commit to a branch, CI will enforce full checking.
-      RANGE="$LOCAL_SHA~1..$LOCAL_SHA"
-    else
-      # Updating branch. Verify new commits.
-      RANGE="$REMOTE_SHA..$LOCAL_SHA"
-    fi
+# Link to READMEs etc
+DCO_URL=https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md#dco-sign-your-work
+README_URL=https://github.com/envoyproxy/envoy/blob/main/support/hooks/README.md
+BAZEL_README_URL=https://github.com/envoyproxy/envoy/blob/main/bazel/README.md
+SHELLCHECK_INSTALL_URL=https://github.com/koalaman/shellcheck#installing
 
+PUSH_MESSAGE=(
+    "Running pre-push checks"
+    "* You can skip this step with \"git push --no-verify\""
+    "* More info here: ${README_URL}"
+    "* Hide this message with \"echo SKIP_PUSH_MESSAGE=yes >> .envoypush\"")
+USE_BAZEL_TOOLS="${USE_BAZEL_TOOLS:-}"
+
+# this is a list of checks that are run
+# the check is split on the first colon
+# - the function to run ie - `check_{check_name}`
+# - a regex to match the filename
+CHECKS=(
+    "code_format:BUILD$|WORKSPACE$|\.bzl$|\.cc$|\.h$|\.java$|\.m$|\.md$|\.mm$|\.proto$|\.rst$"
+    "glint:*"
+    "shellcheck:*"
+    "flake8:\.py$"
+    "yapf:\.py$"
+    "spelling:\.cc$|\.h$|\.proto$"
+    "protos:\.proto$"
+    "repositories:\.bzl$")
+
+DEBUG="${DEBUG_COMMIT_PUSH:-}"
+
+# handle failure
+EXIT_ON_ERROR="${EXIT_ON_ERROR:-}"
+WARN_ON_MISSING="${WARN_ON_MISSING:-}"
+PUSH_ON_FAILURE="${PUSH_ON_FAILURE:-}"
+FAILED=
+
+# DCO
+DCO_ERROR_COMMITS=(
+    "ERROR: The following commits do not have DCO signoff:"
+    ""
+    "  See here for information on how to fix:"
+    ""
+    "      ${DCO_URL}")
+
+# skip message/logic for code_format
+SKIP_CODE_FORMAT="${SKIP_CODE_FORMAT:-}"
+CODE_FORMAT_WARNING=(
+    "WARNING: Skipping code_format checks - missing \$BUILDIFIER_PATH or \$CLANG_FORMAT"
+    ""
+    "  For further information:"
+    ""
+    "      ${BAZEL_README_URL}#running-clang-format-without-docker"
+    ""
+    "  Skip this check with \"echo SKIP_CODE_FORMAT=yes >> .envoypush\"")
+
+# skip message/logic for flake8
+FLAKE8_PATH=${FLAKE8_PATH:-$(command -v flake8)}
+FLAKE8_WARNING=(
+    "WARNING: Skipping python flake8 tests - missing flake8 or bazel commands"
+    ""
+    "  You can install bazel and \"echo USE_BAZEL_TOOLS=yes >> .envoypush\""
+    ""
+    "      For bazel: ${BAZEL_README_URL}"
+    ""
+    "  You can also install flake8 using pip - \"pip install flake8\"."
+    ""
+    "  Skip this check with \"echo SKIP_FLAKE8=yes >> .envoypush\"")
+SKIP_FLAKE8="${SKIP_FLAKE8:-}"
+
+# skip message/logic for shellcheck
+SHELLCHECK_PATH=${SHELLCHECK_PATH:-$(command -v shellcheck)}
+SHELLCHECK_WARNING=(
+    "WARNING: Skipping shellcheck checks - missing shellcheck command"
+    ""
+    "  Install shellcheck for your system:"
+    ""
+    "      ${SHELLCHECK_INSTALL_URL}"
+    ""
+    "  Skip this check with \"echo SKIP_SHELLCHECK=yes >> .envoypush\"")
+SKIP_SHELLCHECK="${SKIP_SHELLCHECK:-}"
+
+# skip logic for protos - requires bazel
+SKIP_PROTOS="${SKIP_PROTOS:-}"
+BAZEL_PATH=${BAZEL_PATH:-$(command -v bazel)}
+PROTOS_WARNING=(
+    "WARNING: Skipping protobuf checks - missing bazel command"
+    ""
+    "  Install bazel for your system:"
+    ""
+    "       ${BAZEL_README_URL}"
+    ""
+    "  Skip this check with \"echo SKIP_PROTOS=yes >> .envoypush\"")
+
+# skip message/logic for yapf
+YAPF_PATH=${YAPF_PATH:-$(command -v yapf)}
+YAPF_WARNING=(
+    "WARNING: Skipping python yapf checks - missing yapf or bazel commands"
+    ""
+    "  You can install bazel and \"echo USE_BAZEL_TOOLS=yes >> .envoypush\""
+    ""
+    "      For bazel: ${BAZEL_README_URL}"
+    ""
+    "  You can also install yapf using pip - \"pip install yapf\"."
+    ""
+    "  Skip this check with \"echo SKIP_YAPF=yes >> .envoypush\"")
+SKIP_YAPF="${SKIP_YAPF:-}"
+
+# NOTE: The `tools` directory will be the same relative to the support
+# directory, independent of whether we're in a submodule, so no need to use
+# our `relpath` helper.
+SRC_DIR="$(dirname "$(realpath "$0")")/../../"
+SCRIPT_DIR="${SRC_DIR}/tools"
+
+SHEBANG_RE='^#!/bin/bash|^#!/bin/sh|^#!/usr/bin/env bash'
+
+
+if [[ -f "${SRC_DIR}/.envoypush" ]]; then
+    # allow user to override paths and/or suppress checks and error messages with env vars
+    # shellcheck disable=SC1090
+    . "${SRC_DIR}/.envoypush"
+fi
+
+
+check_dco () {
     # Verify DCO signoff. We do this before the format checker, since it has
     # some probability of failing spuriously, while this check never should.
     #
     # In general, we can't assume that the commits are signed off by author
     # pushing, so we settle for just checking that there is a signoff at all.
-    SIGNED_OFF=$(git rev-list --no-merges --grep "^Signed-off-by: " "$RANGE")
-    NOT_SIGNED_OFF=$(git rev-list --no-merges "$RANGE" | grep -Fxv "$SIGNED_OFF")
-    if [ -n "$NOT_SIGNED_OFF" ]
-    then
-      echo >&2 "ERROR: The following commits do not have DCO signoff:"
-      while read -r commit; do
-        echo "  $(git log --pretty=oneline --abbrev-commit -n 1 "$commit")"
-      done <<< "$NOT_SIGNED_OFF"
-      exit 1
+    # check all commits that would be added have been signed
+    local range="$1" signed_off not_signed_off
+
+    log_check dco
+    signed_off=$(git rev-list --no-merges --grep "^Signed-off-by: " "$range")
+    not_signed_off=$(git rev-list --no-merges "$range" | grep -Fxv "$signed_off")
+    if [[ -n "$not_signed_off" ]]; then
+        log_error dco "${DCO_ERROR_COMMITS[@]}"
+        while read -r commit; do
+            echo "  $(git log --pretty=oneline --abbrev-commit -n 1 "$commit")"
+        done <<< "$not_signed_off"
+        handle_error dco
     fi
+}
 
-    # NOTE: The `tools` directory will be the same relative to the support
-    # directory, independent of whether we're in a submodule, so no need to use
-    # our `relpath` helper.
-    SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
+check_code_format () {
+    # Clang tidy a file
+    #
+    local file="$1"
+    if [[ -n "$SKIP_CODE_FORMAT" ]]; then
+        return
+    fi
+    log_check code_format "$file"
+    if [[ -n "$BUILDIFIER_PATH" ]] && [[ -n "$CLANG_FORMAT" ]];  then
+        "$SCRIPT_DIR"/code_format/check_format.py check "$file" || handle_error code_format "$file"
+    else
+        handle_missing code_format "${CODE_FORMAT_WARNING[@]}"
+        SKIP_CODE_FORMAT=yes
+    fi
+}
 
-    # TODO(hausdorff): We should have a more graceful failure story when the
-    # user does not have all the tools set up correctly. This script assumes
-    # `$CLANG_FORMAT` and `$BUILDIFY` are defined, or that the default values it
-    # assumes for these variables correspond to real binaries on the system. If
-    # either of these things aren't true, the check fails.
-    for i in $(git diff --name-only $RANGE --diff-filter=ACMR --ignore-submodules=all 2>&1); do
-      if [[ -n "$BUILDIFIER_PATH" ]]; then
-       echo -ne "  Checking format for $i - "
-      "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
-      else
-        echo -e "\nMissing \$BUILDIFIER_PATH, skipping code_format/check_format.py\n" >&2
-      fi
 
-      echo "  Checking spelling for $i"
-      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
-    done
+check_flake8 () {
+    # Flake8 a python file
+    local file="$1"
+    if [[ -n "$SKIP_FLAKE8" ]]; then
+        return
+    fi
+    log_check flake8 "$file"
+    if [[ -n "$BAZEL_PATH" ]] && [[ -n "$USE_BAZEL_TOOLS" ]];  then
+        "$FLAKE8_PATH" run //tools/code_format:python_flake8 "$file" || handle_error flake8 "$file"
+    elif [[ -n "$FLAKE8_PATH" ]];  then
+        "$FLAKE8_PATH" "$file" || handle_error flake8
+    else
+        handle_missing flake8 "${FLAKE8_WARNING[@]}"
+        SKIP_FLAKE8=yes
+    fi
+}
+
+check_protos () {
+    # Run proto_format.sh
+    # this only runs once and only if a .proto file is found to be changed
+    #
+    local file="$1"
+    if [[ -n "$SKIP_PROTOS" ]]; then
+        return
+    fi
+    log_check protos "$file"
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
-    "$SCRIPT_DIR"/proto_format/proto_format.sh check || exit 1
+    # only run this once - this is a half-workaround for now
+    SKIP_PROTOS=yes
 
-    "$SCRIPT_DIR"/code_format/format_python_tools.sh check || exit 1
+    if [[ -n "$BAZEL_PATH" ]];  then
+        "$SCRIPT_DIR"/proto_format/proto_format.sh check || handle_error protos "$file"
+    else
+        handle_missing protos "${PROTOS_WARNING[@]}"
+    fi
+}
 
-    # Check correctness of repositories definitions.
-    echo "  Checking repositories definitions"
-    "$SCRIPT_DIR"/check_repositories.sh || exit 1
-  fi
+check_shellcheck () {
+    # Run shellcheck on a file with .sh suffix or shebang lines
+    local file="$1" isshell=
+    if [[ -n "$SKIP_SHELLCHECK" ]]; then
+        return
+    fi
+    if [[ ${file: -3} == ".sh" ]]; then
+        isshell=yes
+    elif grep -E "$SHEBANG_RE" "$file" > /dev/null; then
+        isshell=yes
+    fi
+    if [[ -z "$isshell" ]]; then
+        return
+    fi
+    log_check shellcheck "$file"
+    if [[ -n "$SHELLCHECK_PATH" ]];  then
+        "$SHELLCHECK_PATH" -x "$file" || handle_error shellcheck "$file"
+    else
+        handle_missing shellcheck "${SHELLCHECK_WARNING[@]}"
+        SKIP_SHELLCHECK=yes
+    fi
+}
+
+check_glint () {
+    # Run glint on a file to ensure general formatting compliance
+    local file="$1"
+    log_check glint "$file"
+    "$SCRIPT_DIR"/code_format/glint.sh "$1" || handle_error glint
+}
+
+check_yapf () {
+    # Run yapf on a file
+    local file="$1"
+    if [[ -n "$SKIP_YAPF" ]]; then
+        return
+    fi
+    log_check yapf "$file"
+    if [[ -n "$BAZEL_PATH" ]] && [[ -n "$USE_BAZEL_TOOLS" ]];  then
+        "$BAZEL_PATH" run //tools/code_format:python_yapf check "$file" || handle_error "yapf: ${file}"
+    elif [[ -n "$YAPF_PATH" ]];  then
+        "$SCRIPT_DIR/code_format/format_python_tools.py" check "$file" || handle_error "yapf: ${file}"
+    else
+        handle_missing yapf "${YAPF_WARNING[@]}"
+        SKIP_YAPF=yes
+    fi
+}
+
+check_spelling () {
+    # Run spelling checks on a file
+    local file="$1"
+    if [[ -n "$SKIP_SPELLING" ]]; then
+        return
+    fi
+    # TODO(phlax): add check for aspell
+    log_check spelling "$file"
+    "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$file" || handle_error spelling
+}
+
+
+check_repositories () {
+    # Check repo dependency rules in a bazel file
+    local file="$1"
+    log_check repositories "$file"
+    # This just uses grep atm so has no dependencies itself
+    "$SCRIPT_DIR"/check_repositories.sh "$1" || handle_error repositories
+}
+
+handle_missing () {
+    local missing="$1"
+    log_error "${@}"
+    if [[ -z "$WARN_ON_MISSING" ]]; then
+        handle_error "Missing required util: ${missing}"
+    fi
+}
+
+handle_error () {
+    FAILED=yes
+    log_error FAILED "${@}"
+    if [[ -n "$EXIT_ON_ERROR" ]]; then
+        exit 1
+    fi
+}
+
+log_check () {
+    if [[ -z "$DEBUG" ]]; then
+        return
+    fi
+    echo "[${1}] ${2}"
+}
+
+log_error () {
+    local check="$1"
+    shift
+    echo "[${check}]" >&2
+    for line in "${@}"; do
+        echo "[${check}] ${line}" >&2
+    done
+    echo "[${check}]" >&2
+}
+
+
+run_checks_for () {
+    # Run checks for a filepath
+    local filepath="$1"
+
+    # Run each check against the file where the check's regex matches for the filepath
+    for checkstring in "${CHECKS[@]}"; do
+        # Split on the first colon, and rejoin the rest
+        IFS=':' read -r -a checkinfo <<< "$checkstring"
+        check="${checkinfo[0]}"
+        match=$(IFS=':'; echo "${checkinfo[*]:1}")
+
+        if echo "$filepath" | grep -E "$match" > /dev/null; then
+            # check <> filepath match, run the check...
+            "check_${check}" "$filepath"
+        fi
+    done
+}
+
+run_checks () {
+    # Run all checks
+    local range="$1"
+
+    check_dco "$range"
+
+    for filepath in $(git diff --name-only "$range" --diff-filter=ACMR --ignore-submodules=all 2>&1); do
+        run_checks_for "$filepath"
+    done
+}
+
+
+if [[ -z "$SKIP_PUSH_MESSAGE" ]]; then
+    echo
+    for line in "${PUSH_MESSAGE[@]}"; do
+        echo "    $line"
+        echo
+    done
+fi
+
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+    export LOCAL_REF REMOTE_REF
+    if [[ "$LOCAL_SHA" = "$DUMMY_SHA" ]];  then
+        # Branch deleted. Do nothing.
+        exit 0
+    else
+        if [[ "$REMOTE_SHA" = "$DUMMY_SHA" ]]; then
+            # New branch. Verify the last commit, since this is very likely where the new code is
+            # (though there is no way to know for sure). In the extremely uncommon case in which someone
+            # pushes more than 1 new commit to a branch, CI will enforce full checking.
+            RANGE="$LOCAL_SHA~1..$LOCAL_SHA"
+        else
+            # Updating branch. Verify new commits.
+            RANGE="$REMOTE_SHA..$LOCAL_SHA"
+        fi
+
+        run_checks "$RANGE"
+
+        # If push on failure is *not* set and there are errors, exit 1
+        if [[ -z "$PUSH_ON_FAILURE" ]] && [[ -n "$FAILED" ]]; then
+            exit 1
+        fi
+    fi
 done
-
-exit 0
