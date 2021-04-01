@@ -267,9 +267,8 @@ Next, start the Envoy server using the override configuration:
          PS> docker run --rm -it
                -p '9902:9902'
                -p '10000:10000'
-               -v "$PWD\:`"C:\envoy-configs`""
                'envoyproxy/|envoy_windows_docker_image|'
-                  -c 'C:\envoy-configs\envoy-demo.yaml'
+                  -c 'C:\ProgramData\envoy.yaml'
                   --config-yaml "$(Get-Content -Raw envoy-override.yaml)"
          ...
 
@@ -396,10 +395,9 @@ This can be overridden using :option:`--log-path`.
             PS> mkdir logs
             PS> docker run --rm -it
                   -p '10000:10000'
-                  -v "$PWD\:`"C:\envoy-configs`""
                   -v "$PWD\logs\:`"C:\logs`""
                   'envoyproxy/|envoy_windows_docker_image|'
-                     -c 'C:\envoy-configs\envoy-demo.yaml'
+                     -c 'C:\ProgramData\envoy.yaml'
                      --log-path 'C:\logs\custom.log'
 
 :ref:`Access log <arch_overview_access_logs>` paths can be set for the
@@ -485,9 +483,8 @@ which are set to ``debug`` and ``trace`` respectively.
             PS> mkdir logs
             PS> docker run --rm -it
                   -p '10000:10000'
-                  -v "$PWD\:`"C:\envoy-configs`""
                   envoyproxy/|envoy_windws_docker_image|
-                     -c 'C:\envoy-configs\envoy-demo.yaml'
+                     -c 'C:\ProgramData\envoy.yaml'
                      -l off
                      --component-log-level 'upstream:debug,connection:trace'
             ...
