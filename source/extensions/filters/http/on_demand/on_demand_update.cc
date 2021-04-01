@@ -86,6 +86,12 @@ void OnDemandRouteUpdate::handleOnDemandCDS(const Router::Route& route) {
     return;
   }
   auto cluster_name = entry->clusterName();
+  if (cluster_name.empty()) {
+    // Empty cluster name may be a result of a missing HTTP header
+    // used for getting the cluster name. Nothing we can do here.
+    filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
+    return;
+  }
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
   cluster_discovery_callback_ = std::make_shared<Upstream::ClusterDiscoveryCallback>(
       [this](Upstream::ClusterDiscoveryStatus cluster_status) {

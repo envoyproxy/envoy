@@ -74,6 +74,13 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterIsNotAva
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterNameIsEmpty) {
+  setupWithCDS();
+  Http::TestRequestHeaderMapImpl headers;
+  decoder_callbacks_.route_->route_entry_.cluster_name_ = "";
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailable) {
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
