@@ -32,8 +32,16 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
       const std::string name = "envoy";
       const std::string config_flag = "--config-yaml";
       const std::string log_flag = "-l";
-      const char* envoy_argv[] = {name.c_str(),     config_flag.c_str(), config.c_str(),
-                                  log_flag.c_str(), log_level.c_str(),   nullptr};
+      const std::string concurrency_option = "--concurrency";
+      const std::string concurrency_arg = "0";
+      const char* envoy_argv[] = {name.c_str(),
+                                  config_flag.c_str(),
+                                  config.c_str(),
+                                  concurrency_option.c_str(),
+                                  concurrency_arg.c_str(),
+                                  log_flag.c_str(),
+                                  log_level.c_str(),
+                                  nullptr};
 
       main_common_ = std::make_unique<MobileMainCommon>(5, envoy_argv);
       event_dispatcher_ = &main_common_->server()->dispatcher();
