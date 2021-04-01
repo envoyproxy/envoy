@@ -39,7 +39,7 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * ClusterUpdateCallbacks provide a way to exposes Cluster lifecycle events in the
+ * ClusterUpdateCallbacks provide a way to expose Cluster lifecycle events in the
  * ClusterManager.
  */
 class ClusterUpdateCallbacks {
