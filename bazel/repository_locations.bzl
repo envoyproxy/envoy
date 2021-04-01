@@ -208,7 +208,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "792f250fb546bde8590e72d64311ea00a70c175fd77df6bb5e02328fa15fe28e",
         strip_prefix = "libprotobuf-mutator-{version}",
         urls = ["https://github.com/google/libprotobuf-mutator/archive/v{version}.tar.gz"],
-        release_date = "2020-11-13",
+        release_date = "2020-11-06",
         use_category = ["test_only"],
     ),
     com_github_google_tcmalloc = dict(
