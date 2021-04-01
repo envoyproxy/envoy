@@ -184,7 +184,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
 
   // Reset the stream.
   upstream_request_->encodeResetStream();
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
 }
 
@@ -386,7 +386,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Ensure the streams are all reset successfully.
   for (uint32_t i = 1; i < num_requests; ++i) {
-    responses[i]->waitForReset();
+    ASSERT_TRUE(responses[i]->waitForReset());
   }
 }
 

@@ -364,7 +364,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 
   ASSERT_TRUE(response->waitForEndStream());
   // The delayed close timeout should trigger since client is not closing the connection.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
@@ -544,7 +544,7 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
 }

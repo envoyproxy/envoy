@@ -42,7 +42,8 @@ public:
   void waitForBodyData(uint64_t size);
   testing::AssertionResult
   waitForEndStream(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-  void waitForReset();
+  testing::AssertionResult
+  waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder
