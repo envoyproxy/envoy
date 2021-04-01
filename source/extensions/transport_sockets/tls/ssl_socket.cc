@@ -8,6 +8,8 @@
 #include "common/http/headers.h"
 #include "common/runtime/runtime_features.h"
 
+#include "server/backtrace.h"
+
 #include "extensions/transport_sockets/tls/io_handle_bio.h"
 #include "extensions/transport_sockets/tls/ssl_handshaker.h"
 #include "extensions/transport_sockets/tls/utility.h"
@@ -363,6 +365,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+  std::cerr << "============== create Client ssl socket\n";
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -404,6 +407,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
 
 Network::TransportSocketPtr
 ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
+  std::cerr << "============== create server ssl socket\n";
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.

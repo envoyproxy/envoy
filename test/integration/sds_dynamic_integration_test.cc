@@ -3,6 +3,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
@@ -40,16 +42,33 @@ namespace Ssl {
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
 
+std::string protocolTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>&
+        p) {
+  return fmt::format(
+      "{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+      std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+      std::get<2>(p.param) ? "DownstreamUseQuic" : "DownstreamUseTcp");
+}
+
 // Sds integration base class with following support:
 // * functions to create sds upstream, and send sds response
 // * functions to create secret protobuf.
-class SdsDynamicIntegrationBaseTest : public Grpc::GrpcClientIntegrationParamTest,
-                                      public HttpIntegrationTest {
+class SdsDynamicIntegrationBaseTest
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public HttpIntegrationTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
+      : HttpIntegrationTest((std::get<2>(GetParam()) ? Http::CodecClient::Type::HTTP3
+                                                     : Http::CodecClient::Type::HTTP1),
+                            ipVersion(), ConfigHelper::httpProxyConfig(std::get<2>(GetParam()))),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert") {}
+
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
 
 protected:
   void createSdsStream(FakeUpstream&) {
@@ -148,26 +167,29 @@ class SdsDynamicDownstreamIntegrationTest : public SdsDynamicIntegrationBaseTest
 public:
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      auto* common_tls_context = tls_context.mutable_common_tls_context();
       auto* transport_socket = bootstrap.mutable_static_resources()
                                    ->mutable_listeners(0)
                                    ->mutable_filter_chains(0)
                                    ->mutable_transport_socket();
-      common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+      if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+        transport_socket->set_name("envoy.transport_sockets.tls");
+        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+        auto* common_tls_context = tls_context.mutable_common_tls_context();
+        configToUseSds(common_tls_context);
+        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      } else {
+        ASSERT(downstream_protocol_ == Http::CodecClient::Type::HTTP3);
+        transport_socket->set_name("envoy.transport_sockets.quic");
+        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+            transport_socket_config;
+        auto* common_tls_context =
+            transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
+        configToUseSds(common_tls_context);
+        transport_socket->mutable_typed_config()->PackFrom(transport_socket_config);
+      }
+    });
 
-      auto* validation_context = common_tls_context->mutable_validation_context();
-      validation_context->mutable_trusted_ca()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-      validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
-
-      // Modify the listener ssl cert to use SDS from sds_cluster
-      auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
-      setUpSdsConfig(secret_config, "server_cert");
-
-      transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
-
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add a static sds cluster
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -177,6 +199,22 @@ public:
 
     HttpIntegrationTest::initialize();
     client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
+  }
+
+  void configToUseSds(
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* common_tls_context) {
+    common_tls_context->add_alpn_protocols(downstream_protocol_ == Http::CodecClient::Type::HTTP1
+                                               ? Http::Utility::AlpnNames::get().Http11
+                                               : Http::Utility::AlpnNames::get().Http3);
+
+    auto* validation_context = common_tls_context->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+
+    // Modify the listener ssl cert to use SDS from sds_cluster
+    auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
+    setUpSdsConfig(secret_config, "server_cert");
   }
 
   void createUpstreams() override {
@@ -190,18 +228,37 @@ public:
   }
 
   Network::ClientConnectionPtr makeSslClientConnection() {
-    Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
-    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_ssl_ctx_->createTransportSocket(nullptr),
-                                               nullptr);
+    int port = lookupPort("http");
+    if (downstream_protocol_ <= Http::CodecClient::Type::HTTP2) {
+      Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, port);
+      return dispatcher_->createClientConnection(
+          address, Network::Address::InstanceConstSharedPtr(),
+          client_ssl_ctx_->createTransportSocket(nullptr), nullptr);
+    }
+    std::string url = "udp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
+                      std::to_string(port);
+    Network::Address::InstanceConstSharedPtr local_address;
+    if (version_ == Network::Address::IpVersion::v4) {
+      local_address = Network::Utility::getLocalAddress(Network::Address::IpVersion::v4);
+    } else {
+      // Docker only works with loopback v6 address.
+      local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
+    }
+    return Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+               Http::QuicCodecNames::get().Quiche)
+        .createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
+                                     Network::Utility::resolveUrl(url), local_address);
   }
 
 protected:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
+                     testing::ValuesIn({false, true})));
 
 class SdsDynamicKeyRotationIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
 protected:
@@ -224,7 +281,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc)));
+                     testing::Values(Grpc::ClientType::EnvoyGrpc), testing::ValuesIn({false})));
 
 // Validate that a basic key-cert rotation works via symlink rename.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
@@ -464,8 +521,11 @@ private:
   bool share_validation_secret_{false};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
+                     testing::ValuesIn({false})));
 
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
@@ -607,8 +667,11 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, SdsDynamicUpstreamIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
+                     testing::ValuesIn({false})));
 
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.
@@ -763,7 +826,10 @@ public:
   FakeStreamPtr sds_stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, SdsCdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, SdsCdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Grpc::ClientType::EnvoyGrpc), testing::ValuesIn({false})));
 
 TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {

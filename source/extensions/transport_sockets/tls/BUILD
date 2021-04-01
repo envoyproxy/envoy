@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
+        "//source/server:backtrace_lib",
     ],
 )
 
