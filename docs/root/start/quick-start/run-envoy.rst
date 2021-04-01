@@ -110,9 +110,9 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
       To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
       Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``:
-   
+
       .. substitution-code-block:: console
-   
+
          $ docker run --rm -it \
                -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml \
                -p 9901:9901 \
@@ -139,7 +139,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
       Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``, from PowerShell run:
 
       .. substitution-code-block:: PowerShell
-   
+
          PS> docker run --rm -it
                -v "$PWD\:`"C:\envoy-configs`""
                -p '9901:9901'
@@ -345,7 +345,7 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.546][11][info][config] [source/server/configuration_impl.cc:80] loading 1 listener(s)
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
-   
+
    .. tab:: Docker, Windows Container
 
       .. substitution-code-block:: PowerShell
@@ -357,7 +357,7 @@ For invalid configuration the process will print the errors and exit with ``1``.
          'envoyproxy/|envoy_windows_docker_image|'
             --mode validate
             -c 'C:\envoy-configs\my-envoy-config.yaml'
-         
+
          configuration 'my-envoy-config.yaml' OK
 
 Envoy logging
@@ -388,13 +388,13 @@ This can be overridden using :option:`--log-path`.
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \
                    --log-path logs/custom.log
-   
+
    .. tab:: Docker, Windows Container
-   
+
       .. substitution-code-block:: PowerShell
 
             PS> mkdir logs
-            PS> docker run --rm -it 
+            PS> docker run --rm -it
                   -p '10000:10000'
                   -v "$PWD\:`"C:\envoy-configs`""
                   -v "$PWD\logs\:`"C:\logs`""
@@ -481,17 +481,17 @@ which are set to ``debug`` and ``trace`` respectively.
    .. tab:: Docker, Windows Container
 
       .. substitution-code-block:: PowerShell
-      
+
             PS> mkdir logs
-            PS> docker run --rm -it 
+            PS> docker run --rm -it
                   -p '10000:10000'
                   -v "$PWD\:`"C:\envoy-configs`""
                   envoyproxy/|envoy_windws_docker_image|
                      -c 'C:\envoy-configs\envoy-demo.yaml'
-                     -l off 
+                     -l off
                      --component-log-level 'upstream:debug,connection:trace'
             ...
-      
+
 .. tip::
 
    See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h#L29>` for a list of components.
