@@ -7,9 +7,6 @@
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
-#include "simple_lru_cache/simple_lru_cache_inl.h"
-
-using ::google::simple_lru_cache::SimpleLRUCache;
 
 namespace Envoy {
 namespace Extensions {

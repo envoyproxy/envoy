@@ -2,6 +2,10 @@
 
 #include "common/common/assert.h"
 
+#include "simple_lru_cache/simple_lru_cache_inl.h"
+
+using ::google::simple_lru_cache::SimpleLRUCache;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -25,7 +29,7 @@ public:
     }
   }
 
-  ~JwtCacheImpl() {
+  ~JwtCacheImpl() override {
     if (jwt_cache_) {
       jwt_cache_->clear();
     }
