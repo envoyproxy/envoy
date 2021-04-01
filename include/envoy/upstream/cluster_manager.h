@@ -363,15 +363,6 @@ public:
   virtual ClusterDiscoveryCallbackHandlePtr
   requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, const std::string& name,
                                   ClusterDiscoveryCallbackWeakPtr callback) PURE;
-
-  /**
-   * Notifies the threads that were waiting for discovery of a cluster with a passed name. Usually
-   * used to unblock the requests in case of discovery failure.
-   *
-   * @param name is the cluster's name.
-   */
-  virtual void notifyOnDemandCluster(const std::string& name,
-                                     ClusterDiscoveryStatus cluster_status) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

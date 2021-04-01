@@ -71,8 +71,6 @@ public:
   MOCK_METHOD(ClusterDiscoveryCallbackHandlePtr, requestOnDemandClusterDiscovery,
               (OdCdsApiSharedPtr odcds, const std::string& name,
                ClusterDiscoveryCallbackWeakPtr callback));
-  MOCK_METHOD(void, notifyOnDemandCluster,
-              (const std::string& name, ClusterDiscoveryStatus cluster_status));
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::config::core::v3::BindConfig bind_config_;

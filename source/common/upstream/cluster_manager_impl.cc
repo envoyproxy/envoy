@@ -954,6 +954,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
+  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
   tls_.runOnAllThreads(
       [info = cm_cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
        load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
@@ -982,9 +983,6 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
             cb->onClusterAddOrUpdate(*new_cluster);
           }
         }
-      },
-      [this, name = cm_cluster.cluster().info()->name()] {
-        pending_cluster_creations_.erase(name);
       });
 }
 
@@ -1176,23 +1174,34 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds,
       return;
     }
     odcds->updateOnDemand(name);
+    auto timer_cb = Event::TimerCb([this, name] { notifyExpiredDiscovery(name); });
+    auto timer = dispatcher_.createTimer(timer_cb);
+    timer->enableTimer(std::chrono::milliseconds(5000));
     // Keep odcds alive for the duration of the discovery process.
-    pending_cluster_creations_.insert({std::move(name), std::move(odcds)});
+    pending_cluster_creations_.insert(
+        {std::move(name), ClusterCreation{std::move(odcds), std::move(timer)}});
   });
 
   return std::move(handle);
 }
 
-void ClusterManagerImpl::notifyOnDemandCluster(const std::string& name,
-                                               ClusterDiscoveryStatus cluster_status) {
-  tls_.runOnAllThreads(
-      [name, cluster_exists](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-        if (!cluster_manager.has_value()) {
-          return;
-        }
-        cluster_manager->cdm_.processClusterName(name, cluster_status);
-      },
-      [this, name] { pending_cluster_creations_.erase(name); });
+void ClusterManagerImpl::notifyExpiredDiscovery(const std::string& name) {
+  auto map_node_handle = pending_cluster_creations_.extract(name);
+  if (map_node_handle.empty()) {
+    return;
+  }
+  // Defer destroying the timer, so it's not destroyed during its
+  // callback. TimerPtr is a unique_ptr, which is not copyable, but
+  // std::function is copyable, we turn a move-only unique_ptr into a
+  // copyable shared_ptr and pass that to the std::function.
+  dispatcher_.post([timer = std::shared_ptr<Event::Timer>(
+                        std::move(map_node_handle.mapped().expiration_timer_))] {});
+  tls_.runOnAllThreads([name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    if (!cluster_manager.has_value()) {
+      return;
+    }
+    cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Missing);
+  });
 }
 
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {

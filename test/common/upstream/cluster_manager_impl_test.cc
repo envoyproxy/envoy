@@ -240,7 +240,7 @@ TEST_F(ODCDTest, TestClusterRediscoveredAfterFail) {
   EXPECT_CALL(*this, testFunction());
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
   auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
-  cluster_manager_->notifyOnDemandCluster("cluster_foo", Upstream::ClusterDiscoveryStatus::Missing);
+  cluster_manager_->notifyExpiredDiscovery("cluster_foo");
   handle.reset();
   cb = createCallback();
   handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);

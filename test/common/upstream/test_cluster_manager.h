@@ -183,6 +183,10 @@ public:
     }
     return clusters;
   }
+
+  void notifyExpiredDiscovery(const std::string& name) {
+    ClusterManagerImpl::notifyExpiredDiscovery(name);
+  }
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls

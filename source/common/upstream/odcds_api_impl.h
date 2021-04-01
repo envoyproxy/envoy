@@ -54,14 +54,12 @@ private:
   OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
                Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void sendAwaiting();
-  void notify(const std::string& cluster_name);
 
   CdsApiHelper helper_;
   ClusterManager& cm_;
   Stats::ScopePtr scope_;
   StartStatus status_;
   absl::flat_hash_set<std::string> awaiting_names_;
-  absl::flat_hash_map<std::string, int> discovered_names_;
   Config::SubscriptionPtr subscription_;
 };
 

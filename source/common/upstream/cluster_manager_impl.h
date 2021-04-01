@@ -288,8 +288,6 @@ public:
   ClusterDiscoveryCallbackHandlePtr
   requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, const std::string& name,
                                   ClusterDiscoveryCallbackWeakPtr callback) override;
-  void notifyOnDemandCluster(const std::string& name,
-                             ClusterDiscoveryStatus cluster_status) override;
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
@@ -624,11 +622,27 @@ private:
                               const ClusterConnectivityState& cluster_manager_state,
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
+  struct ClusterCreation {
+    OdCdsApiSharedPtr odcds_;
+    Event::TimerPtr expiration_timer_;
+  };
+
+  using ClusterCreationsMap = absl::flat_hash_map<std::string, ClusterCreation>;
+
+protected:
+  /**
+   * Notifies cluster discovery managers in each worker thread that
+   * the discovery process for the cluster with a passed name has
+   * timed out.
+   */
+  void notifyExpiredDiscovery(const std::string& name);
+
+private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
-  absl::flat_hash_map<std::string, OdCdsApiSharedPtr> pending_cluster_creations_;
+  ClusterCreationsMap pending_cluster_creations_;
   Random::RandomGenerator& random_;
 
 protected:
