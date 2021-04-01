@@ -66,8 +66,6 @@ do
         echo -e "\nMissing \$BUILDIFIER_PATH, skipping code_format/check_format.py\n" >&2
       fi
 
-      ./tools/code_format/glint.sh "$i"
-
       echo "  Checking spelling for $i"
       "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
     done
