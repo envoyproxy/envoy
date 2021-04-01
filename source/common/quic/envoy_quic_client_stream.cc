@@ -31,23 +31,38 @@ namespace Quic {
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
                                              quic::QuicSpdyClientSession* client_session,
-                                             quic::StreamType type)
+                                             quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
+<<<<<<< Updated upstream:source/common/quic/envoy_quic_client_stream.cc
           // Flow control receive window should be larger than 8k so that the send buffer can fully
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {
   ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
 }
+=======
+          // This should be larger than 8k to fully utilize congestion control
+          // window. And no larger than the max stream flow control window for
+          // the stream to buffer all the data.
+          // Ideally this limit should also correlate to peer's receive window
+          // but not fully depends on that.
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }, http3_options) {}
+>>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_client_stream.cc
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
                                              quic::QuicSpdyClientSession* client_session,
-                                             quic::StreamType type)
+                                             quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(pending, client_session, type),
       EnvoyQuicStream(
+<<<<<<< Updated upstream:source/common/quic/envoy_quic_client_stream.cc
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+=======
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }, http3_options) {}
+>>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_client_stream.cc
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
@@ -136,6 +151,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
+<<<<<<< Updated upstream:source/common/quic/envoy_quic_client_stream.cc
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list);
   const absl::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusNoThrow(*headers);
@@ -144,6 +160,10 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   const uint64_t status = optional_status.value();
+=======
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list, *this);
+  const uint64_t status = Http::Utility::getResponseStatus(*headers);
+>>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_client_stream.cc
   if (Http::CodeUtility::is1xx(status)) {
     if (status == enumToInt(Http::Code::SwitchingProtocols)) {
       // HTTP3 doesn't support the HTTP Upgrade mechanism or 101 (Switching Protocols) status code.

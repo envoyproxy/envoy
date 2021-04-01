@@ -38,7 +38,9 @@ class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ServerConnection {
 public:
   QuicHttpServerConnectionImpl(EnvoyQuicServerSession& quic_session,
-                               Http::ServerConnectionCallbacks& callbacks);
+                               Http::ServerConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t max_request_headers_kb,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action);
 
   // Http::Connection
   void goAway() override;
@@ -54,7 +56,7 @@ class QuicHttpClientConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ClientConnection {
 public:
   QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                               Http::ConnectionCallbacks& callbacks);
+                               Http::ConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;
@@ -69,5 +71,33 @@ private:
   EnvoyQuicClientSession& quic_client_session_;
 };
 
+<<<<<<< Updated upstream:source/common/quic/codec_impl.h
+=======
+// A factory to create QuicHttpClientConnection.
+class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectionFactory {
+public:
+  std::unique_ptr<Http::ClientConnection>
+  createQuicClientConnection(Network::Connection& connection,
+                             Http::ConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t max_request_headers_kb) override;
+
+  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
+};
+
+// A factory to create QuicHttpServerConnection.
+class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectionFactory {
+public:
+  std::unique_ptr<Http::ServerConnection>
+  createQuicServerConnection(Network::Connection& connection,
+                             Http::ConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t max_request_headers_kb,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action) override;
+
+  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
+};
+
+DECLARE_FACTORY(QuicHttpClientConnectionFactoryImpl);
+DECLARE_FACTORY(QuicHttpServerConnectionFactoryImpl);
+
+>>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/codec_impl.h
 } // namespace Quic
 } // namespace Envoy

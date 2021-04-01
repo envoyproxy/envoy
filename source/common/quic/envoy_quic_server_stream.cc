@@ -32,25 +32,42 @@ namespace Envoy {
 namespace Quic {
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
-                                             quic::StreamType type)
+                                             quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action)
     : quic::QuicSpdyServerStreamBase(id, session, type),
       EnvoyQuicStream(
+<<<<<<< Updated upstream:source/common/quic/envoy_quic_server_stream.cc
           // Flow control receive window should be larger than 8k to fully utilize congestion
           // control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {
   ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
 }
+=======
+          // This should be larger than 8k to fully utilize congestion control
+          // window. And no larger than the max stream flow control window for
+          // the stream to buffer all the data.
+          // Ideally this limit should also correlate to peer's receive window
+          // but not fully depends on that.
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }, http3_options), headers_with_underscores_action_(headers_with_underscores_action) {}
+>>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_server_stream.cc
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
-                                             quic::QuicSpdySession* session, quic::StreamType type)
+                                             quic::QuicSpdySession* session, quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action)
     : quic::QuicSpdyServerStreamBase(pending, session, type),
       EnvoyQuicStream(
           // This should be larger than 8k to fully utilize congestion control
           // window. And no larger than the max stream flow control window for
           // the stream to buffer all the data.
+<<<<<<< Updated upstream:source/common/quic/envoy_quic_server_stream.cc
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+=======
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }, http3_options), headers_with_underscores_action_(headers_with_underscores_action) {}
+>>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_server_stream.cc
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
@@ -140,6 +157,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+<<<<<<< Updated upstream:source/common/quic/envoy_quic_server_stream.cc
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list);
   if (!Http::HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
@@ -148,6 +166,20 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   request_decoder_->decodeHeaders(std::move(headers),
                                   /*end_stream=*/fin);
+=======
+  std::unique_ptr<Http::RequestHeaderMapImpl> headers = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list, *this);
+if (headers == nullptr) {
+    if (close_connection_upon_invalid_header_) {
+      stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
+    } else {
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    }
+    return;
+  }
+  request_decoder_->decodeHeaders(
+      std::move(headers),
+      /*end_stream=*/fin);
+>>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_server_stream.cc
   ConsumeHeaderList();
 }
 
@@ -292,6 +324,35 @@ Network::Connection* EnvoyQuicServerStream::connection() { return filterManagerC
 
 QuicFilterManagerConnectionImpl* EnvoyQuicServerStream::filterManagerConnection() {
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
+}
+
+HeaderValidationResult EnvoyQuicServerStream::validateHeader(const std::string& header_name,
+                                                   absl::string_view header_value) {
+  HeaderValidationResult result = EnvoyQuicStream::validateHeader(header_name, header_value);
+  if (result != HeaderValidationResult::ACCEPT) {
+    return result;
+  }
+  return checkHeaderNameForUnderscores(header_name);
+}
+
+HeaderValidationResult
+EnvoyQuicServerStream::checkHeaderNameForUnderscores(const std::string& header_name) {
+  if (headers_with_underscores_action_ == envoy::config::core::v3::HttpProtocolOptions::ALLOW ||
+      !Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
+    return HeaderValidationResult::ACCEPT;
+  }
+  if (headers_with_underscores_action_ ==
+      envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
+    ENVOY_STREAM_LOG(debug, "Dropping header with invalid characters in its name: {}", *this,
+                     header_name);
+    // TODO(danzh) Increment dropped_headers_with_underscores_ once http3 stats is propogated;
+    return HeaderValidationResult::DROP;
+  }
+  ENVOY_STREAM_LOG(debug, "Rejecting request due to header name with underscores: {}", *this,
+                   header_name);
+  // TODO(danzh) Increment requests_rejected_with_underscores_in_headers_ once http3 stats is
+  // propogated;
+  return HeaderValidationResult::INVALID;
 }
 
 } // namespace Quic

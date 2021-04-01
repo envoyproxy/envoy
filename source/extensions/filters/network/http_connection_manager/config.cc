@@ -207,6 +207,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
+      http3_options_(Http3::Utility::initializeAndValidateOptions(
+          config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
+          config.stream_error_on_invalid_http_message())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
@@ -576,6 +579,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         headersWithUnderscoresAction());
   }
   case CodecType::HTTP2: {
+    std::cerr << "aaaa " << http2_options_.aaaa();
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
@@ -583,6 +587,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   case CodecType::HTTP3:
+<<<<<<< Updated upstream
 #ifdef ENVOY_ENABLE_QUIC
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
@@ -590,6 +595,17 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
+=======
+    // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
+    // TODO(danzh) Add support to get the factory name from config, possibly
+    // from HttpConnectionManager protobuf. This is not essential till there are multiple
+    // implementations of QUIC.
+    return std::unique_ptr<Http::ServerConnection>(
+        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
+            Http::QuicCodecNames::get().Quiche)
+            .createQuicServerConnection(connection, callbacks, http3_options_, maxRequestHeadersKb(),
+       headersWithUnderscoresAction()));
+>>>>>>> Stashed changes
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),

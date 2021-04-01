@@ -1421,6 +1421,9 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
+         hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
         hcm.mutable_http2_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
@@ -1486,6 +1489,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
+         hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
         hcm.mutable_http2_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
@@ -2279,6 +2285,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
+        hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
         hcm.mutable_http2_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);

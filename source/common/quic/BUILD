@@ -127,6 +127,7 @@ envoy_cc_library(
     hdrs = ["envoy_quic_stream.h"],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_utils_lib",
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":quic_filter_manager_connection_lib",
         ":send_buffer_monitor_lib",
