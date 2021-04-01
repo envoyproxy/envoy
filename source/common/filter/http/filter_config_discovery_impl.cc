@@ -117,7 +117,7 @@ void FilterConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
-  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
+  auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
       resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
@@ -161,6 +161,7 @@ void FilterConfigSubscription::onConfigUpdate(
   last_config_ = factory_callback;
   last_type_url_ = type_url;
   last_version_info_ = version_info;
+  last_filter_config_ = filter_config;
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -251,6 +252,14 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
   if (subscription->lastConfig().has_value()) {
     TRY_ASSERT_MAIN_THREAD {
       provider->validateTypeUrl(subscription->lastTypeUrl());
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+              subscription->lastFilterConfig());
+      auto message = Config::Utility::translateAnyToFactoryConfig(
+          subscription->lastFilterConfig().typed_config(),
+          factory_context.messageValidationVisitor(), factory);
+      provider->validateTermianlFilter(filter_config_name, factory.name(),
+                                       factory.isTerminalFilter(*message, factory_context));
       last_config_valid = true;
     }
     END_TRY catch (const EnvoyException& e) {
@@ -279,6 +288,8 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config_source.default_config(), factory_context.messageValidationVisitor(),
         *default_factory);
+    provider->validateTermianlFilter(filter_config_name, default_factory->name(),
+                                     default_factory->isTerminalFilter(*message, factory_context));
     Envoy::Http::FilterFactoryCb default_config =
         default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
     provider->onConfigUpdate(default_config, "", nullptr);

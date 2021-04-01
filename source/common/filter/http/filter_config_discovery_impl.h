@@ -107,6 +107,9 @@ public:
   const absl::optional<Envoy::Http::FilterFactoryCb>& lastConfig() { return last_config_; }
   const std::string& lastTypeUrl() { return last_type_url_; }
   const std::string& lastVersionInfo() { return last_version_info_; }
+  const envoy::config::core::v3::TypedExtensionConfig& lastFilterConfig() {
+    return last_filter_config_;
+  }
   void incrementConflictCounter();
 
 private:
@@ -126,6 +129,7 @@ private:
   absl::optional<Envoy::Http::FilterFactoryCb> last_config_{absl::nullopt};
   std::string last_type_url_;
   std::string last_version_info_;
+  envoy::config::core::v3::TypedExtensionConfig last_filter_config_;
   Server::Configuration::FactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
 
