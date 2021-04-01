@@ -37,18 +37,18 @@ class PipChecker(Checker):
     checks = ("dependabot",)
 
     @cached_property
-    def dependabot_config(self) -> dict:
-        """Parsed dependabot config"""
-        with open(os.path.join(self.path, DEPENDABOT_CONFIG)) as f:
-            return yaml.safe_load(f.read())
-
-    @cached_property
     def config_requirements(self) -> set:
         """Set of configured pip dependabot directories"""
         return set(
             update['directory']
             for update in self.dependabot_config["updates"]
             if update["package-ecosystem"] == "pip")
+
+    @cached_property
+    def dependabot_config(self) -> dict:
+        """Parsed dependabot config"""
+        with open(os.path.join(self.path, DEPENDABOT_CONFIG)) as f:
+            return yaml.safe_load(f.read())
 
     @cached_property
     def requirements_dirs(self) -> set:
