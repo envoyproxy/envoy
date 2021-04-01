@@ -93,23 +93,5 @@ void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
   });
 }
 
-std::unique_ptr<Http::ClientConnection>
-QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
-  return std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-      dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks);
-}
-
-std::unique_ptr<Http::ServerConnection>
-QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
-  return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-      dynamic_cast<Quic::EnvoyQuicServerSession&>(connection),
-      dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks));
-}
-
-REGISTER_FACTORY(QuicHttpClientConnectionFactoryImpl, Http::QuicHttpClientConnectionFactory);
-REGISTER_FACTORY(QuicHttpServerConnectionFactoryImpl, Http::QuicHttpServerConnectionFactory);
-
 } // namespace Quic
 } // namespace Envoy
