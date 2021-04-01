@@ -15,6 +15,7 @@ DEPENDABOT_CONFIG = ".github/dependabot.yml"
 
 # TODO(phlax): move this to a base module
 class Checker(object):
+    """Runs check methods prefixed with `check_` and named in `self.checks`"""
     checks = ()
 
     def __init__(self, path: str):
@@ -25,12 +26,12 @@ class Checker(object):
         return "\n - ".join([""] + errors)
 
     def run_checks(self) -> int:
-        """Run all configured checks and return the sum of their errors"""
+        """Run all configured checks and return the sum of their error counts"""
         return sum(getattr(self, f"check_{check}")() for check in self.checks)
 
     def write_errors(self, errors: list, pre: str, post: str) -> None:
         """Write errors to stderr with pre/post ambles"""
-        sys.stderr.write(f"\n{pre}: \n" f"{self.error_lines(errors)}\n\n" f"{post}\n\n")
+        sys.stderr.write(f"\n{pre}: \n{self.error_lines(errors)}\n\n{post}\n\n")
 
 
 class PipChecker(Checker):
