@@ -383,7 +383,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     upstream_request_->encodeData(response_size, true);
   }
   // Wait for the response to be read by the codec client.
-  ASSERT(response->waitForEndStream());
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
   return response;
 }
 
