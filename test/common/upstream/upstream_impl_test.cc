@@ -312,7 +312,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
       header_key_format:
         proper_case_words: {}
     common_http_protocol_options:
-      max_requests_connection: 3     
+      max_requests_connection: 3
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -1170,7 +1170,7 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
       header_key_format:
         proper_case_words: {}
     common_http_protocol_options:
-      max_requests_connection: 3    
+      max_requests_connection: 3
     load_assignment:
         endpoints:
           - lb_endpoints:

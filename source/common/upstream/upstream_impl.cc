@@ -736,7 +736,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
       max_requests_connection_(
-          http_protocol_options_->common_http_protocol_options_.max_requests_connection()), 
+          http_protocol_options_->common_http_protocol_options_.max_requests_connection()),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
