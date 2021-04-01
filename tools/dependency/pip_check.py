@@ -92,4 +92,8 @@ def main(path: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    try:
+        path = sys.argv[1]
+    except IndexError:
+        raise SystemExit("Pip check tool must be called with a path argument")
+    main(path)
