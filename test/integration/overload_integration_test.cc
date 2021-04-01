@@ -137,7 +137,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -146,7 +146,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -237,7 +237,7 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("202", response->headers().getStatusValue());
@@ -285,7 +285,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   // At this point, the connection should be idle but still open.
   ASSERT_TRUE(codec_client_->connected());
@@ -313,7 +313,8 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
-    response->waitForEndStream();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
     EXPECT_TRUE(codec_client_->sawGoAway());
@@ -354,7 +355,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
 
   // Wait for the proxy to notice and take action for the overload.
   test_server_->waitForCounterGe("http.config_test.downstream_rq_idle_timeout", 1);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(response->headers().getStatusValue(), "408");
   EXPECT_THAT(response->body(), HasSubstr("stream timeout"));
