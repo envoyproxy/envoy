@@ -28,7 +28,7 @@ def envoy_select_google_grpc(xs, repository = ""):
 # Selects the given values if http3 is enabled in the current build.
 def envoy_select_enable_http3(xs, repository = ""):
     return select({
-        repository + "//bazel:disable_http3": [],
+        repository + "//bazel:disable_http3_all_reasons": [],
         "//conditions:default": xs,
     })
 

@@ -24,12 +24,6 @@ namespace Envoy {
 namespace Http {
 namespace Utility {
 
-// This is a wrapper around dispatch calls that may throw an exception or may return an error status
-// while exception removal is in migration.
-// TODO(#10878): Remove this.
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data);
-
 /**
  * Well-known HTTP ALPN values.
  */
