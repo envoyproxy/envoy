@@ -24,12 +24,18 @@ using Http::ResponseHeaderMap;
 
 static const std::string kErrorPrefix = "ext_proc error";
 
-void Filter::openStream() {
+Filter::StreamOpenState Filter::openStream() {
+  ENVOY_BUG(!processing_complete_, "openStream should not have been called");
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this);
     stats_.streams_started_.inc();
+    if (processing_complete_) {
+      // Stream failed while starting and either onGrpcError or onGrpcClose was already called
+      return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
+    }
   }
+  return StreamOpenState::Ok;
 }
 
 void Filter::startMessageTimer(Event::TimerPtr& timer) {
@@ -61,7 +67,16 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   }
 
   // We're at the start, so start the stream and send a headers message
-  openStream();
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterHeadersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterHeadersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+
   request_headers_ = &headers;
   ProcessingRequest req;
   auto* headers_req = req.mutable_request_headers();
@@ -89,8 +104,18 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   case ProcessingMode::BUFFERED:
     if (end_stream) {
       ENVOY_BUG(request_state_ == FilterState::Idle, "Invalid filter state on request path");
-      decoder_callbacks_->addDecodedData(data, false);
+      switch (openStream()) {
+      case StreamOpenState::Error:
+        return FilterDataStatus::StopIterationNoBuffer;
+      case StreamOpenState::IgnoreError:
+        return FilterDataStatus::Continue;
+      case StreamOpenState::Ok:
+        // Fall through
+        break;
+      }
+
       // The body has been buffered and we need to send the buffer
+      decoder_callbacks_->addDecodedData(data, false);
       request_state_ = FilterState::BufferedBody;
       startMessageTimer(request_message_timer_);
       sendBodyChunk(true, *decoder_callbacks_->decodingBuffer(), true);
@@ -119,7 +144,16 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   }
 
   // Depending on processing mode this may or may not be the first message
-  openStream();
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterHeadersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterHeadersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+
   response_headers_ = &headers;
   ProcessingRequest req;
   auto* headers_req = req.mutable_response_headers();
@@ -145,6 +179,16 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   case ProcessingMode::BUFFERED:
     if (end_stream) {
       ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on response path");
+      switch (openStream()) {
+      case StreamOpenState::Error:
+        return FilterDataStatus::StopIterationNoBuffer;
+      case StreamOpenState::IgnoreError:
+        return FilterDataStatus::Continue;
+      case StreamOpenState::Ok:
+        // Fall through
+        break;
+      }
+
       encoder_callbacks_->addEncodedData(data, false);
       response_state_ = FilterState::BufferedBody;
       startMessageTimer(response_message_timer_);
@@ -166,7 +210,6 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
 
 void Filter::sendBodyChunk(bool request_path, const Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
-  openStream();
   ProcessingRequest req;
   auto* body_req = request_path ? req.mutable_request_body() : req.mutable_response_body();
   body_req->set_end_of_stream(end_stream);
@@ -382,6 +425,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
     }
   };
 
+  sent_immediate_response_ = true;
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
                                      mutate_headers, grpc_status, response.details());
 }

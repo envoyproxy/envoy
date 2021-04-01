@@ -634,7 +634,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
-
+* http3/quic with --//bazel:http3=False
 
 ## Enabling optional features
 
@@ -844,7 +844,9 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [clangd](https://clangd.llvm.org/) with supported editors.
 
-For example, use following command to prepare a compilation database:
+This requires Python 3.8.0+, download from [here](https://www.python.org/downloads/) if you do not have it installed already.
+
+Use the following command to prepare a compilation database:
 
 ```
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py

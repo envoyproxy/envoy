@@ -16,7 +16,7 @@ class AccessLogFactory : public Server::Configuration::AccessLogInstanceFactory 
 public:
   ::Envoy::AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
-                          Server::Configuration::FactoryContext& context) override;
+                          Server::Configuration::CommonFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

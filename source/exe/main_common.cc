@@ -125,10 +125,12 @@ void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_gener
         // HotRestartImpl is going to multiply this value by 10, so leave head room.
         base_id = static_cast<uint32_t>(random_generator.random()) & 0x0FFFFFFF;
 
-        try {
+        TRY_ASSERT_MAIN_THREAD {
           restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0, options_.socketPath(),
                                                                options_.socketMode());
-        } catch (Server::HotRestartDomainSocketInUseException& ex) {
+        }
+        END_TRY
+        catch (Server::HotRestartDomainSocketInUseException& ex) {
           // No luck, try again.
           ENVOY_LOG_MISC(debug, "dynamic base id: {}", ex.what());
         }
@@ -228,18 +230,22 @@ int MainCommon::main(int argc, char** argv, PostServerHook hook) {
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     main_common = std::make_unique<Envoy::MainCommon>(argc, argv);
     Envoy::Server::Instance* server = main_common->server();
     if (server != nullptr && hook != nullptr) {
       hook(*server);
     }
-  } catch (const Envoy::NoServingException& e) {
+  }
+  END_TRY
+  catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
-  } catch (const Envoy::MalformedArgvException& e) {
+  }
+  catch (const Envoy::MalformedArgvException& e) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
-  } catch (const Envoy::EnvoyException& e) {
+  }
+  catch (const Envoy::EnvoyException& e) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }

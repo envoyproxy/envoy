@@ -169,8 +169,8 @@ def fix_api_deps(path, contents):
         if deps != 'missing':
             existing_api_deps = set([
                 d for d in deps.split()
-                if d.startswith('@envoy_api') and d.endswith('pkg_cc_proto') and
-                d != '@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto'
+                if d.startswith('@envoy_api') and d.endswith('pkg_cc_proto')
+                and d != '@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto'
             ])
         deps_to_remove = existing_api_deps.difference(actual_api_deps)
         if deps_to_remove:
