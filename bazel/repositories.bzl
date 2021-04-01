@@ -144,6 +144,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_nghttp2_nghttp2()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
+    _com_github_nodejs_llhttp()
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
@@ -476,6 +477,16 @@ def _com_github_nodejs_http_parser():
     native.bind(
         name = "http_parser",
         actual = "@com_github_nodejs_http_parser//:http_parser",
+    )
+
+def _com_github_nodejs_llhttp():
+    external_http_archive(
+        name = "com_github_nodejs_llhttp",
+        build_file = "@envoy//bazel/external:llhttp.BUILD",
+    )
+    native.bind(
+        name = "llhttp",
+        actual = "@com_github_nodejs_llhttp//:llhttp",
     )
 
 def _com_github_ncopa_suexec():

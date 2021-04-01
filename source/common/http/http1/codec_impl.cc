@@ -21,6 +21,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
 #include "common/http/http1/legacy_parser_impl.h"
+#include "common/http/http1/parser_impl.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -466,7 +467,11 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_->setWatermarks(connection.bufferLimit());
-  parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_http1_parser")) {
+    parser_ = std::make_unique<HttpParserImpl>(type, this);
+  } else {
+    parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
+  }
 }
 
 Status ConnectionImpl::completeLastHeader() {
@@ -766,6 +771,7 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersComplete() {
       return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
     }
   }
+  parser_->hasContentLength(request_or_response_headers.ContentLength() != nullptr);
 
   auto statusor = onHeadersCompleteBase();
   if (!statusor.ok()) {

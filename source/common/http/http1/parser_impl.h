@@ -8,10 +8,10 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-class LegacyHttpParserImpl : public Parser {
+class HttpParserImpl : public Parser {
 public:
-  LegacyHttpParserImpl(MessageType type, ParserCallbacks* data);
-  ~LegacyHttpParserImpl() override;
+  HttpParserImpl(MessageType type, ParserCallbacks* data);
+  ~HttpParserImpl();
 
   // Http1::Parser
   RcVal execute(const char* data, int len) override;
@@ -22,7 +22,7 @@ public:
   int httpMajor() const override;
   int httpMinor() const override;
   absl::optional<uint64_t> contentLength() const override;
-  void hasContentLength(bool) override{};
+  void hasContentLength(bool val) override;
   bool isChunked() const override;
   absl::string_view methodName() const override;
   absl::string_view errnoName(int rc) const override;

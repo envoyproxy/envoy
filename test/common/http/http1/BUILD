@@ -16,29 +16,38 @@ envoy_cc_test(
     ],
 )
 
+CODEC_DEPS = [
+    "//include/envoy/buffer:buffer_interface",
+    "//include/envoy/event:dispatcher_interface",
+    "//source/common/buffer:buffer_lib",
+    "//source/common/event:dispatcher_lib",
+    "//source/common/http:exception_lib",
+    "//source/common/http:header_map_lib",
+    "//source/common/http/http1:codec_lib",
+    "//test/common/stats:stat_test_utility_lib",
+    "//test/mocks/buffer:buffer_mocks",
+    "//test/mocks/http:http_mocks",
+    "//test/mocks/init:init_mocks",
+    "//test/mocks/local_info:local_info_mocks",
+    "//test/mocks/network:network_mocks",
+    "//test/mocks/protobuf:protobuf_mocks",
+    "//test/mocks/thread_local:thread_local_mocks",
+    "//test/mocks/upstream:upstream_mocks",
+    "//test/test_common:logging_lib",
+    "//test/test_common:test_runtime_lib",
+]
+
+envoy_cc_test(
+    name = "legacy_codec_impl_test",
+    srcs = ["codec_impl_test.cc"],
+    deps = CODEC_DEPS,
+)
+
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/http:exception_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/http1:codec_lib",
-        "//test/common/stats:stat_test_utility_lib",
-        "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/init:init_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:logging_lib",
-        "//test/test_common:test_runtime_lib",
-    ],
+    args = ["--runtime-feature-override-for-tests=envoy.reloadable_features.enable_new_http1_parser"],
+    deps = CODEC_DEPS,
 )
 
 envoy_cc_test(

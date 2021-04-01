@@ -140,6 +140,9 @@ public:
   // Returns the number of bytes in the body. absl::nullopt if no Content-Length header
   virtual absl::optional<uint64_t> contentLength() const PURE;
 
+  // Indicated that Content-Length header is present.
+  virtual void hasContentLength(bool val) PURE;
+
   // Returns whether headers are chunked.
   virtual bool isChunked() const PURE;
 

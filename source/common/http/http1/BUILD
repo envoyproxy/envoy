@@ -36,6 +36,7 @@ envoy_cc_library(
         ":header_formatter_lib",
         ":legacy_parser_lib",
         ":parser_interface",
+        ":parser_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/http:codec_interface",
@@ -111,6 +112,17 @@ envoy_cc_library(
     srcs = ["legacy_parser_impl.cc"],
     hdrs = ["legacy_parser_impl.h"],
     external_deps = ["http_parser"],
+    deps = [
+        ":parser_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "parser_lib",
+    srcs = ["parser_impl.cc"],
+    hdrs = ["parser_impl.h"],
+    external_deps = ["llhttp"],
     deps = [
         ":parser_interface",
         "//source/common/common:assert_lib",
