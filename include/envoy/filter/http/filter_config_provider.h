@@ -36,7 +36,8 @@ public:
   virtual FilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix) PURE;
+      const std::string& stat_prefix, bool last_filter_in_current_config,
+      const std::string& filter_chain_type) PURE;
 
   /**
    * Get an FilterConfigProviderPtr for a statically inlined filter config.

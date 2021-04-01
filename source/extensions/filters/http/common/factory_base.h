@@ -42,10 +42,20 @@ public:
 
   std::string name() const override { return name_; }
 
+  bool isTerminalFilter(const Protobuf::Message& proto_config,
+                        Server::Configuration::FactoryContext& context) override {
+    return isTerminalFilter(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                proto_config, context.messageValidationVisitor()),
+                            context);
+  }
+
 protected:
   FactoryBase(const std::string& name) : name_(name) {}
 
 private:
+  virtual bool isTerminalFilter(const ConfigProto&, Server::Configuration::FactoryContext&) {
+    return false;
+  }
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,

@@ -22,7 +22,9 @@ class RouterFilterConfig
 public:
   RouterFilterConfig() : FactoryBase(HttpFilterNames::get().Router) {}
 
-  bool isTerminalFilter() override { return true; }
+  bool isTerminalFilter(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
+    return true;
+  }
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

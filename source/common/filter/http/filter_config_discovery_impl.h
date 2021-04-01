@@ -33,11 +33,14 @@ class DynamicFilterConfigProviderImpl : public FilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
                                   const absl::flat_hash_set<std::string>& require_type_urls,
-                                  Server::Configuration::FactoryContext& factory_context);
+                                  Server::Configuration::FactoryContext& factory_context,
+                                  bool last_filter_in_current_config,
+                                  const std::string& filter_chain_type);
   ~DynamicFilterConfigProviderImpl() override;
 
   void validateTypeUrl(const std::string& type_url) const;
-
+  void validateTermianlFilter(const std::string& name, const std::string& filter_type,
+                              bool is_terminal_filter);
   // Config::ExtensionConfigProvider
   const std::string& name() override;
   absl::optional<Envoy::Http::FilterFactoryCb> config() override;
@@ -61,6 +64,8 @@ private:
   // case no warming is requested by any other filter config provider.
   Init::TargetImpl init_target_;
 
+  const bool last_filter_in_current_config_;
+  const std::string filter_chain_type_;
   friend class FilterConfigProviderManagerImpl;
 };
 
@@ -174,7 +179,8 @@ public:
   FilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix) override;
+      const std::string& stat_prefix, bool last_filter_in_current_config,
+      const std::string& filter_chain_type) override;
 
   FilterConfigProviderPtr
   createStaticFilterConfigProvider(const Envoy::Http::FilterFactoryCb& config,

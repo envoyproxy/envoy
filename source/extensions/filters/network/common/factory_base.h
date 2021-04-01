@@ -44,7 +44,16 @@ public:
 
   std::string name() const override { return name_; }
 
-  bool isTerminalFilter() override { return is_terminal_filter_; }
+  bool isTerminalFilter(const Protobuf::Message& proto_config,
+                        Server::Configuration::FactoryContext& context) override {
+    return isTerminalFilter(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                proto_config, context.messageValidationVisitor()),
+                            context);
+  }
+
+  virtual bool isTerminalFilter(const ConfigProto&, Server::Configuration::FactoryContext&) {
+    return is_terminal_filter_;
+  }
 
 protected:
   FactoryBase(const std::string& name, bool is_terminal = false)

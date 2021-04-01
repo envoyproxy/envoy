@@ -1278,7 +1278,7 @@ http_filters:
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilter(proto_config, context_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {

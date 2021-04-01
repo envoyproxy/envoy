@@ -29,7 +29,10 @@ private:
     };
   }
 
-  bool isTerminalFilter() override { return true; }
+  bool isTerminalFilter(const envoy::extensions::filters::network::echo::v3::Echo&,
+                        Server::Configuration::FactoryContext&) override {
+    return true;
+  }
 };
 
 /**

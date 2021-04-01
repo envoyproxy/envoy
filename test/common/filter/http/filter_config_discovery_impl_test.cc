@@ -76,7 +76,8 @@ public:
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-  FilterConfigProviderPtr createProvider(std::string name, bool warm) {
+  FilterConfigProviderPtr createProvider(std::string name, bool warm,
+                                         bool last_filter_config = true) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ExtensionConfigSource config_source;
     TestUtility::loadFromYaml(R"EOF(
@@ -94,7 +95,7 @@ type_urls:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_, "xds.");
+        config_source, name, factory_context_, "xds.", last_filter_config, "http");
   }
 
   void setup(bool warm = true) {
@@ -303,6 +304,31 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
       EnvoyException,
       "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
       "expect envoy.extensions.filters.http.router.v3.Router.");
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+}
+
+TEST_F(FilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
+  InSequence s;
+  setup();
+  auto provider2 = createProvider("foo", true, false);
+  const std::string response_yaml = R"EOF(
+  version_info: "1"
+  resources:
+  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: foo
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+  const auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(
+      callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
+      EnvoyException,
+      "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
+      "in a http filter chain.");
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
