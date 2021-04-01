@@ -41,6 +41,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "assert_enabled_in_release_test",
+    srcs = ["assert_test.cc"],
+    copts = ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "assert2_test",
     srcs = ["assert2_test.cc"],
     deps = [
