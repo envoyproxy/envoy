@@ -10,7 +10,8 @@ namespace Http {
 // An HTTP connection pool which will handle the connectivity grid of
 // [WiFi / cellular] [ipv4 / ipv6] [QUIC / TCP].
 // Currently only [QUIC / TCP are handled]
-class ConnectivityGrid : public ConnectionPool::Instance {
+class ConnectivityGrid : public ConnectionPool::Instance,
+                         protected Logger::Loggable<Logger::Id::pool> {
 public:
   struct ConnectivityOptions {
     explicit ConnectivityOptions(const std::vector<Http::Protocol>& protocols)
@@ -47,6 +48,9 @@ public:
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
+    // Attempt to create a new stream for pool();
+    void newStream();
+
     // Removes this from the owning list, deleting it.
     void deleteThis();
 
@@ -82,6 +86,7 @@ public:
   void drainConnections() override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
+  absl::string_view protocolDescription() const override { return "connection grid"; }
 
   // Returns the next pool in the ordered priority list.
   absl::optional<PoolIterator> nextPool(PoolIterator pool_it);

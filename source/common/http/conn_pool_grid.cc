@@ -18,26 +18,41 @@ bool contains(const std::vector<Http::Protocol>& protocols,
   return true;
 }
 
+absl::string_view describePool(const ConnectionPool::Instance& pool) {
+  return pool.protocolDescription();
+}
+
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
                                                      PoolIterator pool_it,
                                                      ConnectionPool::Callbacks& callbacks)
     : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks), pool_it_(pool_it) {
-  // TODO(#15649) add trace logging.
+  newStream();
+}
+
+void ConnectivityGrid::WrapperCallbacks::newStream() {
+  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(pool()),
+            grid_.host_->hostname());
   cancellable_ = pool().newStream(decoder_, *this);
 }
 
 void ConnectivityGrid::WrapperCallbacks::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
     Upstream::HostDescriptionConstSharedPtr host) {
+  ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.", describePool(pool()),
+            grid_.host_->hostname());
+
   // When a connection fails, see if there is a lower priority pool to attempt
   // connecting with.
   absl::optional<PoolIterator> next_pool = grid_.nextPool(pool_it_);
   if (next_pool.has_value()) {
     pool_it_ = next_pool.value();
-    cancellable_ = pool().newStream(decoder_, *this);
+    newStream();
     return;
   }
+
+  ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(pool()),
+            grid_.host_->hostname());
 
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller.
@@ -56,6 +71,9 @@ void ConnectivityGrid::WrapperCallbacks::onPoolReady(RequestEncoder& encoder,
                                                      absl::optional<Http::Protocol> protocol) {
   // Right now, connections are tried serially, so any successful stream
   // creation should be passed up to the original caller.
+  ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(pool()),
+            grid_.host_->hostname());
+
   ConnectionPool::Callbacks& callbacks = inner_callbacks_;
   deleteThis();
   return callbacks.onPoolReady(encoder, host, info, protocol);
