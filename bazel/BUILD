@@ -290,19 +290,21 @@ config_setting(
 bool_flag(
     name = "http3",
     build_setting_default = True,
+    visibility = ["//visibility:private"],
 )
 
 config_setting(
-    name = "disable_http3",
+    name = "disable_http3_setting",
     flag_values = {
         ":http3": "False",
     },
+    visibility = ["//visibility:private"],
 )
 
 selects.config_setting_group(
-    name = "disable_http3_all_reasons",
+    name = "disable_http3",
     match_any = [
-        ":disable_http3",
+        ":disable_http3_setting",
         ":boringssl_fips",
     ],
 )
