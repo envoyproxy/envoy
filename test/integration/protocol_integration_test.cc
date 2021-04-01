@@ -2191,6 +2191,25 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.set_path_with_escaped_slashes_action(
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::REJECT_REQUEST);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setPath("/test/long%2Furl");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
