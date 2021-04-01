@@ -218,9 +218,9 @@ public:
   };
 
   /**
-   * Check if the given |header_name| has underscore.
+   * Check if the given header_name has underscore.
    * Return HeaderValidationResult and populate the given counters based on
-   * |headers_with_underscores_action|.
+   * headers_with_underscores_action.
    */
   static HeaderValidationResult checkHeaderNameForUnderscores(
       const std::string& header_name,
@@ -230,10 +230,9 @@ public:
       Stats::Counter& requests_rejected_with_underscores_in_headers);
 
   /**
-   * Check if |header_value| represents valid value for HTTP content-length
-   * header.
-   * Return HeaderValidationResult and populate |should_close_connection|
-   * according to |override_stream_error_on_invalid_http_message|.
+   * Check if header_value represents a valid value for HTTP content-length header.
+   * Return HeaderValidationResult and populate should_close_connection
+   * according to override_stream_error_on_invalid_http_message.
    */
   static HeaderValidationResult
   validateContentLength(absl::string_view header_value,

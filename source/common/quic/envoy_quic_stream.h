@@ -110,7 +110,6 @@ public:
   Http::HeaderUtility::HeaderValidationResult
   validateHeader(const std::string& header_name, absl::string_view header_value) override {
     bool override_stream_error_on_invalid_http_message =
-        http3_options_.has_override_stream_error_on_invalid_http_message() &&
         http3_options_.override_stream_error_on_invalid_http_message().value();
     if (header_name == "content-length") {
       return Http::HeaderUtility::validateContentLength(

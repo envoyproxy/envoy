@@ -164,7 +164,7 @@ private:
   // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
   // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
   // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
-  // send buffer.`
+  // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
 };
