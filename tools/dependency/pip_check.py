@@ -15,7 +15,10 @@ DEPENDABOT_CONFIG = ".github/dependabot.yml"
 
 # TODO(phlax): move this to a base module
 class Checker(object):
-    """Runs check methods prefixed with `check_` and named in `self.checks`"""
+    """Runs check methods prefixed with `check_` and named in `self.checks`
+
+    check methods should return the count of errors and handle writing to stderr
+    """
     checks = ()
 
     def __init__(self, path: str):
