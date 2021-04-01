@@ -8,6 +8,7 @@ import "envoy/type/v3/percent.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -97,7 +98,8 @@ message ClusterLoadAssignment {
     // Defaults to 0 which means endpoints never go stale.
     google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration = {gt {}}];
 
-    bool hidden_envoy_deprecated_disable_overprovisioning = 5 [deprecated = true];
+    bool hidden_envoy_deprecated_disable_overprovisioning = 5
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // Name of the cluster. This will be the :ref:`service_name

@@ -7,6 +7,7 @@ import "envoy/config/listener/v3/quic_config.proto";
 
 import "google/protobuf/struct.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -38,7 +39,8 @@ message UdpListenerConfig {
   QuicProtocolOptions quic_options = 7;
 
   oneof config_type {
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 }
 
