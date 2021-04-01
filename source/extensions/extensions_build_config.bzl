@@ -54,6 +54,12 @@ EXTENSIONS = {
     "envoy.matching.input_matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
 
     #
+    # Generic Inputs
+    #
+
+    "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
+
+    #
     # HTTP filters
     #
 
