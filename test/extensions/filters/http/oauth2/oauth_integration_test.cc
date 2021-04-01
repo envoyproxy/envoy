@@ -46,10 +46,10 @@ typed_config:
       timeout: 3s
     authorization_endpoint: https://oauth.com/oauth/authorize/
     redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
-    redirect_path_matcher: 
+    redirect_path_matcher:
       path:
         exact: /callback
-    signout_path: 
+    signout_path:
       path:
         exact: /signout
     credentials:

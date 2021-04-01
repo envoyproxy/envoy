@@ -18,6 +18,10 @@ bool contains(const std::vector<Http::Protocol>& protocols,
   return true;
 }
 
+absl::string_view describePool(const ConnectionPool::Instance& pool) {
+  return pool.protocolDescription();
+}
+
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
                                                      PoolIterator pool_it,
@@ -26,10 +30,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
       current_(pool_it) {
-  auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, pool_it);
-  LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
-  // TODO(#15649) When adding config for the grid, make this configurable.
-  next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
+  newStream();
 }
 
 // TODO(#15649) add trace logging.
@@ -40,6 +41,8 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemp
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
     Upstream::HostDescriptionConstSharedPtr host) {
+  ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.", describePool(pool()),
+            parent_.grid_.host_->hostname());
   auto delete_this_on_return = removeFromList(parent_.connection_attempts_);
   // In the unlikely event the pool fails before the failover timer fires, try
   // to kick off another connection.
@@ -48,6 +51,8 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
       // If this point is reached, all pools have been tried. Pass the pool failure up to the
       // original caller.
       ConnectionPool::Callbacks& callbacks = parent_.inner_callbacks_;
+      ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(pool()),
+                parent_.grid_.host_->hostname());
       parent_.deleteThis();
       callbacks.onPoolFailure(reason, transport_failure_reason, host);
     }
@@ -59,9 +64,22 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
   removeFromList(grid_.wrapped_callbacks_);
 }
 
+void ConnectivityGrid::WrapperCallbacks::newStream() {
+  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
+            describePool(**current_), grid_.host_->hostname());
+  auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
+  LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
+  if (!next_attempt_timer_->enabled()) {
+    // TODO(#15649) When adding config for the grid, make this configurable.
+    next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
+  }
+}
+
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
     RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
     const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+  ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(pool()),
+            parent_.grid_.host_->hostname());
   auto delete_parent_on_return = removeFromList(parent_.connection_attempts_);
   // The first successful connection is passed up, and all others will be canceled.
   for (auto& attempt : parent_.connection_attempts_) {
@@ -89,9 +107,7 @@ bool ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
   }
   // Create a new connection attempt for the next pool.
   current_ = next_pool.value();
-  auto attempt_callbacks =
-      std::make_unique<WrapperCallbacks::ConnectionAttemptCallbacks>(*this, current_);
-  LinkedList::moveIntoList(std::move(attempt_callbacks), connection_attempts_);
+  newStream();
   return true;
 }
 
