@@ -212,15 +212,5 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
              : absl::nullopt;
 }
 
-ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
-    Network::ConnectionHandler& parent, Network::ListenerConfig* config)
-    : stats_({ALL_LISTENER_STATS(POOL_COUNTER(config->listenerScope()),
-                                 POOL_GAUGE(config->listenerScope()),
-                                 POOL_HISTOGRAM(config->listenerScope()))}),
-      per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
-          POOL_COUNTER_PREFIX(config->listenerScope(), parent.statPrefix()),
-          POOL_GAUGE_PREFIX(config->listenerScope(), parent.statPrefix()))}),
-      config_(config) {}
-
 } // namespace Server
 } // namespace Envoy
