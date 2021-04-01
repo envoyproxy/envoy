@@ -312,7 +312,6 @@ ClusterManagerImpl::ClusterManagerImpl(
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
-
   // Now setup ADS if needed, this might rely on a primary cluster.
   // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
   // After here, we just have a GrpcMux interface held in ads_mux_, which hides

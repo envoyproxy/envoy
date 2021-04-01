@@ -86,9 +86,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
-     Config::GrpcMuxSharedPtr gmuxsp = cm_.adsMux();
+    Config::GrpcMuxSharedPtr gmuxsp = cm_.adsMux();
     if ( gmuxsp == nullptr ) {
-      throw EnvoyException("A configuration for dynamic_resources is required for ads");
+      throw EnvoyException("A configuration for dynamic resources is required for ads with a non primary cluster");
     } 
     return std::make_unique<GrpcSubscriptionImpl>(
         gmuxsp, callbacks, resource_decoder, stats, type_url, dispatcher_,
