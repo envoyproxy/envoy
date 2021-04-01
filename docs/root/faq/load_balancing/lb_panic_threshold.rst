@@ -1,6 +1,5 @@
-I setup health checking. When I fail some hosts, Envoy starts routing to all of them again. Why?
+我设置了健康检查。当某些主机发生故障时，Envoy 再次开始路由到所有这些主机。为什么？
 ================================================================================================
 
-This feature is known as the load balancer :ref:`panic threshold
-<arch_overview_load_balancing_panic_threshold>`. It is used to prevent cascading failure when
-upstream hosts start failing health checks in large numbers.
+这个特性被称为负载均衡器的:ref:`紧急阈值
+<arch_overview_load_balancing_panic_threshold>`。 当上游主机健康检查大量失败时，它用于防止级联失败。
