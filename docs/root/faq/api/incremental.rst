@@ -1,11 +1,10 @@
-What is the status of incremental xDS support?
+增量 xDS 支持的状态有哪些？
 ==============================================
 
-The :ref:`incremental xDS <xds_protocol_delta>` protocol is designed to improve efficiency,
-scalability and functional use of xDS updates via two mechanisms:
+ :ref:`增量 xDS <xds_protocol_delta>` 协议通过设计两种机制来提高效率、可扩展性和功能性：
 
-* Delta xDS. Resource deltas are delivered rather than state-of-the-world.
-* On-demand xDS. Resource can be lazy loaded depending on request contents.
+* Delta xDS. 只会下发资源的变更，而不是全量下发。
+* On-demand xDS. 可以根据请求内容延迟加载资源。
 
-Currently, all xDS protocols (including ADS) support delta xDS. On-demand xDS is supported for
-:ref:`VHDS <config_http_conn_man_vhds>` only.
+如今，所有的 xDS 协议（包括 ADS）都支持 delta xDS 。On-demand xDS 目前只支持
+:ref:`VHDS <config_http_conn_man_vhds>`。
