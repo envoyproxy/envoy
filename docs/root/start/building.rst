@@ -13,8 +13,8 @@ In order to build without using the Docker container, follow the instructions at
 
 .. _install_requirements:
 
-Linux/Mac Requirements
-----------------------
+Linux/Mac Target Requirements
+-----------------------------
 
 Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
 recent Linux including Ubuntu 18.04 LTS.
@@ -30,8 +30,8 @@ Please note that for Clang/LLVM 8 and lower, Envoy may need to be built with `--
 as the new tcmalloc code is not guaranteed to compile with lower versions of Clang.
 
 
-Windows Requirements
---------------------
+Windows Target Requirements
+---------------------------
 
 Envoy now suports Windows as a target platform. The requirements below only apply if you want to build the Windows
 native executable. If you want to build the Linux version of Envoy on Windows either with WSL or Linux containers

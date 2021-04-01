@@ -6,18 +6,18 @@ It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) inst
 
 On Linux, run the following commands:
 
-```
+```console
 sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
 sudo chmod +x /usr/local/bin/bazel
 ```
 
 On macOS, run the following command:
-```
+```console
 brew install bazelisk
 ```
 
 On Windows, run the following commands:
-```
+```cmd
 mkdir %USERPROFILE%\bazel
 powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe -OutFile %USERPROFILE%\bazel\bazel.exe
 set PATH=%PATH%;%USERPROFILE%\bazel
@@ -52,7 +52,7 @@ for how to update or override dependencies.
 1. Install external dependencies.
     ### Ubuntu
     On Ubuntu, run the following:
-    ```bash
+    ```console
     sudo apt-get install \
        libtool \
        cmake \
@@ -68,19 +68,19 @@ for how to update or override dependencies.
 
     ### Fedora
     On Fedora (maybe also other red hat distros), run the following:
-    ```bash
+    ```console
     dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
     ```
 
     ### Linux
     On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).
     Extract the tar.xz and run the following:
-    ```bash
+    ```console
     bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
     ```
 
     This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
-    ```bash
+    ```console
     echo "build --config=clang" >> user.bazelrc
     ```
 
@@ -96,7 +96,7 @@ for how to update or override dependencies.
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
-    ```
+    ```console
     brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
