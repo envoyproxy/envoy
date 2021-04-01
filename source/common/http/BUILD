@@ -303,7 +303,6 @@ envoy_cc_library(
     srcs = ["hash_policy.cc"],
     hdrs = ["hash_policy.h"],
     deps = [
-        ":header_utility_lib",
         ":utility_lib",
         "//include/envoy/http:hash_policy_interface",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

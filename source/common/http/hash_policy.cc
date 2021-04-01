@@ -6,7 +6,6 @@
 
 #include "common/common/matchers.h"
 #include "common/common/regex.h"
-#include "common/http/header_utility.h"
 #include "common/http/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -47,23 +46,24 @@ public:
       std::vector<std::string> rewrited_header_values;
       std::vector<absl::string_view> header_values;
       header_values.reserve(header.size());
+
+      for (size_t i = 0; i < header.size(); i++) {
+        header_values.push_back(header[i]->value().getStringView());
+      }
+
       if (regex_rewrite_ != nullptr) {
         rewrited_header_values.reserve(header.size());
-      }
-      for (size_t i = 0; i < header.size(); i++) {
-        if (regex_rewrite_ != nullptr) {
-          rewrited_header_values.push_back(regex_rewrite_->replaceAll(
-              header[i]->value().getStringView(), regex_rewrite_substitution_));
-          header_values.push_back(rewrited_header_values.back());
-        } else {
-          header_values.push_back(header[i]->value().getStringView());
+        for (auto& value : header_values) {
+          rewrited_header_values.push_back(
+              regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
+          value = rewrited_header_values.back();
         }
-        // Ensure generating same hash value for different order header values.
-        // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
-        std::sort(header_values.begin(), header_values.end());
-        absl::Hash<const std::vector<absl::string_view>> hasher;
-        hash = hasher(header_values);
       }
+      // Ensure generating same hash value for different order header values.
+      // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
+      std::sort(header_values.begin(), header_values.end());
+      absl::Hash<const std::vector<absl::string_view>> hasher;
+      hash = hasher(header_values);
     }
     return hash;
   }

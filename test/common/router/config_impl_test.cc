@@ -12,7 +12,6 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/hash.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/http/header_map_impl.h"
