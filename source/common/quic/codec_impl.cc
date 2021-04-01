@@ -106,33 +106,5 @@ void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
   });
 }
 
-std::unique_ptr<Http::ClientConnection>
-QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
-    Http::Http3::CodecStats& stats,
-    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-    const uint32_t max_request_headers_kb) {
-  return std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-      dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks, stats, http3_options,
-      max_request_headers_kb);
-}
-
-std::unique_ptr<Http::ServerConnection>
-QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
-    Http::Http3::CodecStats& stats,
-    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-    const uint32_t max_request_headers_kb,
-    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
-  return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-      dynamic_cast<Quic::EnvoyQuicServerSession&>(connection),
-      dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks), stats, http3_options,
-      max_request_headers_kb, headers_with_underscores_action);
-}
-
-REGISTER_FACTORY(QuicHttpClientConnectionFactoryImpl, Http::QuicHttpClientConnectionFactory);
-REGISTER_FACTORY(QuicHttpServerConnectionFactoryImpl, Http::QuicHttpServerConnectionFactory);
-
 } // namespace Quic
 } // namespace Envoy
