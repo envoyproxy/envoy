@@ -531,27 +531,6 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFitlerNotFit) {
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithTerminalNotFit) {
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter("foo", false, false);
-  initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", invalidConfig());
-  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_fail", 1);
-  test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("500", response->headers().getStatusValue());
-}
-
 TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("bar", true);
