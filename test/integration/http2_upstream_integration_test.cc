@@ -583,6 +583,8 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamGoaway) {
   // Clean up
   ASSERT_TRUE(fake_upstream_connection2->close());
   ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+  fake_upstream_connection2.reset();
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy

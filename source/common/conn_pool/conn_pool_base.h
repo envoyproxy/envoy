@@ -238,7 +238,7 @@ public:
 
   void decrConnectingStreamCapacity(uint32_t delta) {
     state_.decrConnectingStreamCapacity(delta);
-    ASSERT(connecting_stream_capacity_ > delta);
+    ASSERT(connecting_stream_capacity_ >= delta);
     connecting_stream_capacity_ -= delta;
   }
 
