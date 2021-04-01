@@ -17,9 +17,13 @@ TEST(ReleaseAssertDeathTest, VariousLogs) {
 
 TEST(AssertDeathTest, VariousLogs) {
   int expected_counted_failures;
+  // Use 2 assert action registrations to verify that action chaining is working correctly.
   int assert_fail_count = 0;
+  int assert_fail_count2 = 0;
   auto debug_assert_action_registration =
-      Assert::setDebugAssertionFailureRecordAction([&]() { assert_fail_count++; });
+      Assert::addDebugAssertionFailureRecordAction([&](const char*) { assert_fail_count++; });
+  auto debug_assert_action_registration2 =
+      Assert::addDebugAssertionFailureRecordAction([&](const char*) { assert_fail_count2++; });
 
 #ifndef NDEBUG
   EXPECT_DEATH({ ASSERT(0); }, ".*assert failure: 0.*");
@@ -47,13 +51,33 @@ TEST(AssertDeathTest, VariousLogs) {
 #endif
 
   EXPECT_EQ(expected_counted_failures, assert_fail_count);
+  EXPECT_EQ(expected_counted_failures, assert_fail_count2);
+}
+
+TEST(AssertInReleaseTest, AssertLocation) {
+#if defined(NDEBUG) && defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
+  std::string assert_location;
+  auto debug_assert_action_registration =
+      Assert::addDebugAssertionFailureRecordAction([&](const char* location) {
+        RELEASE_ASSERT(assert_location.empty(), "");
+        assert_location = location;
+      });
+  ASSERT(false);
+
+  auto expected_line = __LINE__ - 2;
+  EXPECT_EQ(assert_location, absl::StrCat(__FILE__, ":", expected_line));
+#endif
 }
 
 TEST(EnvoyBugDeathTest, VariousLogs) {
+  // Use 2 envoy bug action registrations to verify that action chaining is working correctly.
   int envoy_bug_fail_count = 0;
+  int envoy_bug_fail_count2 = 0;
   // ENVOY_BUG actions only occur on power of two counts.
   auto envoy_bug_action_registration =
-      Assert::setEnvoyBugFailureRecordAction([&]() { envoy_bug_fail_count++; });
+      Assert::addEnvoyBugFailureRecordAction([&](const char*) { envoy_bug_fail_count++; });
+  auto envoy_bug_action_registration2 =
+      Assert::addEnvoyBugFailureRecordAction([&](const char*) { envoy_bug_fail_count2++; });
 
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "envoy bug failure: false.");
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "envoy bug failure: false.");
@@ -62,8 +86,10 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
 
 #ifdef NDEBUG
   EXPECT_EQ(3, envoy_bug_fail_count);
+  EXPECT_EQ(3, envoy_bug_fail_count2);
   // Reset envoy bug count to simplify testing exponential back-off below.
   envoy_bug_fail_count = 0;
+  envoy_bug_fail_count2 = 0;
   // In release mode, same log lines trigger exponential back-off.
   for (int i = 0; i < 4; i++) {
     ENVOY_BUG(false, "placeholder ENVOY_BUG");
@@ -76,6 +102,7 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
   EXPECT_LOG_CONTAINS("error", "envoy bug failure: false. Details: With some logs",
                       ENVOY_BUG(false, "With some logs"));
   EXPECT_EQ(5, envoy_bug_fail_count);
+  EXPECT_EQ(5, envoy_bug_fail_count2);
 #endif
 }
 
@@ -88,11 +115,26 @@ TEST(EnvoyBugDeathTest, TestResetCounters) {
   }
 }
 
+TEST(EnvoyBugInReleaseTest, AssertLocation) {
+#ifdef NDEBUG
+  std::string envoy_bug_location;
+  auto envoy_bug_action_registration =
+      Assert::addEnvoyBugFailureRecordAction([&](const char* location) {
+        RELEASE_ASSERT(envoy_bug_location.empty(), "");
+        envoy_bug_location = location;
+      });
+  ENVOY_BUG(false, "message");
+
+  auto expected_line = __LINE__ - 2;
+  EXPECT_EQ(envoy_bug_location, absl::StrCat(__FILE__, ":", expected_line));
+#endif
+}
+
 TEST(SlowAssertTest, TestSlowAssertInFastAssertInReleaseMode) {
   int expected_counted_failures;
   int slow_assert_fail_count = 0;
   auto debug_assert_action_registration =
-      Assert::setDebugAssertionFailureRecordAction([&]() { slow_assert_fail_count++; });
+      Assert::addDebugAssertionFailureRecordAction([&](const char*) { slow_assert_fail_count++; });
 
 #ifndef NDEBUG
   EXPECT_DEATH({ SLOW_ASSERT(0); }, ".*assert failure: 0.*");
