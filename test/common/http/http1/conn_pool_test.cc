@@ -861,10 +861,46 @@ TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
 /**
  * Test when we reach max requests per connection.
  */
-TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
+// TEST_F(Http1ConnPoolImplTest, DEPRECATED_FEATURE_TEST(MaxRequestsPerConnection)) {
+//   InSequence s;
+
+//   cluster_->max_requests_per_connection_ = 1;
+
+//   // Request 1 should kick off a new connection.
+//   NiceMock<MockResponseDecoder> outer_decoder;
+//   ConnPoolCallbacks callbacks;
+//   conn_pool_->expectClientCreate();
+//   Http::ConnectionPool::Cancellable* handle = conn_pool_->newStream(outer_decoder, callbacks);
+
+//   EXPECT_NE(nullptr, handle);
+
+//   NiceMock<MockRequestEncoder> request_encoder;
+//   ResponseDecoder* inner_decoder;
+//   EXPECT_CALL(*conn_pool_->test_clients_[0].codec_, newStream(_))
+//       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+//   EXPECT_CALL(callbacks.pool_ready_, ready());
+
+//   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+//   conn_pool_->expectEnableUpstreamReady();
+//   EXPECT_TRUE(
+//       callbacks.outer_encoder_
+//           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
+//           .ok());
+
+//   // Response with 'connection: close' which should cause the connection to go away.
+//   EXPECT_CALL(*conn_pool_, onClientDestroy());
+//   Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+//   inner_decoder->decodeHeaders(std::move(response_headers), true);
+//   dispatcher_.clearDeferredDeleteList();
+
+//   EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+//   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_max_requests_.value());
+// }
+
+TEST_F(Http1ConnPoolImplTest, MaxRequestsConnection) {
   InSequence s;
 
-  cluster_->max_requests_per_connection_ = 1;
+  cluster_->max_requests_connection_ = 1;
 
   // Request 1 should kick off a new connection.
   NiceMock<MockResponseDecoder> outer_decoder;
