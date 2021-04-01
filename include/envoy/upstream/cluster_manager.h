@@ -154,7 +154,6 @@ struct ClusterConnectivityState {
 
 class OdCdsApi;
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
-using OdCdsApiWeakPtr = std::weak_ptr<OdCdsApi>;
 
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
@@ -356,13 +355,13 @@ public:
    *
    * This function is thread-safe.
    *
-   * @param weak_odcds is a weak pointer to the ODCDS that will be used for discovery.
+   * @param odcds is a pointer to ODCDS used for discovery. Must not be a nullptr.
    * @param name is the name of the cluster to be discovered.
    * @param callback will be called when the discovery is finished.
-   * @return the discovery process handle
+   * @return ClusterDiscoveryCallbackHandlePtr the discovery process handle.
    */
   virtual ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds, const std::string& name,
+  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, const std::string& name,
                                   ClusterDiscoveryCallbackWeakPtr callback) PURE;
 
   /**

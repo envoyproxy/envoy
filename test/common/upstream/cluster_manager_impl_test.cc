@@ -299,20 +299,6 @@ TEST_F(ODCDTest, TestExpiredCallbackWithExistingCluster) {
   auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", null_cb);
 }
 
-TEST_F(ODCDTest, TestRequestWithExpiredODCDS) {
-  MockOdCdsApiSharedPtr null_odcds;
-  auto cb = createCallback(Upstream::ClusterDiscoveryStatus::Missing);
-  EXPECT_CALL(*this, testFunction());
-  auto handle = cluster_manager_->requestOnDemandClusterDiscovery(null_odcds, "cluster_foo", cb);
-}
-
-TEST_F(ODCDTest, TestRequestWithExpiredODCDSAndExpiredCallback) {
-  MockOdCdsApiSharedPtr null_odcds;
-  ClusterDiscoveryCallbackSharedPtr null_cb;
-  auto handle =
-      cluster_manager_->requestOnDemandClusterDiscovery(null_odcds, "cluster_foo", null_cb);
-}
-
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {
 public:
   bool supportsAlpn() const override { return true; }

@@ -286,7 +286,7 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds, const std::string& name,
+  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, const std::string& name,
                                   ClusterDiscoveryCallbackWeakPtr callback) override;
   void notifyOnDemandCluster(const std::string& name,
                              ClusterDiscoveryStatus cluster_status) override;

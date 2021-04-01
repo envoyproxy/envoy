@@ -1133,7 +1133,7 @@ void ClusterManagerImpl::ClusterDiscoveryManager::maybePostResetCallbacks() {
 }
 
 ClusterDiscoveryCallbackHandlePtr
-ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds,
+ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds,
                                                     const std::string& name,
                                                     ClusterDiscoveryCallbackWeakPtr weak_callback) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
@@ -1146,7 +1146,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds,
     // this name, so nothing more left to do here.
     return std::move(handle);
   }
-  dispatcher_.post([this, weak_odcds, weak_callback, name,
+  dispatcher_.post([this, odcds = std::move(odcds), weak_callback, name,
                     &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
     // Check for the cluster here too. It might have been added
     // between the time when this callback was posted and when it is
@@ -1175,27 +1175,9 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds,
       // nothing to do.
       return;
     }
-    if (auto odcds = weak_odcds.lock(); odcds != nullptr) {
-      // Keep odcds alive for the duration of the discovery process.
-      pending_cluster_creations_.insert({name, odcds});
-      odcds->updateOnDemand(name);
-    } else {
-      // CDS got dropped in the meantime, try to notify the worker
-      // thread if the callback is still valid.
-      if (weak_callback.expired()) {
-        // Callback was also dropped, nothing to do.
-        return;
-      }
-      thread_local_dispatcher.post([weak_callback] {
-        if (auto callback = weak_callback.lock(); callback != nullptr) {
-          // I'm not sure what would it take us to reach this
-          // point. Request is still being paused, but the route entry
-          // for this request got dropped, and thus its ODCDS was also
-          // dropped.
-          (*callback)(ClusterDiscoveryStatus::Missing);
-        }
-      });
-    }
+    odcds->updateOnDemand(name);
+    // Keep odcds alive for the duration of the discovery process.
+    pending_cluster_creations_.insert({std::move(name), std::move(odcds)});
   });
 
   return std::move(handle);

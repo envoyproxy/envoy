@@ -69,7 +69,7 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
   MOCK_METHOD(ClusterDiscoveryCallbackHandlePtr, requestOnDemandClusterDiscovery,
-              (OdCdsApiWeakPtr weak_odcds, const std::string& name,
+              (OdCdsApiSharedPtr odcds, const std::string& name,
                ClusterDiscoveryCallbackWeakPtr callback));
   MOCK_METHOD(void, notifyOnDemandCluster,
               (const std::string& name, ClusterDiscoveryStatus cluster_status));
