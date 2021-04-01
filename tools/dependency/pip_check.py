@@ -6,9 +6,7 @@ from functools import cached_property
 
 import yaml
 
-
 DEPENDABOT_CONFIG = ".github/dependabot.yml"
-
 
 # TODO(phlax): add checks for:
 #      - requirements can be installed together
@@ -28,20 +26,15 @@ class Checker(object):
 
     def run_checks(self) -> int:
         """Run all configured checks and return the sum of their errors"""
-        return sum(
-            getattr(self, f"check_{check}")()
-            for check in self.checks)
+        return sum(getattr(self, f"check_{check}")() for check in self.checks)
 
     def write_errors(self, errors: list, pre: str, post: str) -> None:
         """Write errors to stderr with pre/post ambles"""
-        sys.stderr.write(
-            f"\n{pre}: \n"
-            f"{self.error_lines(errors)}\n\n"
-            f"{post}\n\n")
+        sys.stderr.write(f"\n{pre}: \n" f"{self.error_lines(errors)}\n\n" f"{post}\n\n")
 
 
 class PipChecker(Checker):
-    checks = ("dependabot", )
+    checks = ("dependabot",)
 
     @cached_property
     def dependabot_config(self) -> dict:
@@ -72,14 +65,12 @@ class PipChecker(Checker):
 
         if missing_config:
             self.write_errors(
-                sorted(missing_config),
-                "Missing requirements config for",
+                sorted(missing_config), "Missing requirements config for",
                 "Either add the missing config or remove the file/s")
 
         if missing_dirs:
             self.write_errors(
-                sorted(missing_dirs),
-                "Missing requirements files for",
+                sorted(missing_dirs), "Missing requirements files for",
                 "Either add the missing file/s or remove the config")
 
         return len(missing_config | missing_dirs)
