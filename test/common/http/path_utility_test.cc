@@ -1,3 +1,4 @@
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -131,6 +132,60 @@ TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?#fragment"));
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#"));
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#fragment"));
+}
+
+TEST_F(PathUtilityTest, UnescapeSlashes) {
+  using UnescapeResult = std::tuple<std::string, PathUtil::UnescapeSlashesResult>;
+  auto unescapeSlashes = [this](const std::string& path_value) {
+    auto& path_header = pathHeaderEntry(path_value);
+    auto result = PathUtil::unescapeSlashes(headers_);
+    auto sanitized_path_value = path_header.value().getStringView();
+    return UnescapeResult(std::string(sanitized_path_value), result);
+  };
+  EXPECT_EQ(UnescapeResult("", PathUtil::UnescapeSlashesResult::NotFound),
+            unescapeSlashes("")); // empty
+  EXPECT_EQ(UnescapeResult("//", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%2f%2F")); // case-insensitive
+  EXPECT_EQ(UnescapeResult("/a/b/c/", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("/a%2Fb%2fc/")); // between other characters
+  EXPECT_EQ(UnescapeResult("%2b", PathUtil::UnescapeSlashesResult::NotFound),
+            unescapeSlashes("%2b")); // not %2f
+  EXPECT_EQ(UnescapeResult("/a/b/c", PathUtil::UnescapeSlashesResult::NotFound),
+            unescapeSlashes("/a/b/c")); // not %2f
+  EXPECT_EQ(UnescapeResult("%2", PathUtil::UnescapeSlashesResult::NotFound),
+            unescapeSlashes("%2")); // incomplete
+  EXPECT_EQ(UnescapeResult("%", PathUtil::UnescapeSlashesResult::NotFound),
+            unescapeSlashes("%")); // incomplete
+  EXPECT_EQ(UnescapeResult("/abc%2", PathUtil::UnescapeSlashesResult::NotFound),
+            unescapeSlashes("/abc%2")); // incomplete
+  EXPECT_EQ(UnescapeResult("foo%", PathUtil::UnescapeSlashesResult::NotFound),
+            unescapeSlashes("foo%")); // incomplete
+  EXPECT_EQ(UnescapeResult("/a/", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("/a%2F")); // prefixed
+  EXPECT_EQ(UnescapeResult("/a/", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%2fa/")); // suffixed
+  EXPECT_EQ(UnescapeResult("%/a/", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%%2fa/")); // double escape
+  EXPECT_EQ(UnescapeResult("%2/a/", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%2%2fa/")); // incomplete escape
+
+  EXPECT_EQ(UnescapeResult("\\\\", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%5c%5C")); // case-insensitive
+  EXPECT_EQ(UnescapeResult("/a\\b\\c/", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("/a%5Cb%5cc/")); // between other characters
+  EXPECT_EQ(UnescapeResult("/a\\", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("/a%5C")); // prefixed
+  EXPECT_EQ(UnescapeResult("\\a/", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%5ca/")); // suffixed
+  EXPECT_EQ(UnescapeResult("/x/%2E%2e/z//abc\\../def",
+                           PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("/x/%2E%2e/z%2f%2Fabc%5C../def"));
+
+  EXPECT_EQ(UnescapeResult("/a\\b/c\\", PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%2fa%5Cb%2fc%5c")); // %5c and %2f together
+  EXPECT_EQ(UnescapeResult("/a\\b/c\\?%2fabcd%5C%%2f%",
+                           PathUtil::UnescapeSlashesResult::FoundAndUnescaped),
+            unescapeSlashes("%2fa%5Cb%2fc%5c?%2fabcd%5C%%2f%")); // query is untouched
 }
 
 } // namespace Http

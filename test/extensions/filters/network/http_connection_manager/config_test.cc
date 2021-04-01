@@ -28,6 +28,7 @@
 
 using testing::_;
 using testing::An;
+using testing::AnyNumber;
 using testing::Eq;
 using testing::NotNull;
 using testing::Pointee;
@@ -791,8 +792,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -811,8 +812,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -831,8 +832,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -852,8 +853,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
@@ -874,6 +875,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .WillOnce(Return(true));
@@ -894,6 +898,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
@@ -914,6 +921,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
@@ -1819,6 +1829,156 @@ TEST_F(FilterChainTest, InvalidConfig) {
                                   route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(true));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .WillOnce(Return(0));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED,
+            config.pathWithEscapedSlashesAction());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverriden) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  path_with_escaped_slashes_action: IMPLEMENTATION_SPECIFIC_DEFAULT
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .WillOnce(Return(3));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::UNESCAPE_AND_REDIRECT,
+            config.pathWithEscapedSlashesAction());
+
+  // Check the UNESCAPE_AND_FORWARD override to mollify coverage check
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .WillOnce(Return(4));
+  HttpConnectionManagerConfig config1(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                      date_provider_, route_config_provider_manager_,
+                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::UNESCAPE_AND_FORWARD,
+            config1.pathWithEscapedSlashesAction());
+}
+
+// Verify that runtime override does not affect non default configuration value.
+TEST_F(HttpConnectionManagerConfigTest,
+       PathWithEscapedSlashesActionRuntimeOverrideDoesNotChangeNonDefaultConfigValue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  path_with_escaped_slashes_action: REJECT_REQUEST
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(true));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  // When configuration value is not the IMPLEMENTATION_SPECIFIC_DEFAULT the runtime override should
+  // not even be considered.
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::REJECT_REQUEST,
+            config.pathWithEscapedSlashesAction());
+}
+
+// Verify that disabling unescaping slashes results in the KEEP_UNCHANGED action when config is
+// value is not set.
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverridenAndDisabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.path_with_escaped_slashes_action_enabled",
+                             An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED,
+            config.pathWithEscapedSlashesAction());
+}
+
+// Verify that disabling unescaping slashes results in the KEEP_UNCHANGED action when config is
+// value is set.
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionSetAndDisabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.path_with_escaped_slashes_action_enabled",
+                             An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED,
+            config.pathWithEscapedSlashesAction());
 }
 
 class HcmUtilityTest : public testing::Test {
