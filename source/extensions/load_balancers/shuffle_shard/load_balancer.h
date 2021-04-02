@@ -30,11 +30,11 @@ public:
   }
 
 private:
-  void remove_hosts(const Upstream::HostVector&);
+  void removeHosts(const Upstream::HostVector&);
 
-  void add_hosts(const Upstream::HostVector&);
+  void addHosts(const Upstream::HostVector&);
 
-  absl::optional<std::vector<std::string>> get_coord(const Upstream::HostConstSharedPtr&);
+  absl::optional<std::vector<std::string>> getCoord(const Upstream::HostConstSharedPtr&);
 
   // const Upstream::LoadBalancerType lb_type_;
   const uint32_t endpoints_per_cell_;

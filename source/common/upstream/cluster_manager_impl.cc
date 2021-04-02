@@ -1341,7 +1341,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::LoadBalancingPolicyConfig: {
       ASSERT(lb_factory_ == nullptr);
-      for (auto policy : cluster->loadBalancingPolicy().policies()) {
+      for (const auto& policy : cluster->loadBalancingPolicy().policies()) {
         LoadBalancerFactoryContextImpl context(
             parent_.parent_.validation_context_.staticValidationVisitor());
         TypedLoadBalancerFactory* factory =

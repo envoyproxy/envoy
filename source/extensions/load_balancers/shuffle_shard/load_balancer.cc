@@ -21,20 +21,23 @@ ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, least_request_choice_count, 1)),
       shuffle_sharder_(ShuffleSharder<Upstream::HostConstSharedPtr>(SEED)) {
 
-  for (auto dimension : config.dimensions())
+  for (const auto& dimension : config.dimensions()) {
     dimensions_.push_back(dimension);
-  if (use_zone_as_dimension_)
+  }
+  if (use_zone_as_dimension_) {
     dimensions_.push_back("_envoy_zone");
-  if (dimensions_.empty())
+  }
+  if (dimensions_.empty()) {
     dimensions_.push_back("_envoy_unit_coord");
+  }
 
   lattice_ = std::make_shared<HostLattice>(dimensions_);
 
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t /*priority*/, const Upstream::HostVector& hosts_added,
              const Upstream::HostVector& hosts_removed) -> void {
-        add_hosts(hosts_added);
-        remove_hosts(hosts_removed);
+        addHosts(hosts_added);
+        removeHosts(hosts_removed);
       });
 }
 
@@ -50,8 +53,9 @@ ShuffleShardLoadBalancer::chooseHostOnce(Upstream::LoadBalancerContext* context)
       shuffle_sharder_.shuffleShard(*lattice_, seed, endpoints_per_cell_)->get_endpoints();
 
   // Random
-  if (least_request_choice_count_ <= 2)
+  if (least_request_choice_count_ <= 2) {
     return endpoints[random_.random() % endpoints.size()];
+  }
 
   // Least Request
   Upstream::HostConstSharedPtr candidate_host = nullptr;
@@ -75,9 +79,9 @@ ShuffleShardLoadBalancer::chooseHostOnce(Upstream::LoadBalancerContext* context)
   return candidate_host;
 }
 
-void ShuffleShardLoadBalancer::remove_hosts(const Upstream::HostVector& hosts) {
+void ShuffleShardLoadBalancer::removeHosts(const Upstream::HostVector& hosts) {
   for (auto& host : hosts) {
-    auto coord = get_coord(host);
+    auto coord = getCoord(host);
     if (!coord) {
       continue;
     }
@@ -88,9 +92,9 @@ void ShuffleShardLoadBalancer::remove_hosts(const Upstream::HostVector& hosts) {
   }
 }
 
-void ShuffleShardLoadBalancer::add_hosts(const Upstream::HostVector& hosts) {
+void ShuffleShardLoadBalancer::addHosts(const Upstream::HostVector& hosts) {
   for (auto& host : hosts) {
-    auto coord = get_coord(host);
+    auto coord = getCoord(host);
     if (!coord) {
       continue;
     }
@@ -102,7 +106,7 @@ void ShuffleShardLoadBalancer::add_hosts(const Upstream::HostVector& hosts) {
 }
 
 absl::optional<std::vector<std::string>>
-ShuffleShardLoadBalancer::get_coord(const Upstream::HostConstSharedPtr& host) {
+ShuffleShardLoadBalancer::getCoord(const Upstream::HostConstSharedPtr& host) {
   std::vector<std::string> coord;
 
   if (use_dimensions_) {
@@ -135,7 +139,7 @@ ShuffleShardLoadBalancer::get_coord(const Upstream::HostConstSharedPtr& host) {
   if (use_zone_as_dimension_) {
     coord.push_back(host->locality().zone());
   }
-  if (!coord.size()) {
+  if (coord.empty()) {
     coord.push_back("_envoy_unit_coord");
   }
   return coord;

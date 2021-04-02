@@ -127,7 +127,7 @@ public:
 
 class TypedLoadBalancerFactory : public Config::UntypedFactory {
 public:
-  virtual ~TypedLoadBalancerFactory() = default;
+  ~TypedLoadBalancerFactory() override = default;
 
   virtual LoadBalancerPtr
   create(const envoy::config::cluster::v3::LoadBalancingPolicy::Policy& policy,
