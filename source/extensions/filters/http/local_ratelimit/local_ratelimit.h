@@ -42,17 +42,14 @@ struct LocalRateLimitStats {
   ALL_LOCAL_RATE_LIMIT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using LocalRateLimiterImplSharedPtr =
-    std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>;
-
 class PerConnectionRateLimiter : public StreamInfo::FilterState::Object {
 public:
-  PerConnectionRateLimiter(LocalRateLimiterImplSharedPtr rl) : rate_limiter_(rl) {}
+  PerConnectionRateLimiter(std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rl) : rate_limiter_(rl) {}
   static const std::string& key();
-  LocalRateLimiterImplSharedPtr value() const { return rate_limiter_; }
+  std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> value() const { return rate_limiter_; }
 
 private:
-  LocalRateLimiterImplSharedPtr rate_limiter_;
+  std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
 };
 
 /**
@@ -66,6 +63,7 @@ public:
   ~FilterConfig() override = default;
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
+  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config() const { return proto_config_; }
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
@@ -116,6 +114,7 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
+  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -126,7 +125,8 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::PassThroughFilter {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(config) {}
+  Filter(FilterConfigSharedPtr config, Event::Dispatcher& dispatcher) : 
+    config_(config), dispatcher_(dispatcher) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -137,11 +137,12 @@ private:
 
   void populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
-  LocalRateLimiterImplSharedPtr getRateLimiter();
+  std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> getRateLimiter();
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
   const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace LocalRateLimitFilter
