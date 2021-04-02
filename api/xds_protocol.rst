@@ -374,12 +374,9 @@ work for APIs other than LDS and CDS for clients that may dynamically change the
 that they are subscribing to, unless the server has somehow arranged to increment the resource
 type instance version every time any one client subscribes to a new resource. Specifically,
 consider the following example:
-- C: sends resource_names=[A]
-- S: sends resources=[A], version=1, nonce=1
-- C: sends resource_names=[A], version=1, nonce=1 (this is an ACK)
-- C: sends resource_names=[A, B], version=1, nonce=1 (client is adding subscription to B)
-- S: sends resources=[B], version=1, nonce=2 (server sends B but system version does not change because server has not gotten a new config)
-- C: sends resource_names=[A, B], version=1, nonce=2, error_detail="B is invalid" (client intended to NACK B, server needs to look at error_detail to detect NACK instead of using version and nonce)
+
+.. figure:: diagrams/error-detail-nack.svg
+   :alt: detecting NACK from error_detail instead of version and nonce
 
 ACK and NACK semantics summary
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
