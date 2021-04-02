@@ -7,6 +7,7 @@
 #include "common/common/matchers.h"
 #include "common/common/regex.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -42,33 +43,48 @@ public:
     absl::optional<uint64_t> hash;
 
     const auto header = headers.get(header_name_);
+    bool check_multiple_values = Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hash_multiple_header_values");
+
     if (!header.empty()) {
       absl::InlinedVector<std::string, 1> rewritten_header_values;
       std::vector<absl::string_view> header_values;
-      header_values.reserve(header.size());
 
-      for (size_t i = 0; i < header.size(); i++) {
+      size_t header_size = 1;
+      if (check_multiple_values) {
+        header_size = header.size();
+      }
+      header_values.reserve(header_size);
+
+      for (size_t i = 0; i < header_size; i++) {
         header_values.push_back(header[i]->value().getStringView());
       }
 
       if (regex_rewrite_ != nullptr) {
-        rewritten_header_values.reserve(header.size());
+        rewritten_header_values.reserve(header_size);
         for (auto& value : header_values) {
           rewritten_header_values.push_back(
               regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
           value = rewritten_header_values.back();
         }
       }
-      // Ensure generating same hash value for different order header values.
-      // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
-      std::sort(header_values.begin(), header_values.end());
-      absl::Hash<const std::vector<absl::string_view>> hasher;
-      hash = hasher(header_values);
+
+      if (check_multiple_values) {
+        // Ensure generating same hash value for different order header values.
+        // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
+        std::sort(header_values.begin(), header_values.end());
+        absl::Hash<const std::vector<absl::string_view>> hasher;
+        hash = hasher(header_values);
+      }
+      else {
+        hash = HashUtil::xxHash64(header_values[0]);
+      }
     }
     return hash;
   }
 
 private:
+
   const LowerCaseString header_name_;
   Regex::CompiledMatcherPtr regex_rewrite_{};
   std::string regex_rewrite_substitution_{};
