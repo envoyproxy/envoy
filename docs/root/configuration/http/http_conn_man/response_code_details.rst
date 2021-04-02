@@ -110,5 +110,5 @@ All http3 details are rooted at *http3.*
    :widths: 1, 2
 
     http3.invalid_header_field, One of the HTTP/3 headers was invalid
-    http3.headers.too.large, The size of headers (or trailers) exceeded the configured limits
+    http3.headers_too_large, The size of headers (or trailers) exceeded the configured limits
     http3.unexpected_underscore, Envoy was configured to drop or reject requests with header keys beginning with underscores.
