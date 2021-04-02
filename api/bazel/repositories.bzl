@@ -128,6 +128,8 @@ go_proto_library(
     visibility = ["//visibility:public"],
 )
 
+# TODO(snowp): Generating one Go package from all of these protos could cause problems in the future,
+# but nothing references symbols from collector or resource so we're fine for now.
 api_cc_py_proto_library(
     name = "logs",
     srcs = [
