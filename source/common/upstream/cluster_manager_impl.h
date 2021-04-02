@@ -582,6 +582,7 @@ private:
 
 protected:
   ClusterMap active_clusters_;
+  ProtobufMessage::ValidationContext& validation_context_;
 
 private:
   ClusterMap warming_clusters_;

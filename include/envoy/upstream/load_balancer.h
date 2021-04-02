@@ -112,6 +112,34 @@ public:
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
 
 /**
+ * Context passed to load balancer factory to access server resources.
+ */
+class LoadBalancerFactoryContext {
+public:
+  virtual ~LoadBalancerFactoryContext() = default;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+};
+
+class TypedLoadBalancerFactory : public Config::UntypedFactory {
+public:
+  ~TypedLoadBalancerFactory() override = default;
+
+  virtual LoadBalancerPtr
+  create(const envoy::config::cluster::v3::LoadBalancingPolicy::Policy& policy,
+         LoadBalancerType load_balancer_type, LoadBalancerFactoryContext& context,
+         const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+         ClusterStats& cluster_stats, Runtime::Loader& loader, Random::RandomGenerator& random,
+         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) PURE;
+
+  std::string category() const override { return "envoy.load_balancers"; }
+};
+
+/**
  * Factory for load balancers.
  */
 class LoadBalancerFactory {

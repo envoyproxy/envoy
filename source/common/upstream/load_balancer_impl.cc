@@ -10,9 +10,11 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {

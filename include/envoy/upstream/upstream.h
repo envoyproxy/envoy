@@ -791,6 +791,12 @@ public:
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
    * all load balancers for this cluster.
    */
+  virtual const envoy::config::cluster::v3::LoadBalancingPolicy& loadBalancingPolicy() const PURE;
+
+  /**
+   * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
+   * all load balancers for this cluster.
+   */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
   /**
