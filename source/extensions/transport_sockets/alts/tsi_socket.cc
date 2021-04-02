@@ -205,11 +205,6 @@ Network::IoResult TsiSocket::repeatReadAndUnprotect(Buffer::Instance& buffer,
       callbacks_->setTransportSocketIsReadable();
       break;
     }
-    // Read error happens in the previous read.
-    if (read_error_) {
-      result.action_ = Network::PostIoAction::Close;
-      break;
-    }
     // End of stream is reached in the previous read.
     if (end_stream_read_) {
       result.end_stream_read_ = true;
@@ -257,16 +252,10 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
       return {action, 0, false};
     }
   }
-
-  if (handshake_complete_) {
-    ASSERT(frame_protector_);
-    return repeatReadAndUnprotect(buffer, result);
-  }
-
-  ENVOY_CONN_LOG(debug, "TSI: do read result action {} bytes {} end_stream {}",
-                 callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
-                 result.end_stream_read_);
-  return result;
+  // Handshake finishes.
+  ASSERT(handshake_complete_);
+  ASSERT(frame_protector_);
+  return repeatReadAndUnprotect(buffer, result);
 }
 
 Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {

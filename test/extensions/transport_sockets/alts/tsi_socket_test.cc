@@ -18,7 +18,6 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrictMock;
 
 class TsiSocketTest : public testing::Test {
 protected:
@@ -117,6 +116,21 @@ protected:
     frame.push_back(static_cast<uint8_t>(length));
 
     frame.append(payload);
+    return frame;
+  }
+
+  std::string makeInvalidTsiFrame() {
+    uint32_t length = 3;
+    std::string frame;
+    frame.reserve(4);
+    frame.push_back(static_cast<uint8_t>(length));
+    length >>= 8;
+    frame.push_back(static_cast<uint8_t>(length));
+    length >>= 8;
+    frame.push_back(static_cast<uint8_t>(length));
+    length >>= 8;
+    frame.push_back(static_cast<uint8_t>(length));
+
     return frame;
   }
 
@@ -232,6 +246,24 @@ TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
 
   doHandshakeAndExpectSuccess();
   expectTransferDataFromClientToServer(ClientToServerData);
+}
+
+TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferInvalidData) {
+  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  initialize(validator, validator);
+
+  InSequence s;
+
+  doHandshakeAndExpectSuccess();
+  client_to_server_.add(makeInvalidTsiFrame());
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, 4UL, true};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  expectIoResult({Network::PostIoAction::Close, 0UL, true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
 }
 
 TEST_F(TsiSocketTest, HandshakeValidationFail) {
