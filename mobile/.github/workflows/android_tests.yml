@@ -1,0 +1,39 @@
+name: android_tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  kotlintests:
+    name: kotlin_tests_new
+    runs-on: macOS-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: bazel test --test_output=all --build_tests_only //test/kotlin/...
+        name: 'Run Kotlin library tests'
+  javatests:
+    name: java_tests_new
+    runs-on: macOS-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: bazel test --test_output=all --build_tests_only //test/java/...
+        name: 'Run Java library tests'
