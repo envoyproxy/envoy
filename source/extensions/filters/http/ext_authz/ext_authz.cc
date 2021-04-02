@@ -349,9 +349,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      std::cout << "calling send local reply"
-                << "\n";
-
       decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
                                          absl::nullopt, RcDetails::get().AuthzError);
     }

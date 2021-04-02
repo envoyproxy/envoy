@@ -386,9 +386,6 @@ private:
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
-    std::cout << "calling send local reply in asybc client"
-              << "\n";
-
     if (encoded_response_headers_) {
       resetStream();
       return;
