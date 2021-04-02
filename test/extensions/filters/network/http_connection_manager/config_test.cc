@@ -1850,6 +1850,7 @@ http_filters:
     config_source: { resource_api_version: V3, ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+      pass_through_mode: false
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
   )EOF";

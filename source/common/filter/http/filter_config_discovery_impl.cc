@@ -17,7 +17,7 @@ namespace Http {
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
     FilterConfigSubscriptionSharedPtr& subscription,
     const absl::flat_hash_set<std::string>& require_type_urls,
-    Server::Configuration::FactoryContext& factory_context, bool last_filter_in_current_config,
+    Server::Configuration::FactoryContext& factory_context, bool last_filter_in_filter_chain,
     const std::string& filter_chain_type)
     : subscription_(subscription), require_type_urls_(require_type_urls),
       tls_(factory_context.threadLocal()), init_target_("DynamicFilterConfigProviderImpl",
@@ -30,7 +30,7 @@ DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
                                                           // waiting for a response.
                                                           init_target_.ready();
                                                         }),
-      last_filter_in_current_config_(last_filter_in_current_config),
+      last_filter_in_filter_chain_(last_filter_in_filter_chain),
       filter_chain_type_(filter_chain_type) {
   subscription_->filter_config_providers_.insert(this);
   tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
@@ -69,11 +69,12 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
         this->current_config_ = config;
       });
 }
-void DynamicFilterConfigProviderImpl::validateTermianlFilter(const std::string& name,
+
+void DynamicFilterConfigProviderImpl::validateTerminalFilter(const std::string& name,
                                                              const std::string& filter_type,
                                                              bool is_terminal_filter) {
   Config::Utility::validateTerminalFilters(name, filter_type, filter_chain_type_,
-                                           is_terminal_filter, last_filter_in_current_config_);
+                                           is_terminal_filter, last_filter_in_filter_chain_);
 }
 
 FilterConfigSubscription::FilterConfigSubscription(
@@ -117,7 +118,7 @@ void FilterConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
-  auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
+  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
       resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
@@ -140,10 +141,9 @@ void FilterConfigSubscription::onConfigUpdate(
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
-
+  bool is_terminal_filter = factory.isTerminalFilter(*message, factory_context_);
   for (auto* provider : filter_config_providers_) {
-    provider->validateTermianlFilter(filter_config_name_, factory.name(),
-                                     factory.isTerminalFilter(*message, factory_context_));
+    provider->validateTerminalFilter(filter_config_name_, factory.name(), is_terminal_filter);
   }
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
@@ -157,11 +157,13 @@ void FilterConfigSubscription::onConfigUpdate(
       }
     });
   }
+
   last_config_hash_ = new_hash;
   last_config_ = factory_callback;
   last_type_url_ = type_url;
   last_version_info_ = version_info;
-  last_filter_config_ = filter_config;
+  last_filter_name_ = factory.name();
+  last_filter_is_terminal_ = is_terminal_filter;
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -252,14 +254,8 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
   if (subscription->lastConfig().has_value()) {
     TRY_ASSERT_MAIN_THREAD {
       provider->validateTypeUrl(subscription->lastTypeUrl());
-      auto& factory =
-          Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-              subscription->lastFilterConfig());
-      auto message = Config::Utility::translateAnyToFactoryConfig(
-          subscription->lastFilterConfig().typed_config(),
-          factory_context.messageValidationVisitor(), factory);
-      provider->validateTermianlFilter(filter_config_name, factory.name(),
-                                       factory.isTerminalFilter(*message, factory_context));
+      provider->validateTerminalFilter(filter_config_name, subscription->lastFilterName(),
+                                       subscription->isLastFilterTerminal());
       last_config_valid = true;
     }
     END_TRY catch (const EnvoyException& e) {
@@ -288,7 +284,7 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config_source.default_config(), factory_context.messageValidationVisitor(),
         *default_factory);
-    provider->validateTermianlFilter(filter_config_name, default_factory->name(),
+    provider->validateTerminalFilter(filter_config_name, default_factory->name(),
                                      default_factory->isTerminalFilter(*message, factory_context));
     Envoy::Http::FilterFactoryCb default_config =
         default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);

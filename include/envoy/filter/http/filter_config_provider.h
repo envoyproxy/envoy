@@ -32,7 +32,8 @@ public:
    * @param filter_config_name the filter config resource name.
    * @param factory_context is the context to use for the filter config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
-   * @param last_filter_in_current_config indicate the filter position at filter chain
+   * @param last_filter_in_current_config indicates whether this filter is the last filter in the
+   * configured chain
    * @param filter_chain_type is the filter chain type
    */
   virtual FilterConfigProviderPtr createDynamicFilterConfigProvider(
