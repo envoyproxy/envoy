@@ -41,6 +41,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    # Same as assert_test above, but with ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE
     name = "assert_enabled_in_release_test",
     srcs = ["assert_test.cc"],
     copts = ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
