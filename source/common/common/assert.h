@@ -30,7 +30,8 @@ using ActionRegistrationPtr = std::unique_ptr<ActionRegistration>;
  * @param action The action to take when an assertion fails.
  * @return A registration object. The registration is removed when the object is destructed.
  */
-ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<void()>& action);
+ActionRegistrationPtr
+addDebugAssertionFailureRecordAction(const std::function<void(const char* location)>& action);
 
 /**
  * Sets an action to be invoked when an ENVOY_BUG failure is detected in a release build. This
@@ -46,26 +47,34 @@ ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<v
  * @param action The action to take when an envoy bug fails.
  * @return A registration object. The registration is removed when the object is destructed.
  */
-ActionRegistrationPtr setEnvoyBugFailureRecordAction(const std::function<void()>& action);
+ActionRegistrationPtr
+addEnvoyBugFailureRecordAction(const std::function<void(const char* location)>& action);
 
 /**
  * Invokes the action set by setDebugAssertionFailureRecordAction, or does nothing if
  * no action has been set.
  *
+ * @param location Unique identifier for the ASSERT, currently source file and line.
+ *
  * This should only be called by ASSERT macros in this file.
  */
-void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly();
+void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly(const char* location);
 
 /**
  * Invokes the action set by setEnvoyBugFailureRecordAction, or does nothing if
  * no action has been set.
  *
+ * @param location Unique identifier for the ENVOY_BUG, currently source file and line.
+ *
  * This should only be called by ENVOY_BUG macros in this file.
  */
-void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly();
+void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly(const char* location);
 
 /**
  * Increments power of two counter for EnvoyBugRegistrationImpl.
+ *
+ * @param bug_name Unique identifier for the ENVOY_BUG, currently source file and line.
+ * @return True if the hit count is equal to a power of two after increment.
  *
  * This should only be called by ENVOY_BUG macros in this file.
  */
@@ -131,7 +140,9 @@ void resetEnvoyBugCountersForTest();
 #if !defined(NDEBUG) // If this is a debug build.
 #define ASSERT_ACTION abort()
 #else // If this is not a debug build, but ENVOY_LOG_(FAST)_DEBUG_ASSERT_IN_RELEASE is defined.
-#define ASSERT_ACTION Envoy::Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly()
+#define ASSERT_ACTION                                                                              \
+  Envoy::Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly(                     \
+      __FILE__ ":" TOSTRING(__LINE__))
 #endif // !defined(NDEBUG)
 
 #define _ASSERT_ORIGINAL(X) _ASSERT_IMPL(X, #X, ASSERT_ACTION, "")
@@ -194,7 +205,9 @@ void resetEnvoyBugCountersForTest();
 #if !defined(NDEBUG) && !defined(ENVOY_CONFIG_COVERAGE)
 #define ENVOY_BUG_ACTION abort()
 #else
-#define ENVOY_BUG_ACTION Envoy::Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly()
+#define ENVOY_BUG_ACTION                                                                           \
+  Envoy::Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly(__FILE__                 \
+                                                                          ":" TOSTRING(__LINE__))
 #endif
 
 // These macros are needed to stringify __LINE__ correctly.

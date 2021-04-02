@@ -34,31 +34,6 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
-namespace Http {
-namespace Utility {
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data) {
-  Http::Status status;
-  TRY_NEEDS_AUDIT {
-    status = dispatch(data);
-    // TODO(#10878): Remove this when exception removal is complete. It is currently in migration,
-    // so dispatch may either return an error status or throw an exception. Soon we won't need to
-    // catch these exceptions, as all codec errors will be migrated to using error statuses that are
-    // returned from dispatch.
-  }
-  catch (FrameFloodException& e) {
-    status = bufferFloodError(e.what());
-  }
-  catch (CodecProtocolException& e) {
-    status = codecProtocolError(e.what());
-  }
-  catch (PrematureResponseException& e) {
-    status = prematureResponseError(e.what(), e.responseCode());
-  }
-  return status;
-}
-} // namespace Utility
-} // namespace Http
 namespace Http2 {
 namespace Utility {
 
@@ -442,10 +417,18 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
+  auto status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    throw CodecClientException(":status must be specified and a valid unsigned long");
+  }
+  return status.value();
+}
+
+absl::optional<uint64_t> Utility::getResponseStatusNoThrow(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    throw CodecClientException(":status must be specified and a valid unsigned long");
+    return absl::nullopt;
   }
   return response_code;
 }

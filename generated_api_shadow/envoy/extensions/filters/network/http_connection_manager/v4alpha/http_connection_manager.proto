@@ -19,6 +19,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -472,7 +473,8 @@ message HttpConnectionManager {
   //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
   //    should be used to configure the :ref:`xff extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`
   //    to configure IP detection using the :ref:`config_http_conn_man_headers_x-forwarded-for` header.
-  uint32 hidden_envoy_deprecated_xff_num_trusted_hops = 19 [deprecated = true];
+  uint32 hidden_envoy_deprecated_xff_num_trusted_hops = 19
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.

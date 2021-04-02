@@ -322,15 +322,6 @@ private:
   }
 
   /**
-   * An inner dispatch call that executes the dispatching logic. While exception removal is in
-   * migration (#10878), this function may either throw an exception or return an error status.
-   * Exceptions are caught and translated to their corresponding statuses in the outer level
-   * dispatch.
-   * TODO(#10878): Remove this when exception removal is complete.
-   */
-  Http::Status innerDispatch(Buffer::Instance& data);
-
-  /**
    * Dispatch a memory span.
    * @param slice supplies the start address.
    * @len supplies the length of the span.

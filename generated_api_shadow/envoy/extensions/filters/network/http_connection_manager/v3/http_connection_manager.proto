@@ -164,10 +164,12 @@ message HttpConnectionManager {
     OperationName hidden_envoy_deprecated_operation_name = 1 [
       deprecated = true,
       (validate.rules).enum = {defined_only: true},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
       (envoy.annotations.disallowed_by_default) = true
     ];
 
-    repeated string hidden_envoy_deprecated_request_headers_for_tags = 2 [deprecated = true];
+    repeated string hidden_envoy_deprecated_request_headers_for_tags = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   message InternalAddressConfig {
@@ -473,7 +475,8 @@ message HttpConnectionManager {
   //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
   //    should be used to configure the :ref:`xff extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`
   //    to configure IP detection using the :ref:`config_http_conn_man_headers_x-forwarded-for` header.
-  uint32 xff_num_trusted_hops = 19 [deprecated = true];
+  uint32 xff_num_trusted_hops = 19
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
@@ -672,8 +675,11 @@ message HttpConnectionManager {
   // [#extension-category: envoy.http.original_ip_detection]
   repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 44;
 
-  google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // The configuration to customize local reply returned by Envoy.
@@ -945,7 +951,8 @@ message HttpFilter {
     // as for filters provided via the API.
     config.core.v3.ExtensionConfigSource config_discovery = 5;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // If true, clients that do not support this filter may ignore the
