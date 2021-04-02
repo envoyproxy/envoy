@@ -43,8 +43,8 @@ public:
     absl::optional<uint64_t> hash;
 
     const auto header = headers.get(header_name_);
-    bool check_multiple_values = Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hash_multiple_header_values");
+    bool check_multiple_values =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values");
 
     if (!header.empty()) {
       absl::InlinedVector<std::string, 1> rewritten_header_values;
@@ -75,8 +75,7 @@ public:
         std::sort(header_values.begin(), header_values.end());
         absl::Hash<const std::vector<absl::string_view>> hasher;
         hash = hasher(header_values);
-      }
-      else {
+      } else {
         hash = HashUtil::xxHash64(header_values[0]);
       }
     }
@@ -84,7 +83,6 @@ public:
   }
 
 private:
-
   const LowerCaseString header_name_;
   Regex::CompiledMatcherPtr regex_rewrite_{};
   std::string regex_rewrite_substitution_{};
