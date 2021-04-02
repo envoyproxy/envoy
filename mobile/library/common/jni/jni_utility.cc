@@ -5,6 +5,7 @@
 
 #include "common/common/assert.h"
 
+#include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_version.h"
 
 // NOLINT(namespace-envoy)
@@ -25,7 +26,7 @@ JNIEnv* get_env() {
   if (result == JNI_EDETACHED) {
     // Note: the only thread that should need to be attached is Envoy's engine std::thread.
     JavaVMAttachArgs args = {JNI_VERSION, "EnvoyMain", NULL};
-    result = static_jvm->AttachCurrentThread(&local_env, &args);
+    result = attach_jvm(static_jvm, &local_env, &args);
   }
   // TODO(goaway): add assertions and uncomment
   // ASSERT(result == JNI_OK);

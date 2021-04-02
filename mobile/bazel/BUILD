@@ -24,3 +24,8 @@ alias(
     name = "zipper",
     actual = "@bazel_tools//tools/zip:zipper",
 )
+
+alias(
+    name = "jni",
+    actual = "@bazel_tools//tools/jdk:jni",
+)
