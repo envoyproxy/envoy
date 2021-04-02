@@ -28,3 +28,69 @@ jobs:
         with:
           name: envoy.aar
           path: dist/envoy.aar
+  javahelloworld:
+    name: java_helloworld
+    needs: androidbuild
+    runs-on: macOS-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
+      - uses: actions/download-artifact@v2
+        with:
+          name: envoy.aar
+          path: dist/
+      - run: ls -lh dist/
+      - name: start simulator
+        run: ./ci/mac_start_emulator.sh
+      # Return to using:
+      #   bazelisk mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+      # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
+      - run: |
+          bazelisk build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+          adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
+          adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
+        name: 'Start java app'
+      - run: 'adb logcat -e "received headers with status 200" -m 1'
+        name: 'Check connectivity'
+  kotlinhelloworld:
+    name: kotlin_helloworld
+    needs: androidbuild
+    runs-on: macOS-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
+      - uses: actions/download-artifact@v2
+        with:
+          name: envoy.aar
+          path: dist/
+      - run: ls -lh dist/
+      - name: start simulator
+        run: ./ci/mac_start_emulator.sh
+      # Return to using:
+      #   bazelisk mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
+      - run: |
+          bazelisk build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+          adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
+          adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
+        name: 'Start kotlin app'
+      - run: 'adb logcat -e "received headers with status 200" -m 1'
+        name: 'Check connectivity'
