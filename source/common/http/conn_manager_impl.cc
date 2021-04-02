@@ -1189,7 +1189,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
       if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
         timeout = max_stream_duration.value();
       } else if (route->timeout().count() != 0) {
-        std::cout << "setting timeout::" << std::to_string(route->timeout().count()) << "\n";
+        // If max stream duration is not set either at route/HCM leve, use the route timeout.
         timeout = route->timeout();
       } else {
         disable_timer = true;
