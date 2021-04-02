@@ -20,8 +20,9 @@ TYPE_UPGRADE_REGEXES = [
     ('envoy\.type\.matcher', 'envoy.type.matcher.v3'),
     ('envoy\.type', 'envoy.type.v3'),
     ('envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3'),
-    ('envoy\.config\.retry\.previous_priorities',
-     'envoy.extensions.retry.priority.previous_priorities.v3'),
+    (
+        'envoy\.config\.retry\.previous_priorities',
+        'envoy.extensions.retry.priority.previous_priorities.v3'),
 ]
 
 # These packages must be upgraded to v3, even if there are no protos
@@ -69,8 +70,8 @@ def upgraded_path(proto_path, upgraded_package):
 def upgraded_type_with_description(type_name, type_desc):
     upgrade_type_desc = TypeDescription()
     upgrade_type_desc.qualified_package = upgraded_package(type_desc)
-    upgrade_type_desc.proto_path = upgraded_path(type_desc.proto_path,
-                                                 upgrade_type_desc.qualified_package)
+    upgrade_type_desc.proto_path = upgraded_path(
+        type_desc.proto_path, upgrade_type_desc.qualified_package)
     upgrade_type_desc.deprecated_type = type_desc.deprecated_type
     upgrade_type_desc.map_entry = type_desc.map_entry
     return (upgraded_type(type_name, type_desc), upgrade_type_desc)
@@ -79,12 +80,12 @@ def upgraded_type_with_description(type_name, type_desc):
 def load_types(path):
     """Load a tools.type_whisperer.Types proto from the filesystem.
 
-  Args:
-    path: filesystem path for a file in text proto format.
+    Args:
+        path: filesystem path for a file in text proto format.
 
-  Returns:
-    tools.type_whisperer.Types proto loaded from path.
-  """
+    Returns:
+        tools.type_whisperer.Types proto loaded from path.
+    """
     types = Types()
     with open(path, 'r') as f:
         text_format.Merge(f.read(), types)
@@ -94,19 +95,19 @@ def load_types(path):
 def next_version_upgrade(type_name, type_map, next_version_upgrade_memo, visited=None):
     """Does a given type require upgrade between major version?
 
-  Performs depth-first search through type dependency graph for any upgraded
-  types that will force type_name to be upgraded.
+    Performs depth-first search through type dependency graph for any upgraded
+    types that will force type_name to be upgraded.
 
-  Args:
-    type_name: fully qualified type name.
-    type_map: map from type name to tools.type_whisperer.TypeDescription.
-    next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes
-      across invocations.
-    visited: a set of visited nodes in the current search, used to detect loops.
+    Args:
+        type_name: fully qualified type name.
+        type_map: map from type name to tools.type_whisperer.TypeDescription.
+           next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes
+           across invocations.
+        visited: a set of visited nodes in the current search, used to detect loops.
 
-  Returns:
-    A boolean indicating whether the type requires upgrade.
-  """
+    Returns:
+        A boolean indicating whether the type requires upgrade.
+    """
     if not visited:
         visited = set([])
     # Ignore non-API types.
@@ -159,8 +160,8 @@ if __name__ == '__main__':
         type_map.update([
             upgraded_type_with_description(type_name, type_desc)
             for type_name, type_desc in type_map.items()
-            if type_desc.qualified_package in next_versions_pkgs and
-            (type_desc.active or type_desc.deprecated_type or type_desc.map_entry)
+            if type_desc.qualified_package in next_versions_pkgs and (
+                type_desc.active or type_desc.deprecated_type or type_desc.map_entry)
         ])
 
     # Generate the type database proto. To provide some stability across runs, in

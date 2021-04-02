@@ -23,11 +23,11 @@
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_resource.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/http/http3/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
@@ -43,6 +43,10 @@
 #include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/http/http3/conn_pool.h"
+#endif
 
 namespace Envoy {
 namespace Upstream {
@@ -389,8 +393,13 @@ ClusterManagerImpl::ClusterManagerImpl(
   });
 
   // We can now potentially create the CDS API once the backing cluster exists.
-  if (dyn_resources.has_cds_config()) {
-    cds_api_ = factory_.createCds(dyn_resources.cds_config(), *this);
+  if (dyn_resources.has_cds_config() || !dyn_resources.cds_resources_locator().empty()) {
+    std::unique_ptr<xds::core::v3::ResourceLocator> cds_resources_locator;
+    if (!dyn_resources.cds_resources_locator().empty()) {
+      cds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
+          Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()));
+    }
+    cds_api_ = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -1511,8 +1520,14 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+#ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state, source);
+#else
+    UNREFERENCED_PARAMETER(source);
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
   return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
@@ -1547,9 +1562,11 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
 
 CdsApiPtr
 ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                                     const xds::core::v3::ResourceLocator* cds_resources_locator,
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, cm, stats_, validation_context_.dynamicValidationVisitor());
+  return CdsApiImpl::create(cds_config, cds_resources_locator, cm, stats_,
+                            validation_context_.dynamicValidationVisitor());
 }
 
 } // namespace Upstream

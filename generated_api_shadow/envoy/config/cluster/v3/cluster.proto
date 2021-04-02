@@ -113,8 +113,11 @@ message Cluster {
     // configuring this.]
     LOAD_BALANCING_POLICY_CONFIG = 7;
 
-    hidden_envoy_deprecated_ORIGINAL_DST_LB = 4
-        [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
+    hidden_envoy_deprecated_ORIGINAL_DST_LB = 4 [
+      deprecated = true,
+      (envoy.annotations.disallowed_by_default_enum) = true,
+      (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"
+    ];
   }
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
@@ -757,7 +760,8 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46 [deprecated = true];
+  core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
@@ -769,7 +773,8 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.HttpProtocolOptions common_http_protocol_options = 29 [deprecated = true];
+  core.v3.HttpProtocolOptions common_http_protocol_options = 29
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP1 requests.
   // This has been deprecated in favor of http_protocol_options fields in the in the
@@ -779,7 +784,8 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.Http1ProtocolOptions http_protocol_options = 13 [deprecated = true];
+  core.v3.Http1ProtocolOptions http_protocol_options = 13
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Even if default HTTP2 protocol options are desired, this field must be
   // set so that Envoy will assume that the upstream supports HTTP/2 when
@@ -794,8 +800,11 @@ message Cluster {
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
-  core.v3.Http2ProtocolOptions http2_protocol_options = 14
-      [deprecated = true, (udpa.annotations.security).configure_for_untrusted_upstream = true];
+  core.v3.Http2ProtocolOptions http2_protocol_options = 14 [
+    deprecated = true,
+    (udpa.annotations.security).configure_for_untrusted_upstream = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
@@ -931,7 +940,8 @@ message Cluster {
   // <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
-  ClusterProtocolSelection protocol_selection = 26 [deprecated = true];
+  ClusterProtocolSelection protocol_selection = 26
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional options for upstream connections.
   UpstreamConnectionOptions upstream_connection_options = 30;
@@ -992,7 +1002,8 @@ message Cluster {
   //
   //   This field has been deprecated in favor of `timeout_budgets`, part of
   //   :ref:`track_cluster_stats <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
-  bool track_timeout_budgets = 47 [deprecated = true];
+  bool track_timeout_budgets = 47
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
@@ -1024,13 +1035,21 @@ message Cluster {
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
 
-  repeated core.v3.Address hidden_envoy_deprecated_hosts = 7 [deprecated = true];
+  repeated core.v3.Address hidden_envoy_deprecated_hosts = 7
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext hidden_envoy_deprecated_tls_context =
-      11 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+      11 [
+        deprecated = true,
+        (envoy.annotations.deprecated_at_minor_version) = "3.0",
+        (envoy.annotations.disallowed_by_default) = true
+      ];
 
-  map<string, google.protobuf.Struct> hidden_envoy_deprecated_extension_protocol_options = 35
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  map<string, google.protobuf.Struct> hidden_envoy_deprecated_extension_protocol_options = 35 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
@@ -1064,7 +1083,8 @@ message LoadBalancingPolicy {
 
     google.protobuf.Any typed_config = 3;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // Each client will iterate over the list in order and stop at the first policy that it

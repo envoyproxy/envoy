@@ -19,7 +19,7 @@ The Envoy header map implementation (`HeaderMapImpl`) has the following properti
 
 * O(1) registered headers are tracked during static initialization via the `CustomInlineHeaderBase`
   class.
-* The first time a header map is constructed (in practice this is after bootstrap load and the 
+* The first time a header map is constructed (in practice this is after bootstrap load and the
   Envoy header prefix is finalized when `getAllHeaderMapImplInfo` is called), the
   `StaticLookupTable` is finalized for each header map type. No further changes are possible after
   this point. The `StaticLookupTable` defines the amount of variable pointer table space that is

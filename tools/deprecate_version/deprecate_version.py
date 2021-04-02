@@ -24,10 +24,8 @@ from __future__ import print_function
 
 import datetime
 from datetime import date
-from collections import defaultdict
 import os
 import re
-import subprocess
 import sys
 
 import github
@@ -55,10 +53,10 @@ def get_confirmation():
 def create_issues(access_token, runtime_and_pr):
     """Create issues in GitHub for code to clean up old runtime guarded features.
 
-  Args:
-    access_token: GitHub access token (see comment at top of file).
-    runtime_and_pr: a list of runtime guards and the PRs and commits they were added.
-  """
+    Args:
+        access_token: GitHub access token (see comment at top of file).
+        runtime_and_pr: a list of runtime guards and the PRs and commits they were added.
+    """
     git = github.Github(access_token)
     repo = git.get_repo('envoyproxy/envoy')
 
@@ -93,8 +91,8 @@ def create_issues(access_token, runtime_and_pr):
         body = (
             'Your change %s (%s) introduced a runtime guarded feature. It has been 6 months since '
             'the new code has been exercised by default, so it\'s time to remove the old code '
-            'path. This issue tracks source code cleanup so we don\'t forget.') % (number,
-                                                                                   change_title)
+            'path. This issue tracks source code cleanup so we don\'t forget.') % (
+                number, change_title)
 
         print(title)
         print(body)
@@ -125,8 +123,9 @@ def create_issues(access_token, runtime_and_pr):
                     if login:
                         body += '\ncc @' + login
                     repo.create_issue(title, body=body, labels=labels)
-                    print(('unable to assign issue %s to %s. Add them to the Envoy proxy org'
-                           'and assign it their way.') % (title, login))
+                    print((
+                        'unable to assign issue %s to %s. Add them to the Envoy proxy org'
+                        'and assign it their way.') % (title, login))
                 except github.GithubException as e:
                     print('GithubException while creating issue.')
                     raise
@@ -134,7 +133,7 @@ def create_issues(access_token, runtime_and_pr):
 
 def get_runtime_and_pr():
     """Returns a list of tuples of [runtime features to deprecate, PR, commit the feature was added]
-  """
+    """
     repo = Repo(os.getcwd())
 
     # grep source code looking for reloadable features which are true to find the
@@ -169,8 +168,9 @@ def get_runtime_and_pr():
                 pr_date = date.fromtimestamp(commit.committed_date)
                 removable = (pr_date < removal_date)
                 # Add the runtime guard and PR to the list to file issues about.
-                print('Flag ' + runtime_guard + ' added at ' + str(pr_date) + ' ' +
-                      (removable and 'and is safe to remove' or 'is not ready to remove'))
+                print(
+                    'Flag ' + runtime_guard + ' added at ' + str(pr_date) + ' '
+                    + (removable and 'and is safe to remove' or 'is not ready to remove'))
                 if removable:
                     features_to_flip.append((runtime_guard, pr, commit))
     print('Failed to find test_feature_false.  Script needs fixing')

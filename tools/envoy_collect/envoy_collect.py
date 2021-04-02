@@ -66,13 +66,13 @@ def fetch_url(url):
 def modify_envoy_config(config_path, perf, output_directory):
     """Modify Envoy config to support gathering logs, etc.
 
-  Args:
-    config_path: the command-line specified Envoy config path.
-    perf: boolean indicating whether in performance mode.
-    output_directory: directory path for additional generated files.
-  Returns:
-    (modified Envoy config path, list of additional files to collect)
-  """
+    Args:
+        config_path: the command-line specified Envoy config path.
+        perf: boolean indicating whether in performance mode.
+        output_directory: directory path for additional generated files.
+    Returns:
+        (modified Envoy config path, list of additional files to collect)
+    """
     # No modifications yet when in performance profiling mode.
     if perf:
         return config_path, []
@@ -106,15 +106,15 @@ def modify_envoy_config(config_path, perf, output_directory):
 def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path, dump_handlers_paths):
     """Run Envoy subprocess and trigger admin endpoint gathering on SIGINT.
 
-  Args:
-    envoy_shcmd_args: list of Envoy subprocess args.
-    envoy_log_path: path to write Envoy stderr log to.
-    admin_address_path: path to where admin address is written by Envoy.
-    dump_handlers_paths: map from admin endpoint handler to path to where the respective contents
-      are to be written.
-  Returns:
-    The Envoy subprocess exit code.
-  """
+    Args:
+        envoy_shcmd_args: list of Envoy subprocess args.
+        envoy_log_path: path to write Envoy stderr log to.
+        admin_address_path: path to where admin address is written by Envoy.
+        dump_handlers_paths: map from admin endpoint handler to path to where the respective contents
+           are to be written.
+    Returns:
+        The Envoy subprocess exit code.
+    """
     envoy_shcmd = ' '.join(map(pipes.quote, envoy_shcmd_args))
     print(envoy_shcmd)
 
@@ -127,11 +127,8 @@ def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path, dump_handler
 
     # Launch Envoy, register for SIGINT, and wait for the child process to exit.
     with open(envoy_log_path, 'w') as envoy_log:
-        envoy_proc = sp.Popen(envoy_shcmd,
-                              stdin=sp.PIPE,
-                              stderr=envoy_log,
-                              preexec_fn=envoy_preexec_fn,
-                              shell=True)
+        envoy_proc = sp.Popen(
+            envoy_shcmd, stdin=sp.PIPE, stderr=envoy_log, preexec_fn=envoy_preexec_fn, shell=True)
 
         def signal_handler(signum, frame):
             # The read is deferred until the signal so that the Envoy process gets a
@@ -156,10 +153,10 @@ def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path, dump_handler
 def envoy_collect(parse_result, unknown_args):
     """Run Envoy and collect its artifacts.
 
-  Args:
-    parse_result: Namespace object with envoy_collect.py's args.
-    unknown_args: list of remaining args to pass to Envoy binary.
-  """
+    Args:
+        parse_result: Namespace object with envoy_collect.py's args.
+        unknown_args: list of remaining args to pass to Envoy binary.
+    """
     # Are we in performance mode? Otherwise, debug.
     perf = parse_result.performance
     return_code = 1  # Non-zero default return.
@@ -205,8 +202,8 @@ def envoy_collect(parse_result, unknown_args):
         ] + unknown_args[1:]
 
         # Run the Envoy process (under 'perf record' if needed).
-        return_code = run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path,
-                                dump_handlers_paths)
+        return_code = run_envoy(
+            envoy_shcmd_args, envoy_log_path, admin_address_path, dump_handlers_paths)
 
         # Collect manifest files and tar them.
         with tarfile.TarFile(parse_result.output_path, 'w') as output_tar:
@@ -230,18 +227,17 @@ if __name__ == '__main__':
     # We either need to interpret or override these, so we declare them in
     # envoy_collect.py and always parse and present them again when invoking
     # Envoy.
-    parser.add_argument('--config-path',
-                        '-c',
-                        required=True,
-                        help='Path to Envoy configuration file.')
-    parser.add_argument('--log-level',
-                        '-l',
-                        help='Envoy log level. This will be overridden when invoking Envoy.')
+    parser.add_argument(
+        '--config-path', '-c', required=True, help='Path to Envoy configuration file.')
+    parser.add_argument(
+        '--log-level', '-l', help='Envoy log level. This will be overridden when invoking Envoy.')
     # envoy_collect specific args.
-    parser.add_argument('--performance',
-                        action='store_true',
-                        help='Performance mode (collect perf trace, minimize log verbosity).')
-    parser.add_argument('--envoy-binary',
-                        default=DEFAULT_ENVOY_PATH,
-                        help='Path to Envoy binary (%s by default).' % DEFAULT_ENVOY_PATH)
+    parser.add_argument(
+        '--performance',
+        action='store_true',
+        help='Performance mode (collect perf trace, minimize log verbosity).')
+    parser.add_argument(
+        '--envoy-binary',
+        default=DEFAULT_ENVOY_PATH,
+        help='Path to Envoy binary (%s by default).' % DEFAULT_ENVOY_PATH)
     sys.exit(envoy_collect(*parser.parse_known_args(sys.argv)))

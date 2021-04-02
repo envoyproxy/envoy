@@ -8,6 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
-        "@opentelemetry_proto//:logs",
+        "@opentelemetry_proto//:common",
     ],
 )
