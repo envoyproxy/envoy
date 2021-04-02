@@ -249,6 +249,7 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   ActiveTcpListener& listener_;
   Network::ConnectionSocketPtr socket_;
   const bool hand_off_restored_destination_connections_;
+
   std::list<ListenerFilterWrapperPtr> accept_filters_;
   std::list<ListenerFilterWrapperPtr>::iterator iter_;
   Event::TimerPtr timer_;
