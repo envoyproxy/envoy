@@ -43,7 +43,7 @@ public:
 
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
-      std::vector<std::string> rewrited_header_values;
+      absl::InlinedVector<std::string, 1> rewritten_header_values;
       std::vector<absl::string_view> header_values;
       header_values.reserve(header.size());
 
@@ -52,11 +52,11 @@ public:
       }
 
       if (regex_rewrite_ != nullptr) {
-        rewrited_header_values.reserve(header.size());
+        rewritten_header_values.reserve(header.size());
         for (auto& value : header_values) {
-          rewrited_header_values.push_back(
+          rewritten_header_values.push_back(
               regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
-          value = rewrited_header_values.back();
+          value = rewritten_header_values.back();
         }
       }
       // Ensure generating same hash value for different order header values.
