@@ -545,6 +545,21 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   EXPECT_FALSE(response->complete());
 }
 
+TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/dynamo/url"}, {":scheme", "http"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  response->waitForEndStream();
+  codec_client_->close();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
 TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeaders) {
   initialize();
 
