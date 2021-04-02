@@ -79,3 +79,9 @@ def envoy_select_wasm_wasmtime(xs):
         "@envoy//bazel:wasm_wasmtime": xs,
         "//conditions:default": [],
     })
+
+def envoy_select_new_http1_parser_in_integration_tests(xs):
+    return select({
+        "@envoy//bazel:enable_new_http1_parser_in_integration_tests": xs,
+        "//conditions:default": [],
+    })

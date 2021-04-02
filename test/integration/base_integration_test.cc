@@ -54,6 +54,9 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
+#ifdef ENVOY_USE_NEW_HTTP1_PARSER_IN_INTEGRATION_TESTS
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_new_http1_parser", "true");
+#endif
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect

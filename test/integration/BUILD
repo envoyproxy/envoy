@@ -9,6 +9,7 @@ load(
     "envoy_proto_library",
     "envoy_select_enable_http3",
     "envoy_select_hot_restart",
+    "envoy_select_new_http1_parser_in_integration_tests",
     "envoy_sh_test",
 )
 
@@ -690,6 +691,9 @@ envoy_cc_test_library(
     hdrs = [
         "base_integration_test.h",
     ],
+    copts = envoy_select_new_http1_parser_in_integration_tests(
+        ["-DENVOY_USE_NEW_HTTP1_PARSER_IN_INTEGRATION_TESTS"],
+    ),
     deps = [
         ":autonomous_upstream_lib",
         ":fake_upstream_lib",

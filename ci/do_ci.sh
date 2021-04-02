@@ -312,6 +312,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "deprecated_features=disabled"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng"
+    "--define" "use_new_http1_parser_in_integration_tests=true"
     "--@envoy//bazel:http3=False"
     "--@envoy//source/extensions/filters/http/kill_request:enabled"
     "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")

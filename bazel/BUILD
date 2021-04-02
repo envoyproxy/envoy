@@ -525,6 +525,11 @@ config_setting(
     define_values = {"FUZZING_ENGINE": "oss-fuzz"},
 )
 
+config_setting(
+    name = "enable_new_http1_parser_in_integration_tests",
+    values = {"define": "use_new_http1_parser_in_integration_tests=true"},
+)
+
 alias(
     name = "fuzzing_engine",
     actual = select({
