@@ -1367,8 +1367,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                               parent.parent_.runtime_, parent.parent_.random_, cluster->lbConfig());
         break;
       }
-      if (lb_ == nullptr) { // This doesn't seem to work yet.
-        ExceptionUtil::throwEnvoyException("Didn't find any registered implementation.");
+      if (lb_ == nullptr) {
+        ENVOY_LOG(critical, "Didn't find any registered implementation for load_balancing_policy.");
+        ASSERT(lb_ != nullptr);
       }
       break;
     }
