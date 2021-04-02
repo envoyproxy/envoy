@@ -1,9 +1,9 @@
 #pragma once
 #include "envoy/api/api.h"
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
+#include "envoy/tcp/conn_pool.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/upstream.h"
-
-#include "common/conn_pool/conn_pool_base.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
@@ -70,7 +70,6 @@ public:
 class ConnectionPoolManager {
 public:
   virtual ~ConnectionPoolManager() = default;
-  // now use defualt lb to choose host.
   virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) PURE;
 };
 
@@ -80,7 +79,6 @@ using ConnectionPoolManagerSharedPtr = std::shared_ptr<ConnectionPoolManager>;
 class ConnectionPoolManagerFactory {
 public:
   virtual ~ConnectionPoolManagerFactory() = default;
-  // now use defualt lb to choose host.
   virtual ConnectionPoolManagerSharedPtr
   create(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls, Api::Api& api,
          const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,

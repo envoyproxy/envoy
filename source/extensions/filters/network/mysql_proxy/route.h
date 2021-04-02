@@ -5,7 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/filters/network/mysql_proxy/conn_pool_impl.h"
+#include "extensions/filters/network/mysql_proxy/conn_pool.h"
 
 namespace Envoy {
 namespace Extensions {

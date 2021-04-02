@@ -89,7 +89,9 @@ void MySQLFilter::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
   client_ = client_factory_.create(std::move(conn), decoder_factory_, *this);
   canceler_ = nullptr;
   read_callbacks_->continueReading();
-  doDecode(read_buffer_);
+  if (read_buffer_.length() > 0) {
+    doDecode(read_buffer_);
+  }
   ENVOY_LOG(debug, "upstream client is ready, continue decoding");
 }
 

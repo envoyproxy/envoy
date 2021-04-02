@@ -56,8 +56,7 @@ public:
     greet.decode(buffer, 0, mysql_client->data().size() - 4);
 
     auto seed = greet.getAuthPluginData();
-    auto auth_method = AuthHelper::authMethod(greet.getBaseServerCap(), greet.getExtServerCap(),
-                                              greet.getAuthPluginName());
+    auto auth_method = AuthHelper::authMethod(greet.getServerCap(), greet.getAuthPluginName());
 
     auto client_message =
         MessageHelper::encodeClientLogin(auth_method, username, password, db, seed);
@@ -114,8 +113,7 @@ TEST_P(MySQLIntegrationTest, MySQLWrongLoginTest) {
   Buffer::OwnedImpl buffer(mysql_client->data().data() + 4, mysql_client->data().size() - 4);
   greet.decode(buffer, 0, mysql_client->data().size() - 4);
   auto seed = greet.getAuthPluginData();
-  auto auth_method = AuthHelper::authMethod(greet.getBaseServerCap(), greet.getExtServerCap(),
-                                            greet.getAuthPluginName());
+  auto auth_method = AuthHelper::authMethod(greet.getServerCap(), greet.getAuthPluginName());
 
   auto client_message =
       MessageHelper::encodeClientLogin(auth_method, username, wrongpassword, db, seed);

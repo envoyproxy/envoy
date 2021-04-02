@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 
+#include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/route_impl.h"
 
 #include "gtest/gtest.h"
@@ -30,9 +31,9 @@ envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy createConfig() 
 TEST(PrefixRoutesTest, BasicMatch) {
   auto config = createConfig();
   absl::flat_hash_map<std::string, RouteSharedPtr> routes;
-  std::vector<ConnectionPool::ClientPoolSharedPtr> pools;
+  std::vector<ConnPool::ConnectionPoolManagerSharedPtr> pools;
   for (const auto& route : config.routes()) {
-    pools.emplace_back(std::make_shared<ConnectionPool::MockPool>(route.cluster()));
+    pools.emplace_back(std::make_shared<ConnPool::MockConnectionPoolManager>(route.cluster()));
     auto route_ = std::make_shared<RouteImpl>(pools.back());
     routes.emplace(route.database(), route_);
   }
@@ -40,9 +41,11 @@ TEST(PrefixRoutesTest, BasicMatch) {
   RouterImpl router(std::move(routes));
   EXPECT_EQ(nullptr, router.upstreamPool("c"));
   EXPECT_EQ("fake_clusterB",
-            dynamic_cast<ConnectionPool::MockPool&>(router.upstreamPool("b")->upstream()).name);
+            dynamic_cast<ConnPool::MockConnectionPoolManager&>(router.upstreamPool("b")->upstream())
+                .cluster_name);
   EXPECT_EQ("fake_clusterA",
-            dynamic_cast<ConnectionPool::MockPool&>(router.upstreamPool("a")->upstream()).name);
+            dynamic_cast<ConnPool::MockConnectionPoolManager&>(router.upstreamPool("a")->upstream())
+                .cluster_name);
 }
 
 } // namespace MySQLProxy

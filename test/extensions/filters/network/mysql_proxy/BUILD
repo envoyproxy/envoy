@@ -140,6 +140,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/mysql_proxy:config",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/tcp:tcp_mocks",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -155,6 +156,7 @@ envoy_extension_cc_test(
         ":mysql_test_utils_lib",
         "//source/extensions/filters/network/mysql_proxy:config",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/tcp:tcp_mocks",
     ],
 )
 

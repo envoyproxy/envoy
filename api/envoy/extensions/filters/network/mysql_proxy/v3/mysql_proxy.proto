@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
 // [#extension: envoy.filters.network.mysql_proxy]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message MySQLProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy";
@@ -34,6 +34,10 @@ message MySQLProxy {
     string cluster = 2;
   }
 
+  reserved 3;
+
+  reserved "is_termianl";
+
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mysql_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -42,15 +46,40 @@ message MySQLProxy {
   // If the access log field is empty, access logs will not be written.
   string access_log = 2;
 
-  repeated Route routes = 3;
+  // List of **unique** db name used to separate connections from different database to different
+  // clusters.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //    routes:
+  //      - database: "database_a"
+  //        cluster: "cluster_a"
+  //      - database: "database_b"
+  //        cluster: "cluster_b"
+  //
+  // When using the above routes, the following connect dsn would be sent to:
+  //
+  // * ``jdbc:mysql://host1:9001/database_a`` would sent command to cluster_a.
+  // * ``jdbc:mysql://host1:9001/database_c`` will return ER_ER_BAD_DB_ERROR.
+  // * ``jdbc:mysql://host1:9001/`` will return ER_ER_BAD_DB_ERROR, now envoy not support connect without specific database name.
+  repeated Route routes = 4;
 
-  config.core.v3.DataSource downstream_auth_username = 4 [(udpa.annotations.sensitive) = true];
+  // MySQL client auth username. If the username is not match, then ER_ACCESS_DENIED_ERROR will return; If connect db name is not found in envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy.routes, then ER_ER_BAD_DB_ERROR will return.
+  config.core.v3.DataSource downstream_auth_username = 5 [(udpa.annotations.sensitive) = true];
 
-  config.core.v3.DataSource downstream_auth_password = 5 [(udpa.annotations.sensitive) = true];
+  // MySQL client auth password.
+  config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
 }
 
+// MySQLProtocolOptions specifies MySQL upstream protocol options. This object is used in
+// :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+// keyed by the name `envoy.filters.network.mysql_proxy`.
 message MySQLProtocolOptions {
+  // Upstream database password.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
 
+  // Upstream database username
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }

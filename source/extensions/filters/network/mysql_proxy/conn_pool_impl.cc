@@ -237,7 +237,7 @@ void ConnPoolImpl::onMySQLFailure(MySQLPoolFailureReason reason) {
   ASSERT(reason == MySQLPoolFailureReason::ParseFailure ||
          reason == MySQLPoolFailureReason::AuthFailure);
   // It's always nothing helpful to retry auth when auth or parse failure occurs. It always means
-  // the username or password or db or protcol error.
+  // the username or password or db or protocol error.
   state_.decrPendingStreams(pending_streams_.size());
   pending_streams_to_purge_ = std::move(pending_streams_);
   while (!pending_streams_to_purge_.empty()) {

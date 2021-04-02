@@ -306,7 +306,7 @@ private:
 using ConnectionPoolPtr = std::unique_ptr<ConnPoolImpl>;
 
 /**
- * Implemnation of ConnectionPoolManager, maintain connection pools of hosts of cluster.
+ * implementation of ConnectionPoolManager, maintain connection pools of hosts of cluster.
  */
 class ConnectionPoolManagerImpl : public ConnectionPoolManager,
                                   public std::enable_shared_from_this<ConnectionPoolManagerImpl> {
@@ -327,7 +327,7 @@ private:
 
 class ConnectionPoolManagerFactoryImpl : public ConnectionPoolManagerFactory {
 public:
-  // now use defualt lb to choose host.
+  // now use default lb to choose host.
   ConnectionPoolManagerSharedPtr
   create(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls, Api::Api& api,
          const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,

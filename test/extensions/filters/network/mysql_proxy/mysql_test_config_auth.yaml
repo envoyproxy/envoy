@@ -43,8 +43,4 @@ static_resources:
             routes:
             - database: "db"
               cluster: cluster_0
-            setting:
-              max_connections: 10
-              max_idle_connections: 5
-              start_connections: 0
          

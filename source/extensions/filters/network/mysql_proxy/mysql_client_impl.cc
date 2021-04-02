@@ -24,7 +24,7 @@ ClientImpl::ClientImpl(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
 }
 
 void ClientImpl::onProtocolError() {
-  ENVOY_CONN_LOG(error, "protocol error of upstream client ", conn_data_->connection());
+  ENVOY_CONN_LOG(info, "protocol error of upstream client ", conn_data_->connection());
   callbacks_.onFailure();
 }
 

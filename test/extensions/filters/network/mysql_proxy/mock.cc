@@ -1,5 +1,6 @@
 #include "mock.h"
 
+#include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/route.h"
 
 using testing::_;
@@ -15,7 +16,7 @@ MockRouter::MockRouter(RouteSharedPtr route) : route(route) {
   ON_CALL(*this, upstreamPool(_)).WillByDefault(Return(route));
 }
 
-MockRoute::MockRoute(ConnectionPool::Instance* instance) : pool(instance) {
+MockRoute::MockRoute(ConnPool::ConnectionPoolManager* instance) : pool(instance) {
   ON_CALL(*this, upstream()).WillByDefault(ReturnRef(*pool));
 }
 

@@ -52,12 +52,12 @@ public:
 
 class MockRoute : public Route {
 public:
-  MockRoute(ConnectionPool::Instance* instance);
+  MockRoute(ConnPool::ConnectionPoolManager* instance);
   ~MockRoute() override = default;
-  MOCK_METHOD((ConnectionPool::Instance&), upstream, ());
+  MOCK_METHOD((ConnPool::ConnectionPoolManager&), upstream, ());
   MOCK_METHOD(void, test, (std::string &&));
 
-  ConnectionPool::Instance* pool;
+  ConnPool::ConnectionPoolManager* pool;
 };
 
 class MockClientCallbacks : public ClientCallBack {
@@ -67,55 +67,17 @@ public:
   MOCK_METHOD(void, onFailure, ());
 };
 
-namespace ConnectionPool {
+namespace ConnPool {
 
-class MockCancellable : public ConnectionPool::Cancellable {
+class MockConnectionPoolManager : public ConnectionPoolManager {
 public:
-  ~MockCancellable() override = default;
-  MOCK_METHOD(void, cancel, ());
+  ~MockConnectionPoolManager() override = default;
+  MockConnectionPoolManager(const std::string& cluster_name) : cluster_name(cluster_name) {}
+  MOCK_METHOD((Tcp::ConnectionPool::Cancellable*), newConnection, (ClientPoolCallBack&));
+  std::string cluster_name;
 };
 
-class MockClientData : public ClientData {
-public:
-  MockClientData() = default;
-  ~MockClientData() override = default;
-  void resetClient(DecoderPtr&& decoder) override {
-    decoder_ = std::move(decoder);
-    resetClient_(decoder);
-  }
-  MOCK_METHOD(void, resetClient_, (DecoderPtr&));
-  MOCK_METHOD(void, sendData, (Buffer::Instance&));
-  MOCK_METHOD((Decoder&), decoder, ());
-  MOCK_METHOD(void, close, ());
-  DecoderPtr decoder_;
-};
-
-class MockClientPoolCallbacks : public ClientPoolCallBack {
-public:
-  ~MockClientPoolCallbacks() override = default;
-  void onClientReady(ClientDataPtr&& data) override {
-    data_ = std::move(data);
-    onClientReady_(data);
-  }
-  MOCK_METHOD(void, onClientReady_, (ClientDataPtr&));
-  /*
-   * onClientFailure called when proxy failed to pass the connection phase
-   */
-  MOCK_METHOD(void, onClientFailure, (MySQLPoolFailureReason));
-  ClientDataPtr data_;
-};
-
-class MockPool : public Instance {
-public:
-  MockPool() = default;
-  MockPool(const std::string& name) : name(name) {}
-  ~MockPool() override = default;
-  MOCK_METHOD(Cancellable*, newMySQLClient, (ClientPoolCallBack&));
-  std::string name;
-};
-
-} // namespace ConnectionPool
-
+} // namespace ConnPool
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

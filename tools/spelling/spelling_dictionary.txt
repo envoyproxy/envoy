@@ -118,6 +118,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dsn
 guarddog
 GC
 GCC
