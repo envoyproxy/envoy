@@ -1894,8 +1894,11 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
 // the default configuration aspects.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
   setup(false, "");
-
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(1);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -1919,6 +1922,8 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
 // headers, if it fires we don't faceplant.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
@@ -2049,61 +2054,6 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
-// Test timeout when route timeout needs to be used if max_stream_duration is not specified.
-// Regression test for https://github.com/envoyproxy/envoy/issues/15530.
-// TODO(ramaraochavali): move this test to DurationTimeout test.
-TEST_F(HttpConnectionManagerImplTest, DurationTimeoutFromRouteTimeout) {
-  stream_idle_timeout_ = std::chrono::milliseconds(10);
-  setup(false, "");
-  setupFilterChain(1, 0);
-  RequestHeaderMap* latched_headers = nullptr;
-
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
-
-  // Create the stream.
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        Event::MockTimer* idle_timer = setUpTimer();
-        EXPECT_CALL(*idle_timer, enableTimer(_, _));
-        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-        EXPECT_CALL(*idle_timer, enableTimer(_, _));
-        EXPECT_CALL(*idle_timer, disableTimer());
-        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-        latched_headers = headers.get();
-        decoder->decodeHeaders(std::move(headers), false);
-
-        data.drain(4);
-        return Http::okStatus();
-      }));
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
-  decoder_filters_[0]->callbacks_->clearRouteCache();
-  decoder_filters_[0]->callbacks_->clusterInfo();
-
-  Event::MockTimer* timer = setUpTimer();
-
-  // With max stream duration not set and timer is set to route's timeout.
-  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
-      .WillRepeatedly(Return(absl::nullopt));
-  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, usingNewTimeouts())
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
-      .WillRepeatedly((Return(std::chrono::milliseconds(35))));
-  decoder_filters_[0]->callbacks_->clearRouteCache();
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(35), _));
-  decoder_filters_[0]->callbacks_->clusterInfo();
-
-  // Cleanup.
-  EXPECT_CALL(*timer, disableTimer());
-  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
-  EXPECT_CALL(*decoder_filters_[0], onDestroy());
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
 // Test timeout variants.
 TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
@@ -2117,16 +2067,15 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   // Create the stream.
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+            .WillByDefault(Return(std::chrono::milliseconds(0)));
         Event::MockTimer* idle_timer = setUpTimer();
         EXPECT_CALL(*idle_timer, enableTimer(_, _));
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
         EXPECT_CALL(*idle_timer, enableTimer(_, _));
         EXPECT_CALL(*idle_timer, disableTimer());
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":authority", "host"},
-                                         {"content-type", "application/grpc"},
-                                         {":path", "/"},
-                                         {":method", "GET"}}};
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
         latched_headers = headers.get();
         decoder->decodeHeaders(std::move(headers), false);
 
@@ -2294,16 +2243,76 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that verifies route timeout is used if if grpc timeout header is not set and
+// max stream duration is not at route and HCM level.
+// Regression test for https://github.com/envoyproxy/envoy/issues/15530.
+// TODO(ramaraochavali): merge this with DurationTimeout test.
+TEST_F(HttpConnectionManagerImplTest, DurationTimeoutUsesRouteTimeout) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  setupFilterChain(1, 0);
+  RequestHeaderMap* latched_headers = nullptr;
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Create the stream.
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+            .WillByDefault(Return(std::chrono::milliseconds(0)));
+        Event::MockTimer* idle_timer = setUpTimer();
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        EXPECT_CALL(*idle_timer, disableTimer());
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        latched_headers = headers.get();
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+  decoder_filters_[0]->callbacks_->clearRouteCache();
+  decoder_filters_[0]->callbacks_->clusterInfo();
+
+  Event::MockTimer* timer = setUpTimer();
+
+  // With no max stream duration, route timeout is used.
+  max_stream_duration_ = absl::nullopt;
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(22), _));
+  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+      .Times(1)
+      .WillRepeatedly(Return(absl::nullopt));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(22)));
+  decoder_filters_[0]->callbacks_->clearRouteCache();
+  decoder_filters_[0]->callbacks_->clusterInfo();
+  max_stream_duration_ = absl::nullopt;
+
+  // Cleanup.
+  EXPECT_CALL(*timer, disableTimer());
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Per-route timeouts override the global stream idle timeout.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(30)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        Event::MockTimer* request_timer = setUpTimer();
         Event::MockTimer* idle_timer = setUpTimer();
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
         decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -2311,10 +2320,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(30), _));
-        EXPECT_CALL(*request_timer, enableTimer(_, _));
-
         EXPECT_CALL(*idle_timer, disableTimer());
-        EXPECT_CALL(*request_timer, disableTimer());
         decoder_->decodeHeaders(std::move(headers), false);
 
         data.drain(4);
@@ -2334,19 +2340,18 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteZeroOverride) {
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(0)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        Event::MockTimer* request_timer = setUpTimer();
         Event::MockTimer* idle_timer = setUpTimer();
-        EXPECT_CALL(*request_timer, enableTimer(std::chrono::milliseconds(10), _));
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
         decoder_ = &conn_manager_->newStream(response_encoder_);
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
             {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
         EXPECT_CALL(*idle_timer, disableTimer());
-        EXPECT_CALL(*request_timer, disableTimer());
         decoder_->decodeHeaders(std::move(headers), false);
 
         data.drain(4);
@@ -2366,17 +2371,17 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(10)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   // Codec sends downstream request headers.
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
 
     Event::MockTimer* idle_timer = setUpTimer();
-    Event::MockTimer* request_timer = setUpTimer();
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     decoder_->decodeHeaders(std::move(headers), false);
 
     // Expect resetIdleTimer() to be called for the response
@@ -2408,19 +2413,18 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNormalTermination) {
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
-      .WillByDefault(Return(std::chrono::milliseconds(5)));
+      .WillByDefault(Return(std::chrono::milliseconds(10)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   // Codec sends downstream request headers.
   Event::MockTimer* idle_timer = setUpTimer();
-  Event::MockTimer* request_timer = setUpTimer();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
 
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, disableTimer());
     decoder_->decodeHeaders(std::move(headers), false);
 
     data.drain(4);
@@ -2442,17 +2446,17 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(10)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   // Codec sends downstream request headers.
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
 
     Event::MockTimer* idle_timer = setUpTimer();
-    Event::MockTimer* request_timer = setUpTimer();
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     decoder_->decodeHeaders(std::move(headers), false);
 
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
@@ -2462,7 +2466,6 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
     // encodeHeaders()/encodeData().
     EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
     EXPECT_CALL(*idle_timer, disableTimer());
-    EXPECT_CALL(*request_timer, disableTimer());
     idle_timer->invokeCallback();
 
     data.drain(4);
@@ -2489,6 +2492,8 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(10)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -2538,6 +2543,8 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(10)));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   proxy_100_continue_ = true;
 
   // Store the basic request encoder during filter chain setup.
@@ -2552,43 +2559,35 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   // Codec sends downstream request headers, upstream response headers are
   // encoded, data events happen in various directions.
   Event::MockTimer* idle_timer = setUpTimer();
-  Event::MockTimer* request_timer = setUpTimer();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     decoder_->decodeHeaders(std::move(headers), false);
 
     ResponseHeaderMapPtr response_continue_headers{
         new TestResponseHeaderMapImpl{{":status", "100"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     filter->callbacks_->encode100ContinueHeaders(std::move(response_continue_headers));
 
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     filter->callbacks_->streamInfo().setResponseCodeDetails("");
     filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     decoder_->decodeData(data, false);
 
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     decoder_->decodeTrailers(std::move(trailers));
 
     Buffer::OwnedImpl fake_response("world");
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    EXPECT_CALL(*request_timer, enableTimer(_, _));
     filter->callbacks_->encodeData(fake_response, false);
 
     EXPECT_CALL(*idle_timer, disableTimer());
-    EXPECT_CALL(*request_timer, disableTimer());
     idle_timer->invokeCallback();
 
     data.drain(4);
@@ -2697,6 +2696,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsNotDisarmedOnIncompleteRequestWithHeader) {
   request_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
@@ -2724,6 +2725,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsNotDisarmedOnIncompleteReq
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestWithHeader) {
   request_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
@@ -2750,13 +2753,13 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestWithData) {
   request_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    Event::MockTimer* idle_timer = setUpTimer();
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
-    EXPECT_CALL(*idle_timer, enableTimer(_, _));
 
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -2764,7 +2767,6 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
     decoder_->decodeHeaders(std::move(headers), false);
 
     EXPECT_CALL(*request_timer, disableTimer()).Times(2);
-    EXPECT_CALL(*idle_timer, disableTimer());
     decoder_->decodeData(data, true);
     return Http::okStatus();
   }));
@@ -2780,13 +2782,13 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestWithTrailers) {
   request_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
-    Event::MockTimer* idle_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
-    EXPECT_CALL(*idle_timer, enableTimer(_, _));
     decoder_ = &conn_manager_->newStream(response_encoder_);
 
     RequestHeaderMapPtr headers{
@@ -2795,7 +2797,6 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
     decoder_->decodeData(data, false);
 
     EXPECT_CALL(*request_timer, disableTimer()).Times(2);
-    EXPECT_CALL(*idle_timer, disableTimer());
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
     decoder_->decodeTrailers(std::move(trailers));
     return Http::okStatus();
@@ -2812,6 +2813,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
   request_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -2847,10 +2850,11 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermination) {
   request_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
 
   Event::MockTimer* request_timer = setUpTimer();
-  Event::MockTimer* idle_timer = setUpTimer();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -2863,11 +2867,9 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
   Buffer::OwnedImpl fake_input("1234");
 
   EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
-  EXPECT_CALL(*idle_timer, enableTimer(request_timeout_, _));
   conn_manager_->onData(fake_input, false); // kick off request
 
   EXPECT_CALL(*request_timer, disableTimer());
-  EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 
   expectOnDestroy();
@@ -2876,6 +2878,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
 
 TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutDisarmedAfterHeaders) {
   request_headers_timeout_ = std::chrono::milliseconds(10);
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   setup(false, "");
 
   Event::MockTimer* request_header_timer;
@@ -3176,38 +3180,6 @@ TEST_F(HttpConnectionManagerImplTest, ConnectWithEmptyPath) {
   conn_manager_->onData(fake_input, false);
 
   expectOnDestroy(false);
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ConnectLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.stop_faking_paths", "false"}});
-
-  setup(false, "envoy-custom-server", false);
-
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
-      .WillRepeatedly(Return(false));
-
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        decoder_ = &conn_manager_->newStream(response_encoder_);
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
-        decoder_->decodeHeaders(std::move(headers), false);
-        data.drain(4);
-        return Http::okStatus();
-      }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, _))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("403", headers.getStatusValue());
-      }));
-
-  // Kick off the incoming data.
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
