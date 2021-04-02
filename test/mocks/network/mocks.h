@@ -421,7 +421,7 @@ public:
   MOCK_METHOD(void, setRejectFraction, (UnitFloat));
 };
 
-class MockConnectionHandler : public ConnectionHandler {
+class MockConnectionHandler : public virtual ConnectionHandler {
 public:
   MockConnectionHandler();
   ~MockConnectionHandler() override;
