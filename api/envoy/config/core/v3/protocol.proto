@@ -406,8 +406,6 @@ message Http2ProtocolOptions {
   // Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
   // does not respond within the configured timeout, the connection will be aborted.
   KeepaliveSettings connection_keepalive = 15;
-
-  bool aaaa;
 }
 
 // [#not-implemented-hide:]

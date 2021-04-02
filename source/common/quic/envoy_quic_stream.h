@@ -137,8 +137,8 @@ public:
           return HeaderValidationResult::INVALID;
         }
       }
-      return HeaderValidationResult::ACCEPT;
     }
+    return HeaderValidationResult::ACCEPT;
   }
 
 protected:
