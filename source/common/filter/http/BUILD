@@ -18,6 +18,7 @@ envoy_cc_library(
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:containers_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",

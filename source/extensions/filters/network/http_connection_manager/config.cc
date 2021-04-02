@@ -559,6 +559,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
                                              factory->isTerminalFilter(),
                                              last_filter_in_current_config);
   }
+
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
       config_discovery, name, context_, stats_prefix_);
   filter_factories.push_back(std::move(filter_config_provider));

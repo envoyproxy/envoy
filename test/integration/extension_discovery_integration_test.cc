@@ -1,5 +1,6 @@
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -221,7 +222,7 @@ public:
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version,
-                       const std::string& yaml_config) {
+                       const std::string& yaml_config, bool ttl = false) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
@@ -230,8 +231,15 @@ public:
             yaml_config);
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
+
+    envoy::service::discovery::v3::Resource resource;
+    resource.set_name(name);
     typed_config.mutable_typed_config()->PackFrom(configuration);
-    response.add_resources()->PackFrom(typed_config);
+    resource.mutable_resource()->PackFrom(typed_config);
+    if (ttl) {
+      resource.mutable_ttl()->set_seconds(1);
+    }
+    response.add_resources()->PackFrom(resource);
     ecds_stream_->sendGrpcMessage(response);
   }
 
@@ -304,6 +312,97 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+}
+
+TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false, false);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({"http"});
+  sendXdsResponse("foo", "1", denyPrivateConfig(), true);
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  Http::TestRequestHeaderMapImpl banned_request_headers{
+      {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+
+  {
+    // Wait until the the TTL for the resource expires, which will trigger a config load to remove
+    // the resource.
+    test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                   2);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("500", response->headers().getStatusValue());
+  }
+
+  {
+    // Reinstate the previous configuration.
+    sendXdsResponse("foo", "1", denyPrivateConfig(), true);
+    // Wait until the new configuration has been applied.
+    test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                   3);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+}
+
+TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false, true);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({"http"});
+  sendXdsResponse("foo", "1", allowAllConfig(), true);
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl banned_request_headers{
+      {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  {
+    // Wait until the the TTL for the resource expires, which will trigger a config load to remove
+    // the resource.
+    test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                   2);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
   }
 }
 
