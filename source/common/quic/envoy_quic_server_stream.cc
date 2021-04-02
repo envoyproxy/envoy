@@ -39,7 +39,7 @@ public:
   // closed.
   static constexpr absl::string_view invalid_http_header = "http3.invalid_header_field";
   // The size of headers (or trailers) exceeded the configured limits.
-  static constexpr absl::string_view headers_too_large = "http3.headers.too.large";
+  static constexpr absl::string_view headers_too_large = "http3.headers_too_large";
   // Envoy was configured to drop requests with header keys beginning with underscores.
   static constexpr absl::string_view invalid_underscore = "http3.unexpected_underscore";
   // The peer refused the stream.
@@ -182,7 +182,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     }
     return;
   }
-  if (!Http::HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
     return;

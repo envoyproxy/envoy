@@ -17,6 +17,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -43,8 +45,15 @@ public:
               return &cancel_;
             }));
     if (pools_.size() == 1) {
+      EXPECT_CALL(*first(), protocolDescription())
+          .Times(AnyNumber())
+          .WillRepeatedly(Return("first"));
+
       return pools_.begin();
     }
+    EXPECT_CALL(*second(), protocolDescription())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return("second"));
     return ++pools_.begin();
   }
 
@@ -75,7 +84,7 @@ public:
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         host_(new NiceMock<Upstream::MockHostDescription>()),
         grid_(dispatcher_, random_,
-              Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+              Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
               state_, simTime(), options_) {}
 
@@ -113,20 +122,28 @@ TEST_F(ConnectivityGridTest, Success) {
 TEST_F(ConnectivityGridTest, FailureThenSuccess) {
   EXPECT_EQ(grid_.first(), nullptr);
 
-  grid_.newStream(decoder_, callbacks_);
+  EXPECT_LOG_CONTAINS("trace", "first pool attempting to create a new stream to host 'hostname'",
+                      grid_.newStream(decoder_, callbacks_));
+
   EXPECT_NE(grid_.first(), nullptr);
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should fail over to the second pool.
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
-  grid_.callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                   "reason", host_);
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"trace", "first pool failed to create connection to host 'hostname'"},
+           {"trace", "second pool attempting to create a new stream to host 'hostname'"}}),
+      grid_.callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                       "reason", host_));
   ASSERT_NE(grid_.second(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
-  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  EXPECT_LOG_CONTAINS("trace", "second pool successfully connected to host 'hostname'",
+                      grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt));
 }
 
 // Test that after the first pool fails, subsequent connections will
@@ -269,8 +286,8 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
   EXPECT_CALL(matcher, resolve(_))
-      .WillRepeatedly(testing::Return(
-          Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
+      .WillRepeatedly(
+          Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(dispatcher_, random_,
                         Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
@@ -280,10 +297,13 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
   ASSERT_TRUE(optional_it1.has_value());
+  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
 
   // Create the mixed pool.
   auto optional_it2 = ConnectivityGridForTest::forceCreateNextPool(grid);
   ASSERT_TRUE(optional_it2.has_value());
+  EXPECT_EQ("HTTP/1 HTTP/2 ALPN", (**optional_it2)->protocolDescription());
+
   // There is no third option currently.
   auto optional_it3 = ConnectivityGridForTest::forceCreateNextPool(grid);
   ASSERT_FALSE(optional_it3.has_value());
