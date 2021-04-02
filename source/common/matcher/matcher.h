@@ -180,6 +180,7 @@ private:
           config.typed_config(), factory_context_.messageValidationVisitor(), *factory);
       auto data_input = factory->createDataInput(*message, factory_context_);
       validation_visitor_.validateDataInput(*data_input, config.typed_config().type_url());
+      return data_input;
     }
 
     // If the provided config doesn't match a typed input, assume that this is one of the common
