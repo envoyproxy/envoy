@@ -1,3 +1,6 @@
+#include <openssl/conf.h>
+#include <openssl/ssl.h>
+
 #include <memory>
 #include <string>
 
@@ -52,7 +55,7 @@ std::string protocolTestParamsToString(
   return fmt::format(
       "{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
       std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-      std::get<2>(p.param) ? "DownstreamUseQuic" : "DownstreamUseTcp");
+      std::get<2>(p.param) ? "UsesQuic" : "UsesTcp");
 }
 
 // Sds integration base class with following support:
@@ -65,11 +68,14 @@ class SdsDynamicIntegrationBaseTest
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest((std::get<2>(GetParam()) ? Http::CodecClient::Type::HTTP3
-                                                     : Http::CodecClient::Type::HTTP1),
-                            ipVersion(), ConfigHelper::httpProxyConfig(std::get<2>(GetParam()))),
-        server_cert_("server_cert"), validation_secret_("validation_secret"),
-        client_cert_("client_cert") {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(),
+                            ConfigHelper::httpProxyConfig(false)) {}
+
+  SdsDynamicIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
+                                Network::Address::IpVersion version, const std::string& config)
+      : HttpIntegrationTest(downstream_protocol, version, config), server_cert_("server_cert"),
+        validation_secret_("validation_secret"), client_cert_("client_cert"),
+        test_quic_(std::get<2>(GetParam())) {}
 
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
@@ -164,18 +170,25 @@ protected:
   const std::string validation_secret_;
   const std::string client_cert_;
   bool v3_resource_api_{false};
+  bool test_quic_;
 };
 
 // Downstream SDS integration test: static Listener with ssl cert from SDS
 class SdsDynamicDownstreamIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
+  SdsDynamicDownstreamIntegrationTest()
+      : SdsDynamicIntegrationBaseTest((std::get<2>(GetParam()) ? Http::CodecClient::Type::HTTP3
+                                                               : Http::CodecClient::Type::HTTP1),
+                                      ipVersion(),
+                                      ConfigHelper::httpProxyConfig(std::get<2>(GetParam()))) {}
+
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket = bootstrap.mutable_static_resources()
                                    ->mutable_listeners(0)
                                    ->mutable_filter_chains(0)
                                    ->mutable_transport_socket();
-      if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      if (!test_quic_) {
         transport_socket->set_name("envoy.transport_sockets.tls");
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
         auto* common_tls_context = tls_context.mutable_common_tls_context();
@@ -226,6 +239,14 @@ public:
     HttpIntegrationTest::createUpstreams();
   }
 
+  void waitForSdsUpdateStats(size_t times) {
+    test_server_->waitForCounterGe(
+        listenerStatPrefix(test_quic_
+                               ? "quic_server_transport_socket_factory.context_config_update_by_sds"
+                               : "server_ssl_socket_factory.ssl_context_update_by_sds"),
+        times, std::chrono::milliseconds(5000));
+  }
+
   void TearDown() override {
     cleanUpXdsConnection();
     client_ssl_ctx_.reset();
@@ -250,9 +271,9 @@ public:
       local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
     }
     return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                     Network::Utility::resolveUrl(url), local_address);
+                                             Network::Utility::resolveUrl(url), local_address);
 #else
-  NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
   }
 
@@ -264,7 +285,8 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
-                     testing::ValuesIn({false, true})));
+                     testing::ValuesIn({false, true})),
+    protocolTestParamsToString);
 
 class SdsDynamicKeyRotationIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
 protected:
@@ -287,7 +309,9 @@ protected:
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc), testing::ValuesIn({false})));
+                     testing::Values(Grpc::ClientType::EnvoyGrpc),
+                     testing::ValuesIn({false, true})),
+    protocolTestParamsToString);
 
 // Validate that a basic key-cert rotation works via symlink rename.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
@@ -302,8 +326,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
   initialize();
 
   // Initial update from filesystem.
-  test_server_->waitForCounterGe(
-      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
+  waitForSdsUpdateStats(1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
@@ -314,8 +337,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
   // Rotate.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/new"),
                               TestEnvironment::temporaryPath("root/current"));
-  test_server_->waitForCounterGe(
-      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 2);
+  waitForSdsUpdateStats(2);
   // The rotation is not a SDS attempt, so no change to these stats.
   EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
@@ -337,8 +359,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
   initialize();
 
   // Initial update from filesystem.
-  test_server_->waitForCounterGe(
-      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
+  waitForSdsUpdateStats(1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
@@ -351,10 +372,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/empty"),
                               TestEnvironment::temporaryPath("root/current"));
   test_server_->waitForCounterEq("sds.server_cert.key_rotation_failed", 1);
-  EXPECT_EQ(1,
-            test_server_
-                ->counter(listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"))
-                ->value());
+  waitForSdsUpdateStats(1);
   // The rotation is not a SDS attempt, so no change to these stats.
   EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
@@ -403,9 +421,8 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
 
   sendSdsResponse(getServerSecret());
 
-  // Wait for ssl_context_updated_by_sds counter.
-  test_server_->waitForCounterGe(
-      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
+  // Wait for sds update counter.
+  waitForSdsUpdateStats(1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
@@ -427,18 +444,21 @@ public:
                                    ->mutable_listeners(0)
                                    ->mutable_filter_chains(0)
                                    ->mutable_transport_socket();
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      auto* common_tls_context = tls_context.mutable_common_tls_context();
-      common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
-
-      auto* tls_certificate = common_tls_context->add_tls_certificates();
-      tls_certificate->mutable_certificate_chain()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
-      tls_certificate->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
-      setUpSdsValidationContext(common_tls_context);
-      transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      if (!test_quic_) {
+        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+        auto* common_tls_context = tls_context.mutable_common_tls_context();
+        ConfigInlineCerts(common_tls_context);
+        transport_socket->set_name("envoy.transport_sockets.tls");
+        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      } else {
+        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+            transport_socket_config;
+        auto* common_tls_context =
+            transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
+        ConfigInlineCerts(common_tls_context);
+        transport_socket->set_name("envoy.transport_sockets.quic");
+        transport_socket->mutable_typed_config()->PackFrom(transport_socket_config);
+      }
 
       // Add a static sds cluster
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -469,6 +489,18 @@ public:
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
     client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
+  }
+
+  void ConfigInlineCerts(
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* common_tls_context) {
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+
+    auto* tls_certificate = common_tls_context->add_tls_certificates();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    setUpSdsValidationContext(common_tls_context);
   }
 
   void setUpSdsValidationContext(
@@ -531,7 +563,8 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
-                     testing::ValuesIn({false})));
+                     testing::ValuesIn({false, true})),
+    protocolTestParamsToString);
 
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
@@ -587,8 +620,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicWithSharedSecret) {
   // depending on the verification_secret were updated.
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  test_server_->waitForCounterGe(
-      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
+  waitForSdsUpdateStats(1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
@@ -615,8 +647,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
   // depending on the verification_secret were updated.
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  test_server_->waitForCounterGe(
-      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
+  waitForSdsUpdateStats(1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
@@ -629,6 +660,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
 }
 
 // Upstream SDS integration test: a static cluster has ssl cert from SDS.
+// TODO(15034) Enable SDS support in QUIC upstream.
 class SdsDynamicUpstreamIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   void initialize() override {
@@ -677,7 +709,8 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, SdsDynamicUpstreamIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
-                     testing::ValuesIn({false})));
+                     testing::ValuesIn({false})),
+    protocolTestParamsToString);
 
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.
@@ -743,6 +776,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
 }
 
 // Test CDS with SDS. A cluster provided by CDS raises new SDS request for upstream cert.
+// TODO(15034) Enable SDS support in QUIC upstream.
 class SdsCdsIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   void initialize() override {
@@ -835,7 +869,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, SdsCdsIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc), testing::ValuesIn({false})));
+                     testing::Values(Grpc::ClientType::EnvoyGrpc), testing::ValuesIn({false})),
+    protocolTestParamsToString);
 
 TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {

@@ -11,6 +11,24 @@
 namespace Envoy {
 namespace Quic {
 
+#define QUIC_TRANSPORT_SOCKET_FACTORY_STATS(COUNTER)                                               \
+  COUNTER(context_config_update_by_sds)                                                            \
+  COUNTER(upstream_context_secrets_not_ready)                                                      \
+  COUNTER(downstream_context_secrets_not_ready)
+
+struct QuicTransportSocketFactoryStats {
+  QUIC_TRANSPORT_SOCKET_FACTORY_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+namespace {
+
+QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::string& perspective) {
+  return {QUIC_TRANSPORT_SOCKET_FACTORY_STATS(
+      POOL_COUNTER_PREFIX(store, fmt::format("quic_{}_transport_socket_factory.", perspective)))};
+}
+
+} // namespace
+
 // Base class for QUIC transport socket factory.
 // Because QUIC stack handles all L4 data, there is no need of a real transport
 // socket for QUIC in current implementation. This factory doesn't provides a
@@ -18,10 +36,13 @@ namespace Quic {
 // server and client.
 class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory {
 public:
-  QuicTransportSocketFactoryBase(std::unique_ptr<Ssl::ContextConfig> config)
-      : context_config_(std::move(config)) {
-    context_config_->setSecretUpdateCallback([]() {
-      // No-op. The callback is needed to set up |config_| with the updated secret.
+  QuicTransportSocketFactoryBase(Stats::Scope& store, std::unique_ptr<Ssl::ContextConfig> config,
+                                 const std::string& perspective)
+      : stats_(generateStats(store, perspective)), context_config_(std::move(config)) {
+    context_config_->setSecretUpdateCallback([this]() {
+      // The callback also triggers updating |context_config_| with the new secret.
+      // TODO(danzh) Client transport socket factory may also need to update quic crypto.
+      stats_.context_config_update_by_sds_.inc();
     });
   }
 
@@ -35,6 +56,7 @@ public:
 
 protected:
   const Ssl::ContextConfig& contextConfig() const { return *context_config_; }
+  QuicTransportSocketFactoryStats stats_;
 
 private:
   std::unique_ptr<Ssl::ContextConfig> context_config_;
@@ -44,8 +66,8 @@ private:
 // differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Ssl::ServerContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(std::move(config)),
+  QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(store, std::move(config), "server"),
         config_(dynamic_cast<const Ssl::ServerContextConfig&>(contextConfig())) {}
 
   const Ssl::ServerContextConfig& serverContextConfig() const { return config_; }
@@ -56,8 +78,8 @@ private:
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicClientTransportSocketFactory(Ssl::ClientContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(std::move(config)),
+  QuicClientTransportSocketFactory(Stats::Scope& store, Ssl::ClientContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(store, std::move(config), "client"),
         config_(dynamic_cast<const Ssl::ClientContextConfig&>(contextConfig())) {}
 
   const Ssl::ClientContextConfig& clientContextConfig() const { return config_; }

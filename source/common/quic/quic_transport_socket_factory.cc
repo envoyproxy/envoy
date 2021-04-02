@@ -17,7 +17,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   auto server_config = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       quic_transport.downstream_tls_context(), context);
-  return std::make_unique<QuicServerTransportSocketFactory>(std::move(server_config));
+  return std::make_unique<QuicServerTransportSocketFactory>(context.scope(),
+                                                            std::move(server_config));
 }
 
 ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyConfigProto() {
@@ -34,7 +35,8 @@ QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   auto client_config = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
       quic_transport.upstream_tls_context(), context);
-  return std::make_unique<QuicClientTransportSocketFactory>(std::move(client_config));
+  return std::make_unique<QuicClientTransportSocketFactory>(context.scope(),
+                                                            std::move(client_config));
 }
 
 ProtobufTypes::MessagePtr QuicClientTransportSocketConfigFactory::createEmptyConfigProto() {

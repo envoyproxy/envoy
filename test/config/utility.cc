@@ -106,7 +106,7 @@ static_resources:
     name: listener_0
     address:
       socket_address:
-        address: 0.0.0.0
+        address: 127.0.0.1
         port_value: 0
         protocol: udp
 )EOF",
