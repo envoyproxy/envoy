@@ -1,0 +1,30 @@
+name: android_build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  androidbuild:
+    name: android_build
+    runs-on: macOS-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
+      - name: 'Build envoy.aar distributable'
+        run: bazelisk build --fat_apk_cpu=x86 //:android_dist_ci
+      - uses: actions/upload-artifact@v2
+        with:
+          name: envoy.aar
+          path: dist/envoy.aar
