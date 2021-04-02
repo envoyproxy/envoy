@@ -908,6 +908,8 @@ bool InstanceImpl::enableReusePortDefault() {
     return Runtime::runtimeFeatureEnabled(
         "envoy.reloadable_features.listener_reuse_port_default_enabled");
   }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server
