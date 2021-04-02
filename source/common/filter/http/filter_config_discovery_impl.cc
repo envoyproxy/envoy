@@ -222,7 +222,7 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSu
 FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ExtensionConfigSource& config_source,
     const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix, bool last_filter_in_current_config,
+    const std::string& stat_prefix, bool last_filter_in_filter_config,
     const std::string& filter_chain_type) {
   auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                       factory_context, stat_prefix);
@@ -238,7 +238,7 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     require_type_urls.emplace(factory_type_url);
   }
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      subscription, require_type_urls, factory_context, last_filter_in_current_config,
+      subscription, require_type_urls, factory_context, last_filter_in_filter_config,
       filter_chain_type);
   // Ensure the subscription starts if it has not already.
   if (config_source.apply_default_config_without_warming()) {
