@@ -2,6 +2,8 @@
 
 #include "envoy/matcher/matcher.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Matcher {
 
@@ -27,7 +29,7 @@ public:
     }
   }
 
-  const std::vector<absl::Status> errors() const { return errors_; }
+  const std::vector<absl::Status>& errors() const { return errors_; }
 
 protected:
   // Implementations would subclass this to specify the validation logic for data inputs,
