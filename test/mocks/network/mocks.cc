@@ -171,7 +171,21 @@ MockListener::MockListener() = default;
 
 MockListener::~MockListener() { onDestroy(); }
 
-MockConnectionHandler::MockConnectionHandler() = default;
+MockConnectionHandler::MockConnectionHandler() {
+  ON_CALL(*this, incNumConnections()).WillByDefault(Invoke([this]() {
+    ++num_handler_connections_;
+    FANCY_LOG(debug, "lambdai conn handler incNumConn(), new value is {}",
+              num_handler_connections_.load());
+  }));
+  ON_CALL(*this, decNumConnections()).WillByDefault(Invoke([this]() {
+    --num_handler_connections_;
+    FANCY_LOG(debug, "lambdai conn handler decNumConn(), new value is {}",
+              num_handler_connections_.load());
+  }));
+  ON_CALL(*this, numConnections()).WillByDefault(Invoke([this]() {
+    return num_handler_connections_.load();
+  }));
+}
 MockConnectionHandler::~MockConnectionHandler() = default;
 
 MockIp::MockIp() = default;
