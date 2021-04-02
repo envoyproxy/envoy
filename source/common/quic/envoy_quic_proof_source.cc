@@ -97,9 +97,8 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     return {absl::nullopt, absl::nullopt};
   }
-  auto& transport_socket_factory = const_cast<QuicServerTransportSocketFactory&>(
-      dynamic_cast<const QuicServerTransportSocketFactory&>(
-          filter_chain->transportSocketFactory()));
+  auto& transport_socket_factory =
+      dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory());
 
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs =
       transport_socket_factory.getTlsCertificates();

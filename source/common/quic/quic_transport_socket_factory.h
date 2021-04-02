@@ -72,7 +72,8 @@ public:
         config_(dynamic_cast<const Ssl::ServerContextConfig&>(contextConfig())) {}
 
   // Return TLS certificates if the context config is ready.
-  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> getTlsCertificates() {
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
+  getTlsCertificates() const {
     if (!config_.isReady()) {
       ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
       stats_.downstream_context_secrets_not_ready_.inc();
