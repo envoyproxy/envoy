@@ -76,6 +76,10 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
+  // Either reset the stream or close the connection according to
+  // close_connection_upon_invalid_header.
+  void onStreamError(bool close_connection_upon_invalid_header);
+
   Http::ResponseDecoder* response_decoder_{nullptr};
 
   bool decoded_100_continue_{false};

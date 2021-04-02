@@ -99,8 +99,11 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
 // Called when a QUIC stack reset the stream.
 Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStreamErrorCode rst_err);
 
-// Called when underlying QUIC connection is closed either locally or by peer.
-Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);
+// Called when underlying QUIC connection is closed locally.
+Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error);
+
+// Called when underlying QUIC connection is closed by peer.
+Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCode error);
 
 // Called when a GOAWAY frame is received.
 ABSL_MUST_USE_RESULT

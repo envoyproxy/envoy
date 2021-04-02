@@ -131,7 +131,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   if (!headers_decompressed() || header_list.empty()) {
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
     return;
   }
 
@@ -141,10 +141,15 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list, *this);
+  if (headers == nullptr) {
+    onStreamError(close_connection_upon_invalid_header_);
+    return;
+  }
   const absl::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusNoThrow(*headers);
   if (!optional_status.has_value()) {
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
     return;
   }
   const uint64_t status = optional_status.value();
@@ -262,7 +267,9 @@ void EnvoyQuicClientStream::Reset(quic::QuicRstStreamErrorCode error) {
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
-    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
+                          ? quicErrorCodeToEnvoyLocalResetReason(error)
+                          : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
 }
@@ -298,6 +305,18 @@ Network::Connection* EnvoyQuicClientStream::connection() { return filterManagerC
 
 QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection() {
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
+}
+
+void EnvoyQuicClientStream::onStreamError(bool close_connection_upon_invalid_header) {
+  if (details_.empty()) {
+    details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+  }
+
+  if (close_connection_upon_invalid_header) {
+    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
+  } else {
+    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+  }
 }
 
 } // namespace Quic

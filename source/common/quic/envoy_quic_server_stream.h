@@ -89,6 +89,10 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
+  // Either reset the stream or close the connection according to
+  // close_connection_upon_invalid_header.
+  void onStreamError(bool close_connection_upon_invalid_header);
+
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;

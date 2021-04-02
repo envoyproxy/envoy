@@ -374,8 +374,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
-  // TODO(danzh) re-enable after plumbing through http2 option
-  // "allow_connect".
+  // TODO(danzh) re-enable after adding http3 option "allow_connect".
   EXCLUDE_DOWNSTREAM_HTTP3;
   EXCLUDE_UPSTREAM_HTTP3; // use after free.
   // Faulty filter that removed host in a CONNECT request.
@@ -1274,12 +1273,7 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
     default_response_headers_.setStatus(
         "11111111111111111111111111111111111111111111111111111111111111111");
     upstream_request_->encodeHeaders(default_response_headers_, false);
-    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
-      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    } else {
-      // TODO(#14829) QUIC won't disconnect on invalid messaging.
-      ASSERT_TRUE(upstream_request_->waitForReset());
-    }
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   response->waitForEndStream();
@@ -1315,11 +1309,11 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
     ASSERT_TRUE(fake_upstream_connection->write(std::string(missing_status)));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   } else {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     waitForNextUpstreamRequest();
     default_response_headers_.removeStatus();
     upstream_request_->encodeHeaders(default_response_headers_, false);
-    // TODO(#14829) QUIC won't disconnect on invalid messaging.
-    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   response->waitForEndStream();
@@ -2265,6 +2259,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
+  // TODO(danzh) add "allow_connect" to http3 options.
+  EXCLUDE_DOWNSTREAM_HTTP3;
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     return;
   }
@@ -2285,8 +2281,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
       {":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
 
   response->waitForReset();
-  // TODO(danzh) plumb through stream_error_on_invalid_http_message.
-  EXCLUDE_DOWNSTREAM_HTTP3;
   EXPECT_FALSE(codec_client_->disconnected());
 }
 

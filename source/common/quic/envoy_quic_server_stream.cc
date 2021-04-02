@@ -31,23 +31,6 @@
 namespace Envoy {
 namespace Quic {
 
-// Changes or additions to details should be reflected in
-// docs/root/configuration/http/http_conn_man/response_code_details_details.rst
-class Http3ResponseCodeDetailValues {
-public:
-  // Invalid HTTP header field was received and stream is going to be
-  // closed.
-  static constexpr absl::string_view invalid_http_header = "http3.invalid_header_field";
-  // The size of headers (or trailers) exceeded the configured limits.
-  static constexpr absl::string_view headers_too_large = "http3.headers_too_large";
-  // Envoy was configured to drop requests with header keys beginning with underscores.
-  static constexpr absl::string_view invalid_underscore = "http3.unexpected_underscore";
-  // The peer refused the stream.
-  static constexpr absl::string_view remote_refused = "http3.remote_refuse";
-  // The peer reset the stream.
-  static constexpr absl::string_view remote_reset = "http3.remote_reset";
-};
-
 EnvoyQuicServerStream::EnvoyQuicServerStream(
     quic::QuicStreamId id, quic::QuicSpdySession* session, quic::StreamType type,
     Http::Http3::CodecStats& stats,
@@ -164,7 +147,11 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
-  ASSERT(headers_decompressed() && !header_list.empty());
+  if (!headers_decompressed() || header_list.empty()) {
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
+    return;
+  }
+
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
@@ -172,19 +159,12 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list, *this);
   if (headers == nullptr) {
-    if (details_.empty()) {
-      details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    }
-    if (close_connection_upon_invalid_header_) {
-      stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
-    } else {
-      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-    }
+    onStreamError(close_connection_upon_invalid_header_);
     return;
   }
   if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
     return;
   }
   request_decoder_->decodeHeaders(std::move(headers),
@@ -301,7 +281,9 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
   // Run reset callback before closing the stream so that the watermark change will not trigger
   // callbacks.
   if (!local_end_stream_) {
-    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
+                          ? quicErrorCodeToEnvoyLocalResetReason(error)
+                          : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
 }
@@ -352,6 +334,18 @@ EnvoyQuicServerStream::validateHeader(const std::string& header_name,
     details_ = Http3ResponseCodeDetailValues::invalid_underscore;
   }
   return result;
+}
+
+void EnvoyQuicServerStream::onStreamError(bool close_connection_upon_invalid_header) {
+  if (details_.empty()) {
+    details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+  }
+
+  if (close_connection_upon_invalid_header) {
+    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
+  } else {
+    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+  }
 }
 
 } // namespace Quic
