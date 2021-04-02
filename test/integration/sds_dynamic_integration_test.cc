@@ -1,6 +1,3 @@
-#include <openssl/conf.h>
-#include <openssl/ssl.h>
-
 #include <memory>
 #include <string>
 
@@ -68,8 +65,9 @@ class SdsDynamicIntegrationBaseTest
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(),
-                            ConfigHelper::httpProxyConfig(false)) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
+        server_cert_("server_cert"), validation_secret_("validation_secret"),
+        client_cert_("client_cert") {}
 
   SdsDynamicIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
                                 Network::Address::IpVersion version, const std::string& config)

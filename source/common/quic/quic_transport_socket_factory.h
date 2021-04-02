@@ -34,7 +34,8 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 // socket for QUIC in current implementation. This factory doesn't provides a
 // transport socket, instead, its derived class provides TLS context config for
 // server and client.
-class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory {
+class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
+                                       protected Logger::Loggable<Logger::Id::quic> {
 public:
   QuicTransportSocketFactoryBase(Stats::Scope& store, std::unique_ptr<Ssl::ContextConfig> config,
                                  const std::string& perspective)
@@ -70,7 +71,15 @@ public:
       : QuicTransportSocketFactoryBase(store, std::move(config), "server"),
         config_(dynamic_cast<const Ssl::ServerContextConfig&>(contextConfig())) {}
 
-  const Ssl::ServerContextConfig& serverContextConfig() const { return config_; }
+  // Return TLS certificates if the context config is ready.
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> getTlsCertificates() {
+    if (!config_.isReady()) {
+      ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
+      stats_.downstream_context_secrets_not_ready_.inc();
+      return {};
+    }
+    return config_.tlsCertificates();
+  }
 
 private:
   const Ssl::ServerContextConfig& config_;

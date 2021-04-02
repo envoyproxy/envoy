@@ -141,6 +141,7 @@ public:
         proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
+        listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
   }
 
@@ -249,9 +250,7 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoCertConfig) {
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillRepeatedly(ReturnRef(*transport_socket_factory_));
   EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(true));
-  EXPECT_CALL(dynamic_cast<const Ssl::MockServerContextConfig&>(
-                  transport_socket_factory_->serverContextConfig()),
-              tlsCertificates())
+  EXPECT_CALL(*mock_context_config_, tlsCertificates())
       .WillRepeatedly(
           Return(std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>{}));
   proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
