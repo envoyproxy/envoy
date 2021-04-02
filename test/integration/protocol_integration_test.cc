@@ -2338,10 +2338,6 @@ typed_config:
 )EOF";
 
 TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
-  // TODO(mathetake) enable for HTTP3 when the proper fix found
-  EXCLUDE_UPSTREAM_HTTP3
-  EXCLUDE_DOWNSTREAM_HTTP3
-
   config_helper_.addFilter(remove_response_headers_filter);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2361,10 +2357,6 @@ TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilte
 }
 
 TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
-  // TODO(mathetake) enable for HTTP3 when the proper fix found
-  EXCLUDE_UPSTREAM_HTTP3
-  EXCLUDE_DOWNSTREAM_HTTP3
-
   config_helper_.addFilter(remove_response_headers_filter);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
