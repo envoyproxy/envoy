@@ -1261,7 +1261,6 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1280,17 +1279,11 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
     default_response_headers_.setStatus(
         "11111111111111111111111111111111111111111111111111111111111111111");
     upstream_request_->encodeHeaders(default_response_headers_, false);
-    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
-      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    } else {
-      // TODO(#14829) QUIC won't disconnect on invalid messaging.
-      ASSERT_TRUE(upstream_request_->waitForReset());
-    }
   }
 
   response->waitForEndStream();
   EXPECT_EQ("502", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("protocol_error"));
+  EXPECT_THAT(response->body(), HasSubstr("protocol error"));
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {
@@ -1324,8 +1317,6 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
     waitForNextUpstreamRequest();
     default_response_headers_.removeStatus();
     upstream_request_->encodeHeaders(default_response_headers_, false);
-    // TODO(#14829) QUIC won't disconnect on invalid messaging.
-    ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
   response->waitForEndStream();
@@ -2343,17 +2334,15 @@ TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilte
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-          {":method", "POST"}, {":path", "/test/"}, {":scheme", "http"}, {":authority", "host"}});
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
   response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-
   // If a filter chain removes :status from the response headers, then Envoy must reply with
   // InternalServerError and must not crash.
-  EXPECT_EQ("500", response->headers().getStatusValue());
-  EXPECT_EQ(response->body(), "missing required header: :status");
+  ASSERT_TRUE(codec_client_->connected());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), HasSubstr("missing required header: :status"));
 }
 
 TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
@@ -2361,19 +2350,16 @@ TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "POST"}, {":path", "/test/"}, {":scheme", "http"}, {":authority", "host"}},
-      10);
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, 10);
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
   response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-
   // If a filter chain removes :status from the response headers, then Envoy must reply with
   // InternalServerError and not crash.
-  EXPECT_EQ("500", response->headers().getStatusValue());
-  EXPECT_EQ(response->body(), "missing required header: :status");
+  ASSERT_TRUE(codec_client_->connected());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), HasSubstr("missing required header: :status"));
 }
 
 } // namespace Envoy

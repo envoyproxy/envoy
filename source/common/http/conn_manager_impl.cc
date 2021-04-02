@@ -1469,12 +1469,14 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   if (!status.ok()) {
     // This branch can happen when a misbehaving filter chain removed critical headers or set
     // malformed header values.
+    // Also the bad http response status from upstream over HTTP2/3 (e.g. overflown status value)
+    // reaches here.
     const auto request_headers = requestHeaders();
     sendLocalReply(request_headers.has_value() &&
                        Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
-                   Http::Code::InternalServerError, status.message(), nullptr, absl::nullopt,
+                   Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
                    absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
-                                "{", status.message(), "}"));
+                                "protocol error: ", status.message()));
     return;
   }
   filter_manager_.streamInfo().onFirstDownstreamTxByteSent();

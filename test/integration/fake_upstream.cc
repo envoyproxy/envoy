@@ -103,7 +103,21 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
         return;
       }
     }
-    (void)encoder_.encodeHeaders(*headers_copy, end_stream);
+    const auto status = encoder_.encodeHeaders(*headers_copy, end_stream);
+    // simulate the connection manager's behavior to handle encoding failures.
+    if (!status.ok()) {
+      bool is_grpc = false;
+      {
+        // To avoid deadlock.
+        absl::MutexLock lock(&lock_);
+        is_grpc = Grpc::Common::isGrpcRequestHeaders(*headers_);
+      }
+      sendLocalReply(
+          is_grpc, Http::Code::BadGateway, absl::StrCat("protocol error: ", status.message()),
+          nullptr, absl::nullopt,
+          absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
+                       status.message(), "}"));
+    };
   });
 }
 
