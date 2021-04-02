@@ -93,8 +93,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      std::cout << "calling send local reply"
-                << "\n";
       decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
                                          absl::nullopt, RcDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
@@ -303,8 +301,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                              false};
       config_->httpContext().codeStats().chargeResponseStat(info);
     }
-    std::cout << "calling send local reply"
-              << "\n";
 
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
