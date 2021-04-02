@@ -4,16 +4,11 @@
 #include "envoy/http/codec.h"
 
 #include "common/http/codec_helper.h"
-<<<<<<< Updated upstream:source/common/quic/envoy_quic_stream.h
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
 #include "common/quic/send_buffer_monitor.h"
-=======
+#include "common/quic/envoy_quic_utils.h"
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
-#include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
->>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_stream.h
 
 namespace Envoy {
 namespace Quic {
@@ -22,30 +17,20 @@ namespace Quic {
 class EnvoyQuicStream : public virtual Http::StreamEncoder,
                         public Http::Stream,
                         public Http::StreamCallbackHelper,
-<<<<<<< Updated upstream:source/common/quic/envoy_quic_stream.h
                         public SendBufferMonitor,
-=======
                         public HeaderValidator,
->>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_stream.h
                         protected Logger::Loggable<Logger::Id::quic_stream> {
 public:
   // |buffer_limit| is the high watermark of the stream send buffer, and the low
   // watermark will be half of it.
-<<<<<<< Updated upstream:source/common/quic/envoy_quic_stream.h
   EnvoyQuicStream(uint32_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
                   std::function<void()> below_low_watermark,
-                  std::function<void()> above_high_watermark)
-      : send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
+                  std::function<void()> above_high_watermark, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
+      : http3_options_(http3_options), send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark), ENVOY_LOGGER()),
         filter_manager_connection_(filter_manager_connection) {}
 
   ~EnvoyQuicStream() override = default;
-=======
-  EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
-                  std::function<void()> above_high_watermark, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
-      :  http3_options_(http3_options), send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
-                                std::move(above_high_watermark), ENVOY_LOGGER()) {}
->>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_stream.h
 
   // Http::StreamEncoder
   Stream& getStream() override { return *this; }

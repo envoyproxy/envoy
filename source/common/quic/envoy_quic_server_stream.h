@@ -60,12 +60,10 @@ public:
 
   void clearWatermarkBuffer();
 
-<<<<<<< Updated upstream:source/common/quic/envoy_quic_server_stream.h
-=======
   // EnvoyQuicStream
   HeaderValidationResult validateHeader(const std::string& header_name,
                                                    absl::string_view header_value) override;
->>>>>>> Stashed changes:source/extensions/quic_listeners/quiche/envoy_quic_server_stream.h
+
 protected:
   // EnvoyQuicStream
   void switchStreamBlockState(bool should_block) override;
