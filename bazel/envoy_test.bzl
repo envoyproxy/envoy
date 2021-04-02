@@ -127,7 +127,7 @@ def envoy_cc_fuzz_test(
     )
 
     fuzzing_decoration(
-        base_name = name,
+        name = name,
         raw_binary = name,
         engine = "@envoy//bazel:fuzzing_engine",
         corpus = [corpus_name],
