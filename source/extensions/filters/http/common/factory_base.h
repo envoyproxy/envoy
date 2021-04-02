@@ -53,6 +53,7 @@ protected:
   FactoryBase(const std::string& name) : name_(name) {}
 
 private:
+  using Server::Configuration::NamedHttpFilterConfigFactory::isTerminalFilter;
   virtual bool isTerminalFilter(const ConfigProto&, Server::Configuration::FactoryContext&) {
     return false;
   }
