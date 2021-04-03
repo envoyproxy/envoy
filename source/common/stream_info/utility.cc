@@ -36,9 +36,11 @@ absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
 }
 
 absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
-  static const absl::flat_hash_map<std::string, ResponseFlag> map = ResponseFlagUtils::getFlagMap();
-  const auto& it = map.find(flag);
-  if (it != map.end()) {
+  // This `MapType` is introduce because CONSTRUCT_ON_FIRST_USE doesn't like template.
+  using MapType = absl::flat_hash_map<std::string, ResponseFlag>;
+  const auto& flag_map = []() { CONSTRUCT_ON_FIRST_USE(MapType, ResponseFlagUtils::getFlagMap()); }();
+  const auto& it = flag_map.find(flag);
+  if (it != flag_map.end()) {
     return absl::make_optional<ResponseFlag>(it->second);
   }
   return absl::nullopt;
