@@ -7,6 +7,10 @@ ARG USER_GID=$USER_UID
 ENV BUILD_DIR=/build
 ENV ENVOY_STDLIB=libstdc++
 
+# Obtain a copy of PGP key from https://apt.kitware.com/.
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+RUN sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update \
   && apt-get -y install --no-install-recommends libpython2.7 net-tools psmisc vim 2>&1 \
