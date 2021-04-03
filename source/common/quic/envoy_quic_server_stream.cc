@@ -151,7 +151,7 @@ if (headers == nullptr) {
     }
     return;
   }
-  if (!Http::HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
     return;
   }

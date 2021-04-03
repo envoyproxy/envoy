@@ -114,19 +114,38 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
+    name = "common",
+    srcs = [
+        "opentelemetry/proto/common/v1/common.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "common_go_proto",
+    importpath = "go.opentelemetry.io/proto/otlp/common/v1",
+    proto = ":common",
+    visibility = ["//visibility:public"],
+)
+
+# TODO(snowp): Generating one Go package from all of these protos could cause problems in the future,
+# but nothing references symbols from collector or resource so we're fine for now.
+api_cc_py_proto_library(
     name = "logs",
     srcs = [
         "opentelemetry/proto/collector/logs/v1/logs_service.proto",
-        "opentelemetry/proto/common/v1/common.proto",
         "opentelemetry/proto/logs/v1/logs.proto",
         "opentelemetry/proto/resource/v1/resource.proto",
+    ],
+    deps = [
+        "//:common",
     ],
     visibility = ["//visibility:public"],
 )
 
 go_proto_library(
     name = "logs_go_proto",
-    importpath = "logs",
+    importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
     proto = ":logs",
     visibility = ["//visibility:public"],
 )
