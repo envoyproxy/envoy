@@ -290,27 +290,37 @@ config_setting(
 bool_flag(
     name = "http3",
     build_setting_default = True,
+    visibility = ["//visibility:private"],
 )
 
 config_setting(
-    name = "disable_http3",
+    name = "disable_http3_setting",
     flag_values = {
         ":http3": "False",
     },
+    visibility = ["//visibility:private"],
+)
+
+selects.config_setting_group(
+    name = "disable_http3",
+    match_any = [
+        ":disable_http3_setting",
+        ":boringssl_fips",
+    ],
 )
 
 config_setting(
-    name = "disable_hot_restart",
+    name = "disable_hot_restart_setting",
     values = {"define": "hot_restart=disabled"},
+    visibility = ["//visibility:private"],
 )
 
-# Used to avoid conflicting selects https://github.com/bazelbuild/bazel/issues/8323
-alias(
-    name = "disable_hot_restart_or_apple",
-    actual = select({
-        ":apple": ":apple",
-        "//conditions:default": ":disable_hot_restart",
-    }),
+selects.config_setting_group(
+    name = "disable_hot_restart",
+    match_any = [
+        ":apple",
+        ":disable_hot_restart_setting",
+    ],
 )
 
 config_setting(
@@ -526,53 +536,39 @@ alias(
     }),
 )
 
-alias(
+selects.config_setting_group(
     name = "apple",
-    actual = select(
-        {
-            ":darwin": ":darwin",
-            ":darwin_x86_64": ":darwin_x86_64",
-            ":ios_arm64": ":ios_arm64",
-            ":ios_arm64e": ":ios_arm64e",
-            ":ios_armv7": ":ios_armv7",
-            ":ios_armv7s": ":ios_armv7s",
-            ":ios_i386": ":ios_i386",
-            ":ios_x86_64": ":ios_x86_64",
-            # If we're not on an apple platform return a value that will never match in the select() statement calling this
-            # since it would have already been matched above.
-            "//conditions:default": ":darwin",
-        },
-    ),
+    match_any = [
+        ":darwin",
+        ":darwin_x86_64",
+        ":ios_arm64",
+        ":ios_arm64e",
+        ":ios_armv7",
+        ":ios_armv7s",
+        ":ios_i386",
+        ":ios_x86_64",
+    ],
 )
 
-alias(
+selects.config_setting_group(
     name = "linux",
-    actual = select(
-        {
-            ":linux_x86_64": ":linux_x86_64",
-            ":linux_aarch64": ":linux_aarch64",
-            ":linux_ppc": ":linux_ppc",
-            ":linux_s390x": "linux_s390x",
-            ":linux_mips64": ":linux_mips64",
-            # If we're not on an linux platform return a value that will never match in the select() statement calling this
-            # since it would have already been matched above.
-            "//conditions:default": ":linux_x86_64",
-        },
-    ),
+    match_any = [
+        ":linux_aarch64",
+        ":linux_mips64",
+        ":linux_ppc",
+        ":linux_s390x",
+        ":linux_x86_64",
+    ],
 )
 
-alias(
+selects.config_setting_group(
     name = "x86",
-    actual = select(
-        {
-            ":darwin_x86_64": ":darwin_x86_64",
-            ":ios_x86_64": "ios_x86_64",
-            "linux_x86_64": "linux_x86_64",
-            "windows_x86_64": "windows_x86_64",
-            # If we're not on an x86 platform return a value that will never match in the select() statement calling this since it would have already been matched above.
-            "//conditions:default": ":darwin_x86_64",
-        },
-    ),
+    match_any = [
+        ":darwin_x86_64",
+        ":ios_x86_64",
+        ":linux_x86_64",
+        ":windows_x86_64",
+    ],
 )
 
 alias(
