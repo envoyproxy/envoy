@@ -680,6 +680,21 @@ public:
 
   Api::Api& api() override { return api_; }
 
+  ProcessContextOptRef processContext() override {
+    // TODO(yanavlasov): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override {
+    // TODO(yanavlasov): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  Stats::Scope& listenerScope() override {
+    // TODO(yanavlasov): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
 private:
   Server::Admin& admin_;
   Stats::Scope& stats_scope_;

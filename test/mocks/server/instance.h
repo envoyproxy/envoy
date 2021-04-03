@@ -165,6 +165,9 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
+  MOCK_METHOD(ProcessContextOptRef, processContext, (), ());
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
+  MOCK_METHOD(Stats::Scope&, listenerScope, (), ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

@@ -208,6 +208,11 @@ public:
                ? server_.messageValidationContext().dynamicValidationVisitor()
                : server_.messageValidationContext().staticValidationVisitor();
   }
+  ProcessContextOptRef processContext() override { return server_.processContext(); }
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  Stats::Scope& listenerScope() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   Instance& server_;

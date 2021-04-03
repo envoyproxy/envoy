@@ -133,6 +133,23 @@ public:
    *         the server will start listening.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return ProcessContextOptRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
+   */
+  virtual ProcessContextOptRef processContext() PURE;
+
+  /**
+   * @return Stats::Scope& the listener's stats scope.
+   */
+  virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
 };
 
 /**
@@ -202,17 +219,6 @@ public:
   virtual bool healthCheckFailed() PURE;
 
   /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
-
-  /**
    * @return OverloadManager& the overload manager for the server.
    */
   virtual OverloadManager& overloadManager() PURE;
@@ -231,12 +237,6 @@ public:
    * @return Router::Context& a reference to the router context.
    */
   virtual Router::Context& routerContext() PURE;
-
-  /**
-   * @return ProcessContextOptRef an optional reference to the
-   * process context. Will be unset when running in validation mode.
-   */
-  virtual ProcessContextOptRef processContext() PURE;
 };
 
 /**
