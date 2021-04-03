@@ -496,7 +496,8 @@ private:
   void sendNoHealthyUpstreamResponse();
   bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                const Http::HeaderEntry& internal_redirect);
+                                                const Http::HeaderEntry& internal_redirect,
+                                                uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();

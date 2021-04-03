@@ -1488,13 +1488,15 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstreamTiming().last_upstream_rx_byte_received_ && downstream_end_stream_;
 
+  const uint64_t status_code = Http::Utility::getResponseStatus(headers);
+
   // Redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       ((Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body") &&
         !request_buffer_overflowed_) ||
        !callbacks_->decodingBuffer()) &&
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location) &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
       callbacks_->recreateStream(&headers)) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
@@ -1508,7 +1510,8 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
 }
 
 bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                      const Http::HeaderEntry& internal_redirect) {
+                                                      const Http::HeaderEntry& internal_redirect,
+                                                      uint64_t status_code) {
   if (!downstream_headers.Path()) {
     ENVOY_STREAM_LOG(trace, "no path in downstream_headers", *callbacks_);
     return false;
@@ -1585,6 +1588,12 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
                        route_name, predicate->name());
       return false;
     }
+  }
+
+  // See https://tools.ietf.org/html/rfc7231#section-6.4.4.
+  if (status_code == enumToInt(Http::Code::SeeOther)) {
+    downstream_headers.setMethod(Http::Headers::get().MethodValues.Get);
+    callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
   }
 
   num_internal_redirect.increment();
