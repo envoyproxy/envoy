@@ -43,18 +43,17 @@ public:
     absl::optional<uint64_t> hash;
 
     const auto header = headers.get(header_name_);
-    bool check_multiple_values =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values");
-
     if (!header.empty()) {
+      bool check_multiple_values =
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values");
       absl::InlinedVector<std::string, 1> rewritten_header_values;
-      std::vector<absl::string_view> header_values;
+      absl::InlinedVector<absl::string_view, 1> header_values;
 
       size_t header_size = 1;
       if (check_multiple_values) {
         header_size = header.size();
+        header_values.reserve(header_size);
       }
-      header_values.reserve(header_size);
 
       for (size_t i = 0; i < header_size; i++) {
         header_values.push_back(header[i]->value().getStringView());
@@ -73,7 +72,7 @@ public:
         // Ensure generating same hash value for different order header values.
         // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
         std::sort(header_values.begin(), header_values.end());
-        absl::Hash<const std::vector<absl::string_view>> hasher;
+        absl::Hash<const absl::InlinedVector<absl::string_view, 1>> hasher;
         hash = hasher(header_values);
       } else {
         hash = HashUtil::xxHash64(header_values[0]);
