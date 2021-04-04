@@ -3,8 +3,8 @@
 FAQ
 ===
 
-Build
------
+构建
+-------
 
 .. toctree::
   :maxdepth: 2
@@ -29,8 +29,8 @@ API
 
 .. _faq_overview_debug:
 
-Debugging
----------
+调试
+--------
 .. toctree::
   :maxdepth: 2
 
@@ -40,8 +40,8 @@ Debugging
   debugging/why_is_envoy_sending_413s
   debugging/why_is_my_route_not_found
 
-Performance
------------
+性能
+--------
 
 .. toctree::
   :maxdepth: 2
@@ -49,8 +49,8 @@ Performance
   performance/how_fast_is_envoy
   performance/how_to_benchmark_envoy
 
-Configuration
--------------
+配置
+---------
 
 .. toctree::
   :maxdepth: 2
@@ -65,8 +65,8 @@ Configuration
   configuration/deprecation
   configuration/resource_limits
 
-Load balancing
---------------
+负载均衡
+-------------
 
 .. toctree::
   :maxdepth: 2
@@ -77,7 +77,7 @@ Load balancing
   load_balancing/transient_failures
   load_balancing/region_failover
 
-Extensions
+扩展
 ----------
 
 .. toctree::
