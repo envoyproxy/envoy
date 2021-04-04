@@ -2,7 +2,9 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.base.checker import Checker, CheckerSummary, ForkingChecker
+from tools.base.checker import (
+    BazelChecker, BazelRunError,
+    Checker, CheckerSummary, ForkingChecker)
 
 
 class DummyChecker(Checker):
@@ -35,6 +37,27 @@ def test_checker_constructor():
         list(m_super.call_args)
         == [('path1', 'path2', 'path3'), {}])
     assert checker.summary_class == CheckerSummary
+
+
+def test_checker_constructor():
+    checker = Checker("path1", "path2", "path3")
+    assert checker._args == ("path1", "path2", "path3")
+    assert checker.summary_class == CheckerSummary
+
+
+def test_checker_args():
+    checker = Checker("path1", "path2", "path3")
+    parser_mock = patch(
+        "tools.base.checker.Checker.parser",
+        new_callable=PropertyMock)
+
+    with parser_mock as m_parser:
+        assert checker.args == m_parser.return_value.parse_args.return_value
+
+    assert (
+        list(m_parser.return_value.parse_args.call_args)
+        == [(('path1', 'path2', 'path3'),), {}])
+    assert "args" in checker.__dict__
 
 
 def test_checker_diff():
@@ -269,6 +292,13 @@ def test_checker_add_arguments():
              {'action': 'store_true',
               'default': False,
               'help': 'Display a diff in the console where available'}],
+<<<<<<< HEAD
+=======
+            [('--recurse', '-r'),
+             {'choices': ['yes', 'no'],
+              'default': 'yes',
+              'help': 'Recurse path or paths directories'}],
+>>>>>>> 303261629 (python: Integrate linting/utils/tests)
             [('--warning', '-w'),
              {'choices': ['warn', 'error'],
               'default': 'warn',
@@ -509,6 +539,118 @@ def test_forkingchecker_fork():
         list(m_fork.call_args)
         == [(checker,), {}])
     assert "fork" in checker.__dict__
+
+
+@pytest.mark.parametrize("args", [(), ("a", "b")])
+@pytest.mark.parametrize("cwd", [None, "NONE", "PATH"])
+@pytest.mark.parametrize("capture_output", ["NONE", True, False])
+def test_forkingchecker_fork(patches, args, cwd, capture_output):
+    checker = ForkingChecker("path1", "path2", "path3")
+    patched = patches(
+        "subprocess.run",
+        ("Checker.path", dict(new_callable=PropertyMock)),
+        prefix="tools.base.checker")
+
+    with patched as (m_run, m_path):
+        kwargs = {}
+        if cwd != "NONE":
+            kwargs["cwd"] = cwd
+        if capture_output != "NONE":
+            kwargs["capture_output"] = capture_output
+        assert checker.fork(*args, **kwargs) == m_run.return_value
+
+    expected = {'capture_output': True, 'cwd': cwd}
+    if capture_output is False:
+        expected["capture_output"] = False
+    if cwd == "NONE":
+        expected["cwd"] = m_path.return_value
+    assert (
+        list(m_run.call_args)
+        == [args, expected])
+
+
+# BazelChecker tests
+
+@pytest.mark.parametrize("returns", [0, 1])
+def test_bazelchecker_bazel_query(returns):
+    checker = BazelChecker("path1", "path2", "path3")
+    fork_mock = patch("tools.base.checker.ForkingChecker.fork")
+
+    with fork_mock as m_fork:
+        m_fork.return_value.returncode = returns
+        if returns:
+            with pytest.raises(BazelRunError) as e:
+                checker.bazel_query("QUERY")
+            assert (
+                e.value.args
+                == (f"Bazel query failed: {m_fork.return_value}",))
+        else:
+            result = checker.bazel_query("QUERY")
+    assert (
+        list(m_fork.call_args)
+        == [(['bazel', 'query', "'QUERY'"],), {}])
+    if returns:
+        return
+    assert (
+        result
+        == m_fork.return_value.stdout.decode.return_value.split.return_value)
+    assert (
+        list(m_fork.return_value.stdout.decode.call_args)
+        == [('utf-8',), {}])
+    assert (
+        list(m_fork.return_value.stdout.decode.return_value.split.call_args)
+        == [('\n',), {}])
+
+
+@pytest.mark.parametrize("args", [(), ("foo", ), ("foo", "bar", "baz")])
+@pytest.mark.parametrize("raises", [None, True, False])
+@pytest.mark.parametrize("returns", [0, 1])
+@pytest.mark.parametrize("cwd", [None, "", "PATH"])
+@pytest.mark.parametrize("capture_output", [None, True, False])
+def test_bazelchecker_bazel_run(patches, args, raises, returns, cwd, capture_output):
+    checker = BazelChecker("path1", "path2", "path3")
+    patched = patches(
+        "ForkingChecker.fork",
+        ("Checker.path", dict(new_callable=PropertyMock)),
+        prefix="tools.base.checker")
+
+    with patched as (m_fork, m_path):
+        m_fork.return_value.returncode = returns
+        kwargs = {}
+        if cwd is not None:
+            kwargs["cwd"] = cwd
+        if raises is not None:
+            kwargs["raises"] = raises
+        if capture_output is not None:
+            kwargs["capture_output"] = capture_output
+
+        if raises is False or not returns:
+            assert (
+                checker.bazel_run("TARGET", *args, **kwargs)
+                == m_fork.return_value)
+        else:
+            with pytest.raises(BazelRunError) as e:
+                checker.bazel_run("TARGET", *args, **kwargs)
+            assert (
+                e.value.args
+                == (f"Bazel run failed: {m_fork.return_value}",))
+    _cwd = (
+        m_path.return_value
+        if not cwd
+        else cwd)
+    _capture_output = (
+        False
+        if not capture_output
+        else capture_output)
+    _args = (
+        ('bazel', 'run', 'TARGET', '--') + args
+        if args
+        else ('bazel', 'run', 'TARGET'))
+    assert (
+        list(m_fork.call_args)
+        == [(_args,),
+            {'capture_output': _capture_output,
+             'cwd': _cwd}])
 
 
 # CheckerSummary tests

@@ -51,6 +51,19 @@ py_binary(
     srcs = ["pip_check.py"],
     visibility = ["//visibility:public"],
     deps = [
+        "//tools/base:checker",
         requirement("PyYaml"),
+    ],
+)
+
+py_binary(
+    name = "pytest_pip_check",
+    srcs = [
+        "pytest_pip_check.py",
+        "tests/test_pip_check.py",
+    ],
+    deps = [
+        ":pip_check",
+        "//tools/testing:python_pytest",
     ],
 )

@@ -22,3 +22,15 @@ envoy_py_binary(
         requirement("yapf"),
     ],
 )
+
+py_binary(
+    name = "pytest_python_check",
+    srcs = [
+        "pytest_python_check.py",
+        "tests/test_python_check.py",
+    ],
+    deps = [
+        ":python_check",
+        "//tools/testing:python_pytest",
+    ],
+)

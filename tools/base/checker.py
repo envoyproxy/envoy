@@ -6,6 +6,10 @@ from typing import Sequence, Tuple, Type
 from tools.base import runner
 
 
+class BazelRunError(Exception):
+    pass
+
+
 class Checker(runner.Runner):
     """Runs check methods prefixed with `check_` and named in `self.checks`
 
@@ -19,6 +23,11 @@ class Checker(runner.Runner):
         self.success = {}
         self.errors = {}
         self.warnings = {}
+
+    @cached_property
+    def args(self) -> argparse.Namespace:
+        """Parsed args"""
+        return self.parser.parse_args(self._args)
 
     @property
     def diff(self) -> bool:
@@ -227,6 +236,31 @@ class ForkingChecker(Checker):
     @cached_property
     def fork(self):
         return runner.ForkingAdapter(self)
+
+
+class BazelChecker(ForkingChecker):
+
+    def bazel_query(self, query: str) -> list:
+        """Run a bazel query and return stdout as list of lines"""
+        resp = self.fork(["bazel", "query", f"'{query}'"])
+        if resp.returncode:
+            raise BazelRunError(f"Bazel query failed: {resp}")
+        return resp.stdout.decode("utf-8").split("\n")
+
+    def bazel_run(
+            self,
+            target: str,
+            *args,
+            capture_output: bool = False,
+            cwd: str = "",
+            raises: bool = True) -> subprocess.CompletedProcess:
+        """Run a bazel target and return the subprocess response"""
+        args = (("--",) + args) if args else args
+        bazel_args = ("bazel", "run", target) + args
+        resp = self.fork(bazel_args, capture_output=capture_output, cwd=cwd or self.path)
+        if resp.returncode and raises:
+            raise BazelRunError(f"Bazel run failed: {resp}")
+        return resp
 
 
 class CheckerSummary(object):
