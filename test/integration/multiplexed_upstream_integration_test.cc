@@ -245,7 +245,6 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
-  EXCLUDE_UPSTREAM_HTTP3; // Upper stream buffer limit is reached before response body is delivered.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
@@ -256,7 +255,6 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
-  EXCLUDE_UPSTREAM_HTTP3; // Upper stream buffer limit is reached before response body is delivered.
   use_alpn_ = true;
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
@@ -311,13 +309,13 @@ TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
-  EXCLUDE_UPSTREAM_HTTP3; // Upper stream buffer limit is reached before response body is delivered.
+  EXCLUDE_UPSTREAM_HTTP3; // quic_stream_sequencer.cc:235 CHECK failed: !blocked_.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
-  EXCLUDE_UPSTREAM_HTTP3; // Upper stream buffer limit is reached before response body is delivered.
+  EXCLUDE_UPSTREAM_HTTP3; // fails: no 200s.
   config_helper_.addFilter(
       fmt::format(R"EOF(
   name: pause-filter{}
@@ -329,7 +327,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
 }
 
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
-  EXCLUDE_UPSTREAM_HTTP3; // Upper stream buffer limit is reached before response body is delivered.
+  EXCLUDE_UPSTREAM_HTTP3;                     // Close loop.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
   std::vector<Http::RequestEncoder*> encoders;
