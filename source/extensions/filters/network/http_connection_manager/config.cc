@@ -24,9 +24,8 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/settings.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http3/quic_codec_factory.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/local_reply/local_reply.h"
@@ -36,6 +35,10 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/codec_impl.h"
+#endif
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -207,8 +210,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
-      http1_settings_(Http::Utility::parseHttp1Settings(
-          config.http_protocol_options(), config.stream_error_on_invalid_http_message(),
+      http1_settings_(Http::Http1::parseHttp1Settings(
+          config.http_protocol_options(), context.messageValidationVisitor(),
+          config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
@@ -456,7 +460,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       HTTP3:
+#ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
+#else
+    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+#endif
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -568,6 +576,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
                                              factory->isTerminalFilter(),
                                              last_filter_in_current_config);
   }
+
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
       config_discovery, name, context_, stats_prefix_);
   filter_factories.push_back(std::move(filter_config_provider));
@@ -592,14 +601,13 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   case CodecType::HTTP3:
-    // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
-    // TODO(danzh) Add support to get the factory name from config, possibly
-    // from HttpConnectionManager protobuf. This is not essential till there are multiple
-    // implementations of QUIC.
-    return std::unique_ptr<Http::ServerConnection>(
-        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(connection, callbacks));
+#ifdef ENVOY_ENABLE_QUIC
+    return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),

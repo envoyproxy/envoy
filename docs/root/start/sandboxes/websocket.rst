@@ -8,7 +8,7 @@ WebSockets
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`openssl <start_sandboxes_setup_openssl>`
-	Generate ``SSL`` keys and certificates.
+        Generate ``SSL`` keys and certificates.
 
 This example walks through some of the ways that Envoy can be configured to proxy WebSockets.
 

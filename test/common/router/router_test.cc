@@ -4688,8 +4688,8 @@ private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
 };
 
-// Verifies that we propagate the upstream connection filter state to the upstream request filter
-// state.
+// Verifies that we propagate the upstream connection filter state to the upstream and downstream
+// request filter state.
 TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -4721,10 +4721,12 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   EXPECT_TRUE(filter_state_verified);
+  EXPECT_TRUE(callbacks_.streamInfo().upstreamFilterState()->hasDataWithName("upstream data"));
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {

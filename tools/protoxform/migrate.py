@@ -14,15 +14,15 @@ from udpa.annotations import status_pb2
 from google.api import annotations_pb2
 
 ENVOY_API_TYPE_REGEX_STR = 'envoy_api_(msg|enum_value|field|enum)_([\w\.]+)'
-ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<%s>|:ref:`%s`' %
-                                           (ENVOY_API_TYPE_REGEX_STR, ENVOY_API_TYPE_REGEX_STR))
+ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile(
+    '<%s>|:ref:`%s`' % (ENVOY_API_TYPE_REGEX_STR, ENVOY_API_TYPE_REGEX_STR))
 
 
 class UpgradeVisitor(visitor.Visitor):
     """Visitor to generate an upgraded proto from a FileDescriptor proto.
 
-  See visitor.Visitor for visitor method docs comments.
-  """
+    See visitor.Visitor for visitor method docs comments.
+    """
 
     def __init__(self, n, typedb, envoy_internal_shadow, package_version_status):
         self._base_version = n
@@ -68,8 +68,8 @@ class UpgradeVisitor(visitor.Visitor):
                     residual = 'host_rewrite_literal'
                 elif residual == 'auto_host_rewrite_header':
                     residual = 'auto_host_rewrite'
-            new_ref = 'envoy_api_%s_%s%s' % (ref_type, repl_type,
-                                             '.' + residual if residual else '')
+            new_ref = 'envoy_api_%s_%s%s' % (
+                ref_type, repl_type, '.' + residual if residual else '')
             if label_ref_type is not None:
                 return '<%s>' % new_ref
             else:
@@ -98,10 +98,10 @@ class UpgradeVisitor(visitor.Visitor):
     def _deprecate(self, proto, field_or_value):
         """Deprecate a field or value in a message/enum proto.
 
-    Args:
-      proto: DescriptorProto or EnumDescriptorProto message.
-      field_or_value: field or value inside proto.
-    """
+        Args:
+            proto: DescriptorProto or EnumDescriptorProto message.
+            field_or_value: field or value inside proto.
+        """
         if self._envoy_internal_shadow:
             field_or_value.name = 'hidden_envoy_deprecated_' + field_or_value.name
         else:
@@ -114,10 +114,10 @@ class UpgradeVisitor(visitor.Visitor):
     def _rename(self, proto, migrate_annotation):
         """Rename a field/enum/service/message
 
-    Args:
-      proto: DescriptorProto or corresponding proto message
-      migrate_annotation: udpa.annotations.MigrateAnnotation message
-    """
+        Args:
+            proto: DescriptorProto or corresponding proto message
+            migrate_annotation: udpa.annotations.MigrateAnnotation message
+        """
         if migrate_annotation.rename:
             proto.name = migrate_annotation.rename
             migrate_annotation.rename = ""
@@ -125,11 +125,11 @@ class UpgradeVisitor(visitor.Visitor):
     def _oneof_promotion(self, msg_proto, field_proto, migrate_annotation):
         """Promote a field to a oneof.
 
-    Args:
-      msg_proto: DescriptorProto for message containing field.
-      field_proto: FieldDescriptorProto for field.
-      migrate_annotation: udpa.annotations.FieldMigrateAnnotation message
-    """
+        Args:
+            msg_proto: DescriptorProto for message containing field.
+            field_proto: FieldDescriptorProto for field.
+            migrate_annotation: udpa.annotations.FieldMigrateAnnotation message
+        """
         if migrate_annotation.oneof_promotion:
             oneof_index = -1
             for n, oneof_decl in enumerate(msg_proto.oneof_decl):
@@ -244,15 +244,15 @@ class UpgradeVisitor(visitor.Visitor):
 def version_upgrade_xform(n, envoy_internal_shadow, file_proto, params):
     """Transform a FileDescriptorProto from vN[alpha\d] to v(N+1).
 
-  Args:
-    n: version N to upgrade from.
-    envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.
-    file_proto: vN[alpha\d] FileDescriptorProto message.
-    params: plugin parameters.
+    Args:
+        n: version N to upgrade from.
+        envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.
+        file_proto: vN[alpha\d] FileDescriptorProto message.
+        params: plugin parameters.
 
-  Returns:
-    v(N+1) FileDescriptorProto message.
-  """
+    Returns:
+        v(N+1) FileDescriptorProto message.
+    """
     # Load type database.
     if params['type_db_path']:
         utils.load_type_db(params['type_db_path'])

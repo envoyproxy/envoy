@@ -44,197 +44,192 @@ using ElementVec = absl::InlinedVector<Element, 8>;
 /**
  * Common stats utility routines.
  */
-class Utility {
-public:
-  /**
-   * ':' is a reserved char in statsd. Do a character replacement to avoid
-   * costly inline translations later.
-   *
-   * @param name the stat name to sanitize.
-   * @return the sanitized stat name.
-   */
-  static std::string sanitizeStatsName(absl::string_view name);
+namespace Utility {
+/**
+ * ':' is a reserved char in statsd. Do a character replacement to avoid
+ * costly inline translations later.
+ *
+ * @param name the stat name to sanitize.
+ * @return the sanitized stat name.
+ */
+std::string sanitizeStatsName(absl::string_view name);
 
-  /**
-   * Finds a metric tag with the specified name.
-   *
-   * @param metric The metric in which the tag is expected to exist.
-   * @param find_tag_name The name of the tag to search for.
-   * @return The value of the tag, if found.
-   */
-  static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
+/**
+ * Finds a metric tag with the specified name.
+ *
+ * @param metric The metric in which the tag is expected to exist.
+ * @param find_tag_name The name of the tag to search for.
+ * @return The value of the tag, if found.
+ */
+absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
 
-  /**
-   * Creates a nested scope from a vector of tokens which are used to create the
-   * name. The tokens can be specified as DynamicName or StatName. For
-   * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * See also scopeFromStatNames, which is slightly faster but does not allow
-   * passing DynamicName(string)s as names.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @return A scope named using the joined elements.
-   */
-  static ScopePtr scopeFromElements(Scope& scope, const ElementVec& elements);
+/**
+ * Creates a nested scope from a vector of tokens which are used to create the
+ * name. The tokens can be specified as DynamicName or StatName. For
+ * tokens specified as DynamicName, a dynamic StatName will be created. See
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
+ * for more detail on why symbolic StatNames are preferred when possible.
+ *
+ * See also scopeFromStatNames, which is slightly faster but does not allow
+ * passing DynamicName(string)s as names.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @return A scope named using the joined elements.
+ */
+ScopePtr scopeFromElements(Scope& scope, const ElementVec& elements);
 
-  /**
-   * Creates a nested scope from a vector of StatNames which are used to create the
-   * name.
-   *
-   * See also scopeFromElements, which is slightly slower but allows
-   * passing DynamicName(string)s as names.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @return A scope named using the joined elements.
-   */
-  static ScopePtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
+/**
+ * Creates a nested scope from a vector of StatNames which are used to create the
+ * name.
+ *
+ * See also scopeFromElements, which is slightly slower but allows
+ * passing DynamicName(string)s as names.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @return A scope named using the joined elements.
+ */
+ScopePtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
 
-  /**
-   * Creates a counter from a vector of tokens which are used to create the
-   * name. The tokens can be specified as DynamicName or StatName. For
-   * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * See also counterFromStatNames, which is slightly faster but does not allow
-   * passing DynamicName(string)s as names.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @param tags optionally specified tags.
-   * @return A counter named using the joined elements.
-   */
-  static Counter& counterFromElements(Scope& scope, const ElementVec& elements,
-                                      StatNameTagVectorOptConstRef tags = absl::nullopt);
+/**
+ * Creates a counter from a vector of tokens which are used to create the
+ * name. The tokens can be specified as DynamicName or StatName. For
+ * tokens specified as DynamicName, a dynamic StatName will be created. See
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
+ * for more detail on why symbolic StatNames are preferred when possible.
+ *
+ * See also counterFromStatNames, which is slightly faster but does not allow
+ * passing DynamicName(string)s as names.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param tags optionally specified tags.
+ * @return A counter named using the joined elements.
+ */
+Counter& counterFromElements(Scope& scope, const ElementVec& elements,
+                             StatNameTagVectorOptConstRef tags = absl::nullopt);
 
-  /**
-   * Creates a counter from a vector of tokens which are used to create the
-   * name. The tokens must be of type StatName.
-   *
-   * See also counterFromElements, which is slightly slower, but allows
-   * passing DynamicName(string)s as elements.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param names The vector of StatNames
-   * @param tags optionally specified tags.
-   * @return A counter named using the joined elements.
-   */
-  static Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
-                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
+/**
+ * Creates a counter from a vector of tokens which are used to create the
+ * name. The tokens must be of type StatName.
+ *
+ * See also counterFromElements, which is slightly slower, but allows
+ * passing DynamicName(string)s as elements.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param names The vector of StatNames
+ * @param tags optionally specified tags.
+ * @return A counter named using the joined elements.
+ */
+Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
+                              StatNameTagVectorOptConstRef tags = absl::nullopt);
 
-  /**
-   * Creates a gauge from a vector of tokens which are used to create the
-   * name. The tokens can be specified as DynamicName or StatName. For
-   * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * See also gaugeFromStatNames, which is slightly faster but does not allow
-   * passing DynamicName(string)s as names.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @param import_mode Whether hot-restart should accumulate this value.
-   * @param tags optionally specified tags.
-   * @return A gauge named using the joined elements.
-   */
-  static Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements,
-                                  Gauge::ImportMode import_mode,
+/**
+ * Creates a gauge from a vector of tokens which are used to create the
+ * name. The tokens can be specified as DynamicName or StatName. For
+ * tokens specified as DynamicName, a dynamic StatName will be created. See
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
+ * for more detail on why symbolic StatNames are preferred when possible.
+ *
+ * See also gaugeFromStatNames, which is slightly faster but does not allow
+ * passing DynamicName(string)s as names.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param import_mode Whether hot-restart should accumulate this value.
+ * @param tags optionally specified tags.
+ * @return A gauge named using the joined elements.
+ */
+Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements, Gauge::ImportMode import_mode,
+                         StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+/**
+ * Creates a gauge from a vector of tokens which are used to create the
+ * name. The tokens must be of type StatName.
+ *
+ * See also gaugeFromElements, which is slightly slower, but allows
+ * passing DynamicName(string)s as elements.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param names The vector of StatNames
+ * @param import_mode Whether hot-restart should accumulate this value.
+ * @param tags optionally specified tags.
+ * @return A gauge named using the joined elements.
+ */
+Gauge& gaugeFromStatNames(Scope& scope, const StatNameVec& elements, Gauge::ImportMode import_mode,
+                          StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+/**
+ * Creates a histogram from a vector of tokens which are used to create the
+ * name. The tokens can be specified as DynamicName or StatName. For
+ * tokens specified as DynamicName, a dynamic StatName will be created. See
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
+ * for more detail on why symbolic StatNames are preferred when possible.
+ *
+ * See also histogramFromStatNames, which is slightly faster but does not allow
+ * passing DynamicName(string)s as names.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param unit The unit of measurement.
+ * @param tags optionally specified tags.
+ * @return A histogram named using the joined elements.
+ */
+Histogram& histogramFromElements(Scope& scope, const ElementVec& elements, Histogram::Unit unit,
+                                 StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+/**
+ * Creates a histogram from a vector of tokens which are used to create the
+ * name. The tokens must be of type StatName.
+ *
+ * See also histogramFromElements, which is slightly slower, but allows
+ * passing DynamicName(string)s as elements.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param unit The unit of measurement.
+ * @param tags optionally specified tags.
+ * @return A histogram named using the joined elements.
+ */
+Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, Histogram::Unit unit,
                                   StatNameTagVectorOptConstRef tags = absl::nullopt);
 
-  /**
-   * Creates a gauge from a vector of tokens which are used to create the
-   * name. The tokens must be of type StatName.
-   *
-   * See also gaugeFromElements, which is slightly slower, but allows
-   * passing DynamicName(string)s as elements.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param names The vector of StatNames
-   * @param import_mode Whether hot-restart should accumulate this value.
-   * @param tags optionally specified tags.
-   * @return A gauge named using the joined elements.
-   */
-  static Gauge& gaugeFromStatNames(Scope& scope, const StatNameVec& elements,
-                                   Gauge::ImportMode import_mode,
-                                   StatNameTagVectorOptConstRef tags = absl::nullopt);
+/**
+ * Creates a TextReadout from a vector of tokens which are used to create the
+ * name. The tokens can be specified as DynamicName or StatName. For
+ * tokens specified as DynamicName, a dynamic StatName will be created. See
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
+ * for more detail on why symbolic StatNames are preferred when possible.
+ *
+ * See also TextReadoutFromStatNames, which is slightly faster but does not allow
+ * passing DynamicName(string)s as names.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param unit The unit of measurement.
+ * @param tags optionally specified tags.
+ * @return A TextReadout named using the joined elements.
+ */
+TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
+                                     StatNameTagVectorOptConstRef tags = absl::nullopt);
 
-  /**
-   * Creates a histogram from a vector of tokens which are used to create the
-   * name. The tokens can be specified as DynamicName or StatName. For
-   * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * See also histogramFromStatNames, which is slightly faster but does not allow
-   * passing DynamicName(string)s as names.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @param unit The unit of measurement.
-   * @param tags optionally specified tags.
-   * @return A histogram named using the joined elements.
-   */
-  static Histogram& histogramFromElements(Scope& scope, const ElementVec& elements,
-                                          Histogram::Unit unit,
-                                          StatNameTagVectorOptConstRef tags = absl::nullopt);
-
-  /**
-   * Creates a histogram from a vector of tokens which are used to create the
-   * name. The tokens must be of type StatName.
-   *
-   * See also histogramFromElements, which is slightly slower, but allows
-   * passing DynamicName(string)s as elements.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @param unit The unit of measurement.
-   * @param tags optionally specified tags.
-   * @return A histogram named using the joined elements.
-   */
-  static Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements,
-                                           Histogram::Unit unit,
-                                           StatNameTagVectorOptConstRef tags = absl::nullopt);
-
-  /**
-   * Creates a TextReadout from a vector of tokens which are used to create the
-   * name. The tokens can be specified as DynamicName or StatName. For
-   * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
-   * for more detail on why symbolic StatNames are preferred when possible.
-   *
-   * See also TextReadoutFromStatNames, which is slightly faster but does not allow
-   * passing DynamicName(string)s as names.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @param unit The unit of measurement.
-   * @param tags optionally specified tags.
-   * @return A TextReadout named using the joined elements.
-   */
-  static TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
-                                              StatNameTagVectorOptConstRef tags = absl::nullopt);
-
-  /**
-   * Creates a TextReadout from a vector of tokens which are used to create the
-   * name. The tokens must be of type StatName.
-   *
-   * See also TextReadoutFromElements, which is slightly slower, but allows
-   * passing DynamicName(string)s as elements.
-   *
-   * @param scope The scope in which to create the counter.
-   * @param elements The vector of mixed DynamicName and StatName
-   * @param unit The unit of measurement.
-   * @param tags optionally specified tags.
-   * @return A TextReadout named using the joined elements.
-   */
-  static TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
-                                               StatNameTagVectorOptConstRef tags = absl::nullopt);
-};
+/**
+ * Creates a TextReadout from a vector of tokens which are used to create the
+ * name. The tokens must be of type StatName.
+ *
+ * See also TextReadoutFromElements, which is slightly slower, but allows
+ * passing DynamicName(string)s as elements.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param unit The unit of measurement.
+ * @param tags optionally specified tags.
+ * @return A TextReadout named using the joined elements.
+ */
+TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
+                                      StatNameTagVectorOptConstRef tags = absl::nullopt);
+} // namespace Utility
 
 /**
  * Holds a reference to a stat by name. Note that the stat may not be created

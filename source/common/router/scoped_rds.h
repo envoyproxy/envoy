@@ -224,11 +224,12 @@ private:
   // For creating RDS subscriptions.
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
+  // Stats must outlive subscription.
+  Stats::ScopePtr scope_;
+  ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ScopeKeyBuilder scope_key_builder_;
-  Stats::ScopePtr scope_;
-  ScopedRdsStats stats_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;

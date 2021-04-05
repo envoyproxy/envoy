@@ -104,6 +104,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   // Any time an associated connection is destroyed, it increments both counters.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  tcp_client2->close();
 }
 
 // Test TLS upstream.

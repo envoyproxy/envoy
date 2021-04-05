@@ -8,6 +8,15 @@
 
 namespace Envoy {
 namespace ConnectionPool {
+namespace {
+[[maybe_unused]] ssize_t connectingCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
+  ssize_t ret = 0;
+  for (const auto& client : connecting_clients) {
+    ret += client->effectiveConcurrentStreamLimit();
+  }
+  return ret;
+}
+} // namespace
 
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
@@ -116,6 +125,7 @@ ConnPoolImplBase::ConnectionResult
 ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   // There are already enough CONNECTING connections for the number of queued streams.
   if (!shouldCreateNewConnection(global_preconnect_ratio)) {
+    ENVOY_LOG(trace, "not creating a new connection, shouldCreateNewConnection returned false.");
     return ConnectionResult::ShouldNotConnect;
   }
 
@@ -136,7 +146,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
            client->effectiveConcurrentStreamLimit());
     ASSERT(client->real_host_description_);
     // Increase the connecting capacity to reflect the streams this connection can serve.
-    state_.incrConnectingStreamCapacity(client->effectiveConcurrentStreamLimit());
+    state_.incrConnectingAndConnectedStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
     LinkedList::moveIntoList(std::move(client), owningList(client->state_));
     return can_create_connection ? ConnectionResult::CreatedNewConnection
@@ -170,7 +180,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
     }
 
     // Decrement the capacity, as there's one less stream available for serving.
-    state_.decrConnectingStreamCapacity(1);
+    state_.decrConnectingAndConnectedStreamCapacity(1);
     // Track the new active stream.
     state_.incrActiveStreams(1);
     num_active_streams_++;
@@ -200,7 +210,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // increment as no capacity is freed up.
   if (client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1 ||
       had_negative_capacity) {
-    state_.incrConnectingStreamCapacity(1);
+    state_.incrConnectingAndConnectedStreamCapacity(1);
   }
   if (client.state_ == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
@@ -214,6 +224,8 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
+  ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
+         connectingCapacity(connecting_clients_)); // O(n) debug check.
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing connection", client);
@@ -226,6 +238,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     ConnectionPool::Cancellable* pending = newPendingStream(context);
     ENVOY_LOG(debug, "trying to create new connection");
+    ENVOY_LOG(trace, fmt::format("{}", *this));
 
     auto old_capacity = connecting_stream_capacity_;
     // This must come after newPendingStream() because this function uses the
@@ -372,7 +385,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    state_.decrConnectingStreamCapacity(client.currentUnusedCapacity());
+    state_.decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity());
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.

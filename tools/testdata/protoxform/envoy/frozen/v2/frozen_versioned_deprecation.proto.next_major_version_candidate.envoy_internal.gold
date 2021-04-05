@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.frozen.v3;
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.frozen.v3";
+option java_outer_classname = "FrozenVersionedDeprecationProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+
+message FrozenVersionedDeprecation {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.frozen.v2.FrozenVersionedDeprecation";
+
+  int32 foo = 1;
+
+  int32 hidden_envoy_deprecated_bar = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
+
+  int32 hidden_envoy_deprecated_baz = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.5"];
+}

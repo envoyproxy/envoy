@@ -287,9 +287,9 @@ typed_config:
       end
       request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
       request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
-      request_handle:headers():add("request_downstream_local_address_value", 
+      request_handle:headers():add("request_downstream_local_address_value",
         request_handle:streamInfo():downstreamLocalAddress())
-      request_handle:headers():add("request_downstream_directremote_address_value", 
+      request_handle:headers():add("request_downstream_directremote_address_value",
         request_handle:streamInfo():downstreamDirectRemoteAddress())
       request_handle:headers():add("request_requested_server_name",
         request_handle:streamInfo():requestedServerName())

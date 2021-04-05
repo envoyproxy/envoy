@@ -19,7 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
-  InstanceImpl() { Thread::MainThread::init(); }
+  InstanceImpl() { Thread::MainThread::initMainThread(); }
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
