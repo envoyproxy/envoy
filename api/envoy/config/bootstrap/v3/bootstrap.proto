@@ -21,6 +21,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -187,7 +188,8 @@ message Bootstrap {
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
   // Deprecated in favor of *watchdogs* which has finer granularity.
-  Watchdog watchdog = 8 [deprecated = true];
+  Watchdog watchdog = 8
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
@@ -199,7 +201,8 @@ message Bootstrap {
   // .. attention::
   //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
   //  <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
-  trace.v3.Tracing tracing = 9 [deprecated = true];
+  trace.v3.Tracing tracing = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
@@ -308,7 +311,8 @@ message Admin {
   // access log is desired specify ‘/dev/null’. This is only required if
   // :ref:`address <envoy_api_field_config.bootstrap.v3.Admin.address>` is set.
   // Deprecated in favor of *access_log* which offers more options.
-  string access_log_path = 1 [deprecated = true];
+  string access_log_path = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The cpu profiler output path for the administration server. If no profile
   // path is specified, the default is ‘/var/log/envoy/envoy.prof’.

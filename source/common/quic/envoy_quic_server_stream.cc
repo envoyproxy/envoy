@@ -142,7 +142,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list);
-  if (!Http::HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
     return;
   }

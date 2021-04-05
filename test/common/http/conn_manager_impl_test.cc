@@ -3089,38 +3089,6 @@ TEST_F(HttpConnectionManagerImplTest, ConnectWithEmptyPath) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(HttpConnectionManagerImplTest, ConnectLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.stop_faking_paths", "false"}});
-
-  setup(false, "envoy-custom-server", false);
-
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
-      .WillRepeatedly(Return(false));
-
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        decoder_ = &conn_manager_->newStream(response_encoder_);
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
-        decoder_->decodeHeaders(std::move(headers), false);
-        data.drain(4);
-        return Http::okStatus();
-      }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, _))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("403", headers.getStatusValue());
-      }));
-
-  // Kick off the incoming data.
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/10138
 TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   InSequence s;
