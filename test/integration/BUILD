@@ -342,7 +342,7 @@ envoy_cc_test(
     ],
     shard_count = 4,
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",

@@ -25,8 +25,10 @@ using ::testing::MatchesRegex;
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false);
@@ -1359,12 +1361,16 @@ void Http2RingHashIntegrationTest::createUpstreams() {
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 void Http2RingHashIntegrationTest::sendMultipleRequests(
     int request_bytes, Http::TestRequestHeaderMapImpl headers,
