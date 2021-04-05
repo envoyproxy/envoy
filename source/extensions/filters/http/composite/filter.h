@@ -27,8 +27,7 @@ struct FilterStats {
 
 class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit Filter(FilterStats& stats)
-      : decoded_headers_(false), stats_(stats) {}
+  explicit Filter(FilterStats& stats) : decoded_headers_(false), stats_(stats) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,

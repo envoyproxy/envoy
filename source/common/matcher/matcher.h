@@ -63,8 +63,10 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
 template <class DataType> class MatchTreeFactory {
 public:
   MatchTreeFactory(const std::string& stats_prefix,
-                   Server::Configuration::FactoryContext& factory_context, MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : stats_prefix_(stats_prefix), factory_context_(factory_context), validation_visitor_(validation_visitor) {}
+                   Server::Configuration::FactoryContext& factory_context,
+                   MatchTreeValidationVisitor<DataType>& validation_visitor)
+      : stats_prefix_(stats_prefix), factory_context_(factory_context),
+        validation_visitor_(validation_visitor) {}
 
   MatchTreeSharedPtr<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
     switch (config.matcher_type_case()) {

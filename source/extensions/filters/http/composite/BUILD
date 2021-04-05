@@ -54,5 +54,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/composite:filter_lib",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
