@@ -46,6 +46,12 @@ using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
 
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#define TSAN_TIMEOUT_FACTOR 3
+#else
+#define TSAN_TIMEOUT_FACTOR 1
+#endif
+
 /*
   Macro to use for validating that a statement throws the specified type of exception, and that
   the exception's what() method returns a string which is matched by the specified matcher.

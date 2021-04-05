@@ -27,8 +27,6 @@
 #include "common/grpc/common.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http3/quic_codec_factory.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -138,9 +136,9 @@ public:
               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  waitForEndStream(Event::Dispatcher& client_dispatcher,
-                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  testing::AssertionResult waitForEndStream(
+      Event::Dispatcher& client_dispatcher,
+      std::chrono::milliseconds timeout = TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult

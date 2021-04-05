@@ -220,7 +220,9 @@ public:
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
-  void decrClusterStreamCapacity(uint32_t delta) { state_.decrConnectingStreamCapacity(delta); }
+  void decrClusterStreamCapacity(uint32_t delta) {
+    state_.decrConnectingAndConnectedStreamCapacity(delta);
+  }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
@@ -236,9 +238,9 @@ public:
   }
   Upstream::ClusterConnectivityState& state() { return state_; }
 
-  void decrConnectingStreamCapacity(uint32_t delta) {
-    state_.decrConnectingStreamCapacity(delta);
-    ASSERT(connecting_stream_capacity_ >= delta);
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.decrConnectingAndConnectedStreamCapacity(delta);
+    ASSERT(connecting_stream_capacity_ > delta);
     connecting_stream_capacity_ -= delta;
   }
 
@@ -281,10 +283,11 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void incrConnectingStreamCapacity(uint32_t delta) {
-    state_.incrConnectingStreamCapacity(delta);
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
     connecting_stream_capacity_ += delta;
   }
+
   Upstream::ClusterConnectivityState& state_;
 
   const Upstream::HostConstSharedPtr host_;

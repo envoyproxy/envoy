@@ -180,7 +180,7 @@ public:
 #define CHECK_STATE(active, pending, capacity)                                                     \
   EXPECT_EQ(state_.pending_streams_, pending);                                                     \
   EXPECT_EQ(state_.active_streams_, active);                                                       \
-  EXPECT_EQ(state_.connecting_stream_capacity_, capacity);
+  EXPECT_EQ(state_.connecting_and_connected_stream_capacity_, capacity);
 
   /**
    * Closes a test client.
