@@ -72,7 +72,8 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   // it to reflect any difference between the TCP stream limits and HTTP/2
   // stream limits.
   if (new_client->effectiveConcurrentStreamLimit() > 1) {
-    state_.incrConnectingStreamCapacity(new_client->effectiveConcurrentStreamLimit() - 1);
+    state_.incrConnectingAndConnectedStreamCapacity(new_client->effectiveConcurrentStreamLimit() -
+                                                    1);
   }
   new_client->state_ = ActiveClient::State::CONNECTING;
   LinkedList::moveIntoList(std::move(new_client), owningList(new_client->state_));
