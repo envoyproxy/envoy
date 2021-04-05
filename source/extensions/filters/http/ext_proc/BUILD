@@ -11,8 +11,14 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "ext_proc",
-    srcs = ["ext_proc.cc"],
-    hdrs = ["ext_proc.h"],
+    srcs = [
+        "ext_proc.cc",
+        "processor_state.cc",
+    ],
+    hdrs = [
+        "ext_proc.h",
+        "processor_state.h",
+    ],
     deps = [
         ":client_interface",
         ":mutation_utils_lib",
