@@ -9,6 +9,9 @@ namespace Extensions {
 namespace OriginalIPDetection {
 namespace CustomHeader {
 
+/**
+ * Custom header IP detection extension.
+ */
 class CustomHeaderIPDetection : public Http::OriginalIPDetection {
 public:
   CustomHeaderIPDetection(
@@ -21,7 +24,7 @@ public:
   Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override;
 
 private:
-  std::string header_name_;
+  Http::LowerCaseString header_name_;
   bool allow_trusted_address_checks_{false};
   absl::optional<Http::OriginalIPRejectRequestOptions> reject_options_{absl::nullopt};
 };

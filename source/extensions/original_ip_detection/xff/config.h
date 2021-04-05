@@ -10,6 +10,10 @@ namespace Extensions {
 namespace OriginalIPDetection {
 namespace Xff {
 
+/**
+ * Config registration for the x-forwarded-for IP detection extension.
+ * @see OriginalIPDetectionFactory.
+ */
 class XffIPDetectionFactory : public Http::OriginalIPDetectionFactory {
 public:
   Http::OriginalIPDetectionSharedPtr

@@ -8,6 +8,9 @@ namespace Extensions {
 namespace OriginalIPDetection {
 namespace Xff {
 
+/**
+ * XFF (x-forwarded-for) IP detection extension.
+ */
 class XffIPDetection : public Http::OriginalIPDetection {
 public:
   XffIPDetection(const envoy::extensions::original_ip_detection::xff::v3::XffConfig& config);

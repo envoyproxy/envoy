@@ -22,7 +22,6 @@ protected:
 
     auto* reject_options = config.mutable_reject_options();
     reject_options->set_body_on_error("detection failed");
-    reject_options->set_details_on_error("rejecting because detection failed");
     auto* status_on_error = reject_options->mutable_status_on_error();
     status_on_error->set_code(envoy::type::v3::StatusCode::Unauthorized);
 

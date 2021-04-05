@@ -986,7 +986,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       connection_manager_.stats_.named_.downstream_rq_rejected_via_ip_detection_.inc();
       sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                      reject_request_params.response_code, reject_request_params.body, nullptr,
-                     absl::nullopt, reject_request_params.details);
+                     absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().OriginalIPDetectionFailed);
       return;
     }
 

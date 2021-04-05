@@ -19,8 +19,7 @@ CustomHeaderIPDetection::CustomHeaderIPDetection(
       reject_code = static_cast<Http::Code>(config.reject_options().status_on_error().code());
     }
 
-    reject_options_ = {reject_code, config.reject_options().body_on_error(),
-                       config.reject_options().details_on_error()};
+    reject_options_ = {reject_code, config.reject_options().body_on_error()};
   }
 }
 
@@ -31,7 +30,7 @@ CustomHeaderIPDetection::CustomHeaderIPDetection(
 
 Http::OriginalIPDetectionResult
 CustomHeaderIPDetection::detect(Http::OriginalIPDetectionParams& params) {
-  auto hdr = params.request_headers.get(Http::LowerCaseString(header_name_));
+  auto hdr = params.request_headers.get(header_name_);
   if (hdr.empty()) {
     return {nullptr, false, reject_options_};
   }

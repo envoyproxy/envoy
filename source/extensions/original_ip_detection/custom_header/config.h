@@ -10,6 +10,10 @@ namespace Extensions {
 namespace OriginalIPDetection {
 namespace CustomHeader {
 
+/**
+ * Config registration for the custom header IP detection extension.
+ * @see OriginalIPDetectionFactory.
+ */
 class CustomHeaderIPDetectionFactory : public Http::OriginalIPDetectionFactory {
 public:
   Http::OriginalIPDetectionSharedPtr

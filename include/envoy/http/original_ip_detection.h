@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Http {
 
 struct OriginalIPDetectionParams {
+  // The request headers from downstream.
+  //
   // Note that while extensions can modify the headers, they will undergo standard Envoy
   // sanitation after the detect() call so additions made here may be removed before
   // filters have access to headers.
@@ -25,7 +27,6 @@ struct OriginalIPDetectionParams {
 struct OriginalIPRejectRequestOptions {
   Code response_code;
   std::string body;
-  std::string details;
 };
 
 struct OriginalIPDetectionResult {
