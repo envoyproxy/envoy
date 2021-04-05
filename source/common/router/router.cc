@@ -1595,6 +1595,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
       downstream_headers.getMethodValue() != Http::Headers::get().MethodValues.Get &&
       downstream_headers.getMethodValue() != Http::Headers::get().MethodValues.Head) {
     downstream_headers.setMethod(Http::Headers::get().MethodValues.Get);
+    downstream_headers.remove(Http::Headers::get().ContentLength);
     callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
   }
 

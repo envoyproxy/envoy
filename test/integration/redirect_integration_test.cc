@@ -239,9 +239,10 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  const std::string& request_body = "foobarbizbaz";
   default_request_headers_.setHost("handle.internal.redirect");
   default_request_headers_.setMethod("POST");
-  const std::string& request_body = "foobarbizbaz";
+  default_request_headers_.setContentLength(request_body.length());
 
   // First request to original upstream.
   IntegrationStreamDecoderPtr response =
@@ -263,6 +264,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
   EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
   EXPECT_EQ("GET", upstream_request_->headers().getMethodValue());
+  EXPECT_EQ("", upstream_request_->headers().getContentLengthValue());
 
   // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -270,12 +272,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2 &&
-      downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_EQ(nullptr, response->headers().ContentLength());
-  } else {
-    EXPECT_EQ("0", response->headers().getContentLengthValue());
-  }
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
   // 302 was never returned downstream
