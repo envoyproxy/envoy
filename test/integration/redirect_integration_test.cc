@@ -270,6 +270,68 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2 && downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+    EXPECT_EQ(nullptr, response->headers().ContentLength());
+  } else {
+    EXPECT_EQ("0", response->headers().getContentLengthValue());
+  }
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  // 302 was never returned downstream
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("303 internal_redirect test-header-value\n"));
+  // No test header
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectHttp303PreservesHeadMethod) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.set_via("via_value");
+
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(2)->mutable_routes(0);
+        route->mutable_route()
+            ->mutable_internal_redirect_policy()
+            ->mutable_redirect_response_codes()
+            ->Add(303);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  default_request_headers_.setMethod("HEAD");
+
+  // First request to original upstream.
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Respond with a redirect.
+  redirect_response_.setStatus(303);
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  // Second request to redirected upstream.
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("", upstream_request_->body().toString());
+  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://handle.internal.redirect/test/long/url",
+            upstream_request_->headers().getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+  EXPECT_EQ("HEAD", upstream_request_->headers().getMethodValue());
+
+  // Return the response from the redirect upstream.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
   // 302 was never returned downstream

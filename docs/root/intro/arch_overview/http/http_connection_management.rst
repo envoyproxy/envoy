@@ -164,9 +164,10 @@ When redirect handling is on, any 3xx response from upstream, that matches
 <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
 is subject to the redirect being handled by Envoy.
 
-If Envoy is configured to internally redirect HTTP 303, it will dispatch the redirect with a
-bodiless HTTP GET regardless of the original HTTP method. For more information, see `RFC 7231
-Section 6.4.4 <https://tools.ietf.org/html/rfc7231#section-6.4.4>`_.
+If Envoy is configured to internally redirect HTTP 303 and receives an HTTP 303 response, it will
+dispatch the redirect with a bodiless HTTP GET if the original request was not a GET or HEAD
+request. Otherwise, Envoy will preserve the original HTTP method. For more information, see `RFC
+7231 Section 6.4.4 <https://tools.ietf.org/html/rfc7231#section-6.4.4>`_.
 
 For a redirect to be handled successfully it must pass the following checks:
 
