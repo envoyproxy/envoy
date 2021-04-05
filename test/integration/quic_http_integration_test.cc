@@ -314,8 +314,10 @@ TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
   config_helper_.addConfigModifier(setUpstreamTimeout);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
+  // TODO(danzh) why is this the only one that needs scaled timeout?
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
-                                       false);
+                                       false, false, nullptr,
+                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
