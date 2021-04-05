@@ -1,4 +1,4 @@
-#include "test/integration/http2_upstream_integration_test.h"
+#include "test/integration/multiplexed_upstream_integration_test.h"
 
 #include <iostream>
 

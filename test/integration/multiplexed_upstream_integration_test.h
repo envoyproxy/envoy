@@ -13,7 +13,8 @@ public:
     HttpProtocolIntegrationTest::SetUp();
 
     upstream_tls_ = true;
-    config_helper_.configureUpstreamTls(use_alpn_, upstreamProtocol() == FakeHttpConnection::Type::HTTP3);
+    config_helper_.configureUpstreamTls(use_alpn_,
+                                        upstreamProtocol() == FakeHttpConnection::Type::HTTP3);
   }
 
   void initialize() override { HttpIntegrationTest::initialize(); }
