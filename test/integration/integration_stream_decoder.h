@@ -40,7 +40,7 @@ public:
   // can be used if the previous body data is not relevant and the test wants to wait for a specific
   // amount of new data without considering the existing body size.
   void waitForBodyData(uint64_t size);
-  ABSL_MUST_USE_RESULT testing::AssertionResult
+  testing::AssertionResult
   waitForEndStream(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForReset();
   void clearBody() { body_.clear(); }
