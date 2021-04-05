@@ -95,23 +95,23 @@ public:
   }
 
   RcVal execute(const char* slice, int len) {
-    llhttp_errno_t err;
+    llhttp_errno_t error;
     if (slice == nullptr || len == 0) {
-      err = llhttp_finish(&parser_);
+      error = llhttp_finish(&parser_);
     } else {
-      err = llhttp_execute(&parser_, slice, len);
+      error = llhttp_execute(&parser_, slice, len);
     }
     size_t nread = len;
     // Adjust number of bytes read in case of error.
-    if (err != HPE_OK) {
+    if (error != HPE_OK) {
       nread = llhttp_get_error_pos(&parser_) - slice;
       // Resume after upgrade.
-      if (err == HPE_PAUSED_UPGRADE) {
-        err = HPE_OK;
+      if (error == HPE_PAUSED_UPGRADE) {
+        error = HPE_OK;
         llhttp_resume_after_upgrade(&parser_);
       }
     }
-    return {nread, err};
+    return {nread, error};
   }
 
   void resume() { llhttp_resume(&parser_); }
