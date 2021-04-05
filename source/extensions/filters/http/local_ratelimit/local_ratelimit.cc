@@ -87,8 +87,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     populateDescriptors(descriptors, headers);
   }
 
-  bool isRequestAllowed = config->enabled() ?
-    config->requestAllowed(descriptors) : requestAllowed(descriptors);
+  bool isRequestAllowed = config->proto_config().per_connection() ?
+    requestAllowed(descriptors) : config->requestAllowed(descriptors);
 
   if (isRequestAllowed) {
     config->stats().ok_.inc();
