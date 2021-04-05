@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.validate.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/factory_context.h"
 
@@ -27,6 +29,17 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::composite::v3::Composite& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Server::Configuration::MatchingRequirementsPtr matchingRequirements() override {
+    auto requirements = std::make_unique<
+        envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
+
+    requirements->mutable_data_input_allow_list()->add_type_url(
+        TypeUtil::descriptorFullNameToTypeUrl(
+            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name()));
+
+    return requirements;
+  }
 };
 
 } // namespace Composite
