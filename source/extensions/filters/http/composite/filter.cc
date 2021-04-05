@@ -76,7 +76,7 @@ void Filter::encodeComplete() {
   }
 }
 void Filter::onMatchCallback(const Matcher::Action& action) {
-  const auto& composite_action = action.getTyped<CompositeAction>();
+  const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
   FactoryCallbacksWrapper wrapper(*this);
   composite_action.createFilters(wrapper);

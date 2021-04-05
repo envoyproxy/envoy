@@ -9,10 +9,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
-class CompositeAction : public Matcher::ActionBase<
-                            envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
+class ExecuteFilterAction
+    : public Matcher::ActionBase<
+          envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
 public:
-  explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
+  explicit ExecuteFilterAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
 
   void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
 
@@ -20,7 +21,7 @@ private:
   Http::FilterFactoryCb cb_;
 };
 
-class CompositeActionFactory : public Matcher::ActionFactory {
+class ExecuteFilterActionFactory : public Matcher::ActionFactory {
 public:
   std::string name() const override { return "composite-action"; }
   Matcher::ActionFactoryCb
@@ -38,7 +39,7 @@ public:
         factory);
     auto callback = factory.createFilterFactoryFromProto(*message, stat_prefix, factory_context);
     return [cb = std::move(callback)]() -> Matcher::ActionPtr {
-      return std::make_unique<CompositeAction>(cb);
+      return std::make_unique<ExecuteFilterAction>(cb);
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

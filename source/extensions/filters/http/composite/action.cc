@@ -4,10 +4,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
-void CompositeAction::createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
+void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
   cb_(callbacks);
 }
-REGISTER_FACTORY(CompositeActionFactory, Matcher::ActionFactory);
+REGISTER_FACTORY(ExecuteFilterActionFactory, Matcher::ActionFactory);
 } // namespace Composite
 } // namespace HttpFilters
 } // namespace Extensions

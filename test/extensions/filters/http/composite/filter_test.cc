@@ -94,7 +94,7 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   };
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -113,7 +113,7 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   };
 
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -134,7 +134,7 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   filter_.onMatchCallback(action);
 
   expectDelegatedDecoding(*stream_filter);
@@ -154,7 +154,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
     cb.addStreamFilter(stream_filter);
   };
 
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -172,7 +172,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
     cb.addStreamDecoderFilter(decoder_filter);
   };
 
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -190,7 +190,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
     cb.addStreamEncoderFilter(encode_filter);
   };
 
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -207,7 +207,7 @@ TEST_F(FilterTest, StreamFilterDelegationStreamFilterWithMatchTree) {
     cb.addStreamFilter(stream_filter, nullptr);
   };
 
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -224,7 +224,7 @@ TEST_F(FilterTest, StreamFilterDelegationDecodeFilterWithMatchTree) {
     cb.addStreamDecoderFilter(decoder_filter, nullptr);
   };
 
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -241,7 +241,7 @@ TEST_F(FilterTest, StreamFilterDelegationEncodeFilterWithMatchTree) {
     cb.addStreamEncoderFilter(encode_filter, nullptr);
   };
 
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -259,7 +259,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleEncodeFilterWithMatchTree) {
     cb.addStreamEncoderFilter(encode_filter, nullptr);
   };
 
-  CompositeAction action(factory_callback);
+  ExecuteFilterAction action(factory_callback);
 
   EXPECT_CALL(error_counter_, inc());
   // Verify that the log output looks right.
