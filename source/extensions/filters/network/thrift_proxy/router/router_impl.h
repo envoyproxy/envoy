@@ -184,6 +184,8 @@ public:
         request_oneway_(stat_name_set_->add("request_oneway")),
         request_invalid_type_(stat_name_set_->add("request_invalid_type")),
         response_reply_(stat_name_set_->add("response_reply")),
+        response_reply_success_(stat_name_set_->add("response_success")),
+        response_reply_error_(stat_name_set_->add("response_error")),
         response_exception_(stat_name_set_->add("response_exception")),
         response_invalid_type_(stat_name_set_->add("response_invalid_type")),
         passthrough_supported_(false) {}
@@ -276,6 +278,8 @@ private:
   const Stats::StatName request_oneway_;
   const Stats::StatName request_invalid_type_;
   const Stats::StatName response_reply_;
+  const Stats::StatName response_reply_success_;
+  const Stats::StatName response_reply_error_;
   const Stats::StatName response_exception_;
   const Stats::StatName response_invalid_type_;
 

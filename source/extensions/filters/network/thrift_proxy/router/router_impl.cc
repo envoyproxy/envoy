@@ -354,6 +354,11 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       switch (callbacks_->responseMetadata()->messageType()) {
       case MessageType::Reply:
         incClusterScopeCounter(response_reply_);
+        if (callbacks_->responseSuccess()) {
+          incClusterScopeCounter(response_reply_success_);
+        } else {
+          incClusterScopeCounter(response_reply_error_);
+        }
         break;
 
       case MessageType::Exception:

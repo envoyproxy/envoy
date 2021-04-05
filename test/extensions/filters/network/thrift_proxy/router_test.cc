@@ -305,7 +305,7 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void returnResponse(MessageType msg_type = MessageType::Reply) {
+  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -314,6 +314,7 @@ public:
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
     ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
+    ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
@@ -798,6 +799,9 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
                      .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 // Test the case where an upgrade will occur, but the conn pool
@@ -878,6 +882,9 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
                      .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
@@ -925,6 +932,9 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
                      .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, OneWay) {
@@ -961,6 +971,34 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
                      .value());
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
+}
+
+TEST_P(ThriftRouterFieldTypeTest, Call_Error) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Reply, false);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_error")
                      .value());
 }
 
@@ -1023,6 +1061,9 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceNameEnabled) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
                      .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 // Ensure the service name prefix isn't stripped when strip_service_name = false.
@@ -1046,6 +1087,9 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceNameDisabled) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
                      .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, CallWithExistingConnection) {
@@ -1068,6 +1112,9 @@ TEST_F(ThriftRouterTest, CallWithExistingConnection) {
                      .value());
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
                      .value());
 }
 
