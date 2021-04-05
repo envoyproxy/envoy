@@ -270,7 +270,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2 && downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2 &&
+      downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_EQ(nullptr, response->headers().ContentLength());
   } else {
     EXPECT_EQ("0", response->headers().getContentLengthValue());
