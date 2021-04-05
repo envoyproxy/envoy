@@ -18,7 +18,6 @@ TEST(UInt32AccessorImplTest, IncrementValue) {
   accessor.increment();
   EXPECT_EQ(0xdeadbef0, accessor.value());
 }
-
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy
