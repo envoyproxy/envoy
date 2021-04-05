@@ -127,13 +127,14 @@ envoy_cc_library(
     hdrs = ["envoy_quic_stream.h"],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_utils_lib",
         ":envoy_quic_simulated_watermark_buffer_lib",
+        ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
         ":send_buffer_monitor_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -190,6 +191,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/network:connection_base_lib",
         "//source/common/stream_info:stream_info_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -351,8 +353,10 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
+        "@com_googlesource_quiche//:quic_core_config_lib",
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

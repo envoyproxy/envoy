@@ -44,10 +44,12 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
     return nullptr;
   }
   if (!http3_options_.has_value()) {
-    ENVOY_CONN_LOG(error, "Attempt to create stream {} before HCM filter is initialized.", *this, id);
+    ENVOY_CONN_LOG(error, "Attempt to create stream {} before HCM filter is initialized.", *this,
+                   id);
     return nullptr;
   }
-  auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, http3_options_.value(), headers_with_underscores_action_);
+  auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, http3_options_.value(),
+                                          headers_with_underscores_action_);
   ActivateStream(absl::WrapUnique(stream));
   if (aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();

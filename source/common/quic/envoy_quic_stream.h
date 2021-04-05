@@ -1,14 +1,14 @@
 #pragma once
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codec.h"
 
 #include "common/http/codec_helper.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
 #include "common/quic/send_buffer_monitor.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "envoy/config/core/v3/protocol.pb.h"
 
 namespace Envoy {
 namespace Quic {
@@ -25,8 +25,10 @@ public:
   // watermark will be half of it.
   EnvoyQuicStream(uint32_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
                   std::function<void()> below_low_watermark,
-                  std::function<void()> above_high_watermark, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
-      : http3_options_(http3_options), send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
+                  std::function<void()> above_high_watermark,
+                  const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
+      : http3_options_(http3_options),
+        send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark), ENVOY_LOGGER()),
         filter_manager_connection_(filter_manager_connection) {}
 
@@ -106,14 +108,17 @@ public:
   }
 
   HeaderValidationResult validateHeader(const std::string& header_name,
-                                                   absl::string_view header_value) override {
-   bool override_stream_error_on_invalid_http_message = http3_options_.has_override_stream_error_on_invalid_http_message() && http3_options_.override_stream_error_on_invalid_http_message().value();
+                                        absl::string_view header_value) override {
+    bool override_stream_error_on_invalid_http_message =
+        http3_options_.has_override_stream_error_on_invalid_http_message() &&
+        http3_options_.override_stream_error_on_invalid_http_message().value();
     if (header_name == "content-length") {
       std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
       absl::optional<uint64_t> content_length;
       for (const absl::string_view& value : values) {
         uint64_t new_value;
-        if (!absl::SimpleAtoi(value, &new_value) || !std::all_of(value.begin(), value.end(), absl::ascii_isdigit)) {
+        if (!absl::SimpleAtoi(value, &new_value) ||
+            !std::all_of(value.begin(), value.end(), absl::ascii_isdigit)) {
           ENVOY_STREAM_LOG(debug, "Content length was either unparseable or negative", *this);
           // TODO(danzh) set value according to override_stream_error_on_invalid_http_message from
           // configured http3 options.
@@ -132,7 +137,7 @@ public:
               "Parsed content length {} is inconsistent with previously detected content length {}",
               *this, new_value, content_length.value());
           if (!override_stream_error_on_invalid_http_message) {
-          close_connection_upon_invalid_header_ = true;
+            close_connection_upon_invalid_header_ = true;
           }
           return HeaderValidationResult::INVALID;
         }

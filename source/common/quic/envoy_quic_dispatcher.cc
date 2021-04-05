@@ -51,16 +51,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
     const quic::ParsedQuicVersion& version) {
   quic::QuicConfig quic_config = config();
-  if (!version.AllowsLowFlowControlLimits()) {
-  if (quic_config.GetInitialStreamFlowControlWindowToSend() < quic::kMinimumFlowControlSendWindow) {
-    // QUICHE only support minimum 16K stream flow control window.
-  quic_config.SetInitialStreamFlowControlWindowToSend(quic::kMinimumFlowControlSendWindow);
-  }
-  if (quic_config.GetInitialSessionFlowControlWindowToSend() < quic::kMinimumFlowControlSendWindow) {
-  quic_config.SetInitialSessionFlowControlWindowToSend(
-      quic::kMinimumFlowControlSendWindow);
-  }
-}
+  adjustQuicInitialFlowControlWindow(quic_config, version);
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listen_socket_);

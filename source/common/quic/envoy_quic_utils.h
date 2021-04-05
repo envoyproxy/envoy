@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/platform.h"
+#include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
@@ -15,6 +16,7 @@
 #endif
 
 #include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/core/quic_config.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -45,14 +47,15 @@ enum class HeaderValidationResult {
 
 class HeaderValidator {
 public:
- virtual ~HeaderValidator() = default;
+  virtual ~HeaderValidator() = default;
   virtual HeaderValidationResult validateHeader(const std::string& header_name,
-                                                   absl::string_view header_value) = 0;
+                                                absl::string_view header_value) = 0;
 };
 
 // The returned header map has all keys in lower case.
 template <class T>
-std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidator& validator) {
+std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list,
+                                             HeaderValidator& validator) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
     HeaderValidationResult result = validator.validateHeader(entry.first, entry.second);
@@ -61,15 +64,15 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
     }
 
     if (result == HeaderValidationResult::ACCEPT) {
-    auto key = Http::LowerCaseString(entry.first);
-    if (key != Http::Headers::get().Cookie) {
-      // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
-      headers->addCopy(key, entry.second);
-    } else {
-      // QUICHE breaks "cookie" header into crumbs. Coalesce them by appending current one to
-      // existing one if there is any.
-      headers->appendCopy(key, entry.second);
-    }
+      auto key = Http::LowerCaseString(entry.first);
+      if (key != Http::Headers::get().Cookie) {
+        // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
+        headers->addCopy(key, entry.second);
+      } else {
+        // QUICHE breaks "cookie" header into crumbs. Coalesce them by appending current one to
+        // existing one if there is any.
+        headers->appendCopy(key, entry.second);
+      }
     }
   }
   return headers;
@@ -123,6 +126,12 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::str
 // Return the sign algorithm id works with the public key; If the public key is
 // not supported, return 0 with error_details populated correspondingly.
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
+
+void configQuicInitialFlowControlWindow(
+    const envoy::config::listener::v3::QuicProtocolOptions& config, quic::QuicConfig& quic_config);
+
+void adjustQuicInitialFlowControlWindow(quic::QuicConfig& config,
+                                        const quic::ParsedQuicVersion& version);
 
 } // namespace Quic
 } // namespace Envoy

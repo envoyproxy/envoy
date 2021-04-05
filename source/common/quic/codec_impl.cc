@@ -19,9 +19,11 @@ EnvoyQuicClientStream* quicStreamToEnvoyClientStream(quic::QuicStream* stream) {
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSend() > 0; }
 
 QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
-    EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t /*max_request_headers_kb*/,
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action)
+    EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t /*max_request_headers_kb*/,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : QuicHttpConnectionImplBase(quic_session), quic_server_session_(quic_session) {
   quic_session.setHttp3Options(http3_options);
   quic_session.setHeadersWithUnderscoreAction(headers_with_underscores_action);
@@ -60,8 +62,10 @@ void QuicHttpServerConnectionImpl::goAway() {
   }
 }
 
-QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                                                           Http::ConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t /*max_request_headers_kb*/)
+QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
+    EnvoyQuicClientSession& session, Http::ConnectionCallbacks& callbacks,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t /*max_request_headers_kb*/)
     : QuicHttpConnectionImplBase(session), quic_client_session_(session) {
   session.setHttp3Options(http3_options);
   session.setHttpConnectionCallbacks(callbacks);

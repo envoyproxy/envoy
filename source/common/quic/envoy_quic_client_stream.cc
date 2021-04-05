@@ -29,25 +29,27 @@
 namespace Envoy {
 namespace Quic {
 
-EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
-                                             quic::QuicSpdyClientSession* client_session,
-                                             quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
+EnvoyQuicClientStream::EnvoyQuicClientStream(
+    quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session, quic::StreamType type,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
           // Flow control receive window should be larger than 8k so that the send buffer can fully
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }, http3_options) {
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
+          http3_options) {
   ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
 }
 
-EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
-                                             quic::QuicSpdyClientSession* client_session,
-                                             quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
+EnvoyQuicClientStream::EnvoyQuicClientStream(
+    quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
+    quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(pending, client_session, type),
       EnvoyQuicStream(
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }, http3_options) {}
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
+          http3_options) {}
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
@@ -103,6 +105,7 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
   // TODO(danzh): add stats for metadata not supported error.
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {

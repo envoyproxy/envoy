@@ -579,7 +579,6 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         headersWithUnderscoresAction());
   }
   case CodecType::HTTP2: {
-    std::cerr << "aaaa " << http2_options_.aaaa();
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
@@ -589,8 +588,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks, http3_options_, maxRequestHeadersKb(),
-       headersWithUnderscoresAction());
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks, http3_options_,
+        maxRequestHeadersKb(), headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;

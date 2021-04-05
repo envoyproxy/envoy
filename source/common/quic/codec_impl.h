@@ -37,8 +37,10 @@ protected:
 class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ServerConnection {
 public:
-  QuicHttpServerConnectionImpl(EnvoyQuicServerSession& quic_session,
-                               Http::ServerConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t max_request_headers_kb,
+  QuicHttpServerConnectionImpl(
+      EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
+      const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+      const uint32_t max_request_headers_kb,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action);
 
@@ -56,7 +58,9 @@ class QuicHttpClientConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ClientConnection {
 public:
   QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                               Http::ConnectionCallbacks& callbacks, const envoy::config::core::v3::Http3ProtocolOptions& http3_options, const uint32_t max_request_headers_kb);
+                               Http::ConnectionCallbacks& callbacks,
+                               const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+                               const uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;

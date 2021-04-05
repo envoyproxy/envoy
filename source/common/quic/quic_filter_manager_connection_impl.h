@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
@@ -10,7 +11,6 @@
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "common/quic/send_buffer_monitor.h"
 #include "common/stream_info/stream_info_impl.h"
-#include "envoy/config/core/v3/protocol.pb.h"
 
 namespace Envoy {
 
@@ -118,9 +118,10 @@ public:
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
-   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
-     http3_options_ = std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>(http3_options);
-   }
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+    http3_options_ =
+        std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>(http3_options);
+  }
 
 protected:
   // Propagate connection close to network_connection_callbacks_.
@@ -133,7 +134,8 @@ protected:
 
   EnvoyQuicConnection* quic_connection_{nullptr};
 
-  absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>> http3_options_;
+  absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
+      http3_options_;
 
 private:
   friend class Envoy::TestPauseFilterForQuic;

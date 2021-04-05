@@ -637,7 +637,9 @@ public:
         buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
         local_reply_(local_reply),
         stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
-                     parent_filter_state, filter_state_life_span) {}
+                     parent_filter_state, filter_state_life_span) {
+    std::cerr << "============= FilterManager buffer_limit_ = " << buffer_limit_ << "\n";
+  }
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);

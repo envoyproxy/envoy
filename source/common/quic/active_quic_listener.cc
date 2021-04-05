@@ -230,12 +230,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
 
-  // Use HTTP2 minimum value instead of default ones because the defaults are way too large.
-  size_t stream_flow_control_window_to_send = config.has_initial_stream_window_size() ? config.initial_stream_window_size() : Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE;
-  quic_config_.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
-
-  size_t  session_flow_control_window_to_send = config.has_initial_connection_window_size() ? config.initial_connection_window_size() : Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE;
-  quic_config_.SetInitialSessionFlowControlWindowToSend();
+  configQuicInitialFlowControlWindow(config, quic_config_);
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(

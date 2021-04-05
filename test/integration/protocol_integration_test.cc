@@ -1421,7 +1421,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-         hcm.mutable_http3_protocol_options()
+        hcm.mutable_http3_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
         hcm.mutable_http2_protocol_options()
@@ -1489,7 +1489,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-         hcm.mutable_http3_protocol_options()
+        hcm.mutable_http3_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
         hcm.mutable_http2_protocol_options()
@@ -1794,8 +1794,6 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
 // once after iteration is resumed.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAll) {
-  // TODO(danzh) Enable after setting QUICHE stream initial flow control window from http3 options.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: call-decodedata-once-filter
 )EOF");
@@ -1806,6 +1804,11 @@ name: decode-headers-return-stop-all-filter
 name: passthrough-filter
 )EOF");
 
+  // Explicitly set buffer limit to be larger than request size so that
+  // buffering the whole request doesn't exceed the limit.
+  // This is needed because QUIC's default stream buffer is only 64kB, but
+  // Http2's is 256MB.
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1847,8 +1850,6 @@ name: passthrough-filter
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
-  // TODO(danzh) Re-enable after codec buffer can be set according to http3 options.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
@@ -1907,8 +1908,6 @@ name: passthrough-filter
 
 // Test two filters that return StopAllIterationAndBuffer back-to-back.
 TEST_P(DownstreamProtocolIntegrationTest, TestTwoFiltersDecodeHeadersReturnsStopAll) {
-  // TODO(danzh) Re-enable after codec buffer can be set according to http3 options.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
@@ -1918,6 +1917,11 @@ name: decode-headers-return-stop-all-filter
   config_helper_.addFilter(R"EOF(
 name: passthrough-filter
 )EOF");
+  // Explicitly set buffer limit to be larger than request size so that
+  // buffering the whole request doesn't exceed the limit.
+  // This is needed because QUIC's default stream buffer is only 64kB, but
+  // Http2's is 256MB.
+  config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2001,7 +2005,7 @@ name: encode-headers-return-stop-all-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAllWatermark) {
-  // TODO(danzh) Re-enable after codec buffer can be set according to http3 options.
+  // Metadata is not supported in QUICHE.
   EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter

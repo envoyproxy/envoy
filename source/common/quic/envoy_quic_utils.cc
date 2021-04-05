@@ -3,6 +3,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/http/utility.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
@@ -207,6 +208,35 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     *error_details = "Invalid leaf cert, only RSA and ECDSA certificates are supported";
   }
   return sign_alg;
+}
+
+void configQuicInitialFlowControlWindow(
+    const envoy::config::listener::v3::QuicProtocolOptions& config, quic::QuicConfig& quic_config) {
+  // Use HTTP2 minimum value instead of default ones because the defaults are way too large.
+  size_t stream_flow_control_window_to_send =
+      config.has_initial_stream_window_size()
+          ? config.initial_stream_window_size().value()
+          : Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE;
+  quic_config.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
+
+  size_t session_flow_control_window_to_send =
+      config.has_initial_connection_window_size()
+          ? config.initial_connection_window_size().value()
+          : Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE;
+  quic_config.SetInitialSessionFlowControlWindowToSend(session_flow_control_window_to_send);
+}
+
+void adjustQuicInitialFlowControlWindow(quic::QuicConfig& config,
+                                        const quic::ParsedQuicVersion& version) {
+  if (!version.AllowsLowFlowControlLimits()) {
+    if (config.GetInitialStreamFlowControlWindowToSend() < quic::kMinimumFlowControlSendWindow) {
+      // QUICHE only support minimum 16K stream flow control window.
+      config.SetInitialStreamFlowControlWindowToSend(quic::kMinimumFlowControlSendWindow);
+    }
+    if (config.GetInitialSessionFlowControlWindowToSend() < quic::kMinimumFlowControlSendWindow) {
+      config.SetInitialSessionFlowControlWindowToSend(quic::kMinimumFlowControlSendWindow);
+    }
+  }
 }
 
 } // namespace Quic

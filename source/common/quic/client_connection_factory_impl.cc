@@ -29,6 +29,7 @@ namespace {
 // This was preexisting but should either be removed or potentially moved inside
 // PersistentQuicInfoImpl.
 struct StaticInfo {
+  // TODO(alyssawilk) setup initial flow control window according to http3 options.
   quic::QuicConfig quic_config_;
   quic::QuicClientPushPromiseIndex push_promise_index_;
 
@@ -49,10 +50,14 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
       info_impl->alarm_factory_, quic::ParsedQuicVersionVector{info_impl->supported_versions_[0]},
       local_addr, dispatcher, nullptr);
   auto& static_info = StaticInfo::get();
+
+  quic::QuicConfig config = static_info.quic_config_;
+  ASSERT(!info_impl->supported_versions_.empty());
+  // QUICHE client session always use the 1st version to start handshake.
+  adjustQuicInitialFlowControlWindow(config, info_impl->supported_versions_[0]);
   auto ret = std::make_unique<EnvoyQuicClientSession>(
-      static_info.quic_config_, info_impl->supported_versions_, std::move(connection),
-      info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
-      dispatcher, 0);
+      config, info_impl->supported_versions_, std::move(connection), info_impl->server_id_,
+      info_impl->crypto_config_.get(), &static_info.push_promise_index_, dispatcher, 0);
   ret->Initialize();
   return ret;
 }

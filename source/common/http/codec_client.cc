@@ -185,9 +185,9 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
   }
   case Type::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
-    envoy::config::core::v3::Http3ProtocolOptions http3_options;
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_), *this, http3_options, Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+        dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_), *this,
+        host->cluster().http3Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.

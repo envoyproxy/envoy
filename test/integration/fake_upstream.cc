@@ -344,7 +344,8 @@ FakeHttpConnection::FakeHttpConnection(
     ASSERT(type == Type::HTTP3);
 #ifdef ENVOY_ENABLE_QUIC
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this);
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this,
+        fake_upstream.http3Options(), max_request_headers_kb, headers_with_underscores_action);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif

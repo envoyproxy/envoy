@@ -937,6 +937,17 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
+  const uint32_t stream_buffer_size = std::max(
+      downstream_buffer_limit, Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+  if (Network::Utility::protobufAddressSocketType(listener->address()) ==
+          Network::Socket::Type::Datagram &&
+      listener->udp_listener_config().has_quic_options()) {
+    // QUIC stream's flow control window is configured in listener config.
+    listener->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_initial_stream_window_size()
+        ->set_value(stream_buffer_size);
+  }
 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
@@ -951,10 +962,8 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
                                        v3::HttpConnectionManager::HTTP2) {
-      const uint32_t size = std::max(downstream_buffer_limit,
-                                     Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       auto* options = hcm_config.mutable_http2_protocol_options();
-      options->mutable_initial_stream_window_size()->set_value(size);
+      options->mutable_initial_stream_window_size()->set_value(stream_buffer_size);
       storeHttpConnectionManager(hcm_config);
     }
   }
