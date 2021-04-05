@@ -103,7 +103,7 @@ public:
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
   ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-               const std::string& config = httpProxyConfig());
+               const std::string& config = httpProxyConfig(false));
 
   static void
   initializeTls(const ServerSslOptions& options,
@@ -124,7 +124,7 @@ public:
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
-  static std::string httpProxyConfig();
+  static std::string httpProxyConfig(bool downstream_use_quic = false);
   // A basic configuration for L7 proxying with QUIC transport.
   static std::string quicHttpProxyConfig();
   // A string for a basic buffer filter, which can be used with addFilter()
@@ -193,6 +193,9 @@ public:
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
 
+  // Sets a small kernel buffer for the listener send buffer
+  void setListenerSendBufLimits(uint32_t limit);
+
   // Set the idle timeout on downstream connections through the HttpConnectionManager.
   void setDownstreamHttpIdleTimeout(std::chrono::milliseconds idle_timeout);
 
@@ -229,6 +232,9 @@ public:
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
+
+  // Add the default SSL configuration for QUIC downstream.
+  void addQuicDownstreamTransportSocketConfig(bool resuse_port);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.

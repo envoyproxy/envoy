@@ -54,13 +54,19 @@ addition, `GrpcMuxImpl` and `WatchMap` are aware of this naming scheme and imple
 match semantics and naming schemes.
 
 Implementation is in progress and we support the following aspects of `xdstp://` today:
-* LDS glob collections over ADS.
+* LDS, CDS and SRDS glob collections over gRPC (delta xDS).
+* RDS and EDS singletons over gRPC (delta xDS)
 * LDS filesystem list collections featuring inline resources.
 
 It should be noted that `xdstp://` support is experimental at this time while we complete
 implementation.
 
 `xdstp://` support will only be added for delta xDS.
+
+We do not yet supported federated configuration sources, it is assumed that a
+single ADS stream or `ConfigSource` specified parallel to the `xdstp://`
+resource locator is used. Envoy will support this in the future once a bootstrap
+based mapping from authority to `ConfigSource` is supported.
 
 ## gRPC xDS internals
 

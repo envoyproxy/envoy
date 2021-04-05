@@ -1,5 +1,4 @@
 admin:
-  access_log_path: /dev/stdoutput
   address:
     socket_address:
       address: 0.0.0.0
@@ -17,9 +16,9 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           access_log:
-          - name: envoy.access_loggers.stdoutput
+          - name: envoy.access_loggers.stdout
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
           stat_prefix: ingress_http
           route_config:
             name: local_route

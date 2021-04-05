@@ -16,6 +16,35 @@ struct TestData {
   static absl::string_view name() { return "test"; }
 };
 
+// A CommonProtocolInput that returns the configured value every time.
+struct CommonProtocolTestInput : public CommonProtocolInput {
+  explicit CommonProtocolTestInput(const std::string& data) : data_(data) {}
+  absl::optional<absl::string_view> get() override { return data_; }
+
+  const std::string data_;
+};
+class TestCommonProtocolInputFactory : public CommonProtocolInputFactory {
+public:
+  TestCommonProtocolInputFactory(absl::string_view factory_name, absl::string_view data)
+      : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
+
+  CommonProtocolInputPtr
+  createCommonProtocolInput(const Protobuf::Message&,
+                            Server::Configuration::FactoryContext&) override {
+    return std::make_unique<CommonProtocolTestInput>(value_);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return factory_name_; }
+
+private:
+  const std::string factory_name_;
+  const std::string value_;
+  Registry::InjectFactory<CommonProtocolInputFactory> injection_;
+};
+
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
   explicit TestInput(DataInputGetResult result) : result_(result) {}

@@ -8,6 +8,7 @@ Incompatible Behavior Changes
 * config: the v2 xDS API is no longer supported by the Envoy binary.
 * grpc_stats: the default value for :ref:`stats_for_all_methods <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>` is switched from true to false, in order to avoid possible memory exhaustion due to an untrusted downstream sending a large number of unique method names. The previous default value was deprecated in version 1.14.0. This only changes the behavior when the value is not set. The previous behavior can be used by setting the value to true. This behavior change by be overridden by setting runtime feature `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
 * http: fixing a standards compliance issue with :scheme. The :scheme header sent upstream is now based on the original URL scheme, rather than set based on the security of the upstream connection. This behavior can be temporarily reverted by setting `envoy.reloadable_features.preserve_downstream_scheme` to false.
+* http: http3 is now enabled/disabled via build option `--define http3=disabled` rather than the extension framework. Behavior is the same, but builds may be affected for platforms or build configurations where http3 is not supported.
 * http: resolving inconsistencies between :scheme and X-Forwarded-Proto. :scheme will now be set for all HTTP/1.1 requests. This changes the behavior of the gRPC access logger, Wasm filters, CSRF filter and oath2 filter for HTTP/1 traffic, where :scheme was previously not set. This change also validates that for front-line Envoys (Envoys configured with  :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` set to 0 and :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>` set to true) that HTTP/1.1 https schemed requests can not be sent over non-TLS connections. All behavioral changes listed here can be temporarily reverted by setting `envoy.reloadable_features.add_and_validate_scheme_header` to false.
 * http: when a protocol error is detected in response from upstream, Envoy sends 502 BadGateway downstream and access log entry contains UPE flag. This behavior change can be overwritten to use error code 503 by setting `envoy.reloadable_features.return_502_for_upstream_protocol_errors` to false.
 
@@ -55,6 +56,7 @@ Minor Behavior Changes
 * http: upstream flood and abuse checks increment the count of opened HTTP/2 streams when Envoy sends
   initial HEADERS frame for the new stream. Before the counter was incrementred when Envoy received
   response HEADERS frame with the END_HEADERS flag set from upstream server.
+* lua: added function `timestamp` to provide millisecond resolution timestamps by passing in `EnvoyTimestampResolution.MILLISECOND`.
 * oauth filter: added the optional parameter :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. Enables this value to be overridden in the Authorization request to the OAuth provider.
 * perf: allow reading more bytes per operation from raw sockets to improve performance.
 * router: extended custom date formatting to DOWNSTREAM_PEER_CERT_V_START and DOWNSTREAM_PEER_CERT_V_END when using :ref:`custom request/response header formats <config_http_conn_man_headers_custom_request_headers>`.
@@ -108,10 +110,12 @@ Removed Config or Runtime
 * access_logs: removed legacy unbounded access logs and runtime guard `envoy.reloadable_features.disallow_unbounded_access_logs`.
 * dns: removed legacy buggy wildcard matching path and runtime guard `envoy.reloadable_features.fix_wildcard_matching`.
 * dynamic_forward_proxy: removed `envoy.reloadable_features.enable_dns_cache_circuit_breakers` and legacy code path.
+* http: removed legacy connect behavior and runtime guard `envoy.reloadable_features.stop_faking_paths`.
 * http: removed legacy connection close behavior and runtime guard `envoy.reloadable_features.fixed_connection_close`.
 * http: removed legacy HTTP/1.1 error reporting path and runtime guard `envoy.reloadable_features.early_errors_via_hcm`.
 * http: removed legacy sanitization path for upgrade response headers and runtime guard `envoy.reloadable_features.fix_upgrade_response`.
 * http: removed legacy date header overwriting logic and runtime guard `envoy.reloadable_features.preserve_upstream_date deprecation`.
+* http: removed legacy ALPN handling and runtime guard `envoy.reloadable_features.http_default_alpn`.
 * listener: removed legacy runtime guard `envoy.reloadable_features.listener_in_place_filterchain_update`.
 * router: removed `envoy.reloadable_features.consume_all_retry_headers` and legacy code path.
 * router: removed `envoy.reloadable_features.preserve_query_string_in_path_redirects` and legacy code path.
@@ -122,10 +126,11 @@ New Features
 * access log: added a new :ref:`OpenTelemetry access logger <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>` extension, allowing a flexible log structure with native Envoy access log formatting.
 * access log: added the new response flag `NC` for upstream cluster not found. The error flag is set when the http or tcp route is found for the request but the cluster is not available.
 * access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
-* access log: added support for cross platform writing to :ref:`standard output <envoy_v3_api_msg_extensions.access_loggers.stdoutput.v3.StdoutputAccessLog>` and :ref:`standard error <envoy_v3_api_msg_extensions.access_loggers.stderror.v3.StderrorAccessLog>`.
+* access log: added support for cross platform writing to :ref:`standard output <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>` and :ref:`standard error <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`.
 * access log: support command operator: %FILTER_CHAIN_NAME% for the downstream tcp and http request.
 * access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
 * composite filter: added new :ref:`composite filter <config_http_filters_composite>` that can be used to instantiate different filter configuratios based on matching incoming data.
+* admin: added support for :ref:`access loggers <envoy_v3_api_msg_config.accesslog.v3.AccessLog>` to the admin interface.
 * compression: add brotli :ref:`compressor <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>` and :ref:`decompressor <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`.
 * compression: extended the compression allow compressing when the content length header is not present. This behavior may be temporarily reverted by setting `envoy.reloadable_features.enable_compression_without_content_length_header` to false.
 * config: add `envoy.features.fail_on_any_deprecated_feature` runtime key, which matches the behaviour of compile-time flag `ENVOY_DISABLE_DEPRECATED_FEATURES`, i.e. use of deprecated fields will cause a crash.
@@ -138,6 +143,7 @@ New Features
 * http: added support for `Envoy::ScopeTrackedObject` for HTTP/1 and HTTP/2 dispatching. Crashes while inside the dispatching loop should dump debug information. Furthermore, HTTP/1 and HTTP/2 clients now dumps the originating request whose response from the upstream caused Envoy to crash.
 * http: added support for :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>`. Preconnecting is off by default, but recommended for clusters serving latency-sensitive traffic, especially if using HTTP/1.1.
 * http: added new runtime config `envoy.reloadable_features.check_unsupported_typed_per_filter_config`, the default value is true. When the value is true, envoy will reject virtual host-specific typed per filter config when the filter doesn't support it.
+* http: added the ability to preserve HTTP/1 header case across the proxy. See the :ref:`header casing <config_http_conn_man_header_casing>` documentation for more information.
 * http: change frame flood and abuse checks to the upstream HTTP/2 codec to ON by default. It can be disabled by setting the `envoy.reloadable_features.upstream_http2_flood_checks` runtime key to false.
 * json: introduced new JSON parser (https://github.com/nlohmann/json) to replace RapidJSON. The new parser is disabled by default. To test the new RapidJSON parser, enable the runtime feature `envoy.reloadable_features.remove_legacy_json`.
 * kill_request: :ref:`Kill Request <config_http_filters_kill_request>` Now supports bidirection killing.
@@ -175,3 +181,6 @@ New Features
 
 Deprecated
 ----------
+
+* admin: :ref:`access_log_path <envoy_v3_api_field_config.bootstrap.v3.Admin.access_log_path>` is deprecated in favor for :ref:`access loggers <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`.
+

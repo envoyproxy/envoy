@@ -22,7 +22,7 @@
           },
           {
             "name": "content-length",
-            "range_match": 
+            "range_match":
             {
               "start": 100,
               "end": 1000

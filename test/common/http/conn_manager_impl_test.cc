@@ -1505,8 +1505,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce(Invoke([&](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                           const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
@@ -3090,38 +3091,6 @@ TEST_F(HttpConnectionManagerImplTest, ConnectWithEmptyPath) {
   conn_manager_->onData(fake_input, false);
 
   expectOnDestroy(false);
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ConnectLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.stop_faking_paths", "false"}});
-
-  setup(false, "envoy-custom-server", false);
-
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
-      .WillRepeatedly(Return(false));
-
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        decoder_ = &conn_manager_->newStream(response_encoder_);
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
-        decoder_->decodeHeaders(std::move(headers), false);
-        data.drain(4);
-        return Http::okStatus();
-      }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, _))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("403", headers.getStatusValue());
-      }));
-
-  // Kick off the incoming data.
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 

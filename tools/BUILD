@@ -13,6 +13,7 @@ envoy_package()
 exports_files([
     "gen_git_sha.sh",
     "check_repositories.sh",
+    "stack_decode.py",
 ])
 
 envoy_py_test_binary(
