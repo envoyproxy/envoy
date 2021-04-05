@@ -1,0 +1,43 @@
+name: Build envoy for curiefense
+
+# This build takes a long time, and exceeds the time limit for GitHub's default
+# runner (6 hours, with 2 CPUs)
+# To run this, start the runner manually, and power it off when done:
+# gcloud compute instances start --zone=us-central1-a gh-runner-envoy
+# (this could be automated later...)
+# NEVER enable the custom runner on PRs
+on:
+  push:
+
+jobs:
+  build-envoy-for-curiefense:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Mount bazel cache
+        uses: actions/cache@v2
+        with:
+          path: "/cache"
+          key: bazel
+      - run: |
+          export ENVOY_DOCKER_OPTIONS="-v /cache:/home/.cache"
+          export BAZEL_BUILD_EXTRA_OPTIONS="--define exported_symbols=enabled"
+          ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'
+          mkdir -p cf-docker
+          chmod 755 cf-docker/
+          cp /tmp/envoy-docker-build/envoy/source/exe/envoy cf-docker/
+          chmod 755 cf-docker/envoy
+          ls -l cf-docker
+          strip cf-docker/envoy
+          objdump -T cf-docker/envoy | grep lua_checkstack
+          echo -en 'FROM scratch\nCOPY envoy /envoy' > cf-docker/Dockerfile
+          cd cf-docker
+          docker build -t curiefense/envoy-cf:$GITHUB_SHA .
+      - name: Push the image
+        run: |
+          docker login -u "${{ secrets.DOCKER_HUB_USER }}" -p "${{ secrets.DOCKER_HUB_PASSWORD }}"
+          docker images
+          docker push curiefense/envoy-cf:$GITHUB_SHA
