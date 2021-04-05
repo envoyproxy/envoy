@@ -314,7 +314,6 @@ TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
   config_helper_.addConfigModifier(setUpstreamTimeout);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
-  // TODO(danzh) why is this the only one that needs scaled timeout?
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
                                        false, false, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
@@ -331,7 +330,8 @@ TEST_P(QuicHttpIntegrationTest, LargeFlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/128 * 1024,
                                  /*downstream_buffer_limit=*/128 * 1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024,
-                                       /*response_size=*/10 * 1024 * 1024, false, false);
+                                       /*response_size=*/10 * 1024 * 1024, false, false, nullptr,
+                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 // Tests that a connection idle times out after 1s and starts delayed close.
