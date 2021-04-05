@@ -7,8 +7,6 @@
 namespace Envoy {
 class Http2UpstreamIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  Http2UpstreamIntegrationTest() {}
-
   void SetUp() override {
     HttpProtocolIntegrationTest::SetUp();
 
