@@ -157,6 +157,7 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     raiseConnectionEvent(source == quic::ConnectionCloseSource::FROM_PEER
                              ? Network::ConnectionEvent::RemoteClose
                              : Network::ConnectionEvent::LocalClose);
+    ASSERT(quic_connection_ != nullptr);
     quic_connection_ = nullptr;
   }
 }
