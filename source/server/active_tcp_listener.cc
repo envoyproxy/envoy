@@ -190,7 +190,7 @@ void ActiveTcpSocket::newConnection() {
     // Hands off connections redirected by iptables to the listener associated with the
     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
     // prevent further redirection.
-    // Leave the new listener to decide whether to execute rebalance.
+    // Leave the new listener to decide whether to execute re-balance.
     // Note also that we must account for the number of connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();

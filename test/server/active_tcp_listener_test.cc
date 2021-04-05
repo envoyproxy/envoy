@@ -116,7 +116,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   bool redirected = false;
 
-  // 1. Listener1 rebalance. Set the balance target to the the active listener itself.
+  // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer1, pickTargetHandler(_))
       .WillOnce(testing::DoAll(
           testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
@@ -147,7 +147,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(conn_handler_, getBalancedHandlerByAddress(_))
       .WillOnce(Return(Network::BalancedConnectionHandlerOptRef(*active_listener2)));
 
-  // 3. Listener2 rebalance. Set the balance target to the the active listener itself.
+  // 3. Listener2 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer2, pickTargetHandler(_))
       .WillOnce(testing::DoAll(
           testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
