@@ -35,6 +35,16 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
       callbacks.addAccessLogHandler(nullptr);
     };
   }
+
+  Server::Configuration::MatchingRequirementsPtr matchingRequirements() override {
+    auto requirements = std::make_unique<
+        envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
+
+    requirements->mutable_data_input_allow_list()->add_type_url(
+        "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+
+    return requirements;
+  }
 };
 
 TEST(MatchWrapper, WithMatcher) {
@@ -82,6 +92,44 @@ matcher:
   EXPECT_CALL(factory_callbacks, addStreamFilter(_, testing::IsNull()));
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(_));
   cb(factory_callbacks);
+}
+
+TEST(MatchWrapper, WithMatcherInvalidDataInput) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
+extension_config:
+  name: test
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+matcher:
+  matcher_tree:
+    input:
+      name: request-headers
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+        header_name: default-matcher-header
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchWrapperConfig match_wrapper_config;
+  EXPECT_THROW_WITH_MESSAGE(
+      match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context),
+      EnvoyException,
+      "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
+      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput not permitted "
+      "according to allowlist");
 }
 
 } // namespace
