@@ -164,13 +164,7 @@ private:
   COUNTER(route_missing)                                                                           \
   COUNTER(unknown_cluster)                                                                         \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
-  COUNTER(no_healthy_upstream)                                                                     \
-  COUNTER(request_call)                                                                            \
-  COUNTER(request_oneway)                                                                          \
-  COUNTER(request_invalid_type)                                                                    \
-  COUNTER(response_reply)                                                                          \
-  COUNTER(response_exception)                                                                      \
-  COUNTER(response_invalid_type)
+  COUNTER(no_healthy_upstream)
 
 struct RouterStats {
   ALL_THRIFT_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
