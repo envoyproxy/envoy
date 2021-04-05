@@ -77,7 +77,7 @@ private:
   void maybeDecodeTrailers();
 
   // Either reset the stream or close the connection according to
-  // close_connection_upon_invalid_header.
+  // should_close_connection and configured http3 options.
   void onStreamError(absl::optional<bool> should_close_connection);
 
   Http::ResponseDecoder* response_decoder_{nullptr};
