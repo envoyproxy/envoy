@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This is intended to used with
 // :ref:`ExtensionWithMatcher <envoy_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
 // where a match tree is specified that indicates (via
-// :ref:`CompositeAction <envoy_api_msg_extensions.filters.http.composite.v3.CompositeAction>`)
+// :ref:`CompositeAction <envoy_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`)
 // which filter configuration to create and delegate to.
 //
 message Composite {
