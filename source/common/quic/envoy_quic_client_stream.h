@@ -78,7 +78,7 @@ private:
 
   // Either reset the stream or close the connection according to
   // close_connection_upon_invalid_header.
-  void onStreamError(bool close_connection_upon_invalid_header);
+  void onStreamError(absl::optional<bool> should_close_connection);
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 

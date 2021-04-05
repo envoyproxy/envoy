@@ -148,7 +148,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
   if (!headers_decompressed() || header_list.empty()) {
-    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
+    onStreamError(absl::nullopt);
     return;
   }
 
@@ -164,7 +164,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
+    onStreamError(absl::nullopt);
     return;
   }
   request_decoder_->decodeHeaders(std::move(headers),
@@ -336,11 +336,18 @@ EnvoyQuicServerStream::validateHeader(const std::string& header_name,
   return result;
 }
 
-void EnvoyQuicServerStream::onStreamError(bool close_connection_upon_invalid_header) {
+void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
 
+  bool close_connection_upon_invalid_header;
+  if (should_close_connection != absl::nullopt) {
+    close_connection_upon_invalid_header = should_close_connection.value();
+  } else {
+    close_connection_upon_invalid_header =
+        !http3_options_.override_stream_error_on_invalid_http_message().value();
+  }
   if (close_connection_upon_invalid_header) {
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
   } else {

@@ -307,11 +307,17 @@ QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection(
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
 }
 
-void EnvoyQuicClientStream::onStreamError(bool close_connection_upon_invalid_header) {
+void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
-
+  bool close_connection_upon_invalid_header;
+  if (should_close_connection != absl::nullopt) {
+    close_connection_upon_invalid_header = should_close_connection.value();
+  } else {
+    close_connection_upon_invalid_header =
+        !http3_options_.override_stream_error_on_invalid_http_message().value();
+  }
   if (close_connection_upon_invalid_header) {
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
   } else {

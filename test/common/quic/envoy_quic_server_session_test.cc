@@ -1,3 +1,5 @@
+#include <memory>
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -162,7 +164,6 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             listener_config_),
-        read_filter_(new Network::MockReadFilter()),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -213,6 +214,7 @@ public:
 
   bool installReadFilter() {
     // Setup read filter.
+    read_filter_ = std::make_shared<Network::MockReadFilter>(),
     envoy_quic_session_.addReadFilter(read_filter_);
     EXPECT_EQ(Http::Protocol::Http3,
               read_filter_->callbacks_->connection().streamInfo().protocol().value());
@@ -289,6 +291,19 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerSessionTests, EnvoyQuicServerSessionTest,
                          testing::ValuesIn({true, false}));
+
+TEST_P(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
+  EXPECT_ENVOY_BUG(envoy_quic_session_.GetOrCreateStream(stream_id),
+                   fmt::format("attempts to create stream", envoy_quic_session_.id(), stream_id));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+      .Times(testing::AtMost(1))
+      .WillOnce(Invoke([](const quic::QuicFrame&) { return false; }));
+  envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
+}
 
 TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
@@ -786,6 +801,7 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
 }
 
 TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
+  read_filter_ = std::make_shared<Network::MockReadFilter>();
   Network::MockFilterChain filter_chain;
   crypto_stream_->setProofSourceDetails(
       std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain));
