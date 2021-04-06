@@ -223,7 +223,6 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
-
 // Dependencies provided in one upgrade filter chain do not satisfy
 // requirements in another.
 TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFromOtherUpgrades) {
@@ -251,7 +250,6 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
       EnvoyException,
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
-
 
 } // namespace
 } // namespace HttpConnectionManager
