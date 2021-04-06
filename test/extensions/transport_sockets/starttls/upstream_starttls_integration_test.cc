@@ -7,6 +7,7 @@
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/transport_sockets/raw_buffer/config.h"
+#include "extensions/transport_sockets/starttls/starttls_socket.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
@@ -94,7 +95,7 @@ public:
     UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
 
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
-      std::cout << "StartTlsSwitchFilter received '" << data.toString() << "' from upstream" << std::endl; 
+      std::cout << "UpstreamReadFilter received from upstream: '" << data.toString() << "'" << std::endl; 
       if (auto parent = parent_.lock()) {
         parent->upstreamWrite(data, end_stream);
         return Network::FilterStatus::Continue;
@@ -140,7 +141,10 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
 }
 
 Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool end_stream) {
-  std::cout << "Data: " << data.toString() << std::endl;
+  std::cout << "StartTlsSwitchFilter received from downstream: " << data.toString() << std::endl;
+  if (upstream_connection_->state() != Network::Connection::State::Open) {
+    std::cout << "Connection is not open" << std::endl;
+  }
   upstream_connection_->write(data, end_stream);
   return Network::FilterStatus::Continue;
 }
@@ -149,11 +153,13 @@ void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream)
   const std::string message = buf.toString();
   if (message == "switch") {
     if (!upstream_connection_->startSecureTransport()) {
-      std::cout << "Failed to start upstream secure transport in StartTlsSwitchFilter" << std::endl;
+      // TODO: why is this failing? This is the only one that I really expected to work.
+      std::cout << "Failed to start secure upstream transport in StartTlsSwitchFilter" << std::endl;
     }
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "switch" has been sent.
       if (bytes >= 6) {
+        std::cout << "StartTlsSwitchFilter flushed 'switch' message to client" << std::endl;
         if (!read_callbacks_->connection().startSecureTransport()) {
           std::cout << "Failed to start secure downstream transport in StartTlsSwitchFilter" << std::endl;
         }
@@ -289,17 +295,16 @@ void StartTlsIntegrationTest::initialize() {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
     .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
       
-      std::cout << "Received socket. " << std::endl;
+      std::cout << "Received socket request. " << std::endl;
       
-      // TODO: use a StartTls transport socket instead of a RawBufferSocket.
-      // Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_),
-      //                                                               move(tls_context_))
-      //     .createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-      //         absl::string_view(""), std::vector<std::string>(), std::vector<std::string>())),
-      // nullptr);
+      // TODO: this requires the client to have the right certs.
+      auto server_tls_context_ = Ssl::createUpstreamSslContext(*tls_context_manager_, *api_);
+
+      auto startTlsTransportSocket = Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_), move(server_tls_context_))
+          .createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()));
 
       server_connection_ = dispatcher_->createServerConnection(
-          std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+          std::move(socket), move(startTlsTransportSocket), stream_info_);
       server_connection_->addReadFilter(std::make_shared<TerminalServerTlsFilter>());
     }));
   
@@ -394,7 +399,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   conn_->setTransportSocket(
       tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
           absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"})));
+          std::vector<std::string>())));
   connect_callbacks_.reset();
 
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
@@ -406,19 +411,9 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   conn_->write(buffer, false);
   
   // Make sure we get our echo back
-  ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(100)));
+  ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(1000)));
   ASSERT_EQ("hola", payload_reader_->data());
   payload_reader_->clearData();
-
-  // while (client_write_buffer_->bytesDrained() != 15) {
-  //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // }
-
-  // buffer.add("bye");
-  // conn_->write(buffer, false);
-  // while (client_write_buffer_->bytesDrained() != 18) {
-  //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // }
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   std::cout << "Test finished." << std::endl;
