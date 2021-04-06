@@ -15,6 +15,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "odcds_api_impl_test",
+    srcs = ["odcds_api_impl_test.cc"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/upstream:odcds_api_lib",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cds_api_impl_test",
     srcs = ["cds_api_impl_test.cc"],
     deps = [
@@ -48,6 +61,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:odcds_api_mocks",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
