@@ -118,9 +118,11 @@ private:
   const uint64_t stage_;
   const bool has_descriptors_;
   const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config_;
+  Event::Dispatcher& dispatcher_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+using LocalRateLimiterImplSharedPtr = std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>;
 
 /**
  * HTTP local rate limit filter. Depending on the route configuration, this filter calls consults
@@ -128,8 +130,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::PassThroughFilter {
 public:
-  Filter(FilterConfigSharedPtr config, Event::Dispatcher& dispatcher) : 
-    config_(config), dispatcher_(dispatcher) {}
+  Filter(FilterConfigSharedPtr config) : config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -145,7 +146,6 @@ private:
 
   const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace LocalRateLimitFilter
