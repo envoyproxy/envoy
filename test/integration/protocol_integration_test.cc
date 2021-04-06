@@ -1090,7 +1090,6 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) {
-  // hits assert "Upper stream buffer limit is reached before response body is delivered."
   EXCLUDE_UPSTREAM_HTTP3;
   testTwoRequests(true);
 }
