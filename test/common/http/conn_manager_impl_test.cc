@@ -809,6 +809,120 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// TODO: add test description
+TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
+  setup(false, "");
+  setupFilterChain(2, 0);
+
+  // Cluster mock: foo
+  // For when decoder_filters_[0] invokes setRoute
+  const std::string foo_cluster_name = "foo";
+  std::shared_ptr<Upstream::MockThreadLocalCluster> foo_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{foo_cluster_name}))
+      .Times(1)
+      .WillRepeatedly(Return(foo_cluster.get()));
+
+  // Cluster mock: default
+  // For decoder_filters_[0] invokes decodeHeaders and subsequently refreshCachedRoute
+  const std::string default_cluster_name = "default";
+  std::shared_ptr<Upstream::MockThreadLocalCluster> default_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{default_cluster_name}))
+      .Times(1)
+      .WillRepeatedly(Return(default_cluster.get()));
+
+  // Route mock: default
+  // For when decoder_filters_[0] invokes decodeHeaders and subsequently refreshCachedRoute
+  std::shared_ptr<Router::MockRoute> default_route =
+      std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .Times(1)
+      .WillRepeatedly(Return(default_route));
+  EXPECT_CALL(default_route->route_entry_, clusterName())
+      .Times(1)
+      .WillRepeatedly(ReturnRef(default_cluster_name));
+
+  // default_route Router::RouteEntry method mocks (NOT NEEDED)
+  // EXPECT_CALL(default_route->route_entry_, clusterNotFoundResponseCode())
+  //     .WillRepeatedly(Return(Code::NotFound));
+
+  // DelegatingRoute: foo
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> delegating_route_foo(nullptr);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Instantiate a DelegatingRoute child class object and invoke setRoute from
+        // StreamFilterCallbacks to manually override the cached route for the current request.
+        delegating_route_foo = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+            default_route, foo_cluster_name);
+        decoder_filters_[0]->callbacks_->setRoute(delegating_route_foo);
+
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Check that cached_route was correctly set to the delegating route.
+        EXPECT_EQ(delegating_route_foo, decoder_filters_[1]->callbacks_->route());
+
+        // Check that delegating route correctly overrides the routeEntry()->clusterName()
+        EXPECT_EQ(foo_cluster_name, delegating_route_foo->routeEntry()->clusterName());
+
+        // Check that all other routeEntry calls are delegated correctly
+        EXPECT_EQ(default_route->routeEntry()->clusterNotFoundResponseCode(),
+                  delegating_route_foo->routeEntry()->clusterNotFoundResponseCode());
+        EXPECT_EQ(default_route->routeEntry()->corsPolicy(),
+                  delegating_route_foo->routeEntry()->corsPolicy());
+        auto test_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.lyft.com"},
+                                                           {":path", "/new_endpoint/foo"},
+                                                           {":method", "GET"},
+                                                           {"x-safe", "safe"},
+                                                           {"x-global-nope", "global"},
+                                                           {"x-vhost-nope", "vhost"},
+                                                           {"x-route-nope", "route"},
+                                                           {"x-forwarded-proto", "http"}};
+        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(test_headers),
+                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(test_headers));
+        EXPECT_EQ(default_route->routeEntry()->hashPolicy(),
+                  delegating_route_foo->routeEntry()->hashPolicy());
+
+        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy(),
+        //           delegating_route_foo->routeEntry()->hedgePolicy());
+        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy().additionalRequestChance(),
+        //           delegating_route_foo->routeEntry()->hedgePolicy().additionalRequestChance());
+        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy().hedgeOnPerTryTimeout(),
+        //           delegating_route_foo->routeEntry()->hedgePolicy().hedgeOnPerTryTimeout());
+        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy().initialRequests(),
+        //           delegating_route_foo->routeEntry()->hedgePolicy().initialRequests());
+
+        EXPECT_EQ(default_route->routeEntry()->priority(),
+                  delegating_route_foo->routeEntry()->priority());
+
+        // EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().empty(),
+        //           delegating_route_foo->routeEntry()->rateLimitPolicy().empty());
+        // EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty(),
+        //           delegating_route_foo->routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty());
+
+        // TODO WIP: How would I test delegating behavior if method return type is void, like in the
+        // case of finalizeResponseHeaders?
+        // EXPECT_EQ(
+        //     default_route->routeEntry()->finalizeResponseHeaders(&headers, &stream_info),
+        //     delegating_route_foo->routeEntry()->finalizeResponseHeaders(&headers, &stream_info));
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  // Kick off the incoming data. end_stream set to true to indicate this is a header only request.
+  startRequest(true);
+
+  // Clean up.
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Filters observe host header w/o port's part when port's removal is configured
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   setup(false, "");
