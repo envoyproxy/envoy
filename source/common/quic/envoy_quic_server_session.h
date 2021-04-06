@@ -64,6 +64,12 @@ public:
       const spdy::SpdyStreamPrecedence& precedence,
       quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
 
+  void setHeadersWithUnderscoreAction(
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action) {
+    headers_with_underscores_action_ = headers_with_underscores_action;
+  }
+
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:
@@ -91,6 +97,9 @@ private:
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
+
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 } // namespace Quic

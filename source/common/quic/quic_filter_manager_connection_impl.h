@@ -1,10 +1,13 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/network/connection_impl_base.h"
 #include "common/quic/envoy_quic_connection.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
@@ -117,6 +120,15 @@ public:
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+    http3_options_ =
+        std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>(http3_options);
+  }
+
+  void setCodecStats(Http::Http3::CodecStats& stats) {
+    codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
+  }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -127,6 +139,10 @@ protected:
   virtual bool hasDataToWrite() PURE;
 
   EnvoyQuicConnection* quic_connection_{nullptr};
+
+  absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
+  absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
+      http3_options_;
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
