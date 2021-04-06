@@ -23,8 +23,8 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
   sign(headers, content_hash);
 }
 
-void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  if (require_content_hash_) {
+void SignerImpl::sign(Http::RequestHeaderMap& headers, bool unsigned_payload) {
+  if (unsigned_payload) {
     headers.setReference(SignatureHeaders::get().ContentSha256,
                          SignatureConstants::get().UnsignedPayload);
     sign(headers, SignatureConstants::get().UnsignedPayload);

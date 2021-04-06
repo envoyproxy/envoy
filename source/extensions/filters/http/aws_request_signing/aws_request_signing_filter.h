@@ -60,7 +60,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite);
+                   Stats::Scope& scope, const std::string& host_rewrite, bool unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
@@ -70,6 +70,7 @@ private:
   Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
   std::string host_rewrite_;
+  bool unsigned_payload_;
 };
 
 /**
@@ -81,11 +82,13 @@ public:
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
 private:
   std::shared_ptr<FilterConfig> config_;
+  Http::RequestHeaderMap* request_headers_ = nullptr;
+  bool unsigned_payload_;
 };
 
 } // namespace AwsRequestSigningFilter

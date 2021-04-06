@@ -25,7 +25,7 @@ public:
    * @param headers AWS API request headers.
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::RequestHeaderMap& headers) PURE;
+  virtual void sign(Http::RequestHeaderMap& headers, bool unsigned_payload = false) PURE;
 
   /**
    * Sign an AWS request.
