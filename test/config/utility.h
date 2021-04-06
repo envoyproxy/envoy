@@ -136,7 +136,7 @@ public:
   // A string for a squash filter which can be used with addFilter()
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
-  static std::string startTlsConfig(bool downstream);
+  static std::string startTlsConfig();
   // A cluster that uses the startTls transport socket.
   static envoy::config::cluster::v3::Cluster buildStartTlsCluster(const std::string& address, int port);
 

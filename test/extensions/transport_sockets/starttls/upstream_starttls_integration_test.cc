@@ -206,7 +206,7 @@ public:
 class StartTlsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
-  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig(true)), stream_info_(timeSystem(), nullptr) {}
+  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig()), stream_info_(timeSystem(), nullptr) {}
   void initialize() override;
   void addStartTlsSwitchFilter(ConfigHelper& config_helper);
 

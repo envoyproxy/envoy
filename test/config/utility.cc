@@ -117,14 +117,14 @@ std::string ConfigHelper::tcpProxyConfig() {
 )EOF");
 }
 
-std::string ConfigHelper::startTlsConfig(bool downstream) {
+std::string ConfigHelper::startTlsConfig() {
   return absl::StrCat(
       tcpProxyConfig(),
       fmt::format(R"EOF(
       transport_socket:
         name: "starttls"
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.{}
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
           cleartext_socket_config:
           tls_socket_config:
             common_tls_context:
@@ -134,7 +134,6 @@ std::string ConfigHelper::startTlsConfig(bool downstream) {
                 private_key:
                   filename: {}
 )EOF",
-                  downstream ? "StartTlsConfig" : "UpstreamStartTlsConfig",
                   TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
@@ -1220,10 +1219,10 @@ void ConfigHelper::initializeTls(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
   }
-  // if (!options.san_matchers_.empty()) {
-  //   *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
-  //                                                             options.san_matchers_.end()};
-  // }
+  if (!options.san_matchers_.empty()) {
+    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
+                                                              options.san_matchers_.end()};
+  }
 }
 
 void ConfigHelper::renameListener(const std::string& name) {
