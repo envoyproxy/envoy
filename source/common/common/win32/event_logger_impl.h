@@ -13,8 +13,6 @@ namespace Logger {
 class WindowsEventLogger : public Logger {
 public:
   WindowsEventLogger(const std::string& name);
-
-  friend class ServiceBase;
 };
 
 } // namespace Logger

@@ -209,7 +209,6 @@ envoy_cc_library(
         "//bazel:windows_x86_64": ["win32/event_logger_impl.h"],
         "//conditions:default": [],
     }),
-    strip_include_prefix = "win32",
     deps = [":base_logger_lib"],
 )
 

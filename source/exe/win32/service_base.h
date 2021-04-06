@@ -9,7 +9,7 @@
 
 #include "envoy/event/signal.h"
 
-#include "common/common/event_logger_impl.h"
+#include "common/common/win32/event_logger_impl.h"
 
 #include "exe/service_status.h"
 

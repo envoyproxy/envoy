@@ -36,6 +36,9 @@ public:
   void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
   spdlog::level::level_enum level() const { return logger_->level(); }
 
+  /*
+   * Exposes the log method of the logger. See `spdlog::logger` log method.
+   */
   template <typename... Args>
   void log(spdlog::source_loc loc, spdlog::level::level_enum lvl, absl::string_view fmt,
            const Args&... args) {

@@ -11,6 +11,12 @@
 
 #include "absl/debugging/symbolize.h"
 
+// Logging macro for SCM
+#define ENVOY_LOG_SCM(LOGGER, LEVEL, ...)                                                          \
+  do {                                                                                             \
+    LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, LEVEL, __VA_ARGS__);            \
+  } while (0)
+
 namespace Envoy {
 
 namespace {
@@ -52,8 +58,7 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
     } else {
       std::string error_msg{
           fmt::format("Could not dispatch Envoy to start as a service with error {}", last_error)};
-      service_static->windows_event_logger_.log(::spdlog::source_loc{__FILE__, __LINE__, __func__},
-                                                spdlog::level::err, error_msg);
+      ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
       PANIC(error_msg);
     }
   }
@@ -87,14 +92,11 @@ DWORD ServiceBase::Start(std::vector<std::string> args) {
     return S_OK;
   }
   catch (const Envoy::MalformedArgvException& e) {
-    service_static->windows_event_logger_.log(::spdlog::source_loc{__FILE__, __LINE__, __func__},
-                                              spdlog::level::err, e.what());
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, e.what());
     return E_INVALIDARG;
   }
   catch (const Envoy::EnvoyException& e) {
-    ENVOY_LOG_MISC(warn, "Envoy failed to start with {}", e.what());
-    service_static->windows_event_logger_.log(::spdlog::source_loc{__FILE__, __LINE__, __func__},
-                                              spdlog::level::err, e.what());
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, e.what());
     return E_FAIL;
   }
 
@@ -139,9 +141,8 @@ void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
   RELEASE_ASSERT(service_static != nullptr, "Global pointer to service should not be null");
   if (argc < 1 || argv == 0 || argv[0] == 0) {
     service_static->UpdateState(SERVICE_STOPPED, E_INVALIDARG, true);
-    std::string error_msg{fmt::format("insufficient arguments provided")};
-    service_static->windows_event_logger_.log(::spdlog::source_loc{__FILE__, __LINE__, __func__},
-                                              spdlog::level::err, error_msg);
+    constexpr absl::string_view error_msg{"insufficient arguments provided"};
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
     PANIC(error_msg);
   }
 
@@ -151,8 +152,7 @@ void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
     service_static->UpdateState(SERVICE_STOPPED, last_error, false);
     std::string error_msg{
         fmt::format("Could not register service control handler with error {}", last_error)};
-    service_static->windows_event_logger_.log(::spdlog::source_loc{__FILE__, __LINE__, __func__},
-                                              spdlog::level::err, error_msg);
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
     PANIC(error_msg);
   }
 
