@@ -1,35 +1,18 @@
-Why are the Envoy xDS APIs versioned? What is the benefit?
-==========================================================
+为什么要对 Envoy xDS API 进行版本控制？有什么好处？
+=====================================================
 
-Envoy is a platform and needs to allow its APIs to grow and evolve to encompass new features,
-improve ergonomics and address new use cases. At the same time, we need a disciplined approach to
-turning down stale functionality and removing APIs and their supporting code that are no longer
-maintained. If we don't do this, we lose the ability in the long term to provide a reliable,
-maintainable, scalable code base and set of APIs for our users.
+Envoy 是一个平台，需要允许其 API 不断发展以包含新功能、改进人机工程学并解决新用例。同时，我们需要一种严谨的方法来拒绝过时的功能并删除不再维护的 API 及其支持代码。如果我们不这样做，从长远来看我们将失去为用户提供可靠的、可维护、可扩展的代码库和 API 集的能力。
 
-We had previously put in place policies around :repo:`breaking changes
-<CONTRIBUTING.md#breaking-change-policy>` across releases, the :repo:`API versioning policy
-<api/API_VERSIONING.md>` takes this a step further, articulating a guaranteed multi-year support
-window for APIs that provides control plane authors a predictable clock when considering support
-for a range of Envoy versions.
+我们曾针对在各个发行版之间的 :repo:`重大更改 <CONTRIBUTING.md#breaking-change-policy>` 制定了相关政策，而 :repo:`API版本控制策略 <api/API_VERSIONING.md>` 则对此做了进一步提升，明确说明了 API 的有保证的多年支持窗口，当考虑支持一系列 Envoy 版本时，该窗口为控制平面作者提供了可预测的时钟。
 
-For the v3 xDS APIs, a brief list of the key improvements that were made with a clean break from v2:
+对于 v3 xDS API，简要列出了与 v2 相比所做的主要改进：
 
-* Packages organization was improved to reflect a more logical grouping of related APIs:
+* 软件包的组织得到了改进，以反映相关 API 的更合理的分组：
 
-  - The legacy `envoy.api.v2` tree was eliminated, with protos moved to their logical groupings,
-    e.g. `envoy.config.core.v3`, `envoy.server.listener.v3`.
-  - All packages are now versioned with a `vN` at the end. This allows for type-level identification
-    of major version.
-  - xDS service endpoints/transport and configuration are split between `envoy.service` and
-    `envoy.config`.
-  - Extensions now reflect the Envoy source tree layout under `envoy.extensions`.
-* `std::regex` regular expressions were dropped from the API, in favor of RE2. The former have dangerous
-  security implications.
-* `google.protobuf.Struct` configuration of extensions was dropped from the API, in favor of
-  typed configuration. This provides for better support for multiple instances of extensions, e.g.
-  in filter chains, and more flexible naming of extension instances.
-* Over 60 deprecated fields were removed from the API.
-* Tooling and processes were established for API versioning support. This has now been reflected in
-  the bootstrap `Node`, providing a long term notion of API support that control planes can depend
-  upon for client negotiation.
+  - 现在所有软件包通过末尾的 `vN` 进行版本控制。这允许对主要版本进行类型级别的标识。
+  - xDS服务端点/传输和配置在 `envoy.service` 和 `envoy.config`。
+  - 扩展现在反映了 `envoy.extensions` 下的 Envoy 源代码树布局。  
+* 正则表达式 `std::regex` 已从 API 中删除，以支持 RE2。前者具有危险的安全隐患。
+* 扩展的配置 `google.protobuf.Struct` 已从 API 中删除，这有利于类型化配置。也为扩展的多个实例提供了更好的支持，例如，在过滤器链中，并且扩展实例的命名更加灵活。
+* 从 API 中删除了 60 多个不赞成使用的字段。
+* 建立了用于 API 版本支持的工具和流程。现在，这已经反映在引导程序 `Node` 中，它提供了控制平面可以依赖于客户端协商的 API 支持的长期概念。
