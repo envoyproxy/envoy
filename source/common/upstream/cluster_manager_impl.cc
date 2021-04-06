@@ -26,6 +26,7 @@
 #include "common/config/xds_resource.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/conn_pool_grid.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
@@ -1505,14 +1506,19 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
     ClusterConnectivityState& state) {
-  if (protocols.size() == 2) {
+  if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+    Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
+    return std::make_unique<Http::ConnectivityGrid>(dispatcher, api_.randomGenerator(), host,
+                                                    priority, options, transport_socket_options,
+                                                    state, source, coptions);
+  }
+  if (protocols.size() >= 2) {
     ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
            (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11));
     return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
                                                          priority, options,
                                                          transport_socket_options, state);
   }
-
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,

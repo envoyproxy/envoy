@@ -926,8 +926,11 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return {downstream_protocol.value()};
   } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
-    ASSERT(!(features_ & Upstream::ClusterInfo::Features::HTTP3));
-    return {Http::Protocol::Http2, Http::Protocol::Http11};
+    if (!(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
+      return {Http::Protocol::Http2, Http::Protocol::Http11};
+    } else {
+      return {Http::Protocol::Http3, Http::Protocol::Http2, Http::Protocol::Http11};
+    }
   } else {
     if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
       return {Http::Protocol::Http3};
@@ -974,9 +977,17 @@ ClusterImplBase::ClusterImplBase(
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
 #if defined(ENVOY_ENABLE_QUIC)
-    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+    auto metadata = http3Metadata();
+    if (!(info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
+        cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
       throw EnvoyException(
           fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
+                      cluster.DebugString()));
+    }
+    if (info_->features() & ClusterInfoImpl::Features::USE_ALPN &&
+        info_->transportSocketMatcher().resolve(&metadata).name_ != "use_quic") {
+      throw EnvoyException(
+          fmt::format("HTTP3 with ALPN requires a socket match with 'use_quic': {}", cluster.name(),
                       cluster.DebugString()));
     }
 #else

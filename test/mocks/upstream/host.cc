@@ -40,7 +40,7 @@ MockHostDescription::MockHostDescription()
   ON_CALL(*this, locality()).WillByDefault(ReturnRef(locality_));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, healthChecker()).WillByDefault(ReturnRef(health_checker_));
-  ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*socket_factory_));
+  ON_CALL(*this, transportSocketFactory(_)).WillByDefault(ReturnRef(*socket_factory_));
 }
 
 MockHostDescription::~MockHostDescription() = default;
@@ -50,7 +50,7 @@ MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransp
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, warmed()).WillByDefault(Return(true));
-  ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*socket_factory_));
+  ON_CALL(*this, transportSocketFactory(_)).WillByDefault(ReturnRef(*socket_factory_));
 }
 
 MockHost::~MockHost() = default;

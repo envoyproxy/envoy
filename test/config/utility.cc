@@ -713,6 +713,10 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
         new_protocol_options.mutable_auto_config()->mutable_http2_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http2_protocol_options());
       }
+      if (http3 || old_protocol_options.explicit_http_config().has_http3_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http3_protocol_options());
+      }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
               .PackFrom(new_protocol_options);
@@ -725,10 +729,23 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
     // The test certs are for *.lyft.com, so make sure SNI matches.
     tls_context.set_sni("foo.lyft.com");
     if (http3) {
-      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
       envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
       quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
-      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+      if (use_alpn) {
+        // Configure both HTTP/2 and HTTP/3
+        cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+        cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+        auto* match = cluster->add_transport_socket_matches();
+        ProtobufWkt::Value v;
+        v.set_string_value("true");
+        match->mutable_match()->mutable_fields()->insert({"use_quic", v});
+        match->set_name("use_quic");
+        match->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+        match->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+      } else {
+        cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+        cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+      }
     } else {
       cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
       cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
