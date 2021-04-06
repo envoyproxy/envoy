@@ -45,7 +45,6 @@ TEST_F(CustomHeaderTest, Detection) {
     const auto& reject_options = result.reject_options.value();
     EXPECT_EQ(reject_options.response_code, Http::Code::Unauthorized);
     EXPECT_EQ(reject_options.body, "detection failed");
-    EXPECT_EQ(reject_options.details, "rejecting because detection failed");
   }
 
   // Bad IP in the header.
@@ -61,7 +60,6 @@ TEST_F(CustomHeaderTest, Detection) {
     const auto& reject_options = result.reject_options.value();
     EXPECT_EQ(reject_options.response_code, Http::Code::Unauthorized);
     EXPECT_EQ(reject_options.body, "detection failed");
-    EXPECT_EQ(reject_options.details, "rejecting because detection failed");
   }
 
   // Good IP.
