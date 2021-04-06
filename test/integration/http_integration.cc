@@ -235,6 +235,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
                                            server_addr, local_addr);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
+  return nullptr;
 #endif
 }
 
