@@ -1667,8 +1667,6 @@ envoy_cc_test(
     data = ["//test/config/integration/certs"],
     shard_count = 8,
     tags = [
-        "fails_on_clang_cl",
-        "fails_on_windows",
         "nofips",
     ],
     deps = envoy_select_enable_http3([
