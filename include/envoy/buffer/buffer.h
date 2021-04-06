@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/account.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
@@ -100,6 +101,19 @@ public:
    * from all buffers.
    */
   virtual void addDrainTracker(std::function<void()> drain_tracker) PURE;
+
+  /**
+   * Returns a weak pointer to the account associated with the buffer, if any.
+   */
+  virtual std::weak_ptr<Account> account() const PURE;
+
+  /**
+   * Binds the account to be charged for resources used by the buffer. This
+   * should only be called once.
+   *
+   * @param account a weak_ptr to the account to charge.
+   */
+  virtual void bindAccount(std::weak_ptr<Account> account) PURE;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/account.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
@@ -175,6 +176,27 @@ protected:
     ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
   };
 
+  class BufferMemoryAccount : public Account,
+                              public std::enable_shared_from_this<BufferMemoryAccount> {
+  public:
+    BufferMemoryAccount() = default;
+    ~BufferMemoryAccount() = default;
+
+    // Make not copyable
+    BufferMemoryAccount(BufferMemoryAccount&) = delete;
+    BufferMemoryAccount& operator=(BufferMemoryAccount& other) = delete;
+
+    uint64_t balance() const override { return buffer_memory_allocated_; }
+    std::unique_ptr<Charge> charge(uint64_t amount) override {
+      buffer_memory_allocated_ += amount;
+      return std::make_unique<Charge>(weak_from_this(), amount);
+    }
+
+  private:
+    void credit(uint64_t amount) override { buffer_memory_allocated_ -= amount; }
+    uint64_t buffer_memory_allocated_ = 0;
+  };
+
   /**
    * Base class for client and server side streams.
    */
@@ -306,6 +328,7 @@ protected:
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); },
         []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
+    std::shared_ptr<Account> buffer_memory_account_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;

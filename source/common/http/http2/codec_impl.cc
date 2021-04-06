@@ -130,11 +130,14 @@ template <typename T> static T* removeConst(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent), local_end_stream_sent_(false), remote_end_stream_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
+    : parent_(parent), buffer_memory_account_(std::make_shared<BufferMemoryAccount>()),
+      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
+      received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   parent_.stats_.streams_active_.inc();
+  pending_recv_data_.bindAccount(buffer_memory_account_);
+  pending_send_data_.bindAccount(buffer_memory_account_);
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
   }

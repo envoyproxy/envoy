@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/account.h"
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
@@ -50,13 +52,21 @@ public:
   Slice() = default;
 
   /**
-   * Create an empty mutable Slice that owns its storage.
+   * Create an empty mutable Slice that owns its storage, which it charges to
+   * the provided account, if any.
    * @param min_capacity number of bytes of space the slice should have. Actual capacity is rounded
    * up to the next multiple of 4kb.
+   * @param account the account to charge.
+   * @param freelist to search for the backing storage, if any.
    */
-  Slice(uint64_t min_capacity, absl::optional<FreeListReference> free_list = absl::nullopt)
+  Slice(uint64_t min_capacity, std::weak_ptr<Account> account,
+        absl::optional<FreeListReference> free_list = absl::nullopt)
       : capacity_(sliceSize(min_capacity)), storage_(newStorage(capacity_, free_list)),
-        base_(storage_.get()), data_(0), reservable_(0) {}
+        base_(storage_.get()), data_(0), reservable_(0) {
+    if (!account.expired()) {
+      charges_.emplace_back(account.lock()->charge(capacity_));
+    }
+  }
 
   /**
    * Create an immutable Slice that refers to an external buffer fragment.
@@ -72,6 +82,7 @@ public:
   Slice(Slice&& rhs) noexcept {
     storage_ = std::move(rhs.storage_);
     drain_trackers_ = std::move(rhs.drain_trackers_);
+    charges_ = std::move(rhs.charges_);
     base_ = rhs.base_;
     data_ = rhs.data_;
     reservable_ = rhs.reservable_;
@@ -90,6 +101,7 @@ public:
       freeStorage(std::move(storage_), capacity_);
       storage_ = std::move(rhs.storage_);
       drain_trackers_ = std::move(rhs.drain_trackers_);
+      charges_ = std::move(rhs.charges_);
       base_ = rhs.base_;
       data_ = rhs.data_;
       reservable_ = rhs.reservable_;
@@ -279,11 +291,14 @@ public:
   }
 
   /**
-   * Move all drain trackers from the current slice to the destination slice.
+   * Move all drain trackers and charges from the current slice to the destination slice.
    */
-  void transferDrainTrackersTo(Slice& destination) {
+  void transferDrainTrackersAndChargesTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
+
+    std::move(charges_.begin(), charges_.end(), destination.charges_.end());
+    ASSERT(charges_.empty());
   }
 
   /**
@@ -303,6 +318,24 @@ public:
     }
     drain_trackers_.clear();
   }
+
+  /**
+   * Charges the provided account for the resources if we're not already
+   * charging for this slice, the account still exists, and the slice owns
+   * backing memory.
+   */
+  void chargeAccountIfValid(std::weak_ptr<Account> account) {
+    if (hasCharge() || storage_ == nullptr || account.expired()) {
+      return;
+    }
+
+    charges_.emplace_back(account.lock()->charge(capacity_));
+  }
+
+  /**
+   * Whether there's at least one associated charge for this slice.
+   */
+  bool hasCharge() { return !charges_.empty(); }
 
   static constexpr uint32_t default_slice_size_ = 16384;
 
@@ -383,6 +416,10 @@ protected:
 
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
+
+  /** Charges associated with this slice. This should typically hold just a
+   * single charge, but in cases of coalescing might hold additional charges. */
+  absl::InlinedVector<std::unique_ptr<Charge>, 4> charges_;
 };
 
 class OwnedImpl;
@@ -636,6 +673,8 @@ public:
 
   // Buffer::Instance
   void addDrainTracker(std::function<void()> drain_tracker) override;
+  std::weak_ptr<Account> account() const override;
+  void bindAccount(std::weak_ptr<Account> account) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
@@ -729,6 +768,8 @@ private:
 
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
+
+  std::weak_ptr<Account> account_;
 
   struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
     virtual absl::Span<Slice> ownedSlices() PURE;

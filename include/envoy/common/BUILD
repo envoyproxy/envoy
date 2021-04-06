@@ -91,3 +91,8 @@ envoy_cc_library(
     name = "scope_tracker_interface",
     hdrs = ["scope_tracker.h"],
 )
+
+envoy_cc_library(
+    name = "account_interface",
+    hdrs = ["account.h"],
+)
