@@ -63,7 +63,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
-        "http2_bug_tracker_impl.h",
         "http2_containers_impl.h",
         "http2_estimate_memory_usage_impl.h",
         "http2_logging_impl.h",
@@ -93,8 +92,8 @@ envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
     hdrs = [
-        "quic_bug_tracker_impl.h",
         "quic_logging_impl.h",
+        "quiche_bug_tracker_impl.h",
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],

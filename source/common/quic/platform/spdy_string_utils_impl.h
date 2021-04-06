@@ -13,7 +13,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "fmt/printf.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace spdy {
 
