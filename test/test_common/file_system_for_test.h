@@ -136,15 +136,14 @@ private:
 MemfileInstanceImpl& fileSystemForTest();
 
 class ScopedUseMemfiles {
- public:
-  explicit ScopedUseMemfiles(bool use) : prior_use_memfiles_(Filesystem::fileSystemForTest().useMemfiles()) {
+public:
+  explicit ScopedUseMemfiles(bool use)
+      : prior_use_memfiles_(Filesystem::fileSystemForTest().useMemfiles()) {
     Filesystem::fileSystemForTest().setUseMemfiles(use);
   }
-  ~ScopedUseMemfiles() {
-    Filesystem::fileSystemForTest().setUseMemfiles(prior_use_memfiles_);
-  }
+  ~ScopedUseMemfiles() { Filesystem::fileSystemForTest().setUseMemfiles(prior_use_memfiles_); }
 
- private:
+private:
   bool prior_use_memfiles_;
 };
 
