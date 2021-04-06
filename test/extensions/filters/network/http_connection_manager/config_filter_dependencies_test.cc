@@ -39,6 +39,11 @@ route_config:
         cluster: cluster
 )EOF";
 
+/**
+ * Testing scenario for testing filter dependencies.
+ * ChefFilter requires a "potato" dependency, which PantryFilter provides.
+ */
+
 Dependency potato() {
   Dependency d;
   d.set_name("potato");
@@ -57,11 +62,6 @@ public:
     return std::make_unique<FilterDependencies>(d);
   }
 };
-
-/**
- * Testing scenario for testing filter dependencies.
- * ChefFilter requires a "potato" dependency, which PantryFilter provides.
- */
 
 // Test filter that requires a potato.
 class ChefFilterFactory : public PassThroughFilterFactory {
@@ -178,6 +178,80 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
       EnvoyException,
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
+
+TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  auto upgrade_config = hcm_config.add_upgrade_configs();
+  upgrade_config->set_upgrade_type("websocket");
+  upgrade_config->add_filters()->set_name("test.pantry");
+  upgrade_config->add_filters()->set_name("test.chef");
+  upgrade_config->add_filters()->set_name("envoy.filters.http.router");
+
+  PantryFilterFactory pf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
+  ChefFilterFactory cf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
+
+  HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_, http_tracer_manager_,
+                              filter_config_provider_manager_);
+}
+
+// Dependencies provided in the HCM config filter chain do not satisfy
+// requirements in the upgrade filter chain.
+TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFromHcmConfig) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  hcm_config.add_http_filters()->set_name("test.pantry");
+  hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
+
+  auto upgrade_config = hcm_config.add_upgrade_configs();
+  upgrade_config->set_upgrade_type("websocket");
+  upgrade_config->add_filters()->set_name("test.chef");
+  upgrade_config->add_filters()->set_name("envoy.filters.http.router");
+
+  PantryFilterFactory pf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
+  ChefFilterFactory cf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException,
+      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+}
+
+
+// Dependencies provided in one upgrade filter chain do not satisfy
+// requirements in another.
+TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFromOtherUpgrades) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  auto upgrade_config1 = hcm_config.add_upgrade_configs();
+  upgrade_config1->set_upgrade_type("websocket");
+  upgrade_config1->add_filters()->set_name("test.pantry");
+  upgrade_config1->add_filters()->set_name("envoy.filters.http.router");
+
+  auto upgrade_config2 = hcm_config.add_upgrade_configs();
+  upgrade_config2->set_upgrade_type("CONNECT");
+  upgrade_config2->add_filters()->set_name("test.chef");
+  upgrade_config2->add_filters()->set_name("envoy.filters.http.router");
+
+  PantryFilterFactory pf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
+  ChefFilterFactory cf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException,
+      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+}
+
 
 } // namespace
 } // namespace HttpConnectionManager
