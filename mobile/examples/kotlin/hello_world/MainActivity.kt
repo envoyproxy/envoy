@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.UpstreamHttpProtocol
@@ -45,6 +46,7 @@ class MainActivity : Activity() {
     setContentView(R.layout.activity_main)
 
     engine = AndroidEngineBuilder(application)
+      .addLogLevel(LogLevel.DEBUG)
       .addPlatformFilter { DemoFilter() }
       .addPlatformFilter { BufferDemoFilter() }
       .addPlatformFilter { AsyncDemoFilter() }

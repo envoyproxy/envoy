@@ -11,6 +11,7 @@ import io.envoyproxy.envoymobile.Distribution;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.Element;
 import io.envoyproxy.envoymobile.Gauge;
+import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
@@ -58,6 +59,7 @@ public class MainActivity extends Activity {
     setContentView(R.layout.activity_main);
 
     engine = new AndroidEngineBuilder(getApplication())
+                 .addLogLevel(LogLevel.DEBUG)
                  .setOnEngineRunning(() -> {
                    Log.d("MainActivity", "Envoy async internal setup completed");
                    return null;
