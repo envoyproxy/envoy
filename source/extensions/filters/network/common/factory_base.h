@@ -44,15 +44,11 @@ public:
 
   std::string name() const override { return name_; }
 
-  bool isTerminalFilter(const Protobuf::Message& proto_config,
-                        Server::Configuration::FactoryContext& context) override {
-    return isTerminalFilter(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                proto_config, context.messageValidationVisitor()),
-                            context);
-  }
-
-  virtual bool isTerminalFilter(const ConfigProto&, Server::Configuration::FactoryContext&) {
-    return is_terminal_filter_;
+  bool isTerminalFilterByProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override {
+    return isTerminalFilterByProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                            proto_config, context.messageValidationVisitor()),
+                                        context);
   }
 
 protected:
@@ -60,6 +56,10 @@ protected:
       : name_(name), is_terminal_filter_(is_terminal) {}
 
 private:
+  virtual bool isTerminalFilterByProtoTyped(const ConfigProto&,
+                                            Server::Configuration::FactoryContext&) {
+    return is_terminal_filter_;
+  }
   virtual Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     Server::Configuration::FactoryContext& context) PURE;

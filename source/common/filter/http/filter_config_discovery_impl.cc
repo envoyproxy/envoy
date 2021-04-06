@@ -171,7 +171,7 @@ void FilterConfigSubscription::onConfigUpdate(
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
-  bool is_terminal_filter = factory.isTerminalFilter(*message, factory_context_);
+  bool is_terminal_filter = factory.isTerminalFilterByProto(*message, factory_context_);
   for (auto* provider : filter_config_providers_) {
     provider->validateTerminalFilter(filter_config_name_, factory.name(), is_terminal_filter);
   }
@@ -293,7 +293,8 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
         *default_factory);
     Config::Utility::validateTerminalFilters(
         filter_config_name, default_factory->name(), filter_chain_type,
-        default_factory->isTerminalFilter(*message, factory_context), last_filter_in_filter_config);
+        default_factory->isTerminalFilterByProto(*message, factory_context),
+        last_filter_in_filter_config);
     default_config =
         default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
   }

@@ -111,7 +111,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
     Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
-        factory.isTerminalFilter(*message, filter_chain_factory_context), i == filters.size() - 1);
+        factory.isTerminalFilterByProto(*message, filter_chain_factory_context),
+        i == filters.size() - 1);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
     ret.push_back(callback);

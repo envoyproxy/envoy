@@ -520,7 +520,8 @@ public:
 
   std::string name() const override { return "stats_test"; }
 
-  bool isTerminalFilter(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
+  bool isTerminalFilterByProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
     return true;
   }
 

@@ -29,8 +29,8 @@ private:
     };
   }
 
-  bool isTerminalFilter(const envoy::extensions::filters::network::echo::v3::Echo&,
-                        Server::Configuration::FactoryContext&) override {
+  bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
+                                    Server::Configuration::FactoryContext&) override {
     return true;
   }
 };

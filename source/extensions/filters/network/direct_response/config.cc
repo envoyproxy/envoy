@@ -32,8 +32,9 @@ private:
     };
   }
 
-  bool isTerminalFilter(const envoy::extensions::filters::network::direct_response::v3::Config&,
-                        Server::Configuration::FactoryContext&) override {
+  bool isTerminalFilterByProtoTyped(
+      const envoy::extensions::filters::network::direct_response::v3::Config&,
+      Server::Configuration::FactoryContext&) override {
     return true;
   }
 };

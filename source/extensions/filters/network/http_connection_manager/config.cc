@@ -521,7 +521,7 @@ void HttpConnectionManagerConfig::processFilter(
       proto_config, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  bool is_terminal = factory.isTerminalFilter(*message, context_);
+  bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
   Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(

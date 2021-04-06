@@ -104,8 +104,8 @@ public:
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
     }
 
-    bool isTerminalFilter(const Protobuf::Message&,
-                          Server::Configuration::FactoryContext&) override {
+    bool isTerminalFilterByProto(const Protobuf::Message&,
+                                 Server::Configuration::FactoryContext&) override {
       return true;
     }
   };
