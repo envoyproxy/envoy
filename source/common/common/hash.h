@@ -25,7 +25,7 @@ public:
     return XXH64(input.data(), input.size(), seed);
   }
 
-/**
+  /**
    * Return 64-bit hash from the xxHash algorithm.
    * @param input supplies the absl::InlinedVector<absl::string_view> to hash.
    * @param seed supplies the hash seed which defaults to 0.
