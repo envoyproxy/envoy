@@ -205,7 +205,9 @@ def _assign_from_team(team_name, assignees, exclude_users):
   assigned = None
   # Find owners via github.team_get_by_name, github.team_list_members
   team_slug = team_name.split('/')[1]
-  team = github.team_get_by_name(team_slug)
+  team = github.team_get_by_name(team_slug, success_codes=[200, 404])
+  if not team:
+    return None
   members = [m['login'] for m in github.team_list_members(team['id']) if m['login'] not in exclude_users]
   # Is a team member already assigned? The first assigned team member is picked. Bad O(n^2) as
   # Starlark doesn't have sets, n is small.
