@@ -418,9 +418,15 @@ message GrpcProtocolOptions {
 
 // [#not-implemented-hide:]
 //
-// A message which allows using HTTP/3 as an upstream protocol.
-//
-// Eventually this will include configuration for tuning HTTP/3.
+// A message which allows using HTTP/3.
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
+
+  // Allows invalid HTTP messaging and headers. When this option is disabled (default), then
+  // the whole HTTP/3 connection is terminated upon receiving invalid HEADERS frame. However,
+  // when this option is enabled, only the offending stream is terminated.
+  //
+  // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 2;
 }

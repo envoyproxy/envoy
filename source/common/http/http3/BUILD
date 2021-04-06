@@ -26,3 +26,13 @@ envoy_cc_library(
     name = "quic_client_connection_factory_lib",
     hdrs = ["quic_client_connection_factory.h"],
 )
+
+envoy_cc_library(
+    name = "codec_stats_lib",
+    hdrs = ["codec_stats.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:thread_lib",
+    ],
+)

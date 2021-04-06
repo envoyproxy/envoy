@@ -995,6 +995,11 @@ public:
    */
   virtual Http::Http2::CodecStats& http2CodecStats() const PURE;
 
+  /**
+   * @return the Http3 Codec Stats.
+   */
+  virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

@@ -131,5 +131,9 @@ Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, statsScope());
 }
 
+Http::Http3::CodecStats& MockClusterInfo::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, statsScope());
+}
+
 } // namespace Upstream
 } // namespace Envoy

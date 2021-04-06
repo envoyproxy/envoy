@@ -656,6 +656,7 @@ envoy_cc_test_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:linked_object",
         "//source/common/common:lock_guard_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",

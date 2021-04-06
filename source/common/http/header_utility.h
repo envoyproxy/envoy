@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "envoy/common/regex.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
@@ -209,6 +210,35 @@ public:
    * may not be modified.
    */
   static bool isModifiableHeader(absl::string_view header);
+
+  enum class HeaderValidationResult {
+    ACCEPT = 0,
+    DROP,
+    REJECT,
+  };
+
+  /**
+   * Check if the given header_name has underscore.
+   * Return HeaderValidationResult and populate the given counters based on
+   * headers_with_underscores_action.
+   */
+  static HeaderValidationResult checkHeaderNameForUnderscores(
+      const std::string& header_name,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action,
+      Stats::Counter& dropped_headers_with_underscores,
+      Stats::Counter& requests_rejected_with_underscores_in_headers);
+
+  /**
+   * Check if header_value represents a valid value for HTTP content-length header.
+   * Return HeaderValidationResult and populate should_close_connection
+   * according to override_stream_error_on_invalid_http_message.
+   */
+  static HeaderValidationResult
+  validateContentLength(absl::string_view header_value,
+                        bool override_stream_error_on_invalid_http_message,
+                        bool& should_close_connection);
 };
+
 } // namespace Http
 } // namespace Envoy

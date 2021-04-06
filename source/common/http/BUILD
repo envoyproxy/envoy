@@ -436,6 +436,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

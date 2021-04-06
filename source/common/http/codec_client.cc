@@ -186,7 +186,9 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
   case Type::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_), *this);
+        dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_), *this,
+        host->cluster().http3CodecStats(), host->cluster().http3Options(),
+        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.

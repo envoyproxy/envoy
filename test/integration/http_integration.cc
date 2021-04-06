@@ -247,13 +247,20 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
   if (!http2_options.has_value()) {
     http2_options = Http2::Utility::initializeAndValidateOptions(
         envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
+  } else if (http2_options.value().has_override_stream_error_on_invalid_http_message()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        http2_options.value().override_stream_error_on_invalid_http_message().value());
+  } else if (http2_options.value().stream_error_on_invalid_http_messaging()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   }
   cluster->http2_options_ = http2_options.value();
+  cluster->http3_options_ = http3_options;
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),

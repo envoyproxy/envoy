@@ -16,6 +16,7 @@
 #include "common/common/thread.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -149,6 +150,7 @@ public:
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
+  Http::Http3::CodecStats& http3CodecStats() const override;
 
   std::string name_{"fake_cluster"};
   std::string observability_name_{"observability_name"};
@@ -196,6 +198,7 @@ public:
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

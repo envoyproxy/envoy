@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 44]
+// [#next-free-field: 45]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -324,6 +324,10 @@ message HttpConnectionManager {
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
   config.core.v3.Http2ProtocolOptions http2_protocol_options = 9
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
+
+  // Additional HTTP/3 settings that are passed directly to the HTTP/3 codec.
+  // [#not-implemented-hide:]
+  config.core.v3.Http3ProtocolOptions http3_protocol_options = 44;
 
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.

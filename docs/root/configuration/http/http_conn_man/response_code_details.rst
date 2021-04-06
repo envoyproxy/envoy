@@ -99,3 +99,16 @@ All http2 details are rooted at *http2.*
     http2.unexpected_underscore, Envoy was configured to drop requests with header keys beginning with underscores.
     http2.unknown.nghttp2.error, An unknown error was encountered by nghttp2
     http2.violation.of.messaging.rule, The stream was in violation of a HTTP/2 messaging rule.
+
+Http3 details
+~~~~~~~~~~~~~
+
+All http3 details are rooted at *http3.*
+
+.. csv-table::
+   :header: Name, Description
+   :widths: 1, 2
+
+    http3.invalid_header_field, One of the HTTP/3 headers was invalid
+    http3.headers_too_large, The size of headers (or trailers) exceeded the configured limits
+    http3.unexpected_underscore, Envoy was configured to drop or reject requests with header keys beginning with underscores.

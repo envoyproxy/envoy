@@ -23,9 +23,11 @@ class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
                               public Http::RequestEncoder {
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
-                        quic::StreamType type);
+                        quic::StreamType type, Http::Http3::CodecStats& stats,
+                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
   EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
-                        quic::StreamType type);
+                        quic::StreamType type, Http::Http3::CodecStats& stats,
+                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
   void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
@@ -73,6 +75,10 @@ private:
 
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
+
+  // Either reset the stream or close the connection according to
+  // should_close_connection and configured http3 options.
+  void onStreamError(absl::optional<bool> should_close_connection);
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 

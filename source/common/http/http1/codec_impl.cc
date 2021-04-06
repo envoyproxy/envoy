@@ -474,6 +474,7 @@ Status ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
+  // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   RETURN_IF_ERROR(checkHeaderNameForUnderscores());
   auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {

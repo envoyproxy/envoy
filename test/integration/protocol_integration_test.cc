@@ -379,15 +379,14 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
+  // TODO(danzh) re-enable after adding http3 option "allow_connect".
+  EXCLUDE_DOWNSTREAM_HTTP3;
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
     // For QUIC, even through the headers are not sent upstream, the stream will
     // be created. Use the autonomous upstream and allow incomplete streams.
     autonomous_allow_incomplete_streams_ = true;
     autonomous_upstream_ = true;
   }
-  // TODO(danzh) re-enable after plumbing through http2 option
-  // "allow_connect".
-  EXCLUDE_DOWNSTREAM_HTTP3;
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1109,8 +1108,6 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
-  // TODO(danzh) treat underscore in headers according to the config.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1144,14 +1141,12 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     stat_name = "http2.dropped_headers_with_underscores";
     break;
   case Http::CodecClient::Type::HTTP3:
-    // TODO(danzh) add stats for H3.
+    stat_name = "http3.dropped_headers_with_underscores";
     break;
   default:
     RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}", downstream_protocol_));
   };
-  if (downstream_protocol_ != Http::CodecClient::Type::HTTP3) {
-    EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
-  }
+  EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
 }
 
 // Verify that by default headers with underscores in their names remain in both requests and
@@ -1178,8 +1173,6 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 
 // Verify that request with headers containing underscores is rejected when configured.
 TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
-  // TODO(danzh) pass headers_with_underscores_action config into QUIC stream.
-  EXCLUDE_DOWNSTREAM_HTTP3
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1290,12 +1283,7 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
     default_response_headers_.setStatus(
         "11111111111111111111111111111111111111111111111111111111111111111");
     upstream_request_->encodeHeaders(default_response_headers_, false);
-    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
-      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    } else {
-      // TODO(#14829) QUIC won't disconnect on invalid messaging.
-      ASSERT_TRUE(upstream_request_->waitForReset());
-    }
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   response->waitForEndStream();
@@ -1331,11 +1319,11 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
     ASSERT_TRUE(fake_upstream_connection->write(std::string(missing_status)));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   } else {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     waitForNextUpstreamRequest();
     default_response_headers_.removeStatus();
     upstream_request_->encodeHeaders(default_response_headers_, false);
-    // TODO(#14829) QUIC won't disconnect on invalid messaging.
-    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   response->waitForEndStream();
@@ -1400,8 +1388,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
-  // TODO(danzh) Add content length validation.
-  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1426,11 +1412,12 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
-  // TODO(danzh) Add override_stream_error_on_invalid_http_message to http3 protocol options.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
+        hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
         hcm.mutable_http2_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
@@ -1467,8 +1454,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
-  // TODO(danzh) Add content length validation.
-  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1491,11 +1476,12 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
-  // override_stream_error_on_invalid_http_message not supported yet.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
+        hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
         hcm.mutable_http2_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
@@ -2283,12 +2269,17 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
+  // TODO(danzh) add "allow_connect" to http3 options.
+  EXCLUDE_DOWNSTREAM_HTTP3;
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     return;
   }
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
+        hcm.mutable_http3_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
         hcm.mutable_http2_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
@@ -2300,8 +2291,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
       {":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
 
   response->waitForReset();
-  // TODO(danzh) plumb through stream_error_on_invalid_http_message.
-  EXCLUDE_DOWNSTREAM_HTTP3;
   EXPECT_FALSE(codec_client_->disconnected());
 }
 

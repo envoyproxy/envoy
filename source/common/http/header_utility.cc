@@ -333,5 +333,57 @@ bool HeaderUtility::isModifiableHeader(absl::string_view header) {
           !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
 }
 
+HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscores(
+    const std::string& header_name,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action,
+    Stats::Counter& dropped_headers_with_underscores,
+    Stats::Counter& requests_rejected_with_underscores_in_headers) {
+  if (headers_with_underscores_action == envoy::config::core::v3::HttpProtocolOptions::ALLOW ||
+      !HeaderUtility::headerNameContainsUnderscore(header_name)) {
+    return HeaderValidationResult::ACCEPT;
+  }
+  if (headers_with_underscores_action ==
+      envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
+    ENVOY_LOG_MISC(debug, "Dropping header with invalid characters in its name: {}", header_name);
+    dropped_headers_with_underscores.inc();
+    return HeaderValidationResult::DROP;
+  }
+  ENVOY_LOG_MISC(debug, "Rejecting request due to header name with underscores: {}", header_name);
+  requests_rejected_with_underscores_in_headers.inc();
+  return HeaderUtility::HeaderValidationResult::REJECT;
+}
+
+HeaderUtility::HeaderValidationResult
+HeaderUtility::validateContentLength(absl::string_view header_value,
+                                     bool override_stream_error_on_invalid_http_message,
+                                     bool& should_close_connection) {
+  should_close_connection = false;
+  std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
+  absl::optional<uint64_t> content_length;
+  for (const absl::string_view& value : values) {
+    uint64_t new_value;
+    if (!absl::SimpleAtoi(value, &new_value) ||
+        !std::all_of(value.begin(), value.end(), absl::ascii_isdigit)) {
+      ENVOY_LOG_MISC(debug, "Content length was either unparseable or negative");
+      should_close_connection = !override_stream_error_on_invalid_http_message;
+      return HeaderValidationResult::REJECT;
+    }
+    if (!content_length.has_value()) {
+      content_length = new_value;
+      continue;
+    }
+    if (new_value != content_length.value()) {
+      ENVOY_LOG_MISC(
+          debug,
+          "Parsed content length {} is inconsistent with previously detected content length {}",
+          new_value, content_length.value());
+      should_close_connection = !override_stream_error_on_invalid_http_message;
+      return HeaderValidationResult::REJECT;
+    }
+  }
+  return HeaderValidationResult::ACCEPT;
+}
+
 } // namespace Http
 } // namespace Envoy

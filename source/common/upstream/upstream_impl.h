@@ -45,6 +45,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/shared_pool/shared_pool.h"
@@ -654,6 +655,7 @@ public:
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
+  Http::Http3::CodecStats& http3CodecStats() const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -732,6 +734,7 @@ private:
   std::vector<Network::FilterFactoryCb> filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
 };
 
 /**
