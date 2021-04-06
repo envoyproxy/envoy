@@ -59,11 +59,6 @@ public:
   static bool IsAllDigits(absl::string_view data) {
     return std::all_of(data.begin(), data.end(), absl::ascii_isdigit);
   }
-
-  // NOLINTNEXTLINE(readability-identifier-naming)
-  static std::vector<absl::string_view> Split(absl::string_view data, char delim) {
-    return absl::StrSplit(data, delim);
-  }
 };
 
 } // namespace quiche
