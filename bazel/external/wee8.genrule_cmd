@@ -13,6 +13,7 @@ Linux-x86_64|Linux-s390x|Linux-aarch64|Linux-ppc64le)
 Darwin-x86_64|Darwin-arm64)
   ;;
 MSYS_NT-*-x86_64)
+  DEPOT_TOOLS_WIN_TOOLCHAIN=0
   ;;
 *)
   echo "ERROR: wee8 is currently not supported on $${PLATFORM}." >&2
@@ -133,10 +134,6 @@ elif [[ $${PLATFORM} == MSYS_NT-*-x86_64 ]]; then
 else
   # Fallback to system default.
   ninja=$$(command -v ninja)
-fi
-
-if [[ "$${PLATFORM}" == MSYS_NT-*-x86_64 ]]; then
-  export DEPOT_TOOLS_WIN_TOOLCHAIN=0
 fi
 
 # Build wee8.
