@@ -207,6 +207,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
+      http3_options_(Http3::Utility::initializeAndValidateOptions(
+          config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
+          config.stream_error_on_invalid_http_message())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
@@ -559,6 +562,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
                                              factory->isTerminalFilter(),
                                              last_filter_in_current_config);
   }
+
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
       config_discovery, name, context_, stats_prefix_);
   filter_factories.push_back(std::move(filter_config_provider));
@@ -585,7 +589,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
+        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
+        maxRequestHeadersKb(), headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;

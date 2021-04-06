@@ -37,6 +37,11 @@ def _python_deps():
         # use_category = ["test"],
     )
     pip_install(
+        name = "deps_pip3",
+        requirements = "@envoy//tools/dependency:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "kafka_pip3",
         requirements = "@envoy//source/extensions/filters/network/kafka:requirements.txt",
         extra_pip_args = ["--require-hashes"],
