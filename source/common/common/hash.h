@@ -25,6 +25,24 @@ public:
     return XXH64(input.data(), input.size(), seed);
   }
 
+/**
+   * Return 64-bit hash from the xxHash algorithm.
+   * @param input supplies the absl::InlinedVector<absl::string_view> to hash.
+   * @param seed supplies the hash seed which defaults to 0.
+   * See https://github.com/Cyan4973/xxHash for details.
+   */
+  static uint64_t xxHash64(absl::InlinedVector<absl::string_view, 1>& input, uint64_t seed = 0) {
+    uint64_t hash = seed;
+    if (input.size() == 0) {
+      hash = XXH64(input.data(), input.size(), hash);
+    } else {
+      for (auto& i : input) {
+        hash = XXH64(i.data(), i.size(), hash);
+      }
+    }
+    return hash;
+  }
+
   /**
    * TODO(gsagula): extend xxHash to handle case-insensitive.
    *

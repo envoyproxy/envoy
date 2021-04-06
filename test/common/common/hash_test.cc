@@ -11,6 +11,13 @@ TEST(Hash, xxHash) {
   EXPECT_EQ(17241709254077376921U, HashUtil::xxHash64(""));
 }
 
+TEST(Hash, xxHashWithVector) {
+  absl::InlinedVector<absl::string_view, 1> v{"foo", "bar"};
+  EXPECT_EQ(17745830980996999794U, HashUtil::xxHash64(v));
+  absl::InlinedVector<absl::string_view, 1> empty_vector;
+  EXPECT_EQ(17241709254077376921U, HashUtil::xxHash64(empty_vector));
+}
+
 TEST(Hash, djb2CaseInsensitiveHash) {
   EXPECT_EQ(211616621U, HashUtil::djb2CaseInsensitiveHash("foo"));
   EXPECT_EQ(211611524U, HashUtil::djb2CaseInsensitiveHash("bar"));

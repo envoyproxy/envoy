@@ -44,23 +44,23 @@ public:
 
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
-      bool check_multiple_values =
+      const bool check_multiple_values =
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values");
       absl::InlinedVector<std::string, 1> rewritten_header_values;
       absl::InlinedVector<absl::string_view, 1> header_values;
 
-      size_t header_size = 1;
+      size_t num_headers_to_hash = 1;
       if (check_multiple_values) {
-        header_size = header.size();
-        header_values.reserve(header_size);
+        num_headers_to_hash = header.size();
+        header_values.reserve(num_headers_to_hash);
       }
 
-      for (size_t i = 0; i < header_size; i++) {
+      for (size_t i = 0; i < num_headers_to_hash; i++) {
         header_values.push_back(header[i]->value().getStringView());
       }
 
       if (regex_rewrite_ != nullptr) {
-        rewritten_header_values.reserve(header_size);
+        rewritten_header_values.reserve(num_headers_to_hash);
         for (auto& value : header_values) {
           rewritten_header_values.push_back(
               regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
@@ -68,12 +68,11 @@ public:
         }
       }
 
-      if (check_multiple_values) {
+      if (check_multiple_values && (num_headers_to_hash > 1)) {
         // Ensure generating same hash value for different order header values.
         // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
         std::sort(header_values.begin(), header_values.end());
-        absl::Hash<const absl::InlinedVector<absl::string_view, 1>> hasher;
-        hash = hasher(header_values);
+        hash = HashUtil::xxHash64(header_values);
       } else {
         hash = HashUtil::xxHash64(header_values[0]);
       }
