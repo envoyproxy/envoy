@@ -77,13 +77,10 @@ public:
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-<<<<<<< HEAD
-  FilterConfigProviderPtr createProvider(std::string name, bool warm,
-                                         bool last_filter_config = true) {
-=======
   DynamicFilterConfigProviderPtr createProvider(std::string name, bool warm,
-                                                bool default_configuration) {
->>>>>>> a45ce6578caa682e4556a671261772730dcdfd65
+                                                bool default_configuration,
+                                                bool last_filter_config = true) {
+
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ExtensionConfigSource config_source;
 
@@ -115,8 +112,8 @@ type_urls:
         config_source, name, factory_context_, "xds.", last_filter_config, "http");
   }
 
-  void setup(bool warm = true, bool default_configuration = false) {
-    provider_ = createProvider("foo", warm, default_configuration);
+  void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
+    provider_ = createProvider("foo", warm, default_configuration, last_filter_config);
     callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     if (!warm) {
@@ -358,7 +355,6 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
 TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   InSequence s;
   setup();
-  auto provider2 = createProvider("foo", true, false);
   const std::string response_yaml = R"EOF(
   version_info: "1"
   resources:
@@ -381,10 +377,11 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
+// Raise exception when filter is not the last filter in filter chain, but the filter is terminal
+// filter.
 TEST_F(FilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
   InSequence s;
-  setup();
-  auto provider2 = createProvider("foo", true, false);
+  setup(true, false, false);
   const std::string response_yaml = R"EOF(
   version_info: "1"
   resources:
