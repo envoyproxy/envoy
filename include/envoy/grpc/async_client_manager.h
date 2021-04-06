@@ -29,6 +29,12 @@ class AsyncClientManager {
 public:
   virtual ~AsyncClientManager() = default;
 
+  virtual RawAsyncClientSharedPtr
+  getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
+                            Stats::Scope& scope, bool skip_cluster_check) {
+    return factoryForGrpcService(grpc_service, scope, skip_cluster_check)->create();
+  }
+
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and
    * will raise an exception on failure.
@@ -42,12 +48,6 @@ public:
   virtual AsyncClientFactoryPtr
   factoryForGrpcService(const envoy::config::core::v3::GrpcService& grpc_service,
                         Stats::Scope& scope, bool skip_cluster_check) PURE;
-
-  virtual RawAsyncClientSharedPtr
-  getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
-                            Stats::Scope& scope, bool skip_cluster_check) {
-    return factoryForGrpcService(grpc_service, scope, skip_cluster_check)->create();
-  }
 };
 
 using AsyncClientManagerPtr = std::unique_ptr<AsyncClientManager>;

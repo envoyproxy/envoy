@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/grpc/async_client.h"
 
 #include "common/api/api_impl.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -46,6 +47,22 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
 
   async_client_manager_.factoryForGrpcService(grpc_service, scope_, false);
+}
+
+TEST_F(AsyncClientManagerImplTest, CacheRawAsyncClient) {
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+
+  RawAsyncClientSharedPtr foo_client0 =
+      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  RawAsyncClientSharedPtr foo_client1 =
+      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  EXPECT_EQ(foo_client0.get(), foo_client1.get());
+
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("bar");
+  RawAsyncClientSharedPtr bar_client =
+      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  EXPECT_NE(foo_client1.get(), bar_client.get());
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
