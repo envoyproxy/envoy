@@ -194,17 +194,18 @@ Network::IoResult TsiSocket::repeatReadAndUnprotect(Buffer::Instance& buffer,
       ENVOY_CONN_LOG(debug, "TSI: unprotected buffer left: {} result: {}", callbacks_->connection(),
                      raw_read_buffer_.length(), tsi_result_to_string(status));
       total_bytes_processed += buffer.length() - prev_size;
+
+      // Check if buffer needs to be drained.
+      if (callbacks_->shouldDrainReadBuffer()) {
+        callbacks_->setTransportSocketIsReadable();
+        break;
+      }
     }
 
     if (result.action_ == Network::PostIoAction::Close) {
       break;
     }
 
-    // Check if buffer needs to be drained.
-    if (callbacks_->shouldDrainReadBuffer()) {
-      callbacks_->setTransportSocketIsReadable();
-      break;
-    }
     // End of stream is reached in the previous read.
     if (end_stream_read_) {
       result.end_stream_read_ = true;
