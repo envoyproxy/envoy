@@ -25,9 +25,6 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buf, bool) override {
     auto message = buf.toString();
-
-    std::cout << "Terminal filter read: " << message << std::endl;
-
     if (message != "usetls") {
       // Just echo anything other than the 'usetls' command.
       read_callbacks_->connection().write(buf, false);
@@ -35,10 +32,7 @@ public:
       read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
         // Wait until 6 bytes long "usetls" has been sent.
         if (bytes >= 6) {
-          // TODO: fix me.
-          if (!read_callbacks_->connection().startSecureTransport()) {
-            std::cout << "Failed to start secure transport on terminal server" << std::endl;
-          }
+          ASSERT(read_callbacks_->connection().startSecureTransport());
           // Unsubscribe the callback.
           // Switch to tls has been completed.
           return false;
@@ -95,7 +89,6 @@ public:
     UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
 
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
-      std::cout << "UpstreamReadFilter received from upstream: '" << data.toString() << "'" << std::endl; 
       if (auto parent = parent_.lock()) {
         parent->upstreamWrite(data, end_stream);
         return Network::FilterStatus::Continue;
@@ -129,19 +122,13 @@ private:
 Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   auto c = cluster_manager_.getThreadLocalCluster("dummy_cluster");
   auto h = c->loadBalancer().chooseHost(nullptr);
-
-  // This is progress.
-  std::cout << "Backend host port: " << h->address()->ip()->port() << std::endl;
-
   upstream_connection_ = h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
   upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
-  
   upstream_connection_->connect();
   return Network::FilterStatus::Continue;
 }
 
 Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool end_stream) {
-  std::cout << "StartTlsSwitchFilter received from downstream: " << data.toString() << ", endstream: " << end_stream << std::endl;
   if (end_stream) {
     upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
@@ -154,17 +141,11 @@ Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool 
 void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream) {
   const std::string message = buf.toString();
   if (message == "switch") {
-    if (!upstream_connection_->startSecureTransport()) {
-      // TODO: why is this failing? This is the only one that I really expected to work.
-      std::cout << "Failed to start secure upstream transport in StartTlsSwitchFilter" << std::endl;
-    }
+    ASSERT(upstream_connection_->startSecureTransport());
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "switch" has been sent.
       if (bytes >= 6) {
-        std::cout << "StartTlsSwitchFilter flushed 'switch' message to client" << std::endl;
-        if (!read_callbacks_->connection().startSecureTransport()) {
-          std::cout << "Failed to start secure downstream transport in StartTlsSwitchFilter" << std::endl;
-        }
+        ASSERT(read_callbacks_->connection().startSecureTransport());
         // Unsubscribe the callback.
         // Switch to tls has been completed.
         return false;
@@ -296,10 +277,6 @@ void StartTlsIntegrationTest::initialize() {
   // Prepare for the server side listener
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
     .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-      
-      std::cout << "Received socket request. " << std::endl;
-      
-      // TODO: this requires the client to have the right certs.
       auto server_tls_context_ = Ssl::createUpstreamSslContext(*tls_context_manager_, *api_);
 
       auto startTlsTransportSocket = Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_), move(server_tls_context_))
@@ -312,10 +289,6 @@ void StartTlsIntegrationTest::initialize() {
   
   listener_ = dispatcher_->createListener(socket, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
 
-  std::cout << "Server socket info: " << 
-  socket->addressProvider().localAddress()->ip()->addressAsString() << 
-  ":" << socket->addressProvider().localAddress()->ip()->port() << std::endl;
-
   // Add a start_tls cluster
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
      *bootstrap.mutable_static_resources()->add_clusters() = ConfigHelper::buildStartTlsCluster(
@@ -324,8 +297,6 @@ void StartTlsIntegrationTest::initialize() {
   });
 
   BaseIntegrationTest::initialize();
-
-  std::cout << "Client port: " << lookupPort("tcp_proxy") << std::endl;
 
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
@@ -390,8 +361,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   // }
 
   ASSERT_TRUE(payload_reader_->waitForLength(6, std::chrono::milliseconds(100)));
-
-  std::cout << "Client recieved data: " << payload_reader_->data() << std::endl;
 
   // Make sure we receieved the 'switch' command from the upstream.
   ASSERT_EQ("switch", payload_reader_->data());
