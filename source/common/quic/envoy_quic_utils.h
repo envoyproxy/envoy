@@ -40,25 +40,11 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 
 quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip);
 
-<<<<<<< HEAD
-enum class HeaderValidationResult {
-  ACCEPT = 0,
-  DROP,
-  INVALID,
-};
-
-class HeaderValidator {
-public:
-  virtual ~HeaderValidator() = default;
-  virtual HeaderValidationResult validateHeader(const std::string& header_name,
-                                                absl::string_view header_value) = 0;
-=======
 class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
   virtual Http::HeaderUtility::HeaderValidationResult
   validateHeader(const std::string& header_name, absl::string_view header_value) = 0;
->>>>>>> master
 };
 
 // The returned header map has all keys in lower case.
@@ -67,14 +53,6 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
                                              HeaderValidator& validator) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
-<<<<<<< HEAD
-    HeaderValidationResult result = validator.validateHeader(entry.first, entry.second);
-    if (result == HeaderValidationResult::INVALID) {
-      return nullptr;
-    }
-
-    if (result == HeaderValidationResult::ACCEPT) {
-=======
     Http::HeaderUtility::HeaderValidationResult result =
         validator.validateHeader(entry.first, entry.second);
     switch (result) {
@@ -83,7 +61,6 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
     case Http::HeaderUtility::HeaderValidationResult::DROP:
       continue;
     case Http::HeaderUtility::HeaderValidationResult::ACCEPT:
->>>>>>> master
       auto key = Http::LowerCaseString(entry.first);
       if (key != Http::Headers::get().Cookie) {
         // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
