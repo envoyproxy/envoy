@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common/common/base64.h"
-#include "common/quic/platform/quiche_string_piece_impl.h"
 #include "common/quic/platform/string_utils.h"
 
 #include "absl/strings/ascii.h"
