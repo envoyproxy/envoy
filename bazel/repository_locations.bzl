@@ -499,7 +499,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "llhttp-release-v{version}",
         urls = ["https://github.com/nodejs/llhttp/archive/release/v{version}.tar.gz"],
         use_category = ["dataplane_core"],
-        release_date = "2021-04-03",
+        release_date = "2021-04-04",
         cpe = "N/A",
     ),
     com_github_tencent_rapidjson = dict(

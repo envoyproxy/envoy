@@ -771,7 +771,7 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersComplete() {
       return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
     }
   }
-  parser_->hasContentLength(request_or_response_headers.ContentLength() != nullptr);
+  parser_->setHasContentLength(request_or_response_headers.ContentLength() != nullptr);
 
   auto statusor = onHeadersCompleteBase();
   if (!statusor.ok()) {

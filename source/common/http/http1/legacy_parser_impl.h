@@ -22,7 +22,7 @@ public:
   int httpMajor() const override;
   int httpMinor() const override;
   absl::optional<uint64_t> contentLength() const override;
-  void hasContentLength(bool) override{};
+  void setHasContentLength(bool) override{};
   bool isChunked() const override;
   absl::string_view methodName() const override;
   absl::string_view errnoName(int rc) const override;

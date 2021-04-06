@@ -13,17 +13,17 @@ namespace Http1 {
 namespace {
 ParserStatus intToStatus(int rc) {
   // See
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
+  // https://github.com/nodejs/llhttp/blob/a620012f3fd1b64ace16d31c52cd57b97ee7174c/src/native/api.h#L29-L36
   switch (rc) {
   case -1:
     return ParserStatus::Error;
-  case 0:
+  case HPE_OK:
     return ParserStatus::Success;
   case 1:
     return ParserStatus::NoBody;
   case 2:
     return ParserStatus::NoBodyData;
-  case 21:
+  case HPE_PAUSED:
     return ParserStatus::Paused;
   default:
     return ParserStatus::Unknown;
@@ -136,7 +136,7 @@ public:
     return absl::nullopt;
   }
 
-  void hasContentLength(bool val) { has_content_length_ = val; }
+  void setHasContentLength(bool val) { has_content_length_ = val; }
 
   bool isChunked() const { return parser_.flags & F_CHUNKED; }
 
@@ -190,7 +190,7 @@ int HttpParserImpl::httpMinor() const { return impl_->httpMinor(); }
 
 absl::optional<uint64_t> HttpParserImpl::contentLength() const { return impl_->contentLength(); }
 
-void HttpParserImpl::hasContentLength(bool val) { return impl_->hasContentLength(val); }
+void HttpParserImpl::setHasContentLength(bool val) { return impl_->setHasContentLength(val); }
 
 bool HttpParserImpl::isChunked() const { return impl_->isChunked(); }
 
@@ -204,7 +204,7 @@ int HttpParserImpl::hasTransferEncoding() const { return impl_->hasTransferEncod
 
 int HttpParserImpl::statusToInt(const ParserStatus code) const {
   // See
-  // https://github.com/nodejs/node/blob/5c5d044de028956e4c165b1b4fc465947e44a748/deps/llhttp/include/llhttp.h#L245.
+  // https://github.com/nodejs/llhttp/blob/a620012f3fd1b64ace16d31c52cd57b97ee7174c/src/native/api.h#L29-L36
   switch (code) {
   case ParserStatus::Error:
     return -1;
@@ -215,7 +215,7 @@ int HttpParserImpl::statusToInt(const ParserStatus code) const {
   case ParserStatus::NoBodyData:
     return 2;
   case ParserStatus::Paused:
-    return 21;
+    return HPE_PAUSED;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
