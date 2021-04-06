@@ -335,10 +335,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http2_integration_test",
+    name = "multiplexed_integration_test",
     srcs = [
-        "http2_integration_test.cc",
-        "http2_integration_test.h",
+        "multiplexed_integration_test.cc",
+        "multiplexed_integration_test.h",
     ],
     shard_count = 4,
     deps = [

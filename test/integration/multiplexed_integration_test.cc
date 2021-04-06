@@ -1,4 +1,4 @@
-#include "test/integration/http2_integration_test.h"
+#include "test/integration/multiplexed_integration_test.h"
 
 #include <algorithm>
 #include <string>
@@ -24,9 +24,15 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
+// TODO(#2557) fix all the failures.
+#define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {                                    \
+    return;                                                                                        \
+  }
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2},
+                             {Http::CodecClient::Type::HTTP2, Http::CodecClient::Type::HTTP3},
                              {FakeHttpConnection::Type::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
@@ -104,6 +110,7 @@ TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTra
 
 // Verify downstream codec stream flush timeout.
 TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
+  EXCLUDE_DOWNSTREAM_HTTP3;
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -127,6 +134,7 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
 }
 
 TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
+  EXCLUDE_DOWNSTREAM_HTTP3;
   constexpr uint64_t interval_ms = 1;
   constexpr uint64_t timeout_ms = 250;
   config_helper_.addConfigModifier(
@@ -850,6 +858,7 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
+  EXCLUDE_DOWNSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -866,6 +875,9 @@ TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
 }
 
 TEST_P(Http2IntegrationTest, BadMagic) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return; // protocol-specific framing.
+  }
   initialize();
   std::string response;
   auto connection = createConnectionDriver(
@@ -878,6 +890,8 @@ TEST_P(Http2IntegrationTest, BadMagic) {
 }
 
 TEST_P(Http2IntegrationTest, BadFrame) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
+
   initialize();
   std::string response;
   auto connection = createConnectionDriver(
@@ -892,6 +906,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(Http2IntegrationTest, GoAway) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // QuicHttpClientConnectionImpl::goAway NOT_REACHED_GCOVR_EXCL_LINE
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
@@ -1197,6 +1212,7 @@ TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
 
 // Test downstream connection delayed close processing.
 TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(1000 * 1000); });
@@ -1226,6 +1242,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
 
 // Test disablement of delayed close processing on downstream connections.
 TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
@@ -1362,14 +1379,12 @@ void Http2RingHashIntegrationTest::createUpstreams() {
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP2})),
+                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 void Http2RingHashIntegrationTest::sendMultipleRequests(
