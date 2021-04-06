@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 45]
+// [#next-free-field: 46]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -465,6 +465,37 @@ message HttpConnectionManager {
   google.protobuf.BoolValue use_remote_address = 14
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
+  // The configuration for the original-IP detection extensions.
+  //
+  // By default, when the :ref:`use_remote_address
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.use_remote_address>`
+  // option is not used, Envoy will rely on the :ref:`config_http_conn_man_headers_x-forwarded-for` header
+  // and the deprecated :ref:`xff_num_trusted_hops
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.xff_num_trusted_hops>`
+  // configuration option to detect the remote address. Once :ref:`xff_num_trusted_hops
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.xff_num_trusted_hops>`
+  // is removed, leaving this field empty will retain the default behavior when that field is unset. See
+  // the :ref:`xff extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>` for how to
+  // configure xff_num_trusted_hops when using extensions.
+  //
+  // Furthermore, relying on the :ref:`config_http_conn_man_headers_x-forwarded-for`
+  // header doesn't necessarily work for all network configurations. For instance,
+  // if the number of trusted hops isn't consistent for requests flowing into
+  // Envoy this mechanism cannot be used reliably. For such cases, the following
+  // option allows for a list of custom extensions to be provided.
+  //
+  // When configured the extensions will be called along with the request headers
+  // and information about the downstream connection, such as direct connected address,
+  // when the HCM needs to populate the final remote address. Each extension will then rely
+  // on these parameters to decide the value of the request's final remote address.
+  // If an extension fails to detect the original IP address and isn't configured to reject
+  // the request when this happens, the HCM will then try the remaining configured extensions
+  // until one succeeds or the request is rejected. If the request isn't rejected nor any extension
+  // succeeds, the HCM will fallback to using the remote address.
+  //
+  // [#extension-category: envoy.http.original_ip_detection]
+  repeated config.core.v4alpha.TypedExtensionConfig original_ip_detection_extensions = 45;
+
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
   // See the documentation for :ref:`config_http_conn_man_headers_x-envoy-internal` for more
@@ -629,37 +660,6 @@ message HttpConnectionManager {
   // <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.PathNormalizationOptions>`
   // for details.
   PathNormalizationOptions path_normalization_options = 43;
-
-  // The configuration for the original-IP detection extensions.
-  //
-  // By default, when the :ref:`use_remote_address
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.use_remote_address>`
-  // option is not used, Envoy will rely on the :ref:`config_http_conn_man_headers_x-forwarded-for` header
-  // and the deprecated :ref:`xff_num_trusted_hops
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.xff_num_trusted_hops>`
-  // configuration option to detect the remote address. Once :ref:`xff_num_trusted_hops
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.xff_num_trusted_hops>`
-  // is removed, leaving this field empty will retain the default behavior when that field is unset. See
-  // the :ref:`xff extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>` for how to
-  // configure xff_num_trusted_hops when using extensions.
-  //
-  // Furthermore, relying on the :ref:`config_http_conn_man_headers_x-forwarded-for`
-  // header doesn't necessarily work for all network configurations. For instance,
-  // if the number of trusted hops isn't consistent for requests flowing into
-  // Envoy this mechanism cannot be used reliably. For such cases, the following
-  // option allows for a list of custom extensions to be provided.
-  //
-  // When configured the extensions will be called along with the request headers
-  // and information about the downstream connection, such as direct connected address,
-  // when the HCM needs to populate the final remote address. Each extension will then rely
-  // on these parameters to decide the value of the request's final remote address.
-  // If an extension fails to detect the original IP address and isn't configured to reject
-  // the request when this happens, the HCM will then try the remaining configured extensions
-  // until one succeeds or the request is rejected. If the request isn't rejected nor any extension
-  // succeeds, the HCM will fallback to using the remote address.
-  //
-  // [#extension-category: envoy.http.original_ip_detection]
-  repeated config.core.v4alpha.TypedExtensionConfig original_ip_detection_extensions = 44;
 }
 
 // The configuration to customize local reply returned by Envoy.
