@@ -11,10 +11,11 @@ static_resources:
     typed_extension_protocol_options:
       envoy.filters.network.mysql_proxy:
         "@type": type.googleapis.com/envoy.extensions.filters.network.mysql_proxy.v3.MySQLProtocolOptions
-        auth_username:
-          inline_string: "username"
-        auth_password:
-          inline_string: "password"
+        upstream_auth_info: 
+          auth_username:
+            inline_string: "username"
+          auth_password:
+            inline_string: "password"
     load_assignment:
       cluster_name: cluster_0
       endpoints:
@@ -36,10 +37,11 @@ static_resources:
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy
             stat_prefix: mysql
-            downstream_auth_username:
-              inline_string: "username"
-            downstream_auth_password:
-              inline_string: "password"
+            downstream_auth_info:
+              auth_username:
+                inline_string: "username"
+              auth_password:
+                inline_string: "password"
             routes:
             - database: "db"
               cluster: cluster_0

@@ -30,9 +30,12 @@ namespace MySQLProxy {
 MySQLFilterConfig::MySQLFilterConfig(
     Stats::Scope& scope,
     const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy& config, Api::Api& api)
-    : stats_(generateStats(fmt::format("mysql.{}.", config.stat_prefix()), scope)),
-      username_(Config::DataSource::read(config.downstream_auth_username(), true, api)),
-      password_(Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
+    : stats_(generateStats(fmt::format("mysql.{}.", config.stat_prefix()), scope)) {
+  if (config.has_downstream_auth_info()) {
+    username_ = Config::DataSource::read(config.downstream_auth_info().auth_username(), true, api);
+    password_ = Config::DataSource::read(config.downstream_auth_info().auth_password(), true, api);
+  }
+}
 
 MySQLFilter::MySQLFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router,
                          ClientFactory& client_factory, DecoderFactory& decoder_factory)
@@ -156,6 +159,9 @@ void MySQLFilter::onNewMessage(MySQLSession::State state) {
 
 bool MySQLFilter::checkPassword(const ClientLogin& client_login, const std::vector<uint8_t>& seed,
                                 size_t expect_length) {
+  if (config_->password_.empty()) {
+    return true;
+  }
   if (client_login.getAuthResp().size() != expect_length) {
     ENVOY_LOG(info, "filter: password length error of client login, expected {}, got {}",
               expect_length, client_login.getAuthResp().size());
@@ -181,7 +187,7 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
-  if (config_->username_ != client_login.getUsername()) {
+  if (!config_->username_.empty() && config_->username_ != client_login.getUsername()) {
     ENVOY_LOG(info, "filter: no such username {}", client_login.getUsername());
     onFailure(MessageHelper::authError(
                   client_login.getUsername(),

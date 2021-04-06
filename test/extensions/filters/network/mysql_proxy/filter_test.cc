@@ -62,11 +62,11 @@ TEST_F(MySQLProxyFilterConfigTest, Normal) {
 
 TEST_F(MySQLProxyFilterConfigTest, Bad) {
   const std::string yaml_string = R"EOF(
-  routes:
-  downstream_authusername:
-    inline_string: "username"
-  downstream_authpassword:
-    inline_string: "password"
+  downstream_auth_info:
+    authusername:
+      inline_string: "username"
+    authpassword:
+      inline_string: "password"
   )EOF";
 
   EXPECT_THROW(parseProtoFromYaml(yaml_string), Envoy::EnvoyException);
@@ -75,8 +75,9 @@ TEST_F(MySQLProxyFilterConfigTest, Bad) {
 TEST_F(MySQLProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   const std::string yaml_string = R"EOF(
   stat_prefix: foo
-  downstream_auth_password:
-    inline_string: somepassword
+  downstream_auth_info:
+    auth_password:
+      inline_string: "somepassword"
   )EOF";
 
   auto proto_config = parseProtoFromYaml(yaml_string);
@@ -85,13 +86,14 @@ TEST_F(MySQLProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   EXPECT_TRUE(config.username_.empty());
 }
 
-TEST_F(MySQLProxyFilterConfigTest, DownstreamAuthAclSet) {
+TEST_F(MySQLProxyFilterConfigTest, DownstreamAuthSet) {
   const std::string yaml_string = R"EOF(
   stat_prefix: foo
-  downstream_auth_username:
-    inline_string: someusername
-  downstream_auth_password:
-    inline_string: somepassword
+  downstream_auth_info:
+    auth_username:
+      inline_string: "someusername"
+    auth_password:
+      inline_string: "somepassword"
   )EOF";
 
   auto proto_config = parseProtoFromYaml(yaml_string);
@@ -105,10 +107,11 @@ class MySQLFilterTest : public ::testing::TestWithParam<ConnPool::MySQLPoolFailu
                         public ClientFactory {
 public:
   const std::string yaml_string = R"EOF(
-  downstream_auth_username:
-    inline_string: username
-  downstream_auth_password:
-    inline_string: password
+  downstream_auth_info:
+    auth_username:
+      inline_string: "username"
+    auth_password:
+      inline_string: "password"
   routes:
   - database: db
     cluster: cluster

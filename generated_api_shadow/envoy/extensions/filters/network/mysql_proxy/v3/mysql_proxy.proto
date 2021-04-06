@@ -4,9 +4,6 @@ package envoy.extensions.filters.network.mysql_proxy.v3;
 
 import "envoy/config/core/v3/base.proto";
 
-import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -21,22 +18,25 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
 // [#extension: envoy.filters.network.mysql_proxy]
 
-// [#next-free-field: 7]
+// Auth information of MySQL.
+message AuthInfo {
+  config.core.v3.DataSource auth_username = 1;
+
+  config.core.v3.DataSource auth_password = 2;
+}
+
+// [#next-free-field: 6]
 message MySQLProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy";
 
   message Route {
     // String database name that must exact match with client connection db name
-    string database = 1;
+    string database = 1 [(validate.rules).string = {min_len: 1}];
 
     // Upstream cluster to forward the command to.
-    string cluster = 2;
+    string cluster = 2 [(validate.rules).string = {min_len: 1}];
   }
-
-  reserved 3;
-
-  reserved "is_termianl";
 
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mysql_proxy_stats>`.
@@ -45,6 +45,9 @@ message MySQLProxy {
   // [#not-implemented-hide:] The optional path to use for writing MySQL access logs.
   // If the access log field is empty, access logs will not be written.
   string access_log = 2;
+
+  // [#not-implemented-hide:] enable feature of separate authentication of downstream clients and upstream server. When feature_enable is true, the filter is a terminal filter, it's config should put at the last of filter chain, when feature_enable is false, the filter is not a terminal filter, it's config can not put at the last of filter chain. Default is false.
+  bool feature_enable = 3;
 
   // List of **unique** db name used to separate connections from different database to different
   // clusters.
@@ -66,20 +69,20 @@ message MySQLProxy {
   // * ``jdbc:mysql://host1:9001/`` will return ER_ER_BAD_DB_ERROR, now envoy not support connect without specific database name.
   repeated Route routes = 4;
 
-  // MySQL client auth username. If the username is not match, then ER_ACCESS_DENIED_ERROR will return; If connect db name is not found in envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy.routes, then ER_ER_BAD_DB_ERROR will return.
-  config.core.v3.DataSource downstream_auth_username = 5 [(udpa.annotations.sensitive) = true];
-
-  // MySQL client auth password.
-  config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
+  // Downstream client username/password.
+  // * If username and password is empty, then authentication will always pass.
+  // * If username is empty but password is not, then proxy will only auth password.
+  // * If password is empty but username is not, then proxy will only auth username/
+  // * If the username is not match, then ER_ACCESS_DENIED_ERROR will return;
+  // * If connect db name is not found in envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy.routes, then ER_ER_BAD_DB_ERROR will return.
+  AuthInfo downstream_auth_info = 5 [(udpa.annotations.sensitive) = true];
 }
 
 // MySQLProtocolOptions specifies MySQL upstream protocol options. This object is used in
 // :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
 // keyed by the name `envoy.filters.network.mysql_proxy`.
 message MySQLProtocolOptions {
-  // Upstream database password.
-  config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
-
-  // Upstream database username
-  config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
+  // Upstream database username/password.
+  AuthInfo upstream_auth_info = 1
+      [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
 }

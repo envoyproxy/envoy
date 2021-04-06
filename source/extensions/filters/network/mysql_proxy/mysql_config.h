@@ -18,8 +18,8 @@ public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProtocolOptions&
           proto_config)
-      : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()) {
-  }
+      : auth_username_(proto_config.upstream_auth_info().auth_username()),
+        auth_password_(proto_config.upstream_auth_info().auth_password()) {}
 
   std::string authUsername(Api::Api& api) const {
     return Config::DataSource::read(auth_username_, true, api);
