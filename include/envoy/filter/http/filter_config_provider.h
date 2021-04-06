@@ -16,6 +16,9 @@ using FilterConfigProvider =
     Envoy::Config::ExtensionConfigProvider<Server::Configuration::NamedHttpFilterConfigFactory,
                                            Envoy::Http::FilterFactoryCb>;
 using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider>;
+using DynamicFilterConfigProvider = Envoy::Config::DynamicExtensionConfigProvider<
+    Server::Configuration::NamedHttpFilterConfigFactory, Envoy::Http::FilterFactoryCb>;
+using DynamicFilterConfigProviderPtr = std::unique_ptr<DynamicFilterConfigProvider>;
 
 /**
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider
@@ -36,7 +39,7 @@ public:
    * configured chain
    * @param filter_chain_type is the filter chain type
    */
-  virtual FilterConfigProviderPtr createDynamicFilterConfigProvider(
+  virtual DynamicFilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix, bool last_filter_in_current_config,

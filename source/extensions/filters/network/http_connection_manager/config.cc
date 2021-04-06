@@ -556,6 +556,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
           fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
     }
   }
+
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
       config_discovery, name, context_, stats_prefix_, last_filter_in_current_config,
       filter_chain_type);
