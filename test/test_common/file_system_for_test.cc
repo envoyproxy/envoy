@@ -12,7 +12,7 @@ MemfileInstanceImpl::MemfileInstanceImpl()
 #else
     : file_system_{new InstanceImplPosix()},
 #endif
-      use_memfiles_(true) {
+      use_memfiles_(false) {
 }
 
 MemfileInstanceImpl& fileSystemForTest() {

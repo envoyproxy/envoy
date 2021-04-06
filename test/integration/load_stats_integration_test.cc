@@ -20,8 +20,6 @@ namespace {
 class LoadStatsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
-
   LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {
     // We rely on some fairly specific load balancing picks in this test, so
     // determinize the schedule.

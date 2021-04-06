@@ -23,8 +23,6 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(),
                             ConfigHelper::tcpProxyConfig()) {}
 
-  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
-
   void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 

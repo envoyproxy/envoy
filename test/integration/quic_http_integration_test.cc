@@ -87,8 +87,6 @@ public:
         file_updater_1_(injected_resource_filename_1_),
         file_updater_2_(injected_resource_filename_2_) {}
 
-  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
-
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
     // Release the client before destroying |conn_helper_|. No such need once |conn_helper_| is

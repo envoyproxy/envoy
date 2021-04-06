@@ -19,8 +19,6 @@ protected:
   WatcherImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
-  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
-
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
 };

@@ -16,8 +16,6 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
-  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
-
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {

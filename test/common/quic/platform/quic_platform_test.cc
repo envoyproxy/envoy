@@ -19,7 +19,6 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -78,8 +77,6 @@ protected:
     setVerbosityLogThreshold(0);
     GetLogger().set_level(spdlog::level::err);
   }
-
-  static void SetUpTestSuite() { Envoy::Filesystem::fileSystemForTest().setUseMemfiles(false); }
 
   ~QuicPlatformTest() override {
     setVerbosityLogThreshold(verbosity_log_threshold_);

@@ -113,12 +113,20 @@ public:
   bool illegalPath(const std::string& path) override { return file_system_->illegalPath(path); }
 
   void renameFile(const std::string& old_name, const std::string& new_name);
+
+private:
+  friend class ScopedUseMemfiles;
+
   void setUseMemfiles(bool value) {
     absl::MutexLock m(&lock_);
     use_memfiles_ = value;
   }
 
-private:
+  bool useMemfiles() {
+    absl::MutexLock m(&lock_);
+    return use_memfiles_;
+  }
+
   std::unique_ptr<Instance> file_system_;
   absl::Mutex lock_;
   bool use_memfiles_ ABSL_GUARDED_BY(lock_);
@@ -126,6 +134,19 @@ private:
 };
 
 MemfileInstanceImpl& fileSystemForTest();
+
+class ScopedUseMemfiles {
+ public:
+  explicit ScopedUseMemfiles(bool use) : prior_use_memfiles_(Filesystem::fileSystemForTest().useMemfiles()) {
+    Filesystem::fileSystemForTest().setUseMemfiles(use);
+  }
+  ~ScopedUseMemfiles() {
+    Filesystem::fileSystemForTest().setUseMemfiles(prior_use_memfiles_);
+  }
+
+ private:
+  bool prior_use_memfiles_;
+};
 
 } // namespace Filesystem
 
