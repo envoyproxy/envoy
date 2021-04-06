@@ -25,6 +25,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "containers_lib",
+    hdrs = ["containers.h"],
+    deps = [
+        ":cleanup_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_recursion_checker_lib",
     hdrs = ["debug_recursion_checker.h"],
     deps = [":assert_lib"],
@@ -326,6 +334,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "thread_lib",
+    srcs = ["thread.cc"],
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [

@@ -7,8 +7,7 @@
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
-/*/extensions/access_loggers/stderror @mattklein123 @davinci26
-/*/extensions/access_loggers/stdoutput @mattklein123 @davinci26
+/*/extensions/access_loggers/stream @mattklein123 @davinci26
 # compression extensions
 /*/extensions/compression/common/compressor @rojkov @junr03
 /*/extensions/compression/gzip/compressor @rojkov @junr03
@@ -167,10 +166,14 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
+# environment generic input
+/*/extensions/matching/common_inputs/environment @snowp @donyu
 # user space socket pair and event
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
+# HTTP header formatters
+/*/extensions/http/header_formatters/preserve_case @mattklein123 @jmarantz
 # External Rate Limit
 /*/extensions/filters/common/ratelimit @esmet @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123

@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary")
+load("@deps_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 
 licenses(["notice"])  # Apache 2
@@ -42,5 +43,14 @@ py_binary(
     srcs = ["cve_scan_test.py"],
     data = [
         ":cve_scan",
+    ],
+)
+
+py_binary(
+    name = "pip_check",
+    srcs = ["pip_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("PyYaml"),
     ],
 )

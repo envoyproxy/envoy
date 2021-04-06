@@ -13,25 +13,9 @@ namespace Config {
 namespace {
 // Returns the namespace part (if there's any) in the resource name.
 std::string namespaceFromName(const std::string& resource_name) {
-  // Namespace handling for xdstp:// resource is different to legacy VHDS etc., since we need to
-  // canonicalize context parameters and substitute a * for glob collections. E.g.
-  // xdstp://foo/v3-listener/bar/baz?b=a&a=b becomes xdstp://foo/v3-listener/bar/*?a=b&b=a.
-  if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
-    // This is not very efficient; it is possible to canonicalize etc. much faster with raw string
-    // operations, but this implementation provides a reference for later optimization while we
-    // adopt xdstp://.
-    auto resource = XdsResourceIdentifier::decodeUrn(resource_name);
-    // Replace resource name component with glob for purpose of matching.
-    const auto pos = resource.id().find_last_of('/');
-    resource.set_id(pos == std::string::npos ? "*" : resource.id().substr(0, pos) + "/*");
-    XdsResourceIdentifier::EncodeOptions encode_options;
-    encode_options.sort_context_params_ = true;
-    return XdsResourceIdentifier::encodeUrn(resource, encode_options);
-  }
-  // In the non-xdstp:// legacy case for VHDS, we simple remove the last / component. E.g.
-  // www.foo.com/bar becomes www.foo.com.
+  // We simply remove the last / component. E.g. www.foo.com/bar becomes www.foo.com.
   const auto pos = resource_name.find_last_of('/');
-  // we are not interested in the "/" character in the namespace
+  // We are not interested in the "/" character in the namespace
   return pos == std::string::npos ? "" : resource_name.substr(0, pos);
 }
 } // namespace
@@ -88,12 +72,36 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
   if (!use_namespace_matching_) {
     ret = wildcard_watches_;
   }
-
-  const auto prefix = namespaceFromName(resource_name);
   const bool is_xdstp = XdsResourceIdentifier::hasXdsTpScheme(resource_name);
-  const auto resource_key =
-      (use_namespace_matching_ || is_xdstp) && !prefix.empty() ? prefix : resource_name;
-  const auto watches_interested = watch_interest_.find(resource_key);
+  xds::core::v3::ResourceName xdstp_resource;
+  XdsResourceIdentifier::EncodeOptions encode_options;
+  encode_options.sort_context_params_ = true;
+  // First look for an exact match. If this is xdstp:// we need to normalize context parameters.
+  if (is_xdstp) {
+    // TODO(htuch): factor this (and stuff in namespaceFromName) into a dedicated library.
+    // This is not very efficient; it is possible to canonicalize etc. much faster with raw string
+    // operations, but this implementation provides a reference for later optimization while we
+    // adopt xdstp://.
+    xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
+  }
+  auto watches_interested = watch_interest_.find(
+      is_xdstp ? XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options) : resource_name);
+  // If that fails, consider namespace/glob matching. This is the slow path for xdstp:// and should
+  // only happen for glob collections. TODO(htuch): It should be possible to have much more
+  // efficient matchers here.
+  if (watches_interested == watch_interest_.end()) {
+    if (use_namespace_matching_) {
+      watches_interested = watch_interest_.find(namespaceFromName(resource_name));
+    } else if (is_xdstp) {
+      // Replace resource name component with glob for purpose of matching.
+      const auto pos = xdstp_resource.id().find_last_of('/');
+      xdstp_resource.set_id(pos == std::string::npos ? "*"
+                                                     : xdstp_resource.id().substr(0, pos) + "/*");
+      const std::string encoded_name =
+          XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
+      watches_interested = watch_interest_.find(encoded_name);
+    }
+  }
   if (watches_interested != watch_interest_.end()) {
     for (const auto& watch : watches_interested->second) {
       ret.insert(watch);

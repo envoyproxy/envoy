@@ -53,8 +53,8 @@ def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_
         fd.write(contents)
 
 
-def generate_test_code(type, header_test_cc_file, codec_test_cc_file, utilities_cc_file,
-                       input_files):
+def generate_test_code(
+        type, header_test_cc_file, codec_test_cc_file, utilities_cc_file, input_files):
     """
   Test code generator.
 
@@ -121,10 +121,8 @@ class StatefulProcessor:
                 with open(input_file, 'r') as fd:
                     raw_contents = fd.read()
                     without_comments = re.sub(r'\s*//.*\n', '\n', raw_contents)
-                    without_empty_newlines = re.sub(r'^\s*$',
-                                                    '',
-                                                    without_comments,
-                                                    flags=re.MULTILINE)
+                    without_empty_newlines = re.sub(
+                        r'^\s*$', '', without_comments, flags=re.MULTILINE)
                     message_spec = json.loads(without_empty_newlines)
                     message = self.parse_top_level_element(message_spec)
                     messages.append(message)
@@ -167,13 +165,13 @@ class StatefulProcessor:
                     common_struct_name = common_struct['name']
                     common_struct_versions = Statics.parse_version_string(
                         common_struct['versions'], versions[-1])
-                    parsed_complex = self.parse_complex_type(common_struct_name, common_struct,
-                                                             common_struct_versions)
+                    parsed_complex = self.parse_complex_type(
+                        common_struct_name, common_struct, common_struct_versions)
                     self.common_structs[parsed_complex.name] = parsed_complex
 
             # Parse the type itself.
-            complex_type = self.parse_complex_type(self.currently_processed_message_type, spec,
-                                                   versions)
+            complex_type = self.parse_complex_type(
+                self.currently_processed_message_type, spec, versions)
             complex_type.register_flexible_versions(flexible_versions)
 
             # Request / response types need to carry api key version.
@@ -223,8 +221,8 @@ class StatefulProcessor:
         if field_spec.get('tag') is not None:
             return None
 
-        version_usage = Statics.parse_version_string(field_spec['versions'],
-                                                     highest_possible_version)
+        version_usage = Statics.parse_version_string(
+            field_spec['versions'], highest_possible_version)
         version_usage_as_nullable = Statics.parse_version_string(
             field_spec['nullableVersions'],
             highest_possible_version) if 'nullableVersions' in field_spec else range(-1)
@@ -244,8 +242,8 @@ class StatefulProcessor:
             if (type_name in Primitive.USABLE_PRIMITIVE_TYPE_NAMES):
                 return Primitive(type_name, field_spec.get('default'))
             else:
-                versions = Statics.parse_version_string(field_spec['versions'],
-                                                        highest_possible_version)
+                versions = Statics.parse_version_string(
+                    field_spec['versions'], highest_possible_version)
                 return self.parse_complex_type(type_name, field_spec, versions)
 
 
@@ -382,8 +380,8 @@ class FieldSpec:
 
     def example_value_for_test(self, version):
         if self.is_nullable():
-            return 'absl::make_optional<%s>(%s)' % (self.type.name,
-                                                    self.type.example_value_for_test(version))
+            return 'absl::make_optional<%s>(%s)' % (
+                self.type.name, self.type.example_value_for_test(version))
         else:
             return str(self.type.example_value_for_test(version))
 
@@ -460,8 +458,8 @@ class Array(TypeSpecification):
         return True
 
     def example_value_for_test(self, version):
-        return 'std::vector<%s>{ %s }' % (self.underlying.name,
-                                          self.underlying.example_value_for_test(version))
+        return 'std::vector<%s>{ %s }' % (
+            self.underlying.name, self.underlying.example_value_for_test(version))
 
     def is_printable(self):
         return self.underlying.is_printable()
@@ -551,8 +549,8 @@ class Primitive(TypeSpecification):
 
     def deserializer_name_in_version(self, version, compact):
         if compact and self.original_name in Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER.keys():
-            return Primitive.compute(self.original_name,
-                                     Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER)
+            return Primitive.compute(
+                self.original_name, Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER)
         else:
             return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DESERIALIZER)
 
@@ -600,8 +598,8 @@ class Complex(TypeSpecification):
         for type in self.compute_declaration_chain():
             type.flexible_versions = flexible_versions
             if len(flexible_versions) > 0:
-                tagged_fields_field = FieldSpec('tagged_fields', Primitive('tagged_fields', None),
-                                                flexible_versions, [])
+                tagged_fields_field = FieldSpec(
+                    'tagged_fields', Primitive('tagged_fields', None), flexible_versions, [])
                 type.fields.append(tagged_fields_field)
 
     def compute_declaration_chain(self):
@@ -670,8 +668,8 @@ class Complex(TypeSpecification):
                         FieldSerializationSpec(field, non_flexible, 'computeSize', 'encode'))
                 if flexible:
                     result.append(
-                        FieldSerializationSpec(field, flexible, 'computeCompactSize',
-                                               'encodeCompact'))
+                        FieldSerializationSpec(
+                            field, flexible, 'computeCompactSize', 'encodeCompact'))
             else:
                 result.append(
                     FieldSerializationSpec(field, field.version_usage, 'computeSize', 'encode'))
@@ -712,6 +710,7 @@ class RenderingHelper:
         import sys
         # Templates are resolved relatively to main start script, due to main & test templates being
         # stored in different directories.
-        env = jinja2.Environment(loader=jinja2.FileSystemLoader(
-            searchpath=os.path.dirname(os.path.abspath(sys.argv[0]))))
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(
+                searchpath=os.path.dirname(os.path.abspath(sys.argv[0]))))
         return env.get_template(template)

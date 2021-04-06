@@ -17,10 +17,13 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/http3/quic_client_connection_factory.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/client_connection_factory_impl.h"
+#endif
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/ssl_utility.h"
@@ -199,13 +202,11 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                          client);
   }
 
+#ifdef ENVOY_ENABLE_QUIC
   Network::TransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  Http::QuicClientConnectionFactory& connection_factory =
-      Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-          Http::QuicCodecNames::get().Quiche);
-  persistent_info = connection_factory.createNetworkConnectionInfo(
+  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
 
   Network::Address::InstanceConstSharedPtr local_address;
@@ -215,13 +216,17 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     // Docker only works with loopback v6 address.
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
-  Network::ClientConnectionPtr connection = connection_factory.createQuicNetworkConnection(
-      *persistent_info, *dispatcher, addr, local_address);
+  Network::ClientConnectionPtr connection =
+      Quic::createQuicNetworkConnection(*persistent_info, *dispatcher, addr, local_address);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
+#else
+  ASSERT(false, "running a QUIC integration test without compiling QUIC");
+  return nullptr;
+#endif
 }
 
 BufferingStreamDecoderPtr
