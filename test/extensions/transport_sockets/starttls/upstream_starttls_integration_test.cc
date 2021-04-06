@@ -141,10 +141,12 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
 }
 
 Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool end_stream) {
-  std::cout << "StartTlsSwitchFilter received from downstream: " << data.toString() << std::endl;
-  if (upstream_connection_->state() != Network::Connection::State::Open) {
-    std::cout << "Connection is not open" << std::endl;
+  std::cout << "StartTlsSwitchFilter received from downstream: " << data.toString() << ", endstream: " << end_stream << std::endl;
+  if (end_stream) {
+    upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
+    return Network::FilterStatus::StopIteration;
   }
+
   upstream_connection_->write(data, end_stream);
   return Network::FilterStatus::Continue;
 }
@@ -416,6 +418,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   payload_reader_->clearData();
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
+  server_connection_->close(Network::ConnectionCloseType::FlushWrite);
   std::cout << "Test finished." << std::endl;
 }
 
