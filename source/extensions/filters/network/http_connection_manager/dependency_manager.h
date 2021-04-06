@@ -21,11 +21,16 @@ public:
   /**
    * Register each filter in an http filter chain, using name and dependencies
    * from the filter factory. Filters must be registered in decode path order.
+   *
+   * Currently, filters with no dependencies required or provided have no
+   * bearing on the validity of a filter chain, and are silently skipped.
    */
   void registerFilter(
       const std::string& filter_name,
       const envoy::extensions::filters::common::dependency::v3::FilterDependencies& dependencies) {
-    filter_chain_.push_back({filter_name, dependencies});
+    if (dependencies.ByteSizeLong() != 0) {
+      filter_chain_.push_back({filter_name, dependencies});
+    }
   }
 
   /**
@@ -40,8 +45,14 @@ public:
    */
   absl::Status validDecodeDependencies();
 
+  int filterChainSizeForTest() const {
+    return filter_chain_.size();
+  }
+
 private:
-  // Mapping of filter names to dependencies, in decode path order.
+  // Mapping of filter names to dependencies. This corresponds to a filter chain
+  // configuration in decode-path order, but filters with no dependencies
+  // required or provided are skipped.
   std::vector<std::pair<std::string,
                         envoy::extensions::filters::common::dependency::v3::FilterDependencies>>
       filter_chain_;

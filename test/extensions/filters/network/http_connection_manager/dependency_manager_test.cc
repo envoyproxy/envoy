@@ -15,9 +15,10 @@ using testing::HasSubstr;
 
 TEST(DependencyManagerTest, RegisterFilter) {
   DependencyManager manager;
-
   FilterDependencies dependencies;
   manager.registerFilter("foobar", dependencies);
+  auto result = manager.validDecodeDependencies();
+  EXPECT_TRUE(result.ok());
 }
 
 TEST(DependencyManagerTest, RegisterFilterWithDependency) {
@@ -30,6 +31,39 @@ TEST(DependencyManagerTest, RegisterFilterWithDependency) {
   manager.registerFilter("ingredient", dependencies);
   auto result = manager.validDecodeDependencies();
   EXPECT_TRUE(result.ok());
+}
+
+// Register five filters. The internal filter chain construct is modified
+// iff at least one dependency is required or provided.
+TEST(DependencyManagerTest, RegisterFilterIffNonEmptyDependencies) {
+  DependencyManager manager;
+  FilterDependencies dependencies;
+  Dependency potato;
+  potato.set_type(Dependency::FILTER_STATE_KEY);
+  potato.set_name("potato");
+
+  manager.registerFilter("a", dependencies);
+  EXPECT_EQ(manager.filterChainSizeForTest(), 0);
+
+  dependencies.Clear();
+  *(dependencies.add_decode_required()) = potato;
+  manager.registerFilter("b", dependencies);
+  EXPECT_EQ(manager.filterChainSizeForTest(), 1);
+
+  dependencies.Clear();
+  *(dependencies.add_decode_provided()) = potato;
+  manager.registerFilter("c", dependencies);
+  EXPECT_EQ(manager.filterChainSizeForTest(), 2);
+
+  dependencies.Clear();
+  *(dependencies.add_encode_required()) = potato;
+  manager.registerFilter("c", dependencies);
+  EXPECT_EQ(manager.filterChainSizeForTest(), 3);
+
+  dependencies.Clear();
+  *(dependencies.add_encode_provided()) = potato;
+  manager.registerFilter("d", dependencies);
+  EXPECT_EQ(manager.filterChainSizeForTest(), 4);
 }
 
 TEST(DependencyManagerTest, Valid) {
