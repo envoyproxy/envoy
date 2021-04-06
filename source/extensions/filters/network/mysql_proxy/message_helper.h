@@ -11,6 +11,9 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
+/**
+ * Message helper of MySQL, generate MySQL packs.
+ */
 class MessageHelper {
 public:
   static Buffer::OwnedImpl encodePacket(const MySQLCodec& codec, uint8_t seq);
@@ -24,23 +27,19 @@ public:
   static ServerGreeting encodeGreeting(const std::vector<uint8_t>& seed,
                                        const std::string& auth_plugin_name);
   static OkMessage encodeOk();
-
   static AuthSwitchMessage encodeAuthSwitch(const std::vector<uint8_t>& seed);
   static AuthSwitchMessage encodeAuthSwitch(const std::vector<uint8_t>& seed,
                                             const std::string& auth_plugin_name);
   static AuthMoreMessage encodeAuthMore(const std::vector<uint8_t>& seed);
   static ErrMessage encodeErr(uint16_t error_code, uint8_t sql_marker, std::string&& sql_state,
                               std::string&& error_message);
-
   static ErrMessage passwordLengthError(int len);
   static ErrMessage authError(const std::string& username, const std::string& destination,
                               bool using_password);
   static ErrMessage dbError(const std::string& db);
-  // used for test
   static ClientSwitchResponse encodeSwithResponse(const std::vector<uint8_t>& auth_resp);
   static Command encodeCommand(Command::Cmd cmd, const std::string& data, const std::string db,
                                bool is_query);
-
   static CommandResponse encodeCommandResponse(const std::string& data);
 };
 } // namespace MySQLProxy

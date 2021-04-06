@@ -189,7 +189,7 @@ void ActiveMySQLClient::onAuthPassed() {
   connection_->readDisable(true);
   connection_->removeReadFilter(read_filter_handle_);
   mysql_read_filter_ = std::make_shared<MySQLReadFilter>(*this);
-  // reset read filter, let client can use addUpstreamFilter to replace onData method
+  // reset read filter, let pool user can use addUpstreamFilter to replace onData method
   connection_->addReadFilter(mysql_read_filter_);
   parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
   parent_.scheduleOnUpstreamReady();

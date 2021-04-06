@@ -23,13 +23,15 @@ enum class MySQLPoolFailureReason {
   RemoteConnectionFailure = static_cast<int>(PoolFailureReason::RemoteConnectionFailure),
   // A timeout occurred while creating a new connection.
   Timeout = static_cast<int>(PoolFailureReason::Timeout),
-  // A auth failure when connect to upstream
+  // An auth failure when connect to upstream
   AuthFailure,
   // A parse error when parse upstream data
   ParseFailure,
 };
+
 /**
- * MySQL Client Pool call back
+ * MySQLPool callbacks invoked in the context of a newConnection() call, either synchronously or
+ * asynchronously.
  */
 class ClientPoolCallBack {
 public:
@@ -57,10 +59,30 @@ public:
                            Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 
+/**
+ * An instance of a MySQL connection pool.
+ */
 class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
 public:
   ~Instance() override = default;
+  /**
+   * Create a new connection which passed MySQL connection phase on the pool.
+   * @param cb supplies the callbacks to invoke when the connection is ready or has failed. The
+   *           callbacks may be invoked immediately within the context of this call if there is a
+   *           ready connection or an immediate failure. In this case, the routine returns nullptr.
+   * @return Cancellable* If no connection is ready, the callback is not invoked, and a handle
+   *                      is returned that can be used to cancel the request. Otherwise, one of the
+   *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
+   *                      is called, the handle is no longer valid and any further cancellation
+   *                      should be done by resetting the connection.
+   */
   virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callback) PURE;
+
+  /**
+   * Immediately close all existing connection pool connections. This method can be used in cases
+   * where the connection pool is not being destroyed, but the caller wishes to terminate all
+   * existing connections. For example, when a health check failure occurs.
+   */
   virtual void closeConnections() PURE;
 };
 
@@ -70,6 +92,7 @@ public:
 class ConnectionPoolManager {
 public:
   virtual ~ConnectionPoolManager() = default;
+
   virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) PURE;
 };
 

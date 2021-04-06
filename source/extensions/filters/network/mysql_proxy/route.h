@@ -12,10 +12,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
+/**
+ * MySQL route of cluster connection pool by database name.
+ */
 class Route {
 public:
   virtual ~Route() = default;
-  // cluster connection pool of this route
+  /**
+   * Return the connection pool manager of this cluster.
+   * @return connection pool manager
+   */
   virtual ConnPool::ConnectionPoolManager& upstream() PURE;
 };
 
@@ -25,7 +31,7 @@ public:
   virtual ~Router() = default;
   /**
    * Returns a connection pool that matches a given route. When no match is found, return nullptr.
-   * @param db the db name of current connection.
+   * @param db the database name.
    * @return a handle to the connection pool.
    */
   virtual RouteSharedPtr upstreamPool(const std::string& db) PURE;
