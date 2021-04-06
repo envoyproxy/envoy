@@ -13,8 +13,6 @@
 namespace Envoy {
 class Http2IntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  Http2IntegrationTest() : HttpProtocolIntegrationTest() {}
-
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
 
 protected:

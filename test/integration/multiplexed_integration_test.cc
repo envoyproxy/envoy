@@ -45,11 +45,13 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
+  EXCLUDE_DOWNSTREAM_HTTP3;                   // needs adjustable timeouts (#15812)
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBody) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // needs adjustable timeouts (#15812)
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false);
@@ -60,15 +62,18 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoB
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // needs adjustable timeouts (#15812)
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+  EXCLUDE_DOWNSTREAM_HTTP3;                   // needs adjustable timeouts (#15812)
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  EXCLUDE_DOWNSTREAM_HTTP3; // needs adjustable timeouts (#15812)
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true);
