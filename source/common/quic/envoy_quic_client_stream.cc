@@ -114,8 +114,6 @@ void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
 }
 
 void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
-  ASSERT(FinishedReadingHeaders(),
-         "Upper stream buffer limit is reached before response body is delivered.");
   if (should_block) {
     sequencer()->SetBlockedUntilFlush();
   } else {
@@ -244,7 +242,6 @@ void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
 
 void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
-    ASSERT(!received_trailers().empty());
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
     response_decoder_->decodeTrailers(
