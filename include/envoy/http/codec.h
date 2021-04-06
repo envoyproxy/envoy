@@ -27,6 +27,10 @@ namespace Http2 {
 struct CodecStats;
 }
 
+namespace Http3 {
+struct CodecStats;
+}
+
 // Legacy default value of 60K is safely under both codec default limits.
 static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
 // Default maximum number of headers.

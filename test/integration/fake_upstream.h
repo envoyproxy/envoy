@@ -27,6 +27,7 @@
 #include "common/grpc/common.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -551,6 +552,7 @@ struct FakeUpstreamConfig {
   bool enable_half_close_{};
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -651,6 +653,10 @@ public:
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
   }
 
+  Http::Http3::CodecStats& http3CodecStats() {
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, stats_store_);
+  }
+
   // Write into the outbound buffer of the network connection at the specified index.
   // Note: that this write bypasses any processing by the upstream codec.
   ABSL_MUST_USE_RESULT
@@ -659,6 +665,7 @@ public:
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
+  const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;
@@ -785,6 +792,7 @@ private:
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;
   ConditionalInitializer server_initialized_;
@@ -811,6 +819,7 @@ private:
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;
