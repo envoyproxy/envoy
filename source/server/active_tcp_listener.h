@@ -30,10 +30,10 @@ using RebalancedSocketSharedPtr = std::shared_ptr<RebalancedSocket>;
 /**
  * Wrapper for an active tcp listener owned by this handler.
  */
-class ActiveTcpListener : public Network::TcpListenerCallbacks,
-                          public ActiveListenerImplBase,
-                          public Network::BalancedConnectionHandler,
-                          Logger::Loggable<Logger::Id::conn_handler> {
+class ActiveTcpListener final : public Network::TcpListenerCallbacks,
+                                public ActiveListenerImplBase,
+                                public Network::BalancedConnectionHandler,
+                                Logger::Loggable<Logger::Id::conn_handler> {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,

@@ -20,15 +20,10 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
-using testing::HasSubstr;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
@@ -107,7 +102,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(listener_config2, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
   EXPECT_CALL(listener_config2, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
   auto mock_listener_will_be_moved2 = std::make_unique<Network::MockListener>();
-  auto& listener2 = *mock_listener_will_be_moved2.get();
+  auto& listener2 = *mock_listener_will_be_moved2;
   auto active_listener2 = std::make_shared<ActiveTcpListener>(
       conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2);
 
