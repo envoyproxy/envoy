@@ -1022,7 +1022,8 @@ message RouteAction {
   // request.
   //
   // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
-  google.protobuf.BoolValue include_vh_rate_limits = 14 [deprecated = true];
+  google.protobuf.BoolValue include_vh_rate_limits = 14
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to
@@ -1061,7 +1062,8 @@ message RouteAction {
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
   //    :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   //    :ref:`retry overview <arch_overview_http_routing_retry>`.
-  google.protobuf.Duration max_grpc_timeout = 23 [deprecated = true];
+  google.protobuf.Duration max_grpc_timeout = 23
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Deprecated by :ref:`grpc_timeout_header_offset <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`.
   // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
@@ -1071,7 +1073,8 @@ message RouteAction {
   // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
   // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
   // infinity).
-  google.protobuf.Duration grpc_timeout_offset = 28 [deprecated = true];
+  google.protobuf.Duration grpc_timeout_offset = 28
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   repeated UpgradeConfig upgrade_configs = 25;
 
@@ -1081,7 +1084,8 @@ message RouteAction {
   // <envoy_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`.
   InternalRedirectPolicy internal_redirect_policy = 34;
 
-  InternalRedirectAction internal_redirect_action = 26 [deprecated = true];
+  InternalRedirectAction internal_redirect_action = 26
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // An internal redirect is handled, iff the number of previous internal redirects that a
   // downstream request has encountered is lower than this value, and
@@ -1097,7 +1101,8 @@ message RouteAction {
   // will pass the redirect back to downstream.
   //
   // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value max_internal_redirects = 31 [deprecated = true];
+  google.protobuf.UInt32Value max_internal_redirects = 31
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
@@ -1751,8 +1756,11 @@ message RateLimit {
       //
       // .. attention::
       //   This field has been deprecated in favor of the :ref:`metadata <envoy_api_field_config.route.v3.RateLimit.Action.metadata>` field
-      DynamicMetaData dynamic_metadata = 7
-          [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+      DynamicMetaData dynamic_metadata = 7 [
+        deprecated = true,
+        (envoy.annotations.deprecated_at_minor_version) = "3.0",
+        (envoy.annotations.disallowed_by_default) = true
+      ];
 
       // Rate limit on metadata.
       MetaData metadata = 8;

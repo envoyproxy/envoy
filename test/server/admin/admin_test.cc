@@ -51,6 +51,14 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
                       EXPECT_EQ(Http::Code::MethodNotAllowed, getCallback(path, header_map, data)));
 }
 
+TEST_P(AdminInstanceTest, Getters) {
+  EXPECT_EQ(&admin_.mutableSocket(), &admin_.socket());
+  EXPECT_EQ(1, admin_.concurrency());
+  EXPECT_EQ(false, admin_.preserveExternalRequestId());
+  EXPECT_EQ(nullptr, admin_.tracer());
+  EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
+}
+
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
