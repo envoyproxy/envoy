@@ -15,6 +15,7 @@ import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -133,7 +134,8 @@ message Listener {
   core.v3.Metadata metadata = 6;
 
   // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 7 [deprecated = true];
+  DeprecatedV1 deprecated_v1 = 7
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The type of draining to perform at a listener-wide level.
   DrainType drain_type = 8;

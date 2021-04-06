@@ -164,10 +164,12 @@ message HttpConnectionManager {
     OperationName hidden_envoy_deprecated_operation_name = 1 [
       deprecated = true,
       (validate.rules).enum = {defined_only: true},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
       (envoy.annotations.disallowed_by_default) = true
     ];
 
-    repeated string hidden_envoy_deprecated_request_headers_for_tags = 2 [deprecated = true];
+    repeated string hidden_envoy_deprecated_request_headers_for_tags = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   message InternalAddressConfig {
@@ -635,8 +637,11 @@ message HttpConnectionManager {
   // for details.
   PathNormalizationOptions path_normalization_options = 43;
 
-  google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // The configuration to customize local reply returned by Envoy.
@@ -908,7 +913,8 @@ message HttpFilter {
     // as for filters provided via the API.
     config.core.v3.ExtensionConfigSource config_discovery = 5;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // If true, clients that do not support this filter may ignore the

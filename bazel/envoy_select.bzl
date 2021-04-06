@@ -35,7 +35,7 @@ def envoy_select_enable_http3(xs, repository = ""):
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
     return select({
-        repository + "//bazel:disable_hot_restart_or_apple": [],
+        repository + "//bazel:disable_hot_restart": [],
         "//conditions:default": xs,
     })
 

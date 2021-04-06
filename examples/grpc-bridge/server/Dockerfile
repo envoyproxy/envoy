@@ -16,7 +16,7 @@ COPY kv/ /build/kv
 # Build for linux
 ENV GOOS=linux
 ENV GOARCH=amd64
-ENV CGO_ENABLED=0 
+ENV CGO_ENABLED=0
 RUN go build -o server
 
 # Build the main container (Linux Runtime)
