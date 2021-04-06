@@ -48,9 +48,7 @@ public:
     return Network::FilterStatus::StopIteration;
   }
 
-  Network::FilterStatus onNewConnection() override {
-    return Network::FilterStatus::Continue;
-  }
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
@@ -78,7 +76,8 @@ public:
     read_callbacks_ = &callbacks;
   }
 
-  static std::shared_ptr<StartTlsSwitchFilter> newInstance(Upstream::ClusterManager& cluster_manager) {
+  static std::shared_ptr<StartTlsSwitchFilter>
+  newInstance(Upstream::ClusterManager& cluster_manager) {
     auto p = std::shared_ptr<StartTlsSwitchFilter>(new StartTlsSwitchFilter(cluster_manager));
     p->self_ = p;
     return p;
@@ -98,9 +97,7 @@ public:
       }
     }
 
-    Network::FilterStatus onNewConnection() override {
-      return Network::FilterStatus::Continue;
-    }
+    Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 
     void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
       read_callbacks_ = &callbacks;
@@ -111,7 +108,8 @@ public:
   };
 
 private:
-  StartTlsSwitchFilter(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
+  StartTlsSwitchFilter(Upstream::ClusterManager& cluster_manager)
+      : cluster_manager_(cluster_manager) {}
 
   std::weak_ptr<StartTlsSwitchFilter> self_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
@@ -122,7 +120,8 @@ private:
 Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   auto c = cluster_manager_.getThreadLocalCluster("dummy_cluster");
   auto h = c->loadBalancer().chooseHost(nullptr);
-  upstream_connection_ = h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
+  upstream_connection_ =
+      h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
   upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
   upstream_connection_->connect();
   return Network::FilterStatus::Continue;
@@ -206,7 +205,9 @@ public:
 class StartTlsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
-  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig()), stream_info_(timeSystem(), nullptr) {}
+  StartTlsIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig()),
+        stream_info_(timeSystem(), nullptr) {}
   void initialize() override;
   void addStartTlsSwitchFilter(ConfigHelper& config_helper);
 
@@ -250,7 +251,7 @@ void StartTlsIntegrationTest::initialize() {
       // Connection constructor will also create read buffer, but the test does
       // not track received bytes.
       .WillRepeatedly(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
+                                 std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
 
@@ -276,24 +277,28 @@ void StartTlsIntegrationTest::initialize() {
 
   // Prepare for the server side listener
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
-    .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-      auto server_tls_context_ = Ssl::createUpstreamSslContext(*tls_context_manager_, *api_);
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        auto server_tls_context_ = Ssl::createUpstreamSslContext(*tls_context_manager_, *api_);
 
-      auto startTlsTransportSocket = Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_), move(server_tls_context_))
-          .createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()));
+        auto startTlsTransportSocket =
+            Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_),
+                                                                          move(server_tls_context_))
+                .createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+                    absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()));
 
-      server_connection_ = dispatcher_->createServerConnection(
-          std::move(socket), move(startTlsTransportSocket), stream_info_);
-      server_connection_->addReadFilter(std::make_shared<TerminalServerTlsFilter>());
-    }));
-  
-  listener_ = dispatcher_->createListener(socket, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), move(startTlsTransportSocket), stream_info_);
+        server_connection_->addReadFilter(std::make_shared<TerminalServerTlsFilter>());
+      }));
+
+  listener_ =
+      dispatcher_->createListener(socket, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
 
   // Add a start_tls cluster
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-     *bootstrap.mutable_static_resources()->add_clusters() = ConfigHelper::buildStartTlsCluster(
-       socket->addressProvider().localAddress()->ip()->addressAsString(), 
-       socket->addressProvider().localAddress()->ip()->port());
+    *bootstrap.mutable_static_resources()->add_clusters() = ConfigHelper::buildStartTlsCluster(
+        socket->addressProvider().localAddress()->ip()->addressAsString(),
+        socket->addressProvider().localAddress()->ip()->port());
   });
 
   BaseIntegrationTest::initialize();
@@ -343,7 +348,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  
+
   ASSERT_THAT(test_server_->server().listenerManager().numConnections(), 1);
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -362,15 +367,14 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   ASSERT_TRUE(payload_reader_->waitForLength(6, std::chrono::milliseconds(100)));
 
-  // Make sure we receieved the 'switch' command from the upstream.
+  // Make sure we received the 'switch' command from the upstream.
   ASSERT_EQ("switch", payload_reader_->data());
   payload_reader_->clearData();
-  
+
   // Without closing the connection, switch to tls.
   conn_->setTransportSocket(
       tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>())));
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>())));
   connect_callbacks_.reset();
 
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
@@ -380,7 +384,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   // // Send few messages over encrypted connection.
   buffer.add("hola");
   conn_->write(buffer, false);
-  
+
   // Make sure we get our echo back
   ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(1000)));
   ASSERT_EQ("hola", payload_reader_->data());
@@ -390,7 +394,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   server_connection_->close(Network::ConnectionCloseType::FlushWrite);
   std::cout << "Test finished." << std::endl;
 }
-
 
 INSTANTIATE_TEST_SUITE_P(StartTlsIntegrationTestSuite, StartTlsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));

@@ -138,10 +138,11 @@ std::string ConfigHelper::startTlsConfig() {
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
-envoy::config::cluster::v3::Cluster
-ConfigHelper::buildStartTlsCluster(const std::string& address, int port) {
+envoy::config::cluster::v3::Cluster ConfigHelper::buildStartTlsCluster(const std::string& address,
+                                                                       int port) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
-  auto config_str = fmt::format(R"EOF(
+  auto config_str = fmt::format(
+      R"EOF(
       name: dummy_cluster
       connect_timeout: 5s
       type: STATIC
@@ -173,14 +174,10 @@ ConfigHelper::buildStartTlsCluster(const std::string& address, int port) {
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-        address, port,
-        TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem")
-    );
+      address, port, TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
 
-  TestUtility::loadFromYaml(
-      config_str,
-      cluster);
+  TestUtility::loadFromYaml(config_str, cluster);
   return cluster;
 }
 
