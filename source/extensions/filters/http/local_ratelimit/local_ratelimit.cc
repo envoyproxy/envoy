@@ -44,7 +44,8 @@ FilterConfig::FilterConfig(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
-      proto_config_(config) {
+      proto_config_(config),
+      dispatcher_(dispatcher) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -118,7 +119,7 @@ bool Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request
   return getRateLimiter()->requestAllowed(request_descriptors);
 }
 
-std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> Filter::getRateLimiter() {
+LocalRateLimiterImplSharedPtr Filter::getRateLimiter() {
   const auto* config = getConfig();
 
   if (!decoder_callbacks_->streamInfo().filterState()->hasData<PerConnectionRateLimiter>(
@@ -127,7 +128,7 @@ std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> Filter::g
       std::chrono::milliseconds(
               PROTOBUF_GET_MS_OR_DEFAULT(config->proto_config().token_bucket(), fill_interval, 0)),
           config->proto_config().token_bucket().max_tokens(),
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->proto_config().token_bucket(), tokens_per_fill, 1), dispatcher_,
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->proto_config().token_bucket(), tokens_per_fill, 1), config->dispatcher(),
           config->proto_config().descriptors());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
