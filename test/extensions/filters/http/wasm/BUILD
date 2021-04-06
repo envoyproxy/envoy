@@ -40,6 +40,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:test_cpp_plugin",
         "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:wasm_lib",
     ],
 )

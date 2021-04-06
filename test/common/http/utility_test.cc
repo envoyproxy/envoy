@@ -9,6 +9,7 @@
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http1/settings.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
@@ -423,33 +424,34 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
   Protobuf::BoolValue hcm_value;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
-  EXPECT_FALSE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   hcm_value.set_value(false);
-  EXPECT_TRUE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                   .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
   hcm_value.set_value(true);
-  EXPECT_FALSE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
 
   http1_options.clear_override_stream_error_on_invalid_http_message();
 
   // fallback to HCM.stream_error
   hcm_value.set_value(true);
-  EXPECT_TRUE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                   .stream_error_on_invalid_http_message_);
 
   // fallback to HCM.stream_error (flip boolean value)
   hcm_value.set_value(false);
-  EXPECT_FALSE(Utility::parseHttp1Settings(http1_options, hcm_value, false)
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
                    .stream_error_on_invalid_http_message_);
 }
 

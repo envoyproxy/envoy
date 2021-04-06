@@ -53,6 +53,7 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_root_id() = "some_long_root_id";
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(test);
+  plugin_config.mutable_vm_config()->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "vm_key",

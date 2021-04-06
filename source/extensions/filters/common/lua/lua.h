@@ -62,6 +62,14 @@ namespace Lua {
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
 
 /**
+ * Declare a Lua function in which values are added to a table to approximate an enum.
+ */
+#define LUA_ENUM(state, name, val)                                                                 \
+  lua_pushlstring(state, #name, sizeof(#name) - 1);                                                \
+  lua_pushnumber(state, val);                                                                      \
+  lua_settable(state, -3);
+
+/**
  * Calculate the maximum space needed to be aligned.
  */
 template <typename T> constexpr size_t maximumSpaceNeededToAlign() {
@@ -352,6 +360,8 @@ private:
 };
 
 using CoroutinePtr = std::unique_ptr<Coroutine>;
+using Initializer = std::function<void(lua_State*)>;
+using InitializerList = std::vector<Initializer>;
 
 /**
  * This class wraps a Lua state that can be used safely across threads. The model is that every
@@ -377,9 +387,10 @@ public:
   /**
    * Register a global for later use.
    * @param global supplies the name of the global.
+   * @param initializers supplies a collection of initializers.
    * @return a slot/index for later use with getGlobalRef().
    */
-  uint64_t registerGlobal(const std::string& global);
+  uint64_t registerGlobal(const std::string& global, const InitializerList& initializers);
 
   /**
    * Register a type with the thread local state. After this call the type will be available on

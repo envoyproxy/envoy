@@ -19,9 +19,9 @@ public:
   // HTTP gRPC access log
   const std::string HttpGrpc = "envoy.access_loggers.http_grpc";
   // Standard error access log
-  const std::string Stderror = "envoy.access_loggers.stderror";
+  const std::string Stderr = "envoy.access_loggers.stderr";
   // Standard output access log
-  const std::string Stdoutput = "envoy.access_loggers.stdoutput";
+  const std::string Stdout = "envoy.access_loggers.stdout";
   // TCP gRPC access log
   const std::string TcpGrpc = "envoy.access_loggers.tcp_grpc";
   // OpenTelemetry gRPC access log
