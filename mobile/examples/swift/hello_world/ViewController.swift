@@ -19,6 +19,7 @@ final class ViewController: UITableViewController {
     do {
       NSLog("starting Envoy...")
       let engine = try EngineBuilder()
+        .addLogLevel(.debug)
         .addPlatformFilter(factory: DemoFilter.init)
         .addPlatformFilter(factory: BufferDemoFilter.init)
         .addPlatformFilter(factory: AsyncDemoFilter.init)
