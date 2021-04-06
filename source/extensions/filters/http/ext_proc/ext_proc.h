@@ -43,13 +43,20 @@ public:
                const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()) {}
+        processing_mode_(config.processing_mode()), request_attributes_(config.request_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   const ExtProcFilterStats& stats() const { return stats_; }
+  
+  const google::protobuf::RepeatedPtrField<std::string>& requestAttributesSpecified() const {
+    return request_attributes_;
+  }
+  const google::protobuf::RepeatedPtrField<std::string>& responseAttributesSpecified() const {
+    return response_attributes_;
+  }
 
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode&
   processingMode() const {
@@ -68,6 +75,8 @@ private:
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
+  const google::protobuf::RepeatedPtrField<std::string> request_attributes_;
+  const google::protobuf::RepeatedPtrField<std::string> response_attributes_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

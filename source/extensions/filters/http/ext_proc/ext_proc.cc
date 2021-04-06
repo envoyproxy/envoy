@@ -1,6 +1,9 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+#include "envoy/http/header_map.h"
+#include "extensions/filters/http/ext_proc/mutation_utils.h"
+#include "extensions/filters/http/ext_proc/attr_utils.h"
 
 #include "absl/strings/str_format.h"
 
@@ -75,7 +78,13 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHeaders(&headers);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
+
+  AttrUtils(decoder_callbacks_->streamInfo(), config_->requestAttributesSpecified(),
+            *headers_req->mutable_attributes())
+      .build();
+  ENVOY_LOG(debug, "done in initRequestAttributes");
+
   headers_req->set_end_of_stream(end_stream);
   state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
   state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());

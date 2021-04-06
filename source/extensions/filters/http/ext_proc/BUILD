@@ -22,6 +22,7 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":mutation_utils_lib",
+        ":attr_utils_lib",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -66,6 +67,31 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "attr_utils_lib",
+    srcs = ["attr_utils.cc"],
+    hdrs = ["attr_utils.h"],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+        "//include/envoy/server:lifecycle_notifier_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:enum_to_int",
+        "//source/common/common:base_logger_lib",
+        "//source/common/config:remote_data_fetcher_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/tracing:http_tracer_lib",
+
+    ]
 )
 
 envoy_cc_library(
