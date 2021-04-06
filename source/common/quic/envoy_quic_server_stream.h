@@ -23,13 +23,21 @@ class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public Http::ResponseEncoder {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
+<<<<<<< HEAD
                         quic::StreamType type,
+=======
+                        quic::StreamType type, Http::Http3::CodecStats& stats,
+>>>>>>> master
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
   EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
+<<<<<<< HEAD
                         quic::StreamType type,
+=======
+                        quic::StreamType type, Http::Http3::CodecStats& stats,
+>>>>>>> master
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
@@ -67,8 +75,8 @@ public:
   void clearWatermarkBuffer();
 
   // EnvoyQuicStream
-  HeaderValidationResult validateHeader(const std::string& header_name,
-                                        absl::string_view header_value) override;
+  Http::HeaderUtility::HeaderValidationResult
+  validateHeader(const std::string& header_name, absl::string_view header_value) override;
 
 protected:
   // EnvoyQuicStream
@@ -89,7 +97,11 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  HeaderValidationResult checkHeaderNameForUnderscores(const std::string& header_name);
+  Http::HeaderUtility::HeaderValidationResult checkHeaderNameForUnderscores(const std::string& header_name);
+  
+  // Either reset the stream or close the connection according to
+  // should_close_connection and configured http3 options.
+  void onStreamError(absl::optional<bool> should_close_connection);
 
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

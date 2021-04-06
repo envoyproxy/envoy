@@ -207,15 +207,17 @@ envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error) {
-  envoy::config::core::v3::Http3ProtocolOptions options_clone(options);
   if (options.has_override_stream_error_on_invalid_http_message()) {
-    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
-        options.override_stream_error_on_invalid_http_message().value());
-  } else if (Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-             hcm_stream_error_set) {
+    return options;
+  }
+  envoy::config::core::v3::Http3ProtocolOptions options_clone(options);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      hcm_stream_error_set) {
     options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
+  } else {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
   }
   return options_clone;
 }

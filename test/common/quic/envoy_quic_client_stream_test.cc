@@ -39,7 +39,10 @@ public:
         quic_session_(quic_config_, {quic_version_}, quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(quic::VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
-        quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
+        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
+                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
+        quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL,
+                                               stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
         request_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setResponseDecoder(stream_decoder_);
@@ -136,6 +139,9 @@ protected:
   EnvoyQuicClientConnection* quic_connection_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
+  Stats::IsolatedStoreImpl scope_;
+  Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicClientStream* quic_stream_;
   Http::MockResponseDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;

@@ -79,7 +79,7 @@ struct ClusterConnectivityState {
   ~ClusterConnectivityState() {
     ASSERT(pending_streams_ == 0);
     ASSERT(active_streams_ == 0);
-    ASSERT(connecting_stream_capacity_ == 0);
+    ASSERT(connecting_and_connected_stream_capacity_ == 0);
   }
 
   template <class T> void checkAndDecrement(T& value, uint32_t delta) {
@@ -94,11 +94,11 @@ struct ClusterConnectivityState {
 
   void incrPendingStreams(uint32_t delta) { checkAndIncrement(pending_streams_, delta); }
   void decrPendingStreams(uint32_t delta) { checkAndDecrement(pending_streams_, delta); }
-  void incrConnectingStreamCapacity(uint32_t delta) {
-    checkAndIncrement(connecting_stream_capacity_, delta);
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    checkAndIncrement(connecting_and_connected_stream_capacity_, delta);
   }
-  void decrConnectingStreamCapacity(uint32_t delta) {
-    checkAndDecrement(connecting_stream_capacity_, delta);
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    checkAndDecrement(connecting_and_connected_stream_capacity_, delta);
   }
   void incrActiveStreams(uint32_t delta) { checkAndIncrement(active_streams_, delta); }
   void decrActiveStreams(uint32_t delta) { checkAndDecrement(active_streams_, delta); }
@@ -116,7 +116,7 @@ struct ClusterConnectivityState {
   // Note that if more HTTP/2 streams have been established than are allowed by
   // a late-received SETTINGS frame, this MAY BE NEGATIVE.
   // Note this tracks the sum of multiple 32 bit stream capacities so must remain 64 bit.
-  int64_t connecting_stream_capacity_{};
+  int64_t connecting_and_connected_stream_capacity_{};
 };
 
 /**

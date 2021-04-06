@@ -656,6 +656,7 @@ envoy_cc_test_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:linked_object",
         "//source/common/common:lock_guard_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
@@ -1098,6 +1099,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
     ],
 )

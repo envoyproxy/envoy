@@ -562,6 +562,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
                                              factory->isTerminalFilter(),
                                              last_filter_in_current_config);
   }
+
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
       config_discovery, name, context_, stats_prefix_);
   filter_factories.push_back(std::move(filter_config_provider));
@@ -588,7 +589,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks, http3_options_,
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
+        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
         maxRequestHeadersKb(), headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
