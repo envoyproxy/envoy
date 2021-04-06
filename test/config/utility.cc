@@ -162,6 +162,11 @@ ConfigHelper::buildStartTlsCluster(const std::string& address, int port) {
           cleartext_socket_config:
           tls_socket_config:
             common_tls_context:
+              tls_certificates:
+                certificate_chain:
+                  filename: {}
+                private_key:
+                  filename: {}
       lb_policy: ROUND_ROBIN
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -169,7 +174,10 @@ ConfigHelper::buildStartTlsCluster(const std::string& address, int port) {
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-        address, port, TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+        address, port,
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem")
+    );
 
   TestUtility::loadFromYaml(
       config_str,
@@ -1171,19 +1179,19 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  // common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
-  // common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
-  // auto* validation_context = common_tls_context.mutable_validation_context();
-  // if (options.custom_validator_config_) {
-  //   validation_context->set_allocated_custom_validator_config(options.custom_validator_config_);
-  // } else {
-  //   validation_context->mutable_trusted_ca()->set_filename(
-  //       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  //   validation_context->add_verify_certificate_hash(
-  //       options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
-  // }
-  // validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
+  auto* validation_context = common_tls_context.mutable_validation_context();
+  if (options.custom_validator_config_) {
+    validation_context->set_allocated_custom_validator_config(options.custom_validator_config_);
+  } else {
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    validation_context->add_verify_certificate_hash(
+        options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+  }
+  validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
