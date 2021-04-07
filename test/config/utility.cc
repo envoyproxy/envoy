@@ -78,7 +78,7 @@ static_resources:
                      Platform::null_device_path, Platform::null_device_path);
 }
 
-std::string ConfigHelper::baseUdpListenerConfig() {
+std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
   return fmt::format(R"EOF(
 admin:
   access_log:
@@ -106,11 +106,11 @@ static_resources:
     name: listener_0
     address:
       socket_address:
-        address: 127.0.0.1
+        address: {}
         port_value: 0
         protocol: udp
 )EOF",
-                     Platform::null_device_path);
+                     Platform::null_device_path, listen_address);
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -194,7 +194,7 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
 std::string ConfigHelper::quicHttpProxyConfig() {
-  return absl::StrCat(baseUdpListenerConfig(), fmt::format(R"EOF(
+  return absl::StrCat(baseUdpListenerConfig("127.0.0.1"), fmt::format(R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -226,7 +226,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     udp_listener_config:
       quic_options: {{}}
 )EOF",
-                                                           Platform::null_device_path));
+                                                                      Platform::null_device_path));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
