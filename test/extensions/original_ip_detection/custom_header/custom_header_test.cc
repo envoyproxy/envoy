@@ -62,13 +62,24 @@ TEST_F(CustomHeaderTest, Detection) {
     EXPECT_EQ(reject_options.body, "detection failed");
   }
 
-  // Good IP.
+  // Good IPv4.
   {
     Http::TestRequestHeaderMapImpl headers{{"x-real-ip", "1.2.3.4"}};
     Http::OriginalIPDetectionParams params = {headers, nullptr};
     auto result = custom_header_extension_->detect(params);
 
     EXPECT_EQ("1.2.3.4:0", result.detected_remote_address->asString());
+    EXPECT_TRUE(result.allow_trusted_address_checks);
+    EXPECT_FALSE(result.reject_options.has_value());
+  }
+
+  // Good IPv6.
+  {
+    Http::TestRequestHeaderMapImpl headers{{"x-real-ip", "fc00::1"}};
+    Http::OriginalIPDetectionParams params = {headers, nullptr};
+    auto result = custom_header_extension_->detect(params);
+
+    EXPECT_EQ("[fc00::1]:0", result.detected_remote_address->asString());
     EXPECT_TRUE(result.allow_trusted_address_checks);
     EXPECT_FALSE(result.reject_options.has_value());
   }
