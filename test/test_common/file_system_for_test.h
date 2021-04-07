@@ -62,12 +62,11 @@ public:
     if (file_system_->fileExists(path) || !use_memfiles_) {
       return file_system_->createFile(file_info);
     }
-    auto it = files_.find(path);
-    if (it == files_.end()) {
-      it = files_.emplace(path, std::make_shared<MemFileInfo>()).first;
+    std::shared_ptr<MemFileInfo>& info = files_[path];
+    if (info == nullptr) {
+      info = std::make_shared<MemFileInfo>();
     }
-    std::shared_ptr<MemFileInfo> info = it->second;
-    return FilePtr{new MemfileImpl(file_info, info)};
+    return std::make_unique<MemfileImpl>(file_info, info);
   }
 
   bool fileExists(const std::string& path) override {
@@ -144,7 +143,7 @@ public:
   ~ScopedUseMemfiles() { Filesystem::fileSystemForTest().setUseMemfiles(prior_use_memfiles_); }
 
 private:
-  bool prior_use_memfiles_;
+  const bool prior_use_memfiles_;
 };
 
 } // namespace Filesystem
