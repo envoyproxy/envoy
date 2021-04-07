@@ -208,7 +208,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
   // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
@@ -269,7 +269,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
@@ -326,7 +326,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHttp303PreservesHeadMethod) {
   // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
@@ -371,7 +371,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
   upstream_request_->encodeHeaders(redirect_response_, true);
 
   // Ensure the redirect was returned to the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
 }
@@ -395,7 +395,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToEarlyResponse) {
 
   // Respond with a redirect before the request is complete.
   upstream_request_->encodeHeaders(redirect_response_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
