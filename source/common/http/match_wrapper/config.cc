@@ -7,12 +7,44 @@
 #include "common/config/utility.h"
 #include "common/matcher/matcher.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Common {
 namespace Http {
 namespace MatchWrapper {
 
 namespace {
+
+class MatchTreeValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Envoy::Http::HttpMatchingData> {
+public:
+  explicit MatchTreeValidationVisitor(
+      const envoy::extensions::filters::common::dependency::v3::MatchingRequirements&
+          requirements) {
+    if (requirements.has_data_input_allow_list()) {
+      data_input_allowlist_ = requirements.data_input_allow_list().type_url();
+    }
+  }
+  absl::Status performDataInputValidation(const Matcher::DataInput<Envoy::Http::HttpMatchingData>&,
+                                          absl::string_view type_url) override {
+    if (!data_input_allowlist_) {
+      return absl::OkStatus();
+    }
+
+    if (std::find(data_input_allowlist_->begin(), data_input_allowlist_->end(), type_url) !=
+        data_input_allowlist_->end()) {
+      return absl::OkStatus();
+    }
+
+    return absl::InvalidArgumentError(
+        fmt::format("data input typeUrl {} not permitted according to allowlist", type_url));
+  }
+
+private:
+  absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
+};
+
 struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallbacks {
   DelegatingFactoryCallbacks(Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks,
                              Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
@@ -64,8 +96,17 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
       proto_config.extension_config().typed_config(), context.messageValidationVisitor(), factory);
   auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
 
-  auto match_tree = Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(context).create(
-      proto_config.matcher());
+  MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
+
+  auto match_tree =
+      Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(context, validation_visitor)
+          .create(proto_config.matcher());
+
+  if (!validation_visitor.errors().empty()) {
+    // TODO(snowp): Output all violations.
+    throw EnvoyException(fmt::format("requirement violation while creating match tree: {}",
+                                     validation_visitor.errors()[0]));
+  }
 
   return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree);

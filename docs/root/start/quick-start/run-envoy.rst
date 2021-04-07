@@ -147,7 +147,8 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. tip::
 
-         The output of ``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``.
+         The output of ``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``. For more information
+         Envoy is reporting startup failures with error messages on Windows Event Viewer.
 
 Check Envoy is proxying on http://localhost:10000.
 
