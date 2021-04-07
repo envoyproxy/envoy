@@ -45,6 +45,12 @@ namespace Http {
 namespace Http1 {
 namespace {
 
+// Use a macro to avoid tons of cut and paste, but to retain line numbers on error.
+#define CHECK_STATE(active, pending, capacity)                                                     \
+  EXPECT_EQ(conn_pool_->state_.pending_streams_, pending);                                         \
+  EXPECT_EQ(conn_pool_->state_.active_streams_, active);                                           \
+  EXPECT_EQ(conn_pool_->state_.connecting_and_connected_stream_capacity_, capacity);
+
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
  */
@@ -579,8 +585,8 @@ TEST_F(Http1ConnPoolImplTest, CancelExcessBeforeBound) {
   EXPECT_NE(nullptr, handle);
 
   handle->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-  // Unlike CancelBeforeBound there is no need to raise a close event to destroy the connection.
   EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
   dispatcher_.clearDeferredDeleteList();
 }
 
@@ -879,6 +885,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   EXPECT_CALL(*conn_pool_->test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 1 /*capacity*/);
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
   conn_pool_->expectEnableUpstreamReady();
@@ -886,6 +893,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
       callbacks.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(*conn_pool_, onClientDestroy());
@@ -893,6 +901,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
   EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_max_requests_.value());
 }

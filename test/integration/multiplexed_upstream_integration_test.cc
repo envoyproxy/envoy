@@ -592,4 +592,31 @@ TEST_P(Http2UpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   response2->waitForEndStream();
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/13933
+TEST_P(Http2UpstreamIntegrationTest, UpstreamGoaway) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Kick off the initial request and make sure it's received upstream.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send a goaway from upstream.
+  fake_upstream_connection_->encodeGoAway();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+
+  // A new request should result in a new connection
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  FakeStreamPtr upstream_request2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
+
+  // Clean up
+  ASSERT_TRUE(fake_upstream_connection2->close());
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+  fake_upstream_connection2.reset();
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace Envoy
