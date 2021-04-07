@@ -44,13 +44,11 @@ public:
 
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
-      const bool check_multiple_values =
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values");
       absl::InlinedVector<std::string, 1> rewritten_header_values;
       absl::InlinedVector<absl::string_view, 1> header_values;
 
       size_t num_headers_to_hash = 1;
-      if (check_multiple_values) {
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values")) {
         num_headers_to_hash = header.size();
         header_values.reserve(num_headers_to_hash);
       }
@@ -68,14 +66,10 @@ public:
         }
       }
 
-      if (check_multiple_values && (num_headers_to_hash > 1)) {
-        // Ensure generating same hash value for different order header values.
-        // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
-        std::sort(header_values.begin(), header_values.end());
-        hash = HashUtil::xxHash64(header_values);
-      } else {
-        hash = HashUtil::xxHash64(header_values[0]);
-      }
+      // Ensure generating same hash value for different order header values.
+      // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
+      std::sort(header_values.begin(), header_values.end());
+      hash = HashUtil::xxHash64(absl::MakeSpan(header_values));
     }
     return hash;
   }
