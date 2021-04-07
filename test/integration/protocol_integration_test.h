@@ -18,10 +18,6 @@ public:
              << "Please use DownstreamProtocolIntegrationTest instead of ProtocolIntegrationTest.";
     }
   }
-
-  // TODO(asraa) remove this when flipping fuzzers on.
-  Filesystem::ScopedUseMemfiles use_memfiles_{true};
-
   // Allow exceptions to the rule. There are some tests which will do upstream
   // calls for some downstream protocols and not for others, and those still
   // need the full mesh.
