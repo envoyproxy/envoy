@@ -50,6 +50,11 @@ public:
    * @return the host rewrite value.
    */
   virtual const std::string& hostRewrite() const PURE;
+
+  /**
+   * @return  whether or not to buffer and sign the payload.
+   */
+  virtual bool useUnsignedPayload() PURE;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -65,6 +70,7 @@ public:
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
   const std::string& hostRewrite() const override;
+  bool useUnsignedPayload() override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
@@ -88,7 +94,6 @@ public:
 private:
   std::shared_ptr<FilterConfig> config_;
   Http::RequestHeaderMap* request_headers_ = nullptr;
-  bool unsigned_payload_;
 };
 
 } // namespace AwsRequestSigningFilter
