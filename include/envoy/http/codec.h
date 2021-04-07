@@ -139,14 +139,16 @@ public:
   /**
    * Encode 100-Continue headers.
    * @param headers supplies the 100-Continue header map to encode.
+   * @return indicates the result of encoding and has Http::StatusCode::Ok for success.
    */
   virtual Http::Status encode100ContinueHeaders(const ResponseHeaderMap& headers) PURE;
 
   /**
    * Encode headers, optionally indicating end of stream. Response headers must
-   * have a valid :status set.
+   * have a valid :status set
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only response.
+   * @return indicates the result of encoding and has Http::StatusCode::Ok for success.
    */
   virtual Http::Status encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) PURE;
 

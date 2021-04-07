@@ -112,7 +112,8 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
         absl::MutexLock lock(&lock_);
         is_grpc = Grpc::Common::isGrpcRequestHeaders(*headers_);
       }
-      sendLocalReply(is_grpc, Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+      sendLocalReply(
+          is_grpc, Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
           absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
                        status.message(), "}"));
     };
