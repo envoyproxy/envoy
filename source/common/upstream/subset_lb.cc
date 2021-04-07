@@ -43,7 +43,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       time_source_(time_source) {
   ASSERT(subsets.isEnabled());
 
-  if ((lb_type_ != LoadBalancerType::LeastRequest || lb_type_ != LoadBalancerType::RoundRobin) &&
+  if ((lb_type_ != LoadBalancerType::LeastRequest && lb_type_ != LoadBalancerType::RoundRobin) &&
       common_config.has_slow_start_config()) {
     throw EnvoyException("Slow start mode is not supported for subset lb");
   }

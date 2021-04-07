@@ -516,10 +516,10 @@ message Cluster {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
 
-      // Size of slow start window in seconds, defaults to 0.
-      // If set to value greater than 0, the newly created host remains in slow start mode starting from its creation time
+      // Size of slow start window in seconds, should be set to value greater than zero.
+      // If set, the newly created host remains in slow start mode starting from its creation time
       // for the duration of slow start window.
-      uint32 slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
+      uint32 slow_start_window = 1 [(validate.rules).uint32 = {gt: 0}];
 
       // This parameter linearly affects load balancing weight of an endpoint. Defaults to 1.0.
       // The smaller the time bias is, the less traffic would be sent to endpoint that is within slow start window.
