@@ -161,8 +161,9 @@ def main(cfg):
     else:
         sys.exit("unknown protocol {0}".format(cfg.protocol))
 
-    print("Thrift Server listening on {0} for {1} {2} requests".format(
-        cfg.addr, cfg.transport, cfg.protocol))
+    print(
+        "Thrift Server listening on {0} for {1} {2} requests".format(
+            cfg.addr, cfg.transport, cfg.protocol))
     if cfg.service is not None:
         print("Thrift Server service name {0}".format(cfg.service))
     if cfg.response == "idl-exception":
@@ -186,8 +187,8 @@ if __name__ == "__main__":
         metavar="ADDR",
         dest="addr",
         default=":0",
-        help="Listener address for server in the form host:port. The host is optional. If --unix" +
-        " is set, the address is the socket name.",
+        help="Listener address for server in the form host:port. The host is optional. If --unix"
+        + " is set, the address is the socket name.",
     )
     parser.add_argument(
         "-m",

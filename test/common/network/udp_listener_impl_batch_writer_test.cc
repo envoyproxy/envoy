@@ -27,7 +27,7 @@
 #include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
-#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
+#include "common/quic/udp_gso_batch_writer.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"

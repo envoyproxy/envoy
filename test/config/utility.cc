@@ -34,7 +34,11 @@ namespace Envoy {
 std::string ConfigHelper::baseConfig() {
   return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -77,7 +81,11 @@ static_resources:
 std::string ConfigHelper::baseUdpListenerConfig() {
   return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -259,10 +267,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
               domains: "*"
             name: route_config_0
     udp_listener_config:
-      listener_config:
-        name: quic_listener_config
-        typed_config:
-          "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
+      quic_options: {{}}
 )EOF",
                                                            Platform::null_device_path));
 }
@@ -322,7 +327,11 @@ std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_typ
   return fmt::format(
       R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -431,7 +440,11 @@ static_resources:
         explicit_http_config:
           http2_protocol_options: {{}}
 admin:
-  access_log_path: {3}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{3}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -597,13 +610,13 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
                                envoy::config::core::v3::ApiVersion api_version) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
-      name: {}
+      name: "{}"
       virtual_hosts:
       - name: integration
         domains: ["*"]
         routes:
         - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
+          route: {{ cluster: "{}" }}
     )EOF",
                                         name, cluster),
                             route, shouldBoost(api_version));
@@ -1114,8 +1127,7 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
   ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
                               *tls_context->mutable_common_tls_context());
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
-    if (listener.udp_listener_config().listener_config().typed_config().type_url() ==
-        "type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions") {
+    if (listener.udp_listener_config().has_quic_options()) {
       ASSERT(listener.filter_chains_size() > 0);
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();

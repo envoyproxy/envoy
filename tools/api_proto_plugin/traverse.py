@@ -51,14 +51,14 @@ def traverse_message(type_context, msg_proto, visitor):
     }
     nested_msgs = [
         traverse_message(
-            type_context.extend_nested_message(index, nested_msg.name,
-                                               nested_msg.options.deprecated), nested_msg, visitor)
+            type_context.extend_nested_message(
+                index, nested_msg.name, nested_msg.options.deprecated), nested_msg, visitor)
         for index, nested_msg in enumerate(msg_proto.nested_type)
     ]
     nested_enums = [
         traverse_enum(
-            type_context.extend_nested_enum(index, nested_enum.name,
-                                            nested_enum.options.deprecated), nested_enum, visitor)
+            type_context.extend_nested_enum(
+                index, nested_enum.name, nested_enum.options.deprecated), nested_enum, visitor)
         for index, nested_enum in enumerate(msg_proto.enum_type)
     ]
     return visitor.visit_message(msg_proto, type_context, nested_msgs, nested_enums)
@@ -77,7 +77,8 @@ def traverse_file(file_proto, visitor):
     source_code_info = type_context.SourceCodeInfo(file_proto.name, file_proto.source_code_info)
     package_type_context = type_context.TypeContext(source_code_info, file_proto.package)
     services = [
-        traverse_service(package_type_context.extend_service(index, service.name), service, visitor)
+        traverse_service(
+            package_type_context.extend_service(index, service.name), service, visitor)
         for index, service in enumerate(file_proto.service)
     ]
     msgs = [
@@ -86,7 +87,8 @@ def traverse_file(file_proto, visitor):
             visitor) for index, msg in enumerate(file_proto.message_type)
     ]
     enums = [
-        traverse_enum(package_type_context.extend_enum(index, enum.name, enum.options.deprecated),
-                      enum, visitor) for index, enum in enumerate(file_proto.enum_type)
+        traverse_enum(
+            package_type_context.extend_enum(index, enum.name, enum.options.deprecated), enum,
+            visitor) for index, enum in enumerate(file_proto.enum_type)
     ]
     return visitor.visit_file(file_proto, package_type_context, services, msgs, enums)

@@ -26,7 +26,7 @@ void InjectedResourceMonitor::onFileChanged() { file_changed_ = true; }
 void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
   if (file_changed_) {
     file_changed_ = false;
-    try {
+    TRY_ASSERT_MAIN_THREAD {
       const std::string contents = api_.fileSystem().fileReadToEnd(filename_);
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {
@@ -38,7 +38,9 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callb
       } else {
         throw EnvoyException("failed to parse injected resource pressure");
       }
-    } catch (const EnvoyException& error) {
+    }
+    END_TRY
+    catch (const EnvoyException& error) {
       error_ = error;
       pressure_.reset();
     }

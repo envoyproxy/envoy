@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -1351,6 +1352,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   stream_info.filter_state_->setData("key-no-serialization",
                                      std::make_unique<StreamInfo::FilterState::Object>(),
                                      StreamInfo::FilterState::StateType::ReadOnly);
+
   stream_info.filter_state_->setData(
       "key-serialization-error",
       std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
@@ -1624,6 +1626,14 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
         ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::nullValue()));
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
