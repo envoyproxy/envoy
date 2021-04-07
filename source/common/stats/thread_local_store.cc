@@ -43,6 +43,9 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
+  ASSERT(scopes_to_cleanup_.empty());
+  ASSERT(central_cache_entries_to_cleanup_.empty());
+  ASSERT(histograms_to_cleanup_.empty());
 }
 
 void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
@@ -261,22 +264,27 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   //
   // Since this is called from ScopeImpl's destructor, we must bump the
   // ref-count of the central-cache by copying to a local scoped pointer, and
-  // keep that reference alive until all the TLS caches are clear.
-  CentralCacheEntrySharedPtr central_cache = scope->central_cache_;
+  // keep that reference alive until all the TLS caches are clear. This is done by keeping a
+  // separate vector of shared_ptrs which will be destructed once all threads have completed.
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    const uint64_t scope_id = scope->scope_id_;
+    // Switch to batching of clearing scopes as mentioned in:
+    // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
+    // This greatly reduces the overhead of VHDS updates when there are tens of thousands of
+    // VirtualHosts.
+    bool need_post = scopes_to_cleanup_.empty();
+    scopes_to_cleanup_.push_back(scope->scope_id_);
+    central_cache_entries_to_cleanup_.push_back(scope->central_cache_);
     lock.release();
 
-    // TODO(jmarantz): consider batching all the scope IDs that should be
-    // cleared from TLS caches to reduce bursts of runOnAllThreads on a large
-    // config update. See the pattern below used for histograms.
-    main_thread_dispatcher_->post([this, central_cache, scope_id]() {
-      sync_.syncPoint(MainDispatcherCleanupSync);
-      clearScopeFromCaches(scope_id, central_cache);
-    });
+    if (need_post) {
+      main_thread_dispatcher_->post([this]() {
+        sync_.syncPoint(MainDispatcherCleanupSync);
+        clearScopesFromCaches();
+      });
+    }
   }
 }
 
@@ -284,8 +292,20 @@ void ThreadLocalStoreImpl::releaseHistogramCrossThread(uint64_t histogram_id) {
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    main_thread_dispatcher_->post(
-        [this, histogram_id]() { clearHistogramFromCaches(histogram_id); });
+    // It's possible that many different histograms will be deleted at the same
+    // time, before the main thread gets a chance to run
+    // clearHistogramsFromCaches. If a new histogram is deleted before that
+    // post runs, we add it to our list of histograms to clear, and there's no
+    // need to issue another post.
+    bool need_post = false;
+    {
+      Thread::LockGuard lock(hist_mutex_);
+      need_post = histograms_to_cleanup_.empty();
+      histograms_to_cleanup_.push_back(histogram_id);
+    }
+    if (need_post) {
+      main_thread_dispatcher_->post([this]() { clearHistogramsFromCaches(); });
+    }
   }
 }
 
@@ -294,39 +314,61 @@ ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
   return scope_cache_[scope_id];
 }
 
-void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
-void ThreadLocalStoreImpl::TlsCache::eraseHistogram(uint64_t histogram_id) {
-  // This is called for every histogram in every thread, even though the
-  // histogram may not have been cached in each thread yet. So we don't
-  // want to check whether the erase() call erased anything.
-  tls_histogram_cache_.erase(histogram_id);
-}
-
-void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
-                                                CentralCacheEntrySharedPtr central_cache) {
-  // If we are shutting down we no longer perform cache flushes as workers may be shutting down
-  // at the same time.
-  if (!shutting_down_) {
-    // Perform a cache flush on all threads.
-    tls_cache_->runOnAllThreads(
-        [scope_id](OptRef<TlsCache> tls_cache) { tls_cache->eraseScope(scope_id); },
-        [central_cache]() { /* Holds onto central_cache until all tls caches are clear */ });
+void ThreadLocalStoreImpl::TlsCache::eraseScopes(const std::vector<uint64_t>& scope_ids) {
+  for (uint64_t scope_id : scope_ids) {
+    scope_cache_.erase(scope_id);
   }
 }
 
-void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
+void ThreadLocalStoreImpl::TlsCache::eraseHistograms(const std::vector<uint64_t>& histograms) {
+  // This is called for every histogram in every thread, even though the
+  // histogram may not have been cached in each thread yet. So we don't
+  // want to check whether the erase() call erased anything.
+  for (uint64_t histogram_id : histograms) {
+    tls_histogram_cache_.erase(histogram_id);
+  }
+}
+
+void ThreadLocalStoreImpl::clearScopesFromCaches() {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
-    //
-    // TODO(jmarantz): If this cross-thread posting proves to be a performance
-    // bottleneck,
-    // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
-    // contains a patch that will implement batching together to clear multiple
-    // histograms.
+
+    // Capture all the pending scope ids in a local, clearing the list held in
+    // this. Once this occurs, if a new scope is deleted, a new post will be
+    // required.
+    auto scope_ids = std::make_shared<std::vector<uint64_t>>();
+    // Capture all the central cache entries for scopes we're deleting. These will be freed after
+    // all threads have completed.
+    auto central_caches = std::make_shared<std::vector<CentralCacheEntrySharedPtr>>();
+    {
+      Thread::LockGuard lock(lock_);
+      scope_ids->swap(scopes_to_cleanup_);
+      central_caches->swap(central_cache_entries_to_cleanup_);
+    }
+
     tls_cache_->runOnAllThreads(
-        [histogram_id](OptRef<TlsCache> tls_cache) { tls_cache->eraseHistogram(histogram_id); });
+        [scope_ids](OptRef<TlsCache> tls_cache) { tls_cache->eraseScopes(*scope_ids); },
+        [central_caches]() { /* Holds onto central_caches until all tls caches are clear */ });
+  }
+}
+
+void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
+  // If we are shutting down we no longer perform cache flushes as workers may be shutting down
+  // at the same time.
+  if (!shutting_down_) {
+    // Capture all the pending histograms in a local, clearing the list held in
+    // this. Once this occurs, if a new histogram is deleted, a new post will be
+    // required.
+    auto histograms = std::make_shared<std::vector<uint64_t>>();
+    {
+      Thread::LockGuard lock(hist_mutex_);
+      histograms->swap(histograms_to_cleanup_);
+    }
+
+    tls_cache_->runOnAllThreads(
+        [histograms](OptRef<TlsCache> tls_cache) { tls_cache->eraseHistograms(*histograms); });
   }
 }
 
