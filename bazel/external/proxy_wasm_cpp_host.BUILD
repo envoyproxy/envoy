@@ -64,7 +64,7 @@ cc_library(
     ]),
     deps = [
         ":common_lib",
-        "@com_github_wamr//:wamr_lib",
+        "@com_github_wamr//:libiwasm",
     ],
 )
 

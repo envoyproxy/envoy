@@ -1,24 +1,24 @@
 licenses(["notice"])  # Apache 2
 
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
 package(default_visibility = ["//visibility:public"])
 
-cc_import(
-    name = "linklib",
-    shared_library = "library/linux-classic_interp-multi_module-dbg/libiwasm.so",
+filegroup(
+    name = "srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
 )
 
-cc_library(
-    name = "headlib",
-    hdrs = glob(["include/*.h"]),
-    srcs = glob(["include/*.c"]),
-    include_prefix = "wamr",
-)
-
-cc_library(
-    name = "wamr_lib",
-    defines = ["WASM_WAMR"],
-    deps = [
-        "linklib",
-        "headlib",
-    ],
+cmake(
+    name = "libiwasm",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "On",
+        "WAMR_BUILD_AOT": "0",
+        "WAMR_BUILD_SIMD": "0",
+    },
+    lib_source = ":srcs",
+    out_shared_libs = ["libiwasm.so"],
+    working_directory = "product-mini/platforms/linux"
 )
