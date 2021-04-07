@@ -9,7 +9,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
-#include "common/grpc/google_async_client_cache.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -52,17 +51,12 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    Grpc::AsyncClientCacheSingletonSharedPtr async_client_cache_singleton =
-        Grpc::getAsyncClientCacheSingleton(context.getServerFactoryContext());
-    Grpc::AsyncClientCacheSharedPtr async_client_cache =
-        async_client_cache_singleton->getOrCreateAsyncClientCache(
-            context.clusterManager().grpcAsyncClientManager(), context.scope(),
-            context.threadLocal(), proto_config.grpc_service());
-    callback = [async_client_cache, filter_config, timeout_ms, proto_config,
+    callback = [&context, filter_config, timeout_ms, proto_config,
                 transport_api_version = Config::Utility::getAndCheckTransportVersion(proto_config)](
                    Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          async_client_cache->getAsyncClient(), std::chrono::milliseconds(timeout_ms),
+          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(proto_config.grpc_service(), context.scope(),
+            true), std::chrono::milliseconds(timeout_ms),
           transport_api_version);
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
@@ -80,11 +74,9 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     callback = [grpc_service = proto_config.grpc_service(), &context, filter_config, timeout_ms,
                 transport_api_version = Config::Utility::getAndCheckTransportVersion(proto_config)](
                    Http::FilterChainFactoryCallbacks& callbacks) {
-      const auto async_client_factory =
-          context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-              grpc_service, context.scope(), true);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          async_client_factory->create(), std::chrono::milliseconds(timeout_ms),
+          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(grpc_service, context.scope(),
+            true), std::chrono::milliseconds(timeout_ms),
           transport_api_version);
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };

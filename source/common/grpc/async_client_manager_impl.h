@@ -53,7 +53,6 @@ class AsyncClientManagerImpl : public AsyncClientManager {
 public:
   AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
                          TimeSource& time_source, Api::Api& api, const StatNames& stat_names);
-
   RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
                             bool skip_cluster_check) override {

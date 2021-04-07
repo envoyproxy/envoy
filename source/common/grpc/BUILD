@@ -208,17 +208,3 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "google_async_client_cache",
-    srcs = ["google_async_client_cache.cc"],
-    hdrs = ["google_async_client_cache.h"],
-    external_deps = [
-        "grpc",
-    ],
-    deps = [
-        "//include/envoy/grpc:async_client_manager_interface",
-        "//include/envoy/server:factory_context_interface",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-    ],
-)

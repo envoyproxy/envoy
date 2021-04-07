@@ -803,6 +803,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
 
   int expected_grpc_client_creation_count = 0;
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
+      
     // Make sure Google grpc client is created before the request coming in.
     // Since this is not laziness creation, it should create one client per
     // thread before the traffic comes.

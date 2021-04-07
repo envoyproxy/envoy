@@ -321,7 +321,6 @@ void HttpIntegrationTest::initialize() {
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"});
-
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
