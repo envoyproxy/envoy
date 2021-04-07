@@ -1085,6 +1085,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
     return 0;
   }
 
+  // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
     stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);

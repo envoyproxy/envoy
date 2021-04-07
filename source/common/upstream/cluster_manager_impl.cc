@@ -877,8 +877,8 @@ void ClusterManagerImpl::maybePreconnect(
     // We anticipate the incoming stream here, because maybePreconnect is called
     // before a new stream is established.
     if (!ConnectionPool::ConnPoolImplBase::shouldConnect(
-            state.pending_streams_, state.active_streams_, state.connecting_stream_capacity_,
-            peekahead_ratio, true)) {
+            state.pending_streams_, state.active_streams_,
+            state.connecting_and_connected_stream_capacity_, peekahead_ratio, true)) {
       return;
     }
     ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
