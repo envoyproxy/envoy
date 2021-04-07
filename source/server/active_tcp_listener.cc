@@ -187,7 +187,6 @@ void ActiveTcpSocket::newConnection() {
         listener_.parent_.getBalancedHandlerByAddress(*socket_->addressProvider().localAddress());
   }
   if (new_listener.has_value()) {
-    FANCY_LOG(debug, "listener {} to listener {}", listener_.config_->name(), "unknown");
     // Hands off connections redirected by iptables to the listener associated with the
     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
     // prevent further redirection.
@@ -195,9 +194,6 @@ void ActiveTcpSocket::newConnection() {
     // Note also that we must account for the number of connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
-    FANCY_LOG(debug, "listener {} has  {} conns, new listener unknown has {}",
-              listener_.config_->name(), listener_.numConnections(),
-              new_listener.value().get().numConnections());
     new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
   } else {
     // Set default transport protocol if none of the listener filters did it.

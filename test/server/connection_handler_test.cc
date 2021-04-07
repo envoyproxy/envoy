@@ -415,7 +415,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(conn1));
   listener_callbacks1->onAccept(
       Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
-  ASSERT_EQ(1, handler_->numConnections());
+  EXPECT_EQ(1, handler_->numConnections());
   // Note that these stats are not the per-worker stats, but the per-listener stats.
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
   EXPECT_EQ(1, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
@@ -425,7 +425,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
   // overflow stat.
   listener_callbacks1->onAccept(
       Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
-  ASSERT_EQ(1, handler_->numConnections());
+  EXPECT_EQ(1, handler_->numConnections());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
   EXPECT_EQ(1, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
   EXPECT_EQ(2, TestUtility::findCounter(stats_store_, "downstream_cx_overflow")->value());
@@ -433,7 +433,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
   // Check behavior again for good measure.
   listener_callbacks1->onAccept(
       Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
-  ASSERT_EQ(1, handler_->numConnections());
+  EXPECT_EQ(1, handler_->numConnections());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
   EXPECT_EQ(1, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
   EXPECT_EQ(3, TestUtility::findCounter(stats_store_, "downstream_cx_overflow")->value());
