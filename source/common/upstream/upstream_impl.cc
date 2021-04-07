@@ -971,11 +971,17 @@ ClusterImplBase::ClusterImplBase(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
   }
-  // TODO(#12829) clean up (e.g. move tests out of extensions) once QUIC is no longer an extension.
-  if ((info_->features() & ClusterInfoImpl::Features::HTTP3) &&
-      (cluster.transport_socket().name() != "envoy.transport_sockets.quic")) {
-    throw EnvoyException(fmt::format("HTTP3 requires a QuicUpstreamTransport tranport socket: {}",
-                                     cluster.name(), cluster.DebugString()));
+
+  if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
+#if defined(ENVOY_ENABLE_QUIC)
+    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+      throw EnvoyException(
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
+                      cluster.DebugString()));
+    }
+#else
+    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+#endif
   }
 
   // Create the default (empty) priority set before registering callbacks to
@@ -1248,6 +1254,10 @@ Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
 
 Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
+}
+
+Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
 }
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(
