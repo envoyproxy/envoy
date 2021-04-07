@@ -63,10 +63,7 @@ do
       "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
 
       echo "  Checking spelling for $i"
-      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i"
-      if [[ $? -ne 0 ]]; then
-        exit 1
-      fi
+      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
     done
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
