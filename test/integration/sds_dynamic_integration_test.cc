@@ -46,13 +46,31 @@ namespace Ssl {
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
 
-std::string protocolTestParamsToString(
+std::string sdsTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>&
         p) {
   return fmt::format(
       "{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
       std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
       std::get<2>(p.param) ? "UsesQuic" : "UsesTcp");
+}
+
+std::vector<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>
+getSdsTestsParams(bool test_quic) {
+  std::vector<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> ret;
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    for (auto grpc_type : {Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc}) {
+      ret.push_back({ip_version, grpc_type, false});
+      if (test_quic) {
+#ifdef ENVOY_ENABLE_QUIC
+        ret.push_back({ip_version, grpc_type, true});
+#else
+        ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
+#endif
+      }
+    }
+  }
+  return ret;
 }
 
 // Sds integration base class with following support:
@@ -65,7 +83,7 @@ class SdsDynamicIntegrationBaseTest
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert") {}
 
@@ -279,12 +297,8 @@ protected:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
-                     testing::ValuesIn({false, true})),
-    protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 class SdsDynamicKeyRotationIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
 protected:
@@ -304,12 +318,8 @@ protected:
 
 // We don't care about multiple gRPC types here, Envoy gRPC is fine, the
 // interest is on the filesystem.
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc),
-                     testing::ValuesIn({false, true})),
-    protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 // Validate that a basic key-cert rotation works via symlink rename.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
@@ -445,7 +455,7 @@ public:
       if (!test_quic_) {
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
         auto* common_tls_context = tls_context.mutable_common_tls_context();
-        ConfigInlineCerts(common_tls_context);
+        configInlinedCerts(common_tls_context);
         transport_socket->set_name("envoy.transport_sockets.tls");
         transport_socket->mutable_typed_config()->PackFrom(tls_context);
       } else {
@@ -453,7 +463,7 @@ public:
             transport_socket_config;
         auto* common_tls_context =
             transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
-        ConfigInlineCerts(common_tls_context);
+        configInlinedCerts(common_tls_context);
         transport_socket->set_name("envoy.transport_sockets.quic");
         transport_socket->mutable_typed_config()->PackFrom(transport_socket_config);
       }
@@ -489,7 +499,7 @@ public:
     client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
-  void ConfigInlineCerts(
+  void configInlinedCerts(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* common_tls_context) {
     common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
@@ -557,12 +567,8 @@ private:
   bool share_validation_secret_{false};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
-                     testing::ValuesIn({false, true})),
-    protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
@@ -703,12 +709,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, SdsDynamicUpstreamIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
-                     testing::ValuesIn({false})),
-    protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(false)), sdsTestParamsToString);
 
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.
@@ -864,11 +866,8 @@ public:
   FakeStreamPtr sds_stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, SdsCdsIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc), testing::ValuesIn({false})),
-    protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsCdsIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
