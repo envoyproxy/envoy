@@ -141,11 +141,13 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
+   * TODO(Issue #15864): temporary fix, until interfaces are refactored for access log extensions.
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
+   * TODO(Issue #15864): temporary fix, until interfaces are refactored for access log extensions.
    * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
    * listener.
    */
