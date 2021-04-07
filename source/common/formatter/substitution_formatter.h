@@ -533,5 +533,19 @@ public:
   DownstreamPeerCertVEndFormatter(const std::string& format);
 };
 
+/**
+ * EscapeFormatter (FormatterProvider) for escaping %.
+ */
+class EscapeFormatter : public FormatterProvider {
+public:
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+};
+
 } // namespace Formatter
 } // namespace Envoy

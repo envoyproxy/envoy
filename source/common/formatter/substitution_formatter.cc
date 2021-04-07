@@ -369,7 +369,10 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
 
-  if (absl::StartsWith(token, "REQ(")) {
+  if (absl::StartsWith(token, "%%")) {
+    return std::make_unique<EscapeFormatter>();
+  }
+  else if (absl::StartsWith(token, "REQ(")) {
     std::string main_header, alternative_header;
     absl::optional<size_t> max_length;
 
@@ -456,7 +459,7 @@ SubstitutionFormatParser::parse(const std::string& format,
                                 const std::vector<CommandParserPtr>& commands) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
-  const std::regex command_w_args_regex(R"EOF(^(%%|%)([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%%|%))EOF");
+  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] != '%') {
@@ -1376,6 +1379,18 @@ ProtobufWkt::Value SystemTimeFormatter::formatValue(
     absl::string_view local_reply_body) const {
   return ValueUtil::optionalStringValue(
       format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+}
+
+absl::optional<std::string> EscapeFormatter::format(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& __attribute__((unused)),
+    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
+  return absl::nullopt;
+}
+
+ProtobufWkt::Value EscapeFormatter::formatValue(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& __attribute__((unused)),
+    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
+  return ValueUtil::stringValue(std::string("%"));
 }
 
 } // namespace Formatter
