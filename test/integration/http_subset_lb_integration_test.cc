@@ -155,7 +155,7 @@ public:
 
       // Send header only request.
       IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-      response->waitForEndStream();
+      ASSERT_TRUE(response->waitForEndStream());
 
       // Expect a response from a host in the correct subset.
       EXPECT_EQ(response->headers()
@@ -246,7 +246,7 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerSingleHostPerSubsetNoMetad
                                                                           {":authority", "host"},
                                                                           {"x-type", "a"},
                                                                           {"x-hash", "hash-a"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
 }
