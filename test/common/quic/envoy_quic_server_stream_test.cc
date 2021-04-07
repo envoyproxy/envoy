@@ -15,6 +15,7 @@
 
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
+#include "server/active_listener_base.h"
 
 #include "common/quic/envoy_quic_alarm_factory.h"
 #include "common/quic/envoy_quic_connection_helper.h"
@@ -57,7 +58,12 @@ public:
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
-        quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
+        stats_(
+            {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
+                                   POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
+        quic_stream_(new EnvoyQuicServerStream(
+            stream_id_, &quic_session_, quic::BIDIRECTIONAL, stats_, http3_options_,
+            envoy::config::core::v3::HttpProtocolOptions::ALLOW)),
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setRequestDecoder(stream_decoder_);
@@ -163,6 +169,8 @@ protected:
   EnvoyQuicServerConnection quic_connection_;
   MockEnvoyQuicSession quic_session_;
   quic::QuicStreamId stream_id_;
+  Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicServerStream* quic_stream_;
   Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;

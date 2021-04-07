@@ -1,22 +1,18 @@
 #pragma once
 
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2UpstreamIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                     public HttpIntegrationTest {
+class Http2UpstreamIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  Http2UpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
-
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpProtocolIntegrationTest::SetUp();
 
     upstream_tls_ = true;
-    config_helper_.configureUpstreamTls(use_alpn_);
+    config_helper_.configureUpstreamTls(use_alpn_,
+                                        upstreamProtocol() == FakeHttpConnection::Type::HTTP3);
   }
 
   void initialize() override { HttpIntegrationTest::initialize(); }

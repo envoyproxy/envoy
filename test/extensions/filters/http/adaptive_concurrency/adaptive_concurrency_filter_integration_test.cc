@@ -83,7 +83,7 @@ void AdaptiveConcurrencyIntegrationTest::respondToRequest(bool expect_forwarded)
     upstream_requests_.front()->encodeData(1, true);
   }
 
-  responses_.front()->waitForEndStream();
+  ASSERT_TRUE(responses_.front()->waitForEndStream());
 
   if (expect_forwarded) {
     EXPECT_TRUE(upstream_requests_.front()->complete());

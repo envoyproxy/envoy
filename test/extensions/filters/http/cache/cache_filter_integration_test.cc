@@ -69,7 +69,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     // send 42 'a's
     upstream_request_->encodeData(response_body, /*end_stream=*/true);
     // Wait for the response to be read by the codec client.
-    response_decoder->waitForEndStream();
+    ASSERT_TRUE(response_decoder->waitForEndStream());
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_TRUE(response_decoder->headers().get(Http::CustomHeaders::get().Age).empty());
@@ -84,7 +84,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   {
     IntegrationStreamDecoderPtr response_decoder =
         codec_client_->makeHeaderOnlyRequest(request_headers);
-    response_decoder->waitForEndStream();
+    ASSERT_TRUE(response_decoder->waitForEndStream());
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
@@ -127,7 +127,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     // send 42 'a's
     upstream_request_->encodeData(response_body, true);
     // Wait for the response to be read by the codec client.
-    response_decoder->waitForEndStream();
+    ASSERT_TRUE(response_decoder->waitForEndStream());
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_TRUE(response_decoder->headers().get(Http::CustomHeaders::get().Age).empty());
@@ -159,7 +159,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     response_headers.setDate(not_modified_date);
 
     // Wait for the response to be read by the codec client.
-    response_decoder->waitForEndStream();
+    ASSERT_TRUE(response_decoder->waitForEndStream());
 
     // Check that the served response is the cached response
     EXPECT_TRUE(response_decoder->complete());
@@ -208,7 +208,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     // send 10 'a's
     upstream_request_->encodeData(response_body, /*end_stream=*/true);
     // Wait for the response to be read by the codec client.
-    response_decoder->waitForEndStream();
+    ASSERT_TRUE(response_decoder->waitForEndStream());
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_TRUE(response_decoder->headers().get(Http::CustomHeaders::get().Age).empty());
@@ -244,7 +244,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     upstream_request_->encodeData(response_body, /*end_stream=*/true);
 
     // Wait for the response to be read by the codec client.
-    response_decoder->waitForEndStream();
+    ASSERT_TRUE(response_decoder->waitForEndStream());
     // Check that the served response is the updated response
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
@@ -289,7 +289,7 @@ TEST_P(CacheIntegrationTest, GetRequestWithBodyAndTrailers) {
     // send 42 'a's
     upstream_request_->encodeData(42, true);
     // Wait for the response to be read by the codec client.
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_THAT(response->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_TRUE(response->headers().get(Http::CustomHeaders::get().Age).empty());

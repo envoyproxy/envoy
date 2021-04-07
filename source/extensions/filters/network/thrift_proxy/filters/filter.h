@@ -98,6 +98,17 @@ public:
    * @return StreamInfo for logging purposes.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Response decoder metadata created by the connection manager.
+   */
+  virtual MessageMetadataSharedPtr responseMetadata() PURE;
+
+  /**
+   * @return Signal indicating whether or not the response decoder encountered a successful/void
+   * reply.
+   */
+  virtual bool responseSuccess() PURE;
 };
 
 /**
