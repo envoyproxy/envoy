@@ -13,6 +13,8 @@ namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 namespace {
 
+using ::testing::Matcher;
+
 class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig() { signer_ = std::make_shared<Common::Aws::MockSigner>(); }
@@ -41,7 +43,7 @@ public:
 // Verify filter functionality when signing works.
 TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), sign(_));
+  EXPECT_CALL(*(filter_config_->signer_), sign(Matcher<Http::RequestHeaderMap&>(_), false));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -52,7 +54,7 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   setup();
   filter_config_->host_rewrite_ = "foo";
-  EXPECT_CALL(*(filter_config_->signer_), sign(_));
+  EXPECT_CALL(*(filter_config_->signer_), sign(_, false));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -63,7 +65,7 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
 // Verify filter functionality when signing fails.
 TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), sign(_)).WillOnce(Invoke([](Http::HeaderMap&) -> void {
+  EXPECT_CALL(*(filter_config_->signer_), sign(_, false)).WillOnce(Invoke([](Http::HeaderMap&) -> void {
     throw EnvoyException("failed");
   }));
 
