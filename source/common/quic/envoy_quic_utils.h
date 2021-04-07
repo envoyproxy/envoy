@@ -127,11 +127,9 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::str
 // not supported, return 0 with error_details populated correspondingly.
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
 
-void configQuicInitialFlowControlWindow(
-    const envoy::config::listener::v3::QuicProtocolOptions& config, quic::QuicConfig& quic_config);
-
-void adjustQuicInitialFlowControlWindow(quic::QuicConfig& config,
-                                        const quic::ParsedQuicVersion& version);
+// Set initial flow control windows in quic_config according to the given Envoy config.
+void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
+                                        quic::QuicConfig& quic_config);
 
 } // namespace Quic
 } // namespace Envoy

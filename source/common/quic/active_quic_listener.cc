@@ -230,7 +230,14 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
 
-  configQuicInitialFlowControlWindow(config, quic_config_);
+  if (config.has_quic_protocol_options()) {
+    configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
+  } else {
+    quic_config_.SetInitialStreamFlowControlWindowToSend(
+        Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+    quic_config_.SetInitialSessionFlowControlWindowToSend(
+        Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+  }
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(

@@ -945,6 +945,7 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     // QUIC stream's flow control window is configured in listener config.
     listener->mutable_udp_listener_config()
         ->mutable_quic_options()
+        ->mutable_quic_protocol_options()
         ->mutable_initial_stream_window_size()
         ->set_value(stream_buffer_size);
   }

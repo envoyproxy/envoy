@@ -89,8 +89,6 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  Http::HeaderUtility::HeaderValidationResult checkHeaderNameForUnderscores(const std::string& header_name);
-  
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
   void onStreamError(absl::optional<bool> should_close_connection);

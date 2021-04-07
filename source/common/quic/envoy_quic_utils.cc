@@ -224,33 +224,31 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
   return sign_alg;
 }
 
-void configQuicInitialFlowControlWindow(
-    const envoy::config::listener::v3::QuicProtocolOptions& config, quic::QuicConfig& quic_config) {
+void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
+                                        quic::QuicConfig& quic_config) {
   // Use HTTP2 minimum value instead of default ones because the defaults are way too large.
   size_t stream_flow_control_window_to_send =
       config.has_initial_stream_window_size()
           ? config.initial_stream_window_size().value()
           : Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE;
-  quic_config.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
+  if (stream_flow_control_window_to_send < quic::kMinimumFlowControlSendWindow) {
+    // If the configured value is smaller than 16kB, only use it for IETF QUIC, because Google QUIC
+    // requires minimum 16kB stream flow control window. The QUICHE default 16kB will be used for
+    // Google QUIC connections.
+    quic_config.SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
+        stream_flow_control_window_to_send);
+  } else {
+    // Both Google QUIC and IETF Quic can be configured from this.
+    quic_config.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
+  }
 
   size_t session_flow_control_window_to_send =
       config.has_initial_connection_window_size()
           ? config.initial_connection_window_size().value()
           : Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE;
-  quic_config.SetInitialSessionFlowControlWindowToSend(session_flow_control_window_to_send);
-}
-
-void adjustQuicInitialFlowControlWindow(quic::QuicConfig& config,
-                                        const quic::ParsedQuicVersion& version) {
-  if (!version.AllowsLowFlowControlLimits()) {
-    if (config.GetInitialStreamFlowControlWindowToSend() < quic::kMinimumFlowControlSendWindow) {
-      // QUICHE only support minimum 16K stream flow control window.
-      config.SetInitialStreamFlowControlWindowToSend(quic::kMinimumFlowControlSendWindow);
-    }
-    if (config.GetInitialSessionFlowControlWindowToSend() < quic::kMinimumFlowControlSendWindow) {
-      config.SetInitialSessionFlowControlWindowToSend(quic::kMinimumFlowControlSendWindow);
-    }
-  }
+  // The minimum flow control window supported in QUICHE is 16kB.
+  quic_config.SetInitialSessionFlowControlWindowToSend(
+      std::max(quic::kMinimumFlowControlSendWindow, session_flow_control_window_to_send));
 }
 
 } // namespace Quic

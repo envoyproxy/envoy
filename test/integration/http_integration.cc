@@ -339,8 +339,15 @@ void HttpIntegrationTest::initialize() {
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
-  quic_connection_persistent_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
+  auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       *dispatcher_, *quic_transport_socket_factory_, stats_store_, timeSystem(), server_addr);
+  quic_connection_persistent_info->quic_config_
+      .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
+          Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE);
+  quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
+      Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE);
+  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
+
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif

@@ -255,6 +255,8 @@ protected:
 protected:
   virtual std::string yamlForQuicConfig() {
     return R"EOF(
+    quic_protocol_options:
+      initial_stream_window_size: 1024
     enabled:
       default_value: true
       runtime_key: quic.enabled
@@ -323,10 +325,29 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);
-  sendCHLO(quic::test::TestConnectionId(1));
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  const quic::QuicSession* session =
+      quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
+  ASSERT(session != nullptr);
+  EXPECT_EQ(Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE,
+            const_cast<quic::QuicSession*>(session)
+                ->config()
+                ->GetInitialSessionFlowControlWindowToSend());
+  // IETF Quic supports low flow control limit. But Google Quic only supports flow control window no
+  // smaller than 16kB.
+  if (GetParam().second == QuicVersionType::Iquic) {
+    EXPECT_EQ(1024u, const_cast<quic::QuicSession*>(session)
+                         ->config()
+                         ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  } else {
+    EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
+                                                       ->config()
+                                                       ->GetInitialStreamFlowControlWindowToSend());
+  }
   readFromClientSockets();
 }
 
