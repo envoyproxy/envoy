@@ -542,6 +542,7 @@ private:
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
   bool request_buffer_overflowed_ : 1;
+  bool internal_redirects_with_body_enabled_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 

@@ -1613,13 +1613,11 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   response_encoder_ = nullptr;
 
   Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
-  bool proxy_body = connection_manager_.enable_internal_redirects_with_body_;
+  const auto& buffered_request_data = filter_manager_.bufferedRequestData();
+  const bool proxy_body = connection_manager_.enable_internal_redirects_with_body_ &&
+                          buffered_request_data != nullptr && buffered_request_data->length() > 0;
   if (proxy_body) {
-    const auto& buffered_request_data = filter_manager_.bufferedRequestData();
-    proxy_body = buffered_request_data != nullptr && buffered_request_data->length() > 0;
-    if (proxy_body) {
-      request_data->move(*filter_manager_.bufferedRequestData());
-    }
+    request_data->move(*filter_manager_.bufferedRequestData());
   }
 
   response_encoder->getStream().removeCallbacks(*this);
