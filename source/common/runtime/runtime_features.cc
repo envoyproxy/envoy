@@ -57,6 +57,7 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.always_apply_route_header_rules",
+    "envoy.reloadable_features.accept_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_500_after_100",
@@ -84,7 +85,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_ocsp_response_for_must_staple_certs",
     "envoy.reloadable_features.return_502_for_upstream_protocol_errors",
-    "envoy.reloadable_features.strict_1xx_and_204_response_headers",
+    "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.tls_use_io_handle_bio",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",

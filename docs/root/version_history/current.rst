@@ -53,6 +53,11 @@ Minor Behavior Changes
   `envoy.reloadable_features.remove_forked_chromium_url`.
 * http: increase the maximum allowed number of initial connection WINDOW_UPDATE frames sent by the peer from 1 to 5.
 * http: no longer adding content-length: 0 for requests which should not have bodies. This behavior can be temporarily reverted by setting `envoy.reloadable_features.dont_add_content_length_for_bodiless_requests` false.
+* http: replaced setting `envoy.reloadable_features.strict_1xx_and_204_response_headers` with settings
+  `envoy.reloadable_features.accept_strict_1xx_and_204_response_headers`
+  (do not accept upstream 1xx or 204 responses with Transfer-Encoding or non-zero Content-Length headers) and
+  `envoy.reloadable_features.send_strict_1xx_and_204_response_headers`
+  (do not send 1xx or 204 responses with these headers). Both are true by default.
 * http: upstream flood and abuse checks increment the count of opened HTTP/2 streams when Envoy sends
   initial HEADERS frame for the new stream. Before the counter was incrementred when Envoy received
   response HEADERS frame with the END_HEADERS flag set from upstream server.
