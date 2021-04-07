@@ -1,4 +1,4 @@
-#include "test/integration/http2_upstream_integration_test.h"
+#include "test/integration/multiplexed_upstream_integration_test.h"
 
 #include <iostream>
 
@@ -15,9 +15,24 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+// TODO(#14829) categorize or fix all failures.
+#define EXCLUDE_UPSTREAM_HTTP3                                                                     \
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {                                     \
+    return;                                                                                        \
+  }
+
+INSTANTIATE_TEST_SUITE_P(Protocols, Http2UpstreamIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// TODO(alyssawilk) move #defines into getProtocolTestParams in a follow-up
+#ifdef ENVOY_ENABLE_QUIC
+INSTANTIATE_TEST_SUITE_P(ProtocolsWithQuic, Http2UpstreamIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+#endif
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
@@ -32,10 +47,12 @@ TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer)
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
+  EXCLUDE_UPSTREAM_HTTP3; // Close loop.
   testRouterUpstreamDisconnectBeforeRequestComplete();
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+  EXCLUDE_UPSTREAM_HTTP3; // Close loop.
   testRouterUpstreamDisconnectBeforeResponseComplete();
 }
 
@@ -51,11 +68,20 @@ TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
+TEST_P(Http2UpstreamIntegrationTest, Retry) {
+  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
+  testRetry();
+}
 
-TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
+TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) {
+  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
+  testGrpcRetry();
+}
 
-TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
+TEST_P(Http2UpstreamIntegrationTest, Trailers) {
+  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
+  testTrailers(1024, 2048, true, true);
+}
 
 TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
   autonomous_upstream_ = true;
@@ -68,7 +94,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
       default_request_headers_.setScheme(scheme);
       default_request_headers_.setForwardedProto(xff);
       auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-      response->waitForEndStream();
+      ASSERT_TRUE(response->waitForEndStream());
       auto headers = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
                          ->lastRequestHeaders();
       // Ensure original scheme and x-forwarded-proto are preserved.
@@ -116,7 +142,7 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
 
   // Finish the response.
   upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"trailer", "bar"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 }
 
@@ -203,7 +229,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   // Respond to request 2
   upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request2->encodeData(response2_bytes, true);
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(upstream_request2->complete());
   EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
@@ -213,7 +239,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   // Respond to request 1
   upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request1->encodeData(response1_bytes, true);
-  response1->waitForEndStream();
+  ASSERT_TRUE(response1->waitForEndStream());
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
@@ -270,7 +296,7 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
   }
 
   for (uint32_t i = 0; i < num_requests; ++i) {
-    responses[i]->waitForEndStream();
+    ASSERT_TRUE(responses[i]->waitForEndStream());
     if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
       EXPECT_EQ("200", responses[i]->headers().getStatusValue());
@@ -290,21 +316,25 @@ TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
+  EXCLUDE_UPSTREAM_HTTP3; // quic_stream_sequencer.cc:235 CHECK failed: !blocked_.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
-  config_helper_.addFilter(R"EOF(
-  name: random-pause-filter
+  EXCLUDE_UPSTREAM_HTTP3; // fails: no 200s.
+  config_helper_.addFilter(
+      fmt::format(R"EOF(
+  name: pause-filter{}
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
-  )EOF");
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF",
+                  downstreamProtocol() == Http::CodecClient::Type::HTTP3 ? "-for-quic" : ""));
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
+  EXCLUDE_UPSTREAM_HTTP3;                     // Close loop.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
   std::vector<Http::RequestEncoder*> encoders;
@@ -416,13 +446,15 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 }
 
 // Tests the default limit for the number of response headers is 100. Results in a stream reset if
 // exceeds.
 TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
+  EXCLUDE_UPSTREAM_HTTP3; // no 503.
+
   // Default limit for response headers is 100.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -435,7 +467,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(many_headers, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   // Upstream stream reset triggered.
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
@@ -462,7 +494,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
 
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(512, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
@@ -479,7 +511,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(large_headers, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   // Upstream stream reset.
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
@@ -525,7 +557,7 @@ typed_config:
 
   // Send the response headers.
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -557,7 +589,34 @@ TEST_P(Http2UpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   // result in a second connection and an immediate response.
   FakeStreamPtr upstream_request2;
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/13933
+TEST_P(Http2UpstreamIntegrationTest, UpstreamGoaway) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Kick off the initial request and make sure it's received upstream.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send a goaway from upstream.
+  fake_upstream_connection_->encodeGoAway();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+
+  // A new request should result in a new connection
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  FakeStreamPtr upstream_request2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
+
+  // Clean up
+  ASSERT_TRUE(fake_upstream_connection2->close());
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+  fake_upstream_connection2.reset();
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy

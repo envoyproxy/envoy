@@ -58,5 +58,6 @@ public:
   PerHandlerListenerStats per_worker_stats_;
   Network::ListenerConfig* config_{};
 };
+
 } // namespace Server
 } // namespace Envoy

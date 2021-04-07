@@ -120,7 +120,8 @@ def proto_print(src, dst):
     subprocess.check_output([
         'bazel-bin/tools/protoxform/protoprint', src,
         str(dst),
-        './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
+        './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text',
+        'API_VERSION'
     ])
 
 

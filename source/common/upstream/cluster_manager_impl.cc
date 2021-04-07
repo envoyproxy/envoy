@@ -28,7 +28,6 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/http/http3/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
@@ -44,6 +43,10 @@
 #include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/http/http3/conn_pool.h"
+#endif
 
 namespace Envoy {
 namespace Upstream {
@@ -874,8 +877,8 @@ void ClusterManagerImpl::maybePreconnect(
     // We anticipate the incoming stream here, because maybePreconnect is called
     // before a new stream is established.
     if (!ConnectionPool::ConnPoolImplBase::shouldConnect(
-            state.pending_streams_, state.active_streams_, state.connecting_stream_capacity_,
-            peekahead_ratio, true)) {
+            state.pending_streams_, state.active_streams_,
+            state.connecting_and_connected_stream_capacity_, peekahead_ratio, true)) {
       return;
     }
     ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
@@ -1517,8 +1520,14 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+#ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state, source);
+#else
+    UNREFERENCED_PARAMETER(source);
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
   return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,

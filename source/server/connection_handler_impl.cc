@@ -38,7 +38,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    // TODO(lambdai): Remove the dependency of ActiveTcpListener.
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
     details.typed_listener_ = *tcp_listener;
     details.listener_ = std::move(tcp_listener);

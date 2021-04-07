@@ -6,18 +6,18 @@ It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) inst
 
 On Linux, run the following commands:
 
-```
+```console
 sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
 sudo chmod +x /usr/local/bin/bazel
 ```
 
 On macOS, run the following command:
-```
+```console
 brew install bazelisk
 ```
 
 On Windows, run the following commands:
-```
+```cmd
 mkdir %USERPROFILE%\bazel
 powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe -OutFile %USERPROFILE%\bazel\bazel.exe
 set PATH=%PATH%;%USERPROFILE%\bazel
@@ -52,7 +52,7 @@ for how to update or override dependencies.
 1. Install external dependencies.
     ### Ubuntu
     On Ubuntu, run the following:
-    ```
+    ```console
     sudo apt-get install \
        libtool \
        cmake \
@@ -68,19 +68,19 @@ for how to update or override dependencies.
 
     ### Fedora
     On Fedora (maybe also other red hat distros), run the following:
-    ```
+    ```console
     dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
     ```
 
     ### Linux
     On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).
     Extract the tar.xz and run the following:
-    ```
+    ```console
     bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
     ```
 
     This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
-    ```
+    ```console
     echo "build --config=clang" >> user.bazelrc
     ```
 
@@ -96,7 +96,7 @@ for how to update or override dependencies.
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
-    ```
+    ```console
     brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
@@ -155,7 +155,7 @@ for how to update or override dependencies.
     will not work. Add a symlink for `python3.exe` pointing to the installed `python.exe` for Envoy scripts
     and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
     package.
-    ```
+    ```cmd
     mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
     set PATH=%PATH%;%USERPROFILE%\Python38
     set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
@@ -163,14 +163,14 @@ for how to update or override dependencies.
     ```
 
     [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
-    For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
+    For building with MSVC, you must install at least the VC++ workload.
     You may alternately install the entire Visual Studio 2019 and use the Build Tools installed in that
     package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
     If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
     to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
     the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2,
     which is determined by their relative ordering in your PATH.
-    ```
+    ```cmd
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
@@ -181,7 +181,7 @@ for how to update or override dependencies.
     Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
     the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
     projects are used instead.
-    ```
+    ```cmd
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
@@ -191,7 +191,7 @@ for how to update or override dependencies.
     Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
     executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
     of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
-    ```
+    ```cmd
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
@@ -201,7 +201,7 @@ for how to update or override dependencies.
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
     `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
     path `/c/Windows/TEMP` is equivalent to the Windows path `C:\Windows\TEMP`:
-    ```
+    ```cmd
     set TMPDIR=C:\Windows\TEMP
     mklink /d C:\c C:\
     ```
@@ -218,12 +218,12 @@ for how to update or override dependencies.
 
     [Git](https://git-scm.com/downloads): This version from the Git project, or the version
     distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
-    ```
+    ```cmd
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
     Lastly, persist environment variable changes.
-    ```
+    ``` cmd
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
     setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
@@ -844,7 +844,9 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [clangd](https://clangd.llvm.org/) with supported editors.
 
-For example, use following command to prepare a compilation database:
+This requires Python 3.8.0+, download from [here](https://www.python.org/downloads/) if you do not have it installed already.
+
+Use the following command to prepare a compilation database:
 
 ```
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py

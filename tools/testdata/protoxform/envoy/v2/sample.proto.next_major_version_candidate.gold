@@ -11,15 +11,16 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 enum SomeEnum {
-  reserved 2;
+  reserved 2, 4, 5, 6;
 
-  reserved "BAR";
+  reserved "BAR", "OLD", "DEP", "VERY_OLD";
 
   DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
   FOO = 1;
   WOW = 3;
 }
 
+// [#next-free-field: 7]
 message Sample {
   option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample";
 
@@ -31,9 +32,9 @@ message Sample {
     string value = 2;
   }
 
-  reserved 2;
+  reserved 2, 4, 5, 6;
 
-  reserved "will_deprecated";
+  reserved "will_deprecated", "old_deprecated", "new_deprecated", "very_old_deprecated";
 
   repeated Entry entries = 1;
 
