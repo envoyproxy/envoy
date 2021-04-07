@@ -179,7 +179,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   upstream_request_->encodeData(12, true);
 
   // Verifies metadata is received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
 
@@ -198,7 +198,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
 
@@ -217,7 +217,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
 
@@ -237,7 +237,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   upstream_request_->encodeData(10, true);
 
   // Verifies metadata is received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
 
@@ -257,7 +257,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   upstream_request_->encodeData(0, true);
 
   // Verifies metadata is received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
 
@@ -308,7 +308,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
   upstream_request_->encodeData(12, true);
 
   // Verifies multiple metadata are received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   for (int i = 0; i < size; i++) {
     for (const auto& metadata : *multiple_vecs[i][0]) {
@@ -341,7 +341,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   upstream_request_->encodeData(12, true);
 
   // Verifies metadata is not received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().size(), 0);
 }
@@ -368,7 +368,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   std::set<std::string> expected_metadata_keys = {"headers", "duplicate"};
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
@@ -379,7 +379,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(100, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.insert("data");
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
@@ -393,7 +393,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
   upstream_request_->encodeTrailers(response_trailers);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.insert("trailers");
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
@@ -414,7 +414,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(100, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.erase("trailers");
   expected_metadata_keys.insert("100-continue");
@@ -431,7 +431,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   upstream_request_->encodeMetadata(metadata_map_vector);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.erase("data");
   expected_metadata_keys.erase("100-continue");
@@ -450,7 +450,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(100, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.erase("aaa");
   expected_metadata_keys.insert("data");
@@ -509,7 +509,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
   EXPECT_EQ(upstream_request_->metadataMap().size(), 1);
   EXPECT_EQ(upstream_request_->duplicatedMetadataKeyCount().find("key")->second, 3);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 }
 
@@ -539,7 +539,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
   EXPECT_EQ(upstream_request_->metadataMap().size(), 1);
   EXPECT_EQ(upstream_request_->duplicatedMetadataKeyCount().find("key")->second, 3);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 }
 
@@ -583,7 +583,7 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataThenTrailers) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 }
 
@@ -607,7 +607,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
@@ -624,7 +624,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.insert("data");
   expected_metadata_keys.insert("metadata");
@@ -648,7 +648,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.insert("trailers");
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
@@ -665,7 +665,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
   expected_metadata_keys.erase("trailers");
@@ -688,7 +688,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   expected_metadata_keys.insert("metadata1");
   expected_metadata_keys.insert("metadata2");
@@ -724,7 +724,7 @@ void Http2MetadataIntegrationTest::runHeaderOnlyTest(bool send_request_body, siz
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 }
 
@@ -769,7 +769,7 @@ void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   std::set<std::string> expected_metadata_keys = {"headers",   "data",    "metadata", "metadata1",
                                                   "metadata2", "replace", "trailers"};
@@ -822,7 +822,7 @@ name: encode-headers-return-stop-all-filter
   Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
   upstream_request_->encodeTrailers(response_trailers);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find("headers")->second, "headers");
   EXPECT_EQ(response->metadataMap().find("data")->second, "data");
@@ -900,7 +900,7 @@ TEST_P(Http2IntegrationTest, GoAway) {
   auto response = std::move(encoder_decoder.second);
   codec_client_->goAway();
   codec_client_->sendData(*request_encoder_, 0, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();
 
   EXPECT_TRUE(response->complete());
@@ -941,7 +941,7 @@ TEST_P(Http2IntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMixedLega
                                      {"te", "trailers"},
                                      {"grpc-timeout", "2S"}, // 2 Second
                                      {"content-type", "application/grpc"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream\n"));
@@ -970,7 +970,7 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
                                      {"te", "trailers"},
                                      {"grpc-timeout", "1S"}, // 1 Second
                                      {"content-type", "application/grpc"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_NE(response->headers().GrpcStatus(), nullptr);
@@ -1041,7 +1041,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   // Respond to request 2
   upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request2->encodeData(request2_bytes, true);
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(upstream_request2->complete());
   EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
@@ -1055,7 +1055,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   // Respond to request 1
   upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request1->encodeData(request1_bytes, true);
-  response1->waitForEndStream();
+  ASSERT_TRUE(response1->waitForEndStream());
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
@@ -1085,7 +1085,7 @@ TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Send request with body.
-  IntegrationStreamDecoderPtr request =
+  IntegrationStreamDecoderPtr response =
       codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                         {":path", "/test/long/url"},
                                                                         {":scheme", "http"},
@@ -1108,8 +1108,8 @@ TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  request->waitForEndStream();
-  EXPECT_EQ("200", request->headers().getStatusValue());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   // Cleanup.
   ASSERT_TRUE(fake_upstream_connection2->close());
@@ -1161,7 +1161,7 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
   // Respond to request 2
   upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request2->encodeData(request2_bytes, true);
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(upstream_request2->complete());
   EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
@@ -1171,7 +1171,7 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
   // Respond to request 1
   upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request1->encodeData(request2_bytes, true);
-  response1->waitForEndStream();
+  ASSERT_TRUE(response1->waitForEndStream());
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
@@ -1275,7 +1275,7 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
 
   response->waitForHeaders();
   upstream_request_->encodeData(0, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 }
 
@@ -1295,7 +1295,7 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 }
 
@@ -1316,7 +1316,7 @@ TEST_P(Http2IntegrationTest, EmptyTrailers) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 }
 
@@ -1404,7 +1404,7 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
   }
 
   for (uint32_t i = 0; i < num_requests; ++i) {
-    responses[i]->waitForEndStream();
+    ASSERT_TRUE(responses[i]->waitForEndStream());
     EXPECT_TRUE(upstream_requests[i]->complete());
     EXPECT_EQ(request_bytes, upstream_requests[i]->bodyLength());
 
@@ -1631,7 +1631,7 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
   upstream_request_->encodeMetadata(metadata_map_vector);
 
   // Cleanup.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -1650,7 +1650,7 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   {
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
   }
   {

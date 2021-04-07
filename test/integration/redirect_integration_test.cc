@@ -158,7 +158,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
@@ -448,7 +448,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
     upstream_requests.back()->encodeHeaders(redirect_response_, true);
   }
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ(
@@ -505,7 +505,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   upstream_request_->encodeHeaders(response_with_big_body, false);
   upstream_request_->encodeData(2000000, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
@@ -561,7 +561,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
   redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("http://handle.internal.redirect.max.three.hop/yet/another/path",
@@ -629,7 +629,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
   redirect_response_.setLocation("http://handle.internal.redirect/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("http://handle.internal.redirect/yet/another/path",
@@ -699,7 +699,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredic
   redirect_response_.setLocation("https://handle.internal.redirect/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("https://handle.internal.redirect/yet/another/path",
