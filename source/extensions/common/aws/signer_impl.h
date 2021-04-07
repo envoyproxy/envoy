@@ -47,9 +47,8 @@ class SignerImpl : public Signer, public Logger::Loggable<Logger::Id::http> {
 public:
   SignerImpl(absl::string_view service_name, absl::string_view region,
              const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source)
-      : service_name_(service_name), region_(region),
-        credentials_provider_(credentials_provider), time_source_(time_source),
-        long_date_formatter_(SignatureConstants::get().LongDateFormat),
+      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
+        time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
   void sign(Http::RequestMessage& message, bool sign_body = false) override;
