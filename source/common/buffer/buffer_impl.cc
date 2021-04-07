@@ -261,7 +261,7 @@ void OwnedImpl::coalesceOrAddSlice(Slice&& other_slice) {
     // Copy content of the `other_slice`. The `move` methods which call this method effectively
     // drain the source buffer.
     addImpl(other_slice.data(), slice_size);
-    other_slice.transferDrainTrackersAndChargesTo(slices_.back());
+    other_slice.transferDrainTrackersTo(slices_.back());
   } else {
     // Take ownership of the slice.
     other_slice.chargeAccountIfValid(account_);

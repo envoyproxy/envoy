@@ -66,7 +66,7 @@ public:
         base_(storage_.get()), data_(0), reservable_(0) {
     if (account) {
       account->charge(capacity_);
-      charges_.emplace_back(account, capacity_);
+      charges_.emplace_back(account);
     }
   }
 
@@ -295,12 +295,9 @@ public:
   /**
    * Move all drain trackers and charges from the current slice to the destination slice.
    */
-  void transferDrainTrackersAndChargesTo(Slice& destination) {
+  void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
-
-    std::move(charges_.begin(), charges_.end(), std::back_inserter(destination.charges_));
-    charges_.clear();
   }
 
   /**
@@ -320,9 +317,9 @@ public:
     }
     drain_trackers_.clear();
 
-    for (auto& [account, amount] : charges_) {
+    for (auto& account : charges_) {
       if (account) {
-        account->credit(amount);
+        account->credit(capacity_);
       }
     }
     charges_.clear();
@@ -338,7 +335,7 @@ public:
       return;
     }
     account->charge(capacity_);
-    charges_.emplace_back(account, capacity_);
+    charges_.emplace_back(account);
   }
 
   /**
@@ -426,9 +423,9 @@ protected:
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
 
-  /** Charges associated with this slice. This should typically hold just a
-   * single charge, but in cases of coalescing might hold additional charges. */
-  absl::InlinedVector<std::pair<std::shared_ptr<Account>, uint64_t>, 1> charges_;
+  /** Charges associated with this slice. This should be 0 or 1 elements. When
+   * coalescing with another slice, we do not transfer over their charges. */
+  absl::InlinedVector<std::shared_ptr<Account>, 1> charges_;
 };
 
 class OwnedImpl;
