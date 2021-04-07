@@ -68,6 +68,7 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:main_common_lib",
+        "//source/exe:platform_impl_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",

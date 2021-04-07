@@ -7,6 +7,7 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "exe/main_common.h"
+#include "exe/platform_impl.h"
 
 #include "server/options_impl.h"
 
