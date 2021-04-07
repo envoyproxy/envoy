@@ -1790,6 +1790,46 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
                           "Original IP detection extension not found");
 }
 
+namespace {
+
+class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
+public:
+  Http::OriginalIPDetectionSharedPtr
+  createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
+    return nullptr;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::UInt32Value>();
+  }
+
+  std::string name() const override {
+    return "envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated";
+  }
+};
+
+} // namespace
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) {
+  OriginalIPDetectionExtensionNotCreatedFactory factory;
+  Registry::InjectFactory<Http::OriginalIPDetectionFactory> registration(factory);
+
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection_extensions:
+  - name: envoy.http.ip_detection.OriginalIPDetectionExtensionNotCreated
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Original IP detection extension could not be created");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http

@@ -310,8 +310,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         throw EnvoyException("Original IP detection extension not found");
       }
 
-      original_ip_detection_extensions_.push_back(
-          factory->createExtension(extension_config, context_));
+      auto extension = factory->createExtension(extension_config.typed_config(), context_);
+      if (!extension) {
+        throw EnvoyException("Original IP detection extension could not be created");
+      }
+      original_ip_detection_extensions_.push_back(extension);
     }
   } else {
     original_ip_detection_extensions_.push_back(
