@@ -1,4 +1,4 @@
-#include "common/buffer/buffer_impl.h"
+
 
 #include "extensions/transport_sockets/alts/tsi_socket.h"
 
@@ -14,6 +14,7 @@ namespace TransportSockets {
 namespace Alts {
 namespace {
 
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -44,13 +45,13 @@ protected:
   }
 
   void initialize(HandshakeValidator server_validator, HandshakeValidator client_validator) {
-    server_.raw_socket_ = new NiceMock<Network::MockTransportSocket>();
+    server_.raw_socket_ = new Network::MockTransportSocket();
 
     server_.tsi_socket_ =
         std::make_unique<TsiSocket>(server_.handshaker_factory_, server_validator,
                                     Network::TransportSocketPtr{server_.raw_socket_});
 
-    client_.raw_socket_ = new NiceMock<Network::MockTransportSocket>();
+    client_.raw_socket_ = new Network::MockTransportSocket();
 
     client_.tsi_socket_ =
         std::make_unique<TsiSocket>(client_.handshaker_factory_, client_validator,
@@ -60,6 +61,8 @@ protected:
 
     ON_CALL(client_.callbacks_.connection_, id()).WillByDefault(Return(11));
     ON_CALL(server_.callbacks_.connection_, id()).WillByDefault(Return(12));
+
+    ON_CALL(server_.callbacks_, shouldDrainReadBuffer()).WillByDefault(Return(false));
 
     ON_CALL(*client_.raw_socket_, doWrite(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& buffer, bool) {
@@ -87,8 +90,10 @@ protected:
       return result;
     }));
 
+    EXPECT_CALL(*client_.raw_socket_, setTransportSocketCallbacks(_));
     client_.tsi_socket_->setTransportSocketCallbacks(client_.callbacks_);
 
+    EXPECT_CALL(*server_.raw_socket_, setTransportSocketCallbacks(_));
     server_.tsi_socket_->setTransportSocketCallbacks(server_.callbacks_);
   }
 
@@ -111,6 +116,22 @@ protected:
     frame.push_back(static_cast<uint8_t>(length));
 
     frame.append(payload);
+    return frame;
+  }
+
+  std::string makeInvalidTsiFrame() {
+    // For fake frame protector, minimum frame size is 4 bytes.
+    uint32_t length = 3;
+    std::string frame;
+    frame.reserve(4);
+    frame.push_back(static_cast<uint8_t>(length));
+    length >>= 8;
+    frame.push_back(static_cast<uint8_t>(length));
+    length >>= 8;
+    frame.push_back(static_cast<uint8_t>(length));
+    length >>= 8;
+    frame.push_back(static_cast<uint8_t>(length));
+
     return frame;
   }
 
@@ -140,20 +161,21 @@ protected:
     EXPECT_EQ(0L, client_.read_buffer_.length());
 
     EXPECT_CALL(*server_.raw_socket_, doRead(_));
-    EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
     EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+    EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+    EXPECT_CALL(*server_.raw_socket_, doRead(_));
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    server_.tsi_socket_->doRead(server_.read_buffer_));
     EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
 
     EXPECT_CALL(*client_.raw_socket_, doRead(_));
     EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+    EXPECT_CALL(*client_.raw_socket_, doRead(_));
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    client_.tsi_socket_->doRead(client_.read_buffer_));
   }
 
   void expectTransferDataFromClientToServer(const std::string& data) {
-
     EXPECT_EQ(0L, server_.read_buffer_.length());
     EXPECT_EQ(0L, client_.read_buffer_.length());
 
@@ -163,9 +185,13 @@ protected:
     expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
                    client_.tsi_socket_->doWrite(client_.write_buffer_, false));
     EXPECT_EQ(makeFakeTsiFrame(data), client_to_server_.toString());
-
-    EXPECT_CALL(*server_.raw_socket_, doRead(_));
-    expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+    EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+      Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(),
+                                  true};
+      buffer.move(client_to_server_);
+      return result;
+    }));
+    expectIoResult({Network::PostIoAction::KeepOpen, 17UL, true},
                    server_.tsi_socket_->doRead(server_.read_buffer_));
     EXPECT_EQ(data, server_.read_buffer_.toString());
   }
@@ -173,7 +199,7 @@ protected:
   struct SocketForTest {
     HandshakerFactory handshaker_factory_;
     std::unique_ptr<TsiSocket> tsi_socket_;
-    NiceMock<Network::MockTransportSocket>* raw_socket_{};
+    Network::MockTransportSocket* raw_socket_{};
     NiceMock<Network::MockTransportSocketCallbacks> callbacks_;
     Buffer::OwnedImpl read_buffer_;
     Buffer::OwnedImpl write_buffer_;
@@ -203,6 +229,8 @@ TEST_F(TsiSocketTest, HandshakeWithoutValidationAndTransferData) {
   // pass a nullptr validator to skip validation.
   initialize(nullptr, nullptr);
 
+  InSequence s;
+
   client_.write_buffer_.add(ClientToServerData);
 
   doHandshakeAndExpectSuccess();
@@ -213,15 +241,37 @@ TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
   auto validator = [](const tsi_peer&, std::string&) { return true; };
   initialize(validator, validator);
 
+  InSequence s;
+
   client_.write_buffer_.add(ClientToServerData);
 
   doHandshakeAndExpectSuccess();
   expectTransferDataFromClientToServer(ClientToServerData);
 }
 
+TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferInvalidData) {
+  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  initialize(validator, validator);
+
+  InSequence s;
+
+  doHandshakeAndExpectSuccess();
+  client_to_server_.add(makeInvalidTsiFrame());
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, 4UL, true};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  expectIoResult({Network::PostIoAction::Close, 0UL, true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+}
+
 TEST_F(TsiSocketTest, HandshakeValidationFail) {
   auto validator = [](const tsi_peer&, std::string&) { return false; };
   initialize(validator, validator);
+
+  InSequence s;
 
   client_.write_buffer_.add(ClientToServerData);
 
@@ -249,6 +299,8 @@ TEST_F(TsiSocketTest, HandshakerCreationFail) {
   auto validator = [](const tsi_peer&, std::string&) { return true; };
   initialize(validator, validator);
 
+  InSequence s;
+
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, _)).Times(0);
   EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   client_.tsi_socket_->onConnected();
@@ -266,6 +318,8 @@ TEST_F(TsiSocketTest, HandshakerCreationFail) {
 TEST_F(TsiSocketTest, HandshakeWithUnusedData) {
   initialize(nullptr, nullptr);
 
+  InSequence s;
+
   doFakeInitHandshake();
   EXPECT_CALL(*client_.raw_socket_, doRead(_));
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
@@ -278,21 +332,25 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedData) {
   client_to_server_.add(makeFakeTsiFrame(ClientToServerData));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
-  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
   EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
   EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
 
   EXPECT_CALL(*client_.raw_socket_, doRead(_));
   EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doRead(client_.read_buffer_));
 }
 
 TEST_F(TsiSocketTest, HandshakeWithUnusedDataAndEndOfStream) {
   initialize(nullptr, nullptr);
+
+  InSequence s;
 
   doFakeInitHandshake();
   EXPECT_CALL(*client_.raw_socket_, doRead(_));
@@ -310,21 +368,24 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedDataAndEndOfStream) {
     buffer.move(client_to_server_);
     return result;
   }));
-  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
   EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, true},
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, true},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
   EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
 
   EXPECT_CALL(*client_.raw_socket_, doRead(_));
   EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doRead(client_.read_buffer_));
 }
 
 TEST_F(TsiSocketTest, HandshakeWithImmediateReadError) {
   initialize(nullptr, nullptr);
+
+  InSequence s;
 
   EXPECT_CALL(*client_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
     Network::IoResult result = {Network::PostIoAction::Close, server_to_client_.length(), false};
@@ -340,6 +401,8 @@ TEST_F(TsiSocketTest, HandshakeWithImmediateReadError) {
 
 TEST_F(TsiSocketTest, HandshakeWithReadError) {
   initialize(nullptr, nullptr);
+
+  InSequence s;
 
   doFakeInitHandshake();
 
@@ -375,11 +438,194 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
 
   initialize(nullptr, nullptr);
 
+  InSequence s;
+
   EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   // doWrite won't immediately fail, but it will result connection close.
   client_.tsi_socket_->onConnected();
 
   raw_handshaker->vtable = vtable;
+}
+
+TEST_F(TsiSocketTest, DoReadEndOfStream) {
+  initialize(nullptr, nullptr);
+
+  InSequence s;
+
+  client_.write_buffer_.add(ClientToServerData);
+
+  doHandshakeAndExpectSuccess();
+
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), true};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer());
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+}
+
+TEST_F(TsiSocketTest, DoReadNoData) {
+  initialize(nullptr, nullptr);
+
+  InSequence s;
+
+  client_.write_buffer_.add(ClientToServerData);
+
+  doHandshakeAndExpectSuccess();
+
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer());
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, 0UL, false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+}
+
+TEST_F(TsiSocketTest, DoReadTwiceError) {
+  initialize(nullptr, nullptr);
+
+  client_.write_buffer_.add(ClientToServerData);
+
+  InSequence s;
+
+  doHandshakeAndExpectSuccess();
+
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer());
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::Close, 0UL, false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  expectIoResult({Network::PostIoAction::Close, 17UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+}
+
+TEST_F(TsiSocketTest, DoReadOnceError) {
+  initialize(nullptr, nullptr);
+
+  InSequence s;
+
+  client_.write_buffer_.add(ClientToServerData);
+
+  doHandshakeAndExpectSuccess();
+
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::Close, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer());
+  expectIoResult({Network::PostIoAction::Close, 17UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+}
+
+TEST_F(TsiSocketTest, DoReadDrainBuffer) {
+  initialize(nullptr, nullptr);
+
+  InSequence s;
+
+  client_.write_buffer_.add(ClientToServerData);
+
+  doHandshakeAndExpectSuccess();
+
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer()).WillOnce(Return(true));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+}
+
+TEST_F(TsiSocketTest, DoReadDrainBufferTwice) {
+  initialize(nullptr, nullptr);
+
+  InSequence s;
+
+  client_.write_buffer_.add(ClientToServerData);
+
+  doHandshakeAndExpectSuccess();
+
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer()).WillOnce(Return(true));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+
+  // Client sends data again.
+  server_.read_buffer_.drain(server_.read_buffer_.length());
+  client_.write_buffer_.add(ClientToServerData);
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(server_.callbacks_, shouldDrainReadBuffer());
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, 0UL, false};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
 }
 
 class TsiSocketFactoryTest : public testing::Test {
