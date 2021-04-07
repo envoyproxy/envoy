@@ -2,6 +2,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace {
 
@@ -52,24 +54,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SetDelegatingRouteTest,
 // successfully overrides the cached route, and subsequently, the request's upstream cluster
 // selection.
 TEST_P(SetDelegatingRouteTest, SetRouteToDelegatingRouteWithClusterOverride) {
+  useAccessLog("%UPSTREAM_CLUSTER%\n");
   initialize();
-
-  std::string ip;
-  if (GetParam() == Network::Address::IpVersion::v4) {
-    ip = "127.0.0.1";
-  } else {
-    ip = "[::1]";
-  }
-
-  const std::string ip_port_pair =
-      absl::StrCat(ip, ":", fake_upstreams_[1]->localAddress()->ip()->port());
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
       {":path", "/some/path"},
       {":scheme", "http"},
       {":authority", "cluster_0"},
-      {"x-envoy-original-dst-host", ip_port_pair},
+      {"x-envoy-original-dst-host", fake_upstreams_[1]->localAddress()->asString()},
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -91,6 +84,7 @@ TEST_P(SetDelegatingRouteTest, SetRouteToDelegatingRouteWithClusterOverride) {
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("cluster_override"));
 }
 
 } // namespace
