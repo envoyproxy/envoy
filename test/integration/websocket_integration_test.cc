@@ -369,7 +369,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders("websocket"));
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();
@@ -386,7 +386,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();

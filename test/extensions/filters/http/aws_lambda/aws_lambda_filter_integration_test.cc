@@ -118,7 +118,7 @@ public:
       upstream_request_->encodeData(buffer, true);
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
 
     // verify headers

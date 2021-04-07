@@ -648,7 +648,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
   Buffer::OwnedImpl response_data{"greetings"};
   upstream_request_->encodeData(response_data, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("greetings", response->body());

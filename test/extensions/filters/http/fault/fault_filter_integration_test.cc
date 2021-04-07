@@ -91,7 +91,7 @@ typed_config:
 TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   initializeFilter(upstream_rate_limit_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  IntegrationStreamDecoderPtr decoder =
+  IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
@@ -103,12 +103,12 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   upstream_request_->encodeData(data, true);
 
   // Wait for a tick worth of data.
-  decoder->waitForBodyData(64);
+  response->waitForBodyData(64);
 
   // Wait for a tick worth of data and end stream.
   simTime().advanceTimeWait(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(127);
-  decoder->waitForEndStream();
+  response->waitForBodyData(127);
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -126,7 +126,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
                                                  {":authority", "host"},
                                                  {"x-envoy-fault-delay-request", "200"},
                                                  {"x-envoy-fault-throughput-response", "1"}};
-  IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   test_server_->waitForCounterEq("http.config_test.fault.delays_injected", 1,
                                  TestUtility::DefaultTimeout, dispatcher_.get());
   simTime().advanceTimeWait(std::chrono::milliseconds(200));
@@ -138,12 +138,12 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   upstream_request_->encodeData(data, true);
 
   // Wait for a tick worth of data.
-  decoder->waitForBodyData(64);
+  response->waitForBodyData(64);
 
   // Wait for a tick worth of data and end stream.
   simTime().advanceTimeWait(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(128);
-  decoder->waitForEndStream();
+  response->waitForBodyData(128);
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -162,7 +162,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"x-envoy-fault-abort-request", "429"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
@@ -191,7 +191,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig0PercentageHeaders) {
                                      {"x-envoy-fault-throughput-response-percentage", "0"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -218,7 +218,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig100PercentageHeaders)
   simTime().advanceTimeWait(std::chrono::milliseconds(100));
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -251,7 +251,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig) {
                                      {":authority", "host"},
                                      {"x-envoy-fault-abort-grpc-request", "5"},
                                      {"content-type", "application/grpc"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
@@ -283,7 +283,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig0PercentageHe
                                      {"content-type", "application/grpc"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -302,7 +302,7 @@ TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"content-type", "application/grpc"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
@@ -330,7 +330,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FaultIntegrationTestHttp2,
 TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   initializeFilter(upstream_rate_limit_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  IntegrationStreamDecoderPtr decoder =
+  IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
@@ -342,17 +342,17 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   upstream_request_->encodeData(data, false);
 
   // Wait for a tick worth of data.
-  decoder->waitForBodyData(64);
+  response->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data.
   simTime().advanceTimeWait(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(127);
+  response->waitForBodyData(127);
 
   // Send trailers and wait for end stream.
   Http::TestResponseTrailerMapImpl trailers{{"hello", "world"}};
   upstream_request_->encodeTrailers(trailers);
-  decoder->waitForEndStream();
-  EXPECT_NE(nullptr, decoder->trailers());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_NE(nullptr, response->trailers());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
@@ -364,7 +364,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
 TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
   initializeFilter(upstream_rate_limit_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  IntegrationStreamDecoderPtr decoder =
+  IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -374,13 +374,13 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
   upstream_request_->encodeTrailers(trailers);
 
   // Wait for a tick worth of data.
-  decoder->waitForBodyData(64);
+  response->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data, trailers, and end stream.
   simTime().advanceTimeWait(std::chrono::milliseconds(63));
-  decoder->waitForBodyData(128);
-  decoder->waitForEndStream();
-  EXPECT_NE(nullptr, decoder->trailers());
+  response->waitForBodyData(128);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_NE(nullptr, response->trailers());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());

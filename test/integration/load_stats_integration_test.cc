@@ -314,7 +314,7 @@ public:
     upstream_request_->encodeHeaders(
         Http::TestResponseHeaderMapImpl{{":status", std::to_string(response_code)}}, false);
     upstream_request_->encodeData(response_size_, true);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
 
     ASSERT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
@@ -642,7 +642,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   requestLoadStatsResponse({"cluster_0"});
   // This should count as dropped, since we trigger circuit breaking.
   initiateClientConnection();
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_TRUE(response_->complete());
   EXPECT_EQ("503", response_->headers().getStatusValue());
   cleanupUpstreamAndDownstream();

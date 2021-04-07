@@ -359,7 +359,7 @@ public:
     IntegrationStreamDecoderPtr response =
         codec_client.makeHeaderOnlyRequest(default_request_headers_);
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     if (expect_close) {

@@ -119,7 +119,7 @@ public:
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
 
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
@@ -130,7 +130,7 @@ public:
   }
 
   void waitForFailedUpstreamResponse(uint32_t response_code) {
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(std::to_string(response_code), response_->headers().getStatusValue());
   }

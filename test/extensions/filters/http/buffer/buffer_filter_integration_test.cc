@@ -61,7 +61,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
   ASSERT_NE(content_length, nullptr);
   EXPECT_EQ(content_length->value().getStringView(), "9");
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -90,7 +90,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
   ASSERT_NE(content_length, nullptr);
   EXPECT_EQ(content_length->value().getStringView(), "10");
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -117,7 +117,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
                                      {"x-envoy-retry-on", "5xx"}},
       1024 * 65);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
 }
@@ -159,7 +159,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -185,7 +185,7 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

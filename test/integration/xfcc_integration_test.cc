@@ -180,7 +180,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
     EXPECT_EQ(expected_xfcc, upstream_request_->headers().getForwardedClientCertValue());
   }
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
 }

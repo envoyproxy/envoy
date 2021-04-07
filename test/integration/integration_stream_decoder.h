@@ -11,8 +11,11 @@
 
 #include "common/common/dump_state_utils.h"
 
+#include "test/test_common/utility.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 /**
@@ -37,7 +40,8 @@ public:
   // can be used if the previous body data is not relevant and the test wants to wait for a specific
   // amount of new data without considering the existing body size.
   void waitForBodyData(uint64_t size);
-  void waitForEndStream();
+  testing::AssertionResult
+  waitForEndStream(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForReset();
   void clearBody() { body_.clear(); }
 

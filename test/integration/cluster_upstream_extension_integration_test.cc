@@ -84,7 +84,7 @@ TEST_P(ClusterUpstreamExtensionIntegrationTest,
     EXPECT_EQ("host-value", host_header_values[0]->value().getStringView());
   }
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
