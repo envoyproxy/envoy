@@ -79,10 +79,12 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
+  auto attr_utils =
+      AttrUtils(decoder_callbacks_->streamInfo(), config_->requestAttributesSpecified(),
+                *headers_req->mutable_attributes());
+  attr_utils.setResponseHeaders(headers);
+  attr_utils.build();
 
-  AttrUtils(decoder_callbacks_->streamInfo(), config_->requestAttributesSpecified(),
-            *headers_req->mutable_attributes())
-      .build();
   ENVOY_LOG(debug, "done in initRequestAttributes");
 
   headers_req->set_end_of_stream(end_stream);

@@ -1,9 +1,11 @@
 #include <atomic>
+#include <chrono>
 #include <iterator>
 #include <map>
 #include <memory>
 #include <string>
 
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 #include "envoy/access_log/access_log.h"
@@ -282,13 +284,22 @@ void AttrUtils::requestSet(absl::string_view path){
         attr_fields[REQUEST_PROTOCOL_TOKEN] = ValueUtil::optionalStringValue(HttpProtocolStrings[static_cast<int>(info_.protocol().value())]);
       break;
     case RequestToken::DURATION:
-      ENVOY_LOG(debug, "request.duration unimplemented");
+      if (info_.requestComplete().has_value()) {
+        attr_fields[REQUEST_DURATION_TOKEN] = ValueUtil::stringValue(formatDuration(absl::FromChrono(info_.requestComplete().value())));
+      }
       break;
     case RequestToken::SIZE:
-      ENVOY_LOG(debug, "request.size unimplemented");
+      if (headers != nullptr && headers->ContentLength() != nullptr) {
+        int64_t length;
+        if (absl::SimpleAtoi(headers->ContentLength()->value().getStringView(), &length)) {
+          attr_fields[REQUEST_SIZE_TOKEN] = ValueUtil::numberValue(length);
+        }
+      } else {
+          attr_fields[REQUEST_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived());
+      }
       break;
     case RequestToken::TOTAL_SIZE:
-      ENVOY_LOG(debug, "request.total_size unimplemented");
+      attr_fields[REQUEST_TOTAL_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived() + headers != nullptr ? headers->byteSize() : 0);
       break;
   }
 }
@@ -315,14 +326,7 @@ void AttrUtils::responseSet(absl::string_view path) {
       attr_fields[RESPONSE_FLAGS_TOKEN] = ValueUtil::numberValue(info_.responseFlags());
       break;
     case ResponseToken::GRPC_STATUS:
-      ENVOY_LOG(debug, "attribute response.grpc_status unimplemented");
-      // auto const& optional_status = Grpc::Common::getGrpcStatus(
-      //     trailers_.value_ ? *trailers_.value_ : *Http::StaticEmptyHeaders::get().response_trailers,
-      //     headers_.value_ ? *headers_.value_ : *Http::StaticEmptyHeaders::get().response_headers,
-      //     info_);
-      // if (optional_status.has_value()) {
-      //   attr_fields["grpc_status"] = ValueUtil::nullValue(optional_status.value())
-      // }
+      attr_fields[RESPONSE_GRPC_STATUS_TOKEN] = getGrpcStatus();
       break;
     case ResponseToken::HEADERS:
       ENVOY_LOG(debug, "attribute response.headers unimplemented");
@@ -334,7 +338,7 @@ void AttrUtils::responseSet(absl::string_view path) {
       attr_fields[RESPONSE_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesSent());
 
     case ResponseToken::TOTAL_SIZE:
-      ENVOY_LOG(debug, "attribute response.total_size unimplemented");
+      attr_fields[RESPONSE_TOTAL_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived());
       break;
   }
 }
@@ -539,6 +543,13 @@ void AttrUtils::filterStateSet() {
     // }
 }
 
+std::string AttrUtils::formatDuration(absl::Duration duration) {
+  // ProtobufWkt::Duration proto_dur;
+  // proto_dur.set_seconds(duration / absl::Seconds(1));
+  // proto_dur.set_nanos(duration / absl::Nanoseconds(1));
+  return absl::FormatDuration(duration);
+}
+
 std::string AttrUtils::getTs() {
   ProtobufWkt::Timestamp ts;
   TimestampUtil::systemClockToTimestamp(info_.startTime(), ts);
@@ -550,6 +561,24 @@ ProtobufWkt::Map<std::string, ProtobufWkt::Value>& AttrUtils::getOrInsert(std::s
     attributes_[key] = ProtobufWkt::Struct();
   }
   return *attributes_[key].mutable_fields();
+}
+
+ProtobufWkt::Value AttrUtils::getGrpcStatus() {
+  auto const& optional_status = Envoy::Grpc::Common::getGrpcStatus(
+      response_trailers_ != nullptr ? *response_trailers_ : *Http::StaticEmptyHeaders::get().response_trailers,
+      response_headers_ != nullptr ? *response_headers_ : *Http::StaticEmptyHeaders::get().response_headers,
+      info_);
+
+  if (optional_status.has_value()) {
+    return ValueUtil::numberValue(optional_status.value());
+  }
+  return ValueUtil::nullValue();
+}
+void AttrUtils::setResponseHeaders(Http::ResponseHeaderMap& response_headers){
+  response_headers_ = &response_headers;
+}
+void AttrUtils::setResponseTrailers(Http::ResponseTrailerMap& response_trailers){
+  response_trailers_ = &response_trailers;
 }
 
 } // ExternalProcessing
