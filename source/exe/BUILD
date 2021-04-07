@@ -212,6 +212,7 @@ envoy_cc_library(
             ":main_common_lib",
             "//source/common/buffer:buffer_lib",
             "//source/common/common:assert_lib",
+            "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/common:thread_lib",
             "//source/common/event:signal_lib",
         ],

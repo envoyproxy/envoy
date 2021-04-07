@@ -9,14 +9,17 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+# TODO(phlax): remove openssl bug workaround when openssl/ubuntu are updated
+#    see #15555 for more info
+touch ~/.rnd
 
 interact_ws () {
     local port="$1" \
-	  protocol="$2" \
-	  backend="$3" \
-	  insecure=""
+          protocol="$2" \
+          backend="$3" \
+          insecure=""
     if [ "$protocol" == "wss" ]; then
-       insecure="--insecure"
+        insecure="--insecure"
     fi
     expect <<EOF
 set timeout 1

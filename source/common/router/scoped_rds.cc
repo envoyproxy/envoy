@@ -16,6 +16,7 @@
 #include "common/config/api_version.h"
 #include "common/config/resource_name.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_resource.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 #include "common/router/rds_impl.h"
@@ -103,16 +104,25 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
           scoped_rds.scoped_rds_config_source().resource_api_version(),
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
+      factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
-      rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
-      route_config_provider_manager_(route_config_provider_manager) {
+      scope_key_builder_(scope_key_builder), rds_config_source_(std::move(rds_config_source)),
+      stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
   const auto resource_name = getResourceName();
-  subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-          *this, resource_decoder_, false);
+  if (scoped_rds.srds_resources_locator().empty()) {
+    subscription_ =
+        factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+            scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
+            *this, resource_decoder_, {});
+  } else {
+    const auto srds_resources_locator =
+        Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator());
+    subscription_ =
+        factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
+            srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
+            *this, resource_decoder_);
+  }
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
