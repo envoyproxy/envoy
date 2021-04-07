@@ -47,8 +47,7 @@ FilterConfig::FilterConfig(
       request_headers_parser_(Envoy::Router::HeaderParser::configure(
           config.request_headers_to_add_when_not_enforced())),
       stage_(static_cast<uint64_t>(config.stage())),
-      has_descriptors_(!config.descriptors().empty()),
-      proto_config_(config),
+      has_descriptors_(!config.descriptors().empty()), proto_config_(config),
       dispatcher_(dispatcher) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
@@ -92,8 +91,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     populateDescriptors(descriptors, headers);
   }
 
-  bool isRequestAllowed = config->proto_config().per_connection() ?
-    requestAllowed(descriptors) : config->requestAllowed(descriptors);
+  bool isRequestAllowed = config->proto_config().per_connection()
+                              ? requestAllowed(descriptors)
+                              : config->requestAllowed(descriptors);
 
   if (isRequestAllowed) {
     config->stats().ok_.inc();
@@ -130,20 +130,22 @@ LocalRateLimiterImplSharedPtr Filter::getRateLimiter() {
   if (!decoder_callbacks_->streamInfo().filterState()->hasData<PerConnectionRateLimiter>(
           PerConnectionRateLimiter::key())) {
     auto rate_limiter = std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-      std::chrono::milliseconds(
-              PROTOBUF_GET_MS_OR_DEFAULT(config->proto_config().token_bucket(), fill_interval, 0)),
-          config->proto_config().token_bucket().max_tokens(),
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->proto_config().token_bucket(), tokens_per_fill, 1), config->dispatcher(),
-          config->proto_config().descriptors());
+        std::chrono::milliseconds(
+            PROTOBUF_GET_MS_OR_DEFAULT(config->proto_config().token_bucket(), fill_interval, 0)),
+        config->proto_config().token_bucket().max_tokens(),
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->proto_config().token_bucket(), tokens_per_fill, 1),
+        config->dispatcher(), config->proto_config().descriptors());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
-      PerConnectionRateLimiter::key(), std::make_unique<PerConnectionRateLimiter>(rate_limiter),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection
-    );
+        PerConnectionRateLimiter::key(), std::make_unique<PerConnectionRateLimiter>(rate_limiter),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
-  return decoder_callbacks_->streamInfo().filterState()
-    ->getDataReadOnly<PerConnectionRateLimiter>(PerConnectionRateLimiter::key()).value();
+  return decoder_callbacks_->streamInfo()
+      .filterState()
+      ->getDataReadOnly<PerConnectionRateLimiter>(PerConnectionRateLimiter::key())
+      .value();
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
