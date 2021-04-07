@@ -3,6 +3,7 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -36,6 +37,7 @@ using Http::LowerCaseString;
 
 using testing::Eq;
 using testing::Invoke;
+using testing::ReturnRef;
 using testing::Unused;
 
 using namespace std::chrono_literals;
@@ -47,7 +49,9 @@ class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
 
     envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config{};
     if (!yaml.empty()) {
@@ -59,10 +63,8 @@ protected:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const std::chrono::milliseconds& timeout) {
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
     stream_callbacks_ = &callbacks;
-    stream_timeout_ = timeout;
 
     auto stream = std::make_unique<MockStream>();
     // We never send with the "close" flag set
@@ -175,10 +177,10 @@ protected:
   ProcessingRequest last_request_;
   bool last_request_processed_ = true;
   bool server_closed_stream_ = false;
-  std::chrono::milliseconds stream_timeout_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;

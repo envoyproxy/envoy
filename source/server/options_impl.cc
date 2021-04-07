@@ -159,18 +159,21 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg enable_core_dump("", "enable-core-dump", "Enable core dumps", cmd, false);
 
   cmd.setExceptionHandling(false);
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
-  } catch (TCLAP::ArgException& e) {
-    try {
-      cmd.getOutput()->failure(cmd, e);
-    } catch (const TCLAP::ExitException&) {
+  }
+  END_TRY
+  catch (TCLAP::ArgException& e) {
+    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
+    END_TRY
+    catch (const TCLAP::ExitException&) {
       // failure() has already written an informative message to stderr, so all that's left to do
       // is throw our own exception with the original message.
       throw MalformedArgvException(e.what());
     }
-  } catch (const TCLAP::ExitException& e) {
+  }
+  catch (const TCLAP::ExitException& e) {
     // parse() throws an ExitException with status 0 after printing the output for --help and
     // --version.
     throw NoServingException();

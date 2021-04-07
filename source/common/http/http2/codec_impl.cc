@@ -16,6 +16,7 @@
 #include "common/common/dump_state_utils.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
@@ -646,14 +647,6 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
 }
 
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
@@ -789,8 +782,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // was the current time when the ping was sent. This can be useful while debugging
     // to match the ping and ack.
     uint64_t data;
-    static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
-    memcpy(&data, frame->ping.opaque_data, sizeof(data));
+    safeMemcpy(&data, &(frame->ping.opaque_data));
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
 
     onKeepaliveResponse();
@@ -1093,6 +1085,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
     return 0;
   }
 
+  // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
     stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);
@@ -1710,17 +1703,9 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  return ConnectionImpl::innerDispatch(data);
+  return ConnectionImpl::dispatch(data);
 }
 
 absl::optional<int>

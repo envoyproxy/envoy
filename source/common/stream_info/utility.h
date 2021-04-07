@@ -45,6 +45,7 @@ private:
   const static std::string RESPONSE_FROM_CACHE_FILTER;
   const static std::string NO_FILTER_CONFIG_FOUND;
   const static std::string DURATION_TIMEOUT;
+  const static std::string NO_CLUSTER_FOUND;
 };
 
 /**

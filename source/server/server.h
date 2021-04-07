@@ -197,6 +197,7 @@ public:
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
   Init::Manager& initManager() override { return server_.initManager(); }
+  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation

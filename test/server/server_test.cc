@@ -1115,7 +1115,7 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/invalid_layered_runtime_missing_name.yaml"),
-      EnvoyException, "RuntimeLayerValidationError.Name: \\[\"value length must be at least");
+      EnvoyException, "RuntimeLayerValidationError.Name: value length must be at least");
 }
 
 // Validate invalid layered runtime with duplicate names is rejected.
@@ -1152,8 +1152,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0.25),
-      EnvoyException,
-      "HealthCheckValidationError.Timeout: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid interval entry of a health check config entry.
@@ -1161,8 +1160,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0.5, 0),
-      EnvoyException,
-      "HealthCheckValidationError.Interval: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Interval: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid timeout and interval entry of a health check
@@ -1171,8 +1169,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInter
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0),
-      EnvoyException,
-      "HealthCheckValidationError.Timeout: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on valid interval entry of a health check config entry.
@@ -1189,13 +1186,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
   // that there is no listener.
   server_->admin().addListenerToHandler(/*handler=*/nullptr);
-}
-
-// Validate that an admin config with a server address but no access log path is rejected.
-TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/node_bootstrap_without_access_log.yaml"),
-      EnvoyException, "An admin access log path is required for a listening server.");
 }
 
 namespace {
