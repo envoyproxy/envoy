@@ -13,6 +13,7 @@
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 #include "extensions/filters/network/dubbo_proxy/router/route.h"
 #include "extensions/filters/network/dubbo_proxy/router/router.h"
@@ -47,7 +48,7 @@ public:
 
 protected:
   RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
-  bool headersMatch(const Http::HeaderMap& headers) const;
+  bool headersMatch(const RpcInvocationImpl& invocation) const;
 
 private:
   class WeightedClusterEntry : public RouteEntry, public Route {
@@ -131,35 +132,11 @@ class SingleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logg
 public:
   class InterfaceMatcher {
   public:
-    using MatcherImpl = std::function<bool(const absl::string_view)>;
-    InterfaceMatcher(const std::string& interface_name) {
-      if (interface_name == "*") {
-        impl_ = [](const absl::string_view interface) { return !interface.empty(); };
-        return;
-      }
-      if (absl::StartsWith(interface_name, "*")) {
-        const std::string suffix = interface_name.substr(1);
-        impl_ = [suffix](const absl::string_view interface) {
-          return interface.size() > suffix.size() && absl::EndsWith(interface, suffix);
-        };
-        return;
-      }
-      if (absl::EndsWith(interface_name, "*")) {
-        const std::string prefix = interface_name.substr(0, interface_name.size() - 1);
-        impl_ = [prefix](const absl::string_view interface) {
-          return interface.size() > prefix.size() && absl::StartsWith(interface, prefix);
-        };
-        return;
-      }
-      impl_ = [interface_name](const absl::string_view interface) {
-        return interface == interface_name;
-      };
-    }
-
+    InterfaceMatcher(const std::string& interface_name);
     bool match(const absl::string_view interface) const { return impl_(interface); }
 
   private:
-    MatcherImpl impl_;
+    std::function<bool(const absl::string_view)> impl_;
   };
 
   using RouteConfig = envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration;
@@ -168,6 +145,10 @@ public:
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
 private:
+  bool matchServiceName(const RpcInvocationImpl& invocation) const;
+  bool matchServiceVersion(const RpcInvocationImpl& invocation) const;
+  bool matchServiceGroup(const RpcInvocationImpl& invocation) const;
+
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   const InterfaceMatcher interface_matcher_;
   const absl::optional<std::string> group_;

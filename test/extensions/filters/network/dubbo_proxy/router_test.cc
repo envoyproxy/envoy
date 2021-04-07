@@ -5,9 +5,9 @@
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
 #include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
+#include "test/extensions/filters/network/dubbo_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
@@ -58,6 +58,20 @@ public:
   std::function<MockProtocol*()> f_;
 };
 
+void writeRequest(Buffer::Instance& buffer) {
+  buffer.add(std::string({'\xda', '\xbb', 0x42, 20})); // Header
+  addInt64(buffer, 1);
+  addInt32(buffer, 5);
+
+  buffer.add(std::string({
+      0x04,
+      't',
+      'e',
+      's',
+      't',
+  })); // Body
+}
+
 } // namespace
 
 class DubboRouterTestBase {
@@ -95,6 +109,10 @@ public:
   }
 
   void initializeMetadata(MessageType msg_type) {
+    if (metadata_ != nullptr) {
+      return;
+    }
+
     msg_type_ = msg_type;
 
     metadata_ = std::make_shared<MessageMetadata>();
@@ -391,9 +409,39 @@ TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   buffer.add("test");                                  // Body
 
   auto ctx = static_cast<ContextImpl*>(message_context_.get());
-  ctx->messageOriginData().move(buffer, buffer.length());
+  ctx->originMessage().move(buffer, buffer.length());
   startRequest(MessageType::Request);
   connectUpstream();
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, UpstreamRemoteCloseNoRequest) {
+  initializeRouter();
+
+  startRequest(MessageType::Request);
+  connectUpstream();
+  returnResponse();
+
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, UpstreamLocalCloseAndRequestReset) {
+  initializeRouter();
+
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(callbacks_, startUpstreamResponse());
+
+  EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
+      .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Reset));
+
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
   destroyRouter();
 }
 
@@ -441,6 +489,55 @@ TEST_F(DubboRouterTest, Call) {
   EXPECT_CALL(upstream_connection_, write(_, false));
 
   startRequest(MessageType::Request);
+  connectUpstream();
+  returnResponse();
+  destroyRouter();
+}
+
+// Test the attachment being updated.
+TEST_F(DubboRouterTest, AttachmentUpdated) {
+  initializeRouter();
+  initializeMetadata(MessageType::Request);
+
+  auto* invo = const_cast<RpcInvocationImpl*>(
+      dynamic_cast<const RpcInvocationImpl*>(&metadata_->invocationInfo()));
+
+  EXPECT_CALL(upstream_connection_, write(_, false));
+
+  writeRequest(message_context_->originMessage());
+  dynamic_cast<ContextImpl*>(message_context_.get())->setHeaderSize(16);
+
+  const size_t origin_message_size = message_context_->originMessage().length();
+
+  invo->setParametersLazyCallback([]() -> RpcInvocationImpl::ParametersPtr {
+    return std::make_unique<RpcInvocationImpl::Parameters>();
+  });
+
+  invo->setAttachmentLazyCallback([origin_message_size]() -> RpcInvocationImpl::AttachmentPtr {
+    auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
+    return std::make_unique<RpcInvocationImpl::Attachment>(std::move(map), origin_message_size);
+  });
+
+  invo->mutableAttachment()->insert("fake_attach_key", "fake_attach_value");
+
+  startRequest(MessageType::Request);
+
+  auto& upstream_request_buffer = router_->upstreamRequestBufferForTest();
+
+  // Verify that the attachment is properly serialized.
+  Hessian2::Decoder decoder(
+      std::make_unique<BufferReader>(upstream_request_buffer, origin_message_size));
+  EXPECT_EQ("fake_attach_value",
+            *(decoder.decode<Hessian2::Object>()
+                  ->toUntypedMap()
+                  .value()
+                  ->at(std::make_unique<Hessian2::StringObject>("fake_attach_key"))
+                  ->toString()
+                  .value()));
+
+  // Check new body size value.
+  EXPECT_EQ(upstream_request_buffer.peekBEInt<int32_t>(12), upstream_request_buffer.length() - 16);
+
   connectUpstream();
   returnResponse();
   destroyRouter();
