@@ -307,12 +307,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       auto* factory =
           Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(extension_config);
       if (!factory) {
-        throw EnvoyException("Original IP detection extension not found");
+        throw EnvoyException(fmt::format("Original IP detection extension not found: '{}'",
+                                         extension_config.name()));
       }
 
       auto extension = factory->createExtension(extension_config.typed_config(), context_);
       if (!extension) {
-        throw EnvoyException("Original IP detection extension could not be created");
+        throw EnvoyException(fmt::format(
+            "Original IP detection extension could not be created: '{}'", extension_config.name()));
       }
       original_ip_detection_extensions_.push_back(extension);
     }

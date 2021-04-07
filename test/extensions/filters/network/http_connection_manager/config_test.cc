@@ -1787,7 +1787,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                          "Original IP detection extension not found");
+                          "Original IP detection extension not found: "
+                          "'envoy.ip_detection.UnknownOriginalIPDetectionExtension'");
 }
 
 namespace {
@@ -1827,7 +1828,8 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) 
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                          "Original IP detection extension could not be created");
+                          "Original IP detection extension could not be created: "
+                          "'envoy.http.ip_detection.OriginalIPDetectionExtensionNotCreated'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
