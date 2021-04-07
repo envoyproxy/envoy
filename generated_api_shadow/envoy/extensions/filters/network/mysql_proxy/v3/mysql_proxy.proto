@@ -20,9 +20,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Auth information of MySQL.
 message AuthInfo {
-  config.core.v3.DataSource auth_username = 1 [(udpa.annotations.sensitive) = true];
+  config.core.v3.DataSource username = 1 [(udpa.annotations.sensitive) = true];
 
-  config.core.v3.DataSource auth_password = 2 [(udpa.annotations.sensitive) = true];
+  config.core.v3.DataSource password = 2 [(udpa.annotations.sensitive) = true];
 }
 
 // [#next-free-field: 6]
@@ -48,7 +48,7 @@ message MySQLProxy {
 
   // [#not-implemented-hide:] enable manage MySQL protocol at proxy. Default is false.
   // * When enable_manage_protocol is true, MySQL filter is a terminal filter, it's config should put at the last of filter chain, in the same time, MySQLProtocolOptions should be set at corresponding config of cluster for connecting to upstream database.
-  // * When enable_manage_protocol is false, MySQL filter is not a terminal filter, it's config can not put at the last of filter chain.
+  // * When enable_manage_protocol is false, MySQL filter is not a terminal filter, it's config can not put at the last of filter chain, the routes and downstream_auth_info fields will be ignore.
   bool enable_manage_protocol = 3;
 
   // List of **unique** db name used to separate connections from different database to different

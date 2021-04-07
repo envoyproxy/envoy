@@ -72,15 +72,12 @@ enum class AuthMethod : uint8_t {
 class AuthHelper : public Logger::Loggable<Logger::Id::filter> {
 public:
   static AuthMethod authMethod(uint32_t cap, const std::string& auth_plugin_name);
-
   static std::vector<uint8_t> generateSeed();
-
   static std::vector<uint8_t> oldPasswordSignature(const std::string& password,
                                                    const std::vector<uint8_t>& seed);
 
   static std::vector<uint8_t> nativePasswordSignature(const std::string& password,
                                                       const std::vector<uint8_t>& seed);
-
   static std::vector<uint32_t> oldHash(const std::string& text) {
     return oldHash(text.data(), text.size());
   }
