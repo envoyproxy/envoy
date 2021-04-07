@@ -1286,7 +1286,6 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
 
   response->waitForEndStream();
   EXPECT_EQ("502", response->headers().getStatusValue());
-  EXPECT_THAT(response->body(), HasSubstr("protocol error"));
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {

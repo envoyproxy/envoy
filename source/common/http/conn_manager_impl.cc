@@ -1476,7 +1476,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                        Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
                    Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
                    absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
-                                "protocol error: ", status.message()));
+                                "{", status.message(), "}"));
     return;
   }
   filter_manager_.streamInfo().onFirstDownstreamTxByteSent();
