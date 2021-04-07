@@ -20,6 +20,12 @@ Minor Behavior Changes
 * access_logs: fix substition formatter to recognize commands ending with an integer such as DOWNSTREAM_PEER_FINGERPRINT_256.
 * access_logs: set the error flag `NC` for `no cluster found` instead of `NR` if the route is found but the corresponding cluster is not available.
 * admin: added :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>` information to GET /clusters?format=json :ref:`cluster status <envoy_v3_api_msg_admin.v3.ClusterStatus>`.
+* aws_request_signing: requests are now buffered by default to compute signatures which include the
+  payload hash, making the filter compatible with most AWS services. Previously, requests were
+  never buffered, which only produced correct signatures for requests without a body, or for
+  requests to S3, ES or Glacier, which used the literal string ``UNSIGNED-PAYLOAD``. Buffering can
+  be now be disabled in favor of using unsigned payloads with compatible services via the new
+  ``unsigned_payload`` filter option (default ``false``).
 * dns: both the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and
   :ref:`logical DNS <arch_overview_service_discovery_types_logical_dns>` cluster types now honor the
   :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field if not empty.
