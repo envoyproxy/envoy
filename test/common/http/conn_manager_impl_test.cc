@@ -809,7 +809,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// TODO: add test description
+// Test that all methods supported by DelegatingRouteEntry delegate correctly
 TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
   setup(false, "");
   setupFilterChain(2, 0);
@@ -843,10 +843,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
       .Times(1)
       .WillRepeatedly(ReturnRef(default_cluster_name));
 
-  // default_route Router::RouteEntry method mocks (NOT NEEDED)
-  // EXPECT_CALL(default_route->route_entry_, clusterNotFoundResponseCode())
-  //     .WillRepeatedly(Return(Code::NotFound));
-
   // DelegatingRoute: foo
   std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> delegating_route_foo(nullptr);
 
@@ -875,41 +871,133 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->clusterNotFoundResponseCode());
         EXPECT_EQ(default_route->routeEntry()->corsPolicy(),
                   delegating_route_foo->routeEntry()->corsPolicy());
-        auto test_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.lyft.com"},
-                                                           {":path", "/new_endpoint/foo"},
-                                                           {":method", "GET"},
-                                                           {"x-safe", "safe"},
-                                                           {"x-global-nope", "global"},
-                                                           {"x-vhost-nope", "vhost"},
-                                                           {"x-route-nope", "route"},
-                                                           {"x-forwarded-proto", "http"}};
-        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(test_headers),
-                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(test_headers));
+
+        auto test_req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.choice.com"},
+                                                               {":path", "/new_endpoint/foo"},
+                                                               {":method", "GET"},
+                                                               {"x-forwarded-proto", "http"}};
+        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(test_req_headers),
+                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(test_req_headers));
+
         EXPECT_EQ(default_route->routeEntry()->hashPolicy(),
                   delegating_route_foo->routeEntry()->hashPolicy());
 
-        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy(),
-        //           delegating_route_foo->routeEntry()->hedgePolicy());
-        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy().additionalRequestChance(),
-        //           delegating_route_foo->routeEntry()->hedgePolicy().additionalRequestChance());
-        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy().hedgeOnPerTryTimeout(),
-        //           delegating_route_foo->routeEntry()->hedgePolicy().hedgeOnPerTryTimeout());
-        // EXPECT_EQ(default_route->routeEntry()->hedgePolicy().initialRequests(),
-        //           delegating_route_foo->routeEntry()->hedgePolicy().initialRequests());
+        // HedgePolicy objects don't have valid comparison operator, so compare 2 attributes at
+        // random. Will apply this strategy for all objects that don't have a valid comparison
+        // operator (next example being RetryPolicy).
+        EXPECT_EQ(default_route->routeEntry()->hedgePolicy().additionalRequestChance().numerator(),
+                  delegating_route_foo->routeEntry()
+                      ->hedgePolicy()
+                      .additionalRequestChance()
+                      .numerator());
+        EXPECT_EQ(default_route->routeEntry()->hedgePolicy().initialRequests(),
+                  delegating_route_foo->routeEntry()->hedgePolicy().initialRequests());
 
         EXPECT_EQ(default_route->routeEntry()->priority(),
                   delegating_route_foo->routeEntry()->priority());
 
-        // EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().empty(),
-        //           delegating_route_foo->routeEntry()->rateLimitPolicy().empty());
-        // EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty(),
-        //           delegating_route_foo->routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty());
+        EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().empty(),
+                  delegating_route_foo->routeEntry()->rateLimitPolicy().empty());
+        EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty(),
+                  delegating_route_foo->routeEntry()
+                      ->rateLimitPolicy()
+                      .getApplicableRateLimit(0)
+                      .empty());
 
-        // TODO WIP: How would I test delegating behavior if method return type is void, like in the
-        // case of finalizeResponseHeaders?
-        // EXPECT_EQ(
-        //     default_route->routeEntry()->finalizeResponseHeaders(&headers, &stream_info),
-        //     delegating_route_foo->routeEntry()->finalizeResponseHeaders(&headers, &stream_info));
+        EXPECT_EQ(default_route->routeEntry()->retryPolicy().numRetries(),
+                  delegating_route_foo->routeEntry()->retryPolicy().numRetries());
+        EXPECT_EQ(default_route->routeEntry()->retryPolicy().retryOn(),
+                  delegating_route_foo->routeEntry()->retryPolicy().retryOn());
+
+        EXPECT_EQ(default_route->routeEntry()->internalRedirectPolicy().enabled(),
+                  delegating_route_foo->routeEntry()->internalRedirectPolicy().enabled());
+        EXPECT_EQ(
+            default_route->routeEntry()->internalRedirectPolicy().shouldRedirectForResponseCode(
+                Code::OK),
+            delegating_route_foo->routeEntry()
+                ->internalRedirectPolicy()
+                .shouldRedirectForResponseCode(Code::OK));
+
+        EXPECT_EQ(default_route->routeEntry()->retryShadowBufferLimit(),
+                  delegating_route_foo->routeEntry()->retryShadowBufferLimit());
+        EXPECT_EQ(default_route->routeEntry()->shadowPolicies().empty(),
+                  delegating_route_foo->routeEntry()->shadowPolicies().empty());
+        EXPECT_EQ(default_route->routeEntry()->timeout(),
+                  delegating_route_foo->routeEntry()->timeout());
+        EXPECT_EQ(default_route->routeEntry()->idleTimeout(),
+                  delegating_route_foo->routeEntry()->idleTimeout());
+        EXPECT_EQ(default_route->routeEntry()->usingNewTimeouts(),
+                  delegating_route_foo->routeEntry()->usingNewTimeouts());
+        EXPECT_EQ(default_route->routeEntry()->maxStreamDuration(),
+                  delegating_route_foo->routeEntry()->maxStreamDuration());
+        EXPECT_EQ(default_route->routeEntry()->grpcTimeoutHeaderMax(),
+                  delegating_route_foo->routeEntry()->grpcTimeoutHeaderMax());
+        EXPECT_EQ(default_route->routeEntry()->grpcTimeoutHeaderOffset(),
+                  delegating_route_foo->routeEntry()->grpcTimeoutHeaderOffset());
+        EXPECT_EQ(default_route->routeEntry()->maxGrpcTimeout(),
+                  delegating_route_foo->routeEntry()->maxGrpcTimeout());
+        EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
+                  delegating_route_foo->routeEntry()->grpcTimeoutOffset());
+        EXPECT_EQ(default_route->routeEntry()->virtualCluster(test_req_headers),
+                  delegating_route_foo->routeEntry()->virtualCluster(test_req_headers));
+
+        EXPECT_EQ(default_route->routeEntry()->virtualHost().statName(),
+                  delegating_route_foo->routeEntry()->virtualHost().statName());
+        EXPECT_EQ(default_route->routeEntry()->virtualHost().corsPolicy(),
+                  delegating_route_foo->routeEntry()->virtualHost().corsPolicy());
+
+        EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
+                  delegating_route_foo->routeEntry()->autoHostRewrite());
+        EXPECT_EQ(default_route->routeEntry()->metadataMatchCriteria(),
+                  delegating_route_foo->routeEntry()->metadataMatchCriteria());
+        EXPECT_EQ(default_route->routeEntry()->opaqueConfig(),
+                  delegating_route_foo->routeEntry()->opaqueConfig());
+        EXPECT_EQ(default_route->routeEntry()->includeVirtualHostRateLimits(),
+                  delegating_route_foo->routeEntry()->includeVirtualHostRateLimits());
+
+        // NOTE: no coverage for routeEntry()->typedMetadata()
+        // "The mock function has no default action set, and its return type has no default value
+        // set"
+
+        EXPECT_EQ(default_route->routeEntry()->metadata().filter_metadata().size(),
+                  delegating_route_foo->routeEntry()->metadata().filter_metadata().size());
+        EXPECT_EQ(default_route->routeEntry()->tlsContextMatchCriteria(),
+                  delegating_route_foo->routeEntry()->tlsContextMatchCriteria());
+
+        EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matcher(),
+                  delegating_route_foo->routeEntry()->pathMatchCriterion().matcher());
+        EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matchType(),
+                  delegating_route_foo->routeEntry()->pathMatchCriterion().matchType());
+
+        EXPECT_EQ(default_route->routeEntry()->perFilterConfig("bar"),
+                  delegating_route_foo->routeEntry()->perFilterConfig("bar"));
+        EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInRequest(),
+                  delegating_route_foo->routeEntry()->includeAttemptCountInRequest());
+        EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInResponse(),
+                  delegating_route_foo->routeEntry()->includeAttemptCountInResponse());
+        EXPECT_EQ(default_route->routeEntry()->upgradeMap(),
+                  delegating_route_foo->routeEntry()->upgradeMap());
+
+        EXPECT_EQ(default_route->routeEntry()->connectConfig().has_value(),
+                  delegating_route_foo->routeEntry()->connectConfig().has_value());
+        if (default_route->routeEntry()->connectConfig().has_value()) {
+          EXPECT_EQ(default_route->routeEntry()->connectConfig().value().allow_post(),
+                    delegating_route_foo->routeEntry()->connectConfig().value().allow_post());
+        }
+
+        EXPECT_EQ(default_route->routeEntry()->routeName(),
+                  delegating_route_foo->routeEntry()->routeName());
+
+        // Coverage for finalizeRequestHeaders
+        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+        delegating_route_foo->routeEntry()->finalizeRequestHeaders(test_req_headers, stream_info,
+                                                                   true);
+        EXPECT_EQ("/new_endpoint/foo", test_req_headers.get_(Http::Headers::get().Path));
+
+        // Coverage for finalizeResponseHeaders
+        Http::TestResponseHeaderMapImpl test_resp_headers;
+        delegating_route_foo->routeEntry()->finalizeResponseHeaders(test_resp_headers, stream_info);
+        EXPECT_EQ(test_resp_headers, Http::TestResponseHeaderMapImpl{});
 
         return FilterHeadersStatus::StopIteration;
       }));

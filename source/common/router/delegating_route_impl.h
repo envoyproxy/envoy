@@ -19,6 +19,7 @@ public:
     ASSERT(base_route_ != nullptr);
   }
 
+  // Router::Route
   const Router::DirectResponseEntry* directResponseEntry() const override;
   const Router::RouteEntry* routeEntry() const override;
   const Router::Decorator* decorator() const override;
