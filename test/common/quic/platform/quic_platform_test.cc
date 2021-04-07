@@ -52,7 +52,6 @@
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
-#include "quiche/quic/platform/api/quic_uint128.h"
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -272,12 +271,6 @@ TEST_F(QuicPlatformTest, QuicThread) {
   // QuicThread will panic if it's started but not joined.
   EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
                "QuicThread should be joined before destruction");
-}
-
-TEST_F(QuicPlatformTest, QuicUint128) {
-  QuicUint128 i = MakeQuicUint128(16777216, 315);
-  EXPECT_EQ(315, QuicUint128Low64(i));
-  EXPECT_EQ(16777216, QuicUint128High64(i));
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {

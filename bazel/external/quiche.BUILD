@@ -785,16 +785,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_core_fifo_write_scheduler_lib",
-    hdrs = ["quiche/spdy/core/fifo_write_scheduler.h"],
-    repository = "@envoy",
-    deps = [
-        ":spdy_core_write_scheduler_lib",
-        ":spdy_platform",
-    ],
-)
-
-envoy_cc_library(
     name = "spdy_core_framer_lib",
     srcs = [
         "quiche/spdy/core/spdy_frame_builder.cc",
@@ -885,16 +875,6 @@ envoy_cc_library(
         ":spdy_core_hpack_hpack_decoder_adapter_lib",
         ":spdy_core_hpack_hpack_lib",
         ":spdy_core_protocol_lib",
-        ":spdy_platform",
-    ],
-)
-
-envoy_cc_library(
-    name = "spdy_core_lifo_write_scheduler_lib",
-    hdrs = ["quiche/spdy/core/lifo_write_scheduler.h"],
-    repository = "@envoy",
-    deps = [
-        ":spdy_core_write_scheduler_lib",
         ":spdy_platform",
     ],
 )
@@ -1067,7 +1047,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_server_stats.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
-        "quiche/quic/platform/api/quic_uint128.h",
         "quiche/quic/platform/api/quic_testvalue.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
@@ -2370,6 +2349,7 @@ envoy_cc_library(
         ":quic_core_utils_lib",
         ":quic_platform_base",
         ":spdy_core_framer_lib",
+	":quic_core_http_server_initiated_spdy_stream_lib",
         ":spdy_core_protocol_lib",
         "@envoy//source/common/quic:spdy_server_push_utils_for_envoy_lib",
     ],
@@ -2438,6 +2418,19 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_platform_base",
         ":spdy_core_framer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_http_server_initiated_spdy_stream_lib",
+    srcs = ["quiche/quic/core/http/quic_server_initiated_spdy_stream.cc"],
+    hdrs = ["quiche/quic/core/http/quic_server_initiated_spdy_stream.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_http_spdy_session_lib",
+        ":quic_core_types_lib",
     ],
 )
 
@@ -2784,9 +2777,7 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quic_platform_socket_address",
-        ":spdy_core_fifo_write_scheduler_lib",
         ":spdy_core_http2_priority_write_scheduler_lib",
-        ":spdy_core_lifo_write_scheduler_lib",
         ":spdy_core_priority_write_scheduler_lib",
     ],
 )

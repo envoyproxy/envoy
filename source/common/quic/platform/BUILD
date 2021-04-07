@@ -122,7 +122,6 @@ envoy_cc_library(
         "quic_stack_trace_impl.h",
         "quic_stream_buffer_allocator_impl.h",
         "quic_testvalue_impl.h",
-        "quic_uint128_impl.h",
     ],
     external_deps = [
         "abseil_base",
