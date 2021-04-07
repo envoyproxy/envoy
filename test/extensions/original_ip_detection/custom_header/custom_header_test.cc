@@ -15,7 +15,9 @@ namespace CustomHeader {
 
 class CustomHeaderTest : public testing::Test {
 protected:
-  CustomHeaderTest() {
+  CustomHeaderTest() { configure(); }
+
+  void configure(envoy::type::v3::StatusCode code = envoy::type::v3::StatusCode::Unauthorized) {
     envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
     config.set_header_name("x-real-ip");
     config.set_allow_extension_to_set_address_as_trusted(true);
@@ -23,7 +25,7 @@ protected:
     auto* reject_options = config.mutable_reject_options();
     reject_options->set_body_on_error("detection failed");
     auto* status_on_error = reject_options->mutable_status_on_error();
-    status_on_error->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    status_on_error->set_code(code);
 
     custom_header_extension_ = std::make_shared<CustomHeaderIPDetection>(config);
   }
@@ -83,6 +85,22 @@ TEST_F(CustomHeaderTest, Detection) {
     EXPECT_TRUE(result.allow_trusted_address_checks);
     EXPECT_FALSE(result.reject_options.has_value());
   }
+}
+
+TEST_F(CustomHeaderTest, FallbacksToDefaultResponseCode) {
+  configure(envoy::type::v3::StatusCode::OK);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-other", "abc"}};
+  Http::OriginalIPDetectionParams params = {headers, nullptr};
+  auto result = custom_header_extension_->detect(params);
+
+  EXPECT_EQ(nullptr, result.detected_remote_address);
+  EXPECT_FALSE(result.allow_trusted_address_checks);
+  EXPECT_TRUE(result.reject_options.has_value());
+
+  const auto& reject_options = result.reject_options.value();
+  EXPECT_EQ(reject_options.response_code, Http::Code::Forbidden);
+  EXPECT_EQ(reject_options.body, "detection failed");
 }
 
 } // namespace CustomHeader
