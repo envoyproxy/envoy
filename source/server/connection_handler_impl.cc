@@ -38,7 +38,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    // TODO(lambdai): Remove the dependency of ActiveTcpListener.
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
     details.typed_listener_ = *tcp_listener;
     details.listener_ = std::move(tcp_listener);
@@ -211,16 +210,6 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
                        .get())
              : absl::nullopt;
 }
-
-ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
-    Network::ConnectionHandler& parent, Network::ListenerConfig* config)
-    : stats_({ALL_LISTENER_STATS(POOL_COUNTER(config->listenerScope()),
-                                 POOL_GAUGE(config->listenerScope()),
-                                 POOL_HISTOGRAM(config->listenerScope()))}),
-      per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
-          POOL_COUNTER_PREFIX(config->listenerScope(), parent.statPrefix()),
-          POOL_GAUGE_PREFIX(config->listenerScope(), parent.statPrefix()))}),
-      config_(config) {}
 
 } // namespace Server
 } // namespace Envoy

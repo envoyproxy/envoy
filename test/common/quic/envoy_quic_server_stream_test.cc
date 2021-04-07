@@ -15,6 +15,7 @@
 
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
+#include "server/active_listener_base.h"
 
 #include "common/quic/envoy_quic_alarm_factory.h"
 #include "common/quic/envoy_quic_connection_helper.h"

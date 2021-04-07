@@ -8,8 +8,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
-// TODO(lambdai): remove connection_handler_impl after ActiveListenerImplBase is extracted from it.
-#include "server/connection_handler_impl.h"
+#include "server/active_listener_base.h"
 
 namespace Envoy {
 namespace Server {
@@ -23,7 +22,7 @@ struct UdpListenerStats {
   ALL_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
+class ActiveUdpListenerBase : public ActiveListenerImplBase,
                               public Network::ConnectionHandler::ActiveUdpListener {
 public:
   ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,

@@ -77,6 +77,7 @@ envoy_cc_library(
         "connection_handler_impl.h",
     ],
     deps = [
+        ":active_tcp_listener",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
@@ -92,38 +93,19 @@ envoy_cc_library(
         "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/server:active_tcp_listener_header",
     ],
 )
 
 envoy_cc_library(
-    # Currently both `active_tcp_listener` and `connection_handler_impl` need below headers
-    # while addressing https://github.com/envoyproxy/envoy/issues/15126
-    # TODO(lambdai): Remove the definition of ActiveTcpListener from dependency of ConnectionHandlerImpl
-    # and delete this target.
-    name = "active_tcp_listener_header",
+    name = "active_listener_base",
     hdrs = [
-        "active_tcp_listener.h",
-        "connection_handler_impl.h",
+        "active_listener_base.h",
     ],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/event:deferred_deletable",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_handler_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
-        "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:timespan_interface",
-        "//source/common/common:linked_object",
-        "//source/common/common:non_copyable",
-        "//source/common/event:deferred_task",
-        "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
-        "//source/common/stream_info:stream_info_lib",
     ],
 )
 
@@ -153,7 +135,7 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "//source/server:active_tcp_listener_header",
+        "//source/server:active_listener_base",
     ],
 )
 
