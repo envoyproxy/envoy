@@ -22,7 +22,7 @@ class OdCdsApiImplTest : public testing::Test {
 public:
   void SetUp() override {
     envoy::config::core::v3::ConfigSource odcds_config;
-    odcds_ = OdCdsApiImpl::create(odcds_config, cm_, store_, validation_visitor_);
+    odcds_ = OdCdsApiImpl::create(odcds_config, nullptr, cm_, store_, validation_visitor_);
     odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 

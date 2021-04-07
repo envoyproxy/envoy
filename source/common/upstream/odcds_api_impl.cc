@@ -8,22 +8,31 @@
 namespace Envoy {
 namespace Upstream {
 
-OdCdsApiPtr OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
+OdCdsApiPtr OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
+                                 const xds::core::v3::ResourceLocator* odcds_resources_locator,
                                  ClusterManager& cm, Stats::Scope& scope,
                                  ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return OdCdsApiPtr{new OdCdsApiImpl(cds_config, cm, scope, validation_visitor)};
+  return OdCdsApiPtr{new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, scope, validation_visitor)};
 }
 
-OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
+OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
+                           const xds::core::v3::ResourceLocator* odcds_resources_locator,
                            ClusterManager& cm, Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
-          cds_config.resource_api_version(), validation_visitor, "name"),
+          odcds_config.resource_api_version(), validation_visitor, "name"),
       helper_(cm, "odcds"), cm_(cm), scope_(scope.createScope("odcds.")),
       status_(StartStatus::NotStarted) {
+  // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
+  // class for CDS and ODCDS.
   const auto resource_name = getResourceName();
-  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+  if (odcds_resources_locator == nullptr) {
+    subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+  } else {
+    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
+        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this, resource_decoder_);
+  }
 }
 
 void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
