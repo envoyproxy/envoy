@@ -20,9 +20,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Auth information of MySQL.
 message AuthInfo {
-  config.core.v3.DataSource auth_username = 1;
+  config.core.v3.DataSource auth_username = 1 [(udpa.annotations.sensitive) = true];
 
-  config.core.v3.DataSource auth_password = 2;
+  config.core.v3.DataSource auth_password = 2 [(udpa.annotations.sensitive) = true];
 }
 
 // [#next-free-field: 6]
@@ -46,8 +46,10 @@ message MySQLProxy {
   // If the access log field is empty, access logs will not be written.
   string access_log = 2;
 
-  // [#not-implemented-hide:] enable feature of separate authentication of downstream clients and upstream server. When feature_enable is true, the filter is a terminal filter, it's config should put at the last of filter chain, when feature_enable is false, the filter is not a terminal filter, it's config can not put at the last of filter chain. Default is false.
-  bool feature_enable = 3;
+  // [#not-implemented-hide:] enable manage MySQL protocol at proxy. Default is false.
+  // * When enable_manage_protocol is true, MySQL filter is a terminal filter, it's config should put at the last of filter chain, in the same time, MySQLProtocolOptions should be set at corresponding config of cluster for connecting to upstream database.
+  // * When enable_manage_protocol is false, MySQL filter is not a terminal filter, it's config can not put at the last of filter chain.
+  bool enable_manage_protocol = 3;
 
   // List of **unique** db name used to separate connections from different database to different
   // clusters.
@@ -62,7 +64,7 @@ message MySQLProxy {
   //      - database: "database_b"
   //        cluster: "cluster_b"
   //
-  // When using the above routes, the following connect dsn would be sent to:
+  // When using the above routes, the following connect data source names would be sent to:
   //
   // * ``jdbc:mysql://host1:9001/database_a`` would sent command to cluster_a.
   // * ``jdbc:mysql://host1:9001/database_c`` will return ER_ER_BAD_DB_ERROR.
@@ -70,12 +72,8 @@ message MySQLProxy {
   repeated Route routes = 4;
 
   // Downstream client username/password.
-  // * If username and password is empty, then authentication will always pass.
-  // * If username is empty but password is not, then proxy will only auth password.
-  // * If password is empty but username is not, then proxy will only auth username/
-  // * If the username is not match, then ER_ACCESS_DENIED_ERROR will return;
-  // * If connect db name is not found in envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy.routes, then ER_ER_BAD_DB_ERROR will return.
-  AuthInfo downstream_auth_info = 5 [(udpa.annotations.sensitive) = true];
+  // * If the username/password is not match, then ER_ACCESS_DENIED_ERROR will return;
+  AuthInfo downstream_auth_info = 5;
 }
 
 // MySQLProtocolOptions specifies MySQL upstream protocol options. This object is used in
@@ -83,6 +81,5 @@ message MySQLProxy {
 // keyed by the name `envoy.filters.network.mysql_proxy`.
 message MySQLProtocolOptions {
   // Upstream database username/password.
-  AuthInfo upstream_auth_info = 1
-      [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
+  AuthInfo upstream_auth_info = 1 [(validate.rules).message = {required: true}];
 }

@@ -256,7 +256,9 @@ public:
   }
 
   void onMySQLFailure(MySQLPoolFailureReason reason);
-
+  // These two functions exist for testing parity between old and new Tcp Connection Pools.
+  virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
+  virtual void onConnDestroyed() {}
   ThreadLocalPool& parent_;
 };
 

@@ -86,13 +86,21 @@ public:
   virtual void closeConnections() PURE;
 };
 
-/*
- * cluster connection pool manager, per connection pool per host.
- */
 class ConnectionPoolManager {
 public:
   virtual ~ConnectionPoolManager() = default;
-
+  /**
+   * Create a new connection which passed MySQL connection phase on the pool. The host of connection
+   * is chose by default load balancer.
+   * @param cb supplies the callbacks to invoke when the connection is ready or has failed. The
+   *           callbacks may be invoked immediately within the context of this call if there is a
+   *           ready connection or an immediate failure. In this case, the routine returns nullptr.
+   * @return Cancellable* If no connection is ready, the callback is not invoked, and a handle
+   *                      is returned that can be used to cancel the request. Otherwise, one of the
+   *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
+   *                      is called, the handle is no longer valid and any further cancellation
+   *                      should be done by resetting the connection.
+   */
   virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) PURE;
 };
 
