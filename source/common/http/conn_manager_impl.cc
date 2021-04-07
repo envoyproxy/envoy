@@ -904,7 +904,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     const auto& continue_headers = continueHeader();
     const auto status = response_encoder_->encode100ContinueHeaders(continue_headers);
     // We must make sure static `continue_headers` is valid in its content and encoding not fail.
-    RELEASE_ASSERT(status.ok(), "failed to encode 100-continue headers");
+    ASSERT(status.ok(), "failed to encode 100-continue headers");
     chargeStats(continue_headers);
     // Remove the Expect header so it won't be handled again upstream.
     request_headers_->removeExpect();
@@ -1342,7 +1342,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // Now actually encode via the codec.
   const auto status = response_encoder_->encode100ContinueHeaders(response_headers);
   // encode100ContinueHeaders is always called with valid headers soon after parsing so must be OK.
-  RELEASE_ASSERT(status.ok(), "failed to encode 100-continue headers");
+  ASSERT(status.ok(), "failed to encode 100-continue headers");
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(response_headers);
