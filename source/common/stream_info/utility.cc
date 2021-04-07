@@ -1,29 +1,24 @@
 #include "common/stream_info/utility.h"
 
 #include <string>
+#include <type_traits>
 
 namespace Envoy {
 namespace StreamInfo {
 
-void ResponseFlagUtils::appendString(std::string& result, absl::string_view append) {
-  if (result.empty()) {
-    result = append;
-  } else {
-    result += ",";
-    result += append;
-  }
-}
-
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
-  std::string result;
-
+  absl::InlinedVector<absl::string_view,
+                      std::numeric_limits<std::underlying_type_t<ResponseFlag>>::digits>
+      flag_strings;
   for (const auto& [flag_string, flag] : ALL_RESPONSE_STRING_FLAGS) {
     if (stream_info.hasResponseFlag(flag)) {
-      appendString(result, flag_string);
+      flag_strings.push_back(flag_string);
     }
   }
-
-  return result.empty() ? std::string(NONE) : result;
+  if (flag_strings.empty()) {
+    return std::string(NONE);
+  }
+  return absl::StrJoin(flag_strings, ",");
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {

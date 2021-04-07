@@ -79,8 +79,6 @@ public:
 private:
   ResponseFlagUtils();
   static absl::flat_hash_map<std::string, ResponseFlag> getFlagMap();
-
-  static void appendString(std::string& result, absl::string_view append);
 };
 
 /**
