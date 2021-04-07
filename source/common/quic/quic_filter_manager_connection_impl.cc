@@ -157,6 +157,8 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     raiseConnectionEvent(source == quic::ConnectionCloseSource::FROM_PEER
                              ? Network::ConnectionEvent::RemoteClose
                              : Network::ConnectionEvent::LocalClose);
+    ASSERT(quic_connection_ != nullptr);
+    quic_connection_ = nullptr;
   }
 }
 
@@ -166,7 +168,6 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
   }
   quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                     quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
-  quic_connection_ = nullptr;
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
