@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^.github|.rst$|.md$"}
-SHEBANG_RE='^#!/bin/bash|^#!/bin/sh|^#!/usr/bin/env bash'
+SHEBANG_RE='^#!/bin/bash|^#!/bin/sh|^#!/usr/bin/env bash|^#!/usr/bin/env sh'
 
 
 find_shell_files () {
