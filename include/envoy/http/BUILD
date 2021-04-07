@@ -160,5 +160,6 @@ envoy_cc_library(
         ":header_map_interface",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/server:factory_context_interface",
     ],
 )
