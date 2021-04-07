@@ -176,27 +176,6 @@ protected:
     ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
   };
 
-  class BufferMemoryAccount : public Account,
-                              public std::enable_shared_from_this<BufferMemoryAccount> {
-  public:
-    BufferMemoryAccount() = default;
-    ~BufferMemoryAccount() = default;
-
-    // Make not copyable
-    BufferMemoryAccount(BufferMemoryAccount&) = delete;
-    BufferMemoryAccount& operator=(BufferMemoryAccount& other) = delete;
-
-    uint64_t balance() const override { return buffer_memory_allocated_; }
-    std::unique_ptr<Charge> charge(uint64_t amount) override {
-      buffer_memory_allocated_ += amount;
-      return std::make_unique<Charge>(weak_from_this(), amount);
-    }
-
-  private:
-    void credit(uint64_t amount) override { buffer_memory_allocated_ -= amount; }
-    uint64_t buffer_memory_allocated_ = 0;
-  };
-
   /**
    * Base class for client and server side streams.
    */
@@ -328,7 +307,6 @@ protected:
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); },
         []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
-    std::shared_ptr<Account> buffer_memory_account_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;
@@ -410,7 +388,11 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
+        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()),
+          buffer_memory_account_(std::make_shared<Buffer::BufferMemoryAccount>()) {
+      pending_recv_data_.bindAccount(buffer_memory_account_);
+      pending_send_data_.bindAccount(buffer_memory_account_);
+    }
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -445,6 +427,7 @@ protected:
 
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    std::shared_ptr<Account> buffer_memory_account_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;

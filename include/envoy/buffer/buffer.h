@@ -103,17 +103,12 @@ public:
   virtual void addDrainTracker(std::function<void()> drain_tracker) PURE;
 
   /**
-   * Returns a weak pointer to the account associated with the buffer, if any.
-   */
-  virtual std::weak_ptr<Account> account() const PURE;
-
-  /**
    * Binds the account to be charged for resources used by the buffer. This
    * should only be called once.
    *
-   * @param account a weak_ptr to the account to charge.
+   * @param account a shared_ptr to the account to charge.
    */
-  virtual void bindAccount(std::weak_ptr<Account> account) PURE;
+  virtual void bindAccount(std::shared_ptr<Account> account) PURE;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant

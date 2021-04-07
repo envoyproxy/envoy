@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <iterator>
 #include <memory>
 #include <string>
 
@@ -59,12 +60,13 @@ public:
    * @param account the account to charge.
    * @param freelist to search for the backing storage, if any.
    */
-  Slice(uint64_t min_capacity, std::weak_ptr<Account> account,
+  Slice(uint64_t min_capacity, std::shared_ptr<Account> account,
         absl::optional<FreeListReference> free_list = absl::nullopt)
       : capacity_(sliceSize(min_capacity)), storage_(newStorage(capacity_, free_list)),
         base_(storage_.get()), data_(0), reservable_(0) {
-    if (!account.expired()) {
-      charges_.emplace_back(account.lock()->charge(capacity_));
+    if (account) {
+      account->charge(capacity_);
+      charges_.emplace_back(account, capacity_);
     }
   }
 
@@ -96,7 +98,7 @@ public:
 
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
-      callAndClearDrainTrackers();
+      callAndClearDrainTrackersAndCharges();
 
       freeStorage(std::move(storage_), capacity_);
       storage_ = std::move(rhs.storage_);
@@ -117,12 +119,12 @@ public:
   }
 
   ~Slice() {
-    callAndClearDrainTrackers();
+    callAndClearDrainTrackersAndCharges();
     freeStorage(std::move(storage_), capacity_);
   }
 
   void freeStorage(FreeListReference free_list) {
-    callAndClearDrainTrackers();
+    callAndClearDrainTrackersAndCharges();
     freeStorage(std::move(storage_), capacity_, free_list);
   }
 
@@ -297,8 +299,8 @@ public:
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
 
-    std::move(charges_.begin(), charges_.end(), destination.charges_.end());
-    ASSERT(charges_.empty());
+    std::move(charges_.begin(), charges_.end(), std::back_inserter(destination.charges_));
+    charges_.clear();
   }
 
   /**
@@ -312,11 +314,18 @@ public:
    * Call all drain trackers associated with the slice, then clear
    * the drain tracker list.
    */
-  void callAndClearDrainTrackers() {
+  void callAndClearDrainTrackersAndCharges() {
     for (const auto& drain_tracker : drain_trackers_) {
       drain_tracker();
     }
     drain_trackers_.clear();
+
+    for (auto& [account, amount] : charges_) {
+      if (account) {
+        account->credit(amount);
+      }
+    }
+    charges_.clear();
   }
 
   /**
@@ -324,12 +333,12 @@ public:
    * charging for this slice, the account still exists, and the slice owns
    * backing memory.
    */
-  void chargeAccountIfValid(std::weak_ptr<Account> account) {
-    if (hasCharge() || storage_ == nullptr || account.expired()) {
+  void chargeAccountIfValid(std::shared_ptr<Account> account) {
+    if (hasCharge() || storage_ == nullptr || !account) {
       return;
     }
-
-    charges_.emplace_back(account.lock()->charge(capacity_));
+    account->charge(capacity_);
+    charges_.emplace_back(account, capacity_);
   }
 
   /**
@@ -419,7 +428,7 @@ protected:
 
   /** Charges associated with this slice. This should typically hold just a
    * single charge, but in cases of coalescing might hold additional charges. */
-  absl::InlinedVector<std::unique_ptr<Charge>, 4> charges_;
+  absl::InlinedVector<std::pair<std::shared_ptr<Account>, uint64_t>, 1> charges_;
 };
 
 class OwnedImpl;
@@ -673,8 +682,7 @@ public:
 
   // Buffer::Instance
   void addDrainTracker(std::function<void()> drain_tracker) override;
-  std::weak_ptr<Account> account() const override;
-  void bindAccount(std::weak_ptr<Account> account) override;
+  void bindAccount(std::shared_ptr<Account> account) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
@@ -769,7 +777,7 @@ private:
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
 
-  std::weak_ptr<Account> account_;
+  std::shared_ptr<Account> account_;
 
   struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
     virtual absl::Span<Slice> ownedSlices() PURE;
@@ -838,6 +846,36 @@ private:
 };
 
 using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
+
+/**
+ * A BufferMemoryAccount tracks allocated bytes across associated buffers and
+ * slices that originate from those buffers, or are untagged and pass through an
+ * associated buffer.
+ */
+class BufferMemoryAccount : public Account {
+public:
+  BufferMemoryAccount() = default;
+  ~BufferMemoryAccount() override { ASSERT(buffer_memory_allocated_ == 0); }
+
+  // Make not copyable
+  BufferMemoryAccount(BufferMemoryAccount&) = delete;
+  BufferMemoryAccount& operator=(BufferMemoryAccount& other) = delete;
+
+  uint64_t balance() const override { return buffer_memory_allocated_; }
+  void charge(uint64_t amount) override {
+    // Check overflow
+    ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
+    buffer_memory_allocated_ += amount;
+  }
+
+  void credit(uint64_t amount) override {
+    ASSERT(buffer_memory_allocated_ >= amount);
+    buffer_memory_allocated_ -= amount;
+  }
+
+private:
+  uint64_t buffer_memory_allocated_ = 0;
+};
 
 } // namespace Buffer
 } // namespace Envoy

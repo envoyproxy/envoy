@@ -31,44 +31,16 @@ public:
    * Charges the account the specified amount.
    *
    * @param amount the amount to debit.
-   * @return the charge object that when destroyed, will credit the account
-   * freeing the resource.
    */
-  virtual std::unique_ptr<Charge> charge(uint64_t amount) PURE;
-
-private:
-  friend Charge;
+  virtual void charge(uint64_t amount) PURE;
 
   /**
-   * Called by `Charge` on destruction to credits the account as
-   * the used resource is freed.
+   * Called on to credit the account as
+   * a charged resource is no longer used.
    *
    * @param amount the amount to credit.
    */
   virtual void credit(uint64_t amount) PURE;
-};
-
-/**
- * A RAII-like object charging for the usage of a particular resource.
- * It is move only and credits the given Account on destruction. This ensures
- * that an Account never underflows and is only credited once for releasing a resource.
- */
-class Charge final {
-public:
-  Charge(Charge&&) = default;
-  Charge& operator=(Charge&& other) = default;
-  ~Charge() {
-    if (!account_.expired()) {
-      account_.lock()->credit(amount_);
-    }
-  }
-
-  Charge(std::weak_ptr<Account> account, uint64_t amount) : account_(account), amount_(amount) {}
-
-private:
-  // Sometimes the given account might no longer be available.
-  std::weak_ptr<Account> account_;
-  uint64_t amount_;
 };
 
 } // namespace Envoy
