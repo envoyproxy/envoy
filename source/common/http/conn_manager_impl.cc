@@ -1617,7 +1617,7 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   const bool proxy_body = connection_manager_.enable_internal_redirects_with_body_ &&
                           buffered_request_data != nullptr && buffered_request_data->length() > 0;
   if (proxy_body) {
-    request_data->move(*filter_manager_.bufferedRequestData());
+    request_data->move(*buffered_request_data);
   }
 
   response_encoder->getStream().removeCallbacks(*this);
