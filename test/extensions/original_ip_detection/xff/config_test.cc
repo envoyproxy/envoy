@@ -3,6 +3,7 @@
 
 #include "extensions/original_ip_detection/xff/config.h"
 
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -17,14 +18,17 @@ TEST(CustomHeaderFactoryTest, Basic) {
       "envoy.http.original_ip_detection.xff");
   ASSERT_NE(factory, nullptr);
 
-  auto empty = factory->createEmptyConfigProto();
-  EXPECT_NE(empty, nullptr);
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  const std::string yaml = R"EOF(
+    name: envoy.formatter.TestFormatter
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.original_ip_detection.xff.v3.XffConfig
+        xff_num_trusted_hops: 1
+)EOF";
+  TestUtility::loadFromYaml(yaml, typed_config);
 
-  auto config =
-      *dynamic_cast<envoy::extensions::original_ip_detection::xff::v3::XffConfig*>(empty.get());
-  config.set_xff_num_trusted_hops(1);
-
-  EXPECT_NE(factory->createExtension(config), nullptr);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_NE(factory->createExtension(typed_config.typed_config(), context), nullptr);
 }
 
 } // namespace Xff

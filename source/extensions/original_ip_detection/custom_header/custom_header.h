@@ -24,6 +24,14 @@ public:
   Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override;
 
 private:
+  static Http::Code toErrorCode(uint64_t status) {
+    const auto code = static_cast<Http::Code>(status);
+    if (code >= Http::Code::BadRequest && code <= Http::Code::NetworkAuthenticationRequired) {
+      return code;
+    }
+    return Http::Code::Forbidden;
+  }
+
   Http::LowerCaseString header_name_;
   bool allow_trusted_address_checks_{false};
   absl::optional<Http::OriginalIPRejectRequestOptions> reject_options_{absl::nullopt};

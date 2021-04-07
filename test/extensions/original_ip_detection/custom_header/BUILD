@@ -31,6 +31,7 @@ envoy_extension_cc_test(
         "//include/envoy/registry",
         "//source/extensions/original_ip_detection/custom_header:config",
         "//source/extensions/original_ip_detection/custom_header:custom_header_lib",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/original_ip_detection/custom_header/v3:pkg_cc_proto",
     ],

@@ -8,6 +8,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Http {
@@ -76,7 +77,9 @@ public:
    * @param config supplies the configuration for the original IP detection extension.
    * @return OriginalIPDetectionSharedPtr the extension instance.
    */
-  virtual OriginalIPDetectionSharedPtr createExtension(const Protobuf::Message& config) const PURE;
+  virtual OriginalIPDetectionSharedPtr
+  createExtension(const Protobuf::Message& config,
+                  Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.http.original_ip_detection"; }
 };

@@ -303,18 +303,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   const auto& ip_detection_extensions = config.original_ip_detection_extensions();
   if (!ip_detection_extensions.empty()) {
     original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
-    for (const auto& typed_config : ip_detection_extensions) {
+    for (const auto& extension_config : ip_detection_extensions) {
       auto* factory =
-          Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(typed_config);
+          Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(extension_config);
       if (!factory) {
         throw EnvoyException("Original IP detection extension not found");
       }
 
-      ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-      Envoy::Config::Utility::translateOpaqueConfig(typed_config.typed_config(),
-                                                    ProtobufWkt::Struct::default_instance(),
-                                                    context_.messageValidationVisitor(), *message);
-      original_ip_detection_extensions_.push_back(factory->createExtension(*message));
+      original_ip_detection_extensions_.push_back(
+          factory->createExtension(extension_config, context_));
     }
   } else {
     original_ip_detection_extensions_.push_back(

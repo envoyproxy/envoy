@@ -34,6 +34,7 @@ envoy_cc_extension(
         ":xff_lib",
         "//include/envoy/http:original_ip_detection_interface",
         "//include/envoy/registry",
+        "//source/common/config:utility_lib",
         "@envoy_api//envoy/extensions/original_ip_detection/xff/v3:pkg_cc_proto",
     ],
 )

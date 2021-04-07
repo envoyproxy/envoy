@@ -17,7 +17,8 @@ namespace CustomHeader {
 class CustomHeaderIPDetectionFactory : public Http::OriginalIPDetectionFactory {
 public:
   Http::OriginalIPDetectionSharedPtr
-  createExtension(const Protobuf::Message& message) const override;
+  createExtension(const Protobuf::Message& message,
+                  Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
