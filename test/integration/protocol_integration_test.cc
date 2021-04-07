@@ -1796,8 +1796,7 @@ name: passthrough-filter
 
   // Explicitly set buffer limit to be larger than request size so that
   // buffering the whole request doesn't exceed the limit.
-  // This is needed because QUIC's default stream buffer is only 64kB, but
-  // Http2's is 256MB.
+  // This is needed because QUIC default stream buffer size is only 64kB, but Http2's is 256MB.
   config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1909,8 +1908,7 @@ name: passthrough-filter
 )EOF");
   // Explicitly set buffer limit to be larger than request size so that
   // buffering the whole request doesn't exceed the limit.
-  // This is needed because QUIC's default stream buffer is only 64kB, but
-  // Http2's is 256MB.
+  // This is needed because QUIC default stream buffer size is only 64kB, but Http2's is 256MB.
   config_helper_.setBufferLimits(128 * 1024, 128 * 1024);
 
   initialize();
