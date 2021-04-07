@@ -475,13 +475,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http2_upstream_integration_test",
+    name = "multiplexed_upstream_integration_test",
     srcs = [
-        "http2_upstream_integration_test.cc",
-        "http2_upstream_integration_test.h",
+        "multiplexed_upstream_integration_test.cc",
+        "multiplexed_upstream_integration_test.h",
     ],
+    shard_count = 2,
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/filters/http/buffer:config",
@@ -656,6 +657,7 @@ envoy_cc_test_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:linked_object",
         "//source/common/common:lock_guard_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
@@ -1666,8 +1668,6 @@ envoy_cc_test(
     data = ["//test/config/integration/certs"],
     shard_count = 8,
     tags = [
-        "fails_on_clang_cl",
-        "fails_on_windows",
         "nofips",
     ],
     deps = envoy_select_enable_http3([
