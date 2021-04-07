@@ -13,7 +13,8 @@ DUMMY_SHA=0000000000000000000000000000000000000000
 
 echo "Running pre-push check; to skip this step use 'push --no-verify'"
 
-while read LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA
+# shellcheck disable=SC2034
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA
 do
   if [ "$LOCAL_SHA" = $DUMMY_SHA ]
   then
@@ -42,7 +43,7 @@ do
     then
       echo >&2 "ERROR: The following commits do not have DCO signoff:"
       while read -r commit; do
-        echo "  $(git log --pretty=oneline --abbrev-commit -n 1 $commit)"
+        echo "  $(git log --pretty=oneline --abbrev-commit -n 1 "$commit")"
       done <<< "$NOT_SIGNED_OFF"
       exit 1
     fi
@@ -57,36 +58,22 @@ do
     # `$CLANG_FORMAT` and `$BUILDIFY` are defined, or that the default values it
     # assumes for these variables correspond to real binaries on the system. If
     # either of these things aren't true, the check fails.
-    for i in $(git diff --name-only $RANGE --diff-filter=ACMR --ignore-submodules=all 2>&1); do
+    for i in $(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1); do
       echo -ne "  Checking format for $i - "
-      "$SCRIPT_DIR"/code_format/check_format.py check $i
-      if [[ $? -ne 0 ]]; then
-        exit 1
-      fi
+      "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
 
       echo "  Checking spelling for $i"
-      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check $i
-      if [[ $? -ne 0 ]]; then
-        exit 1
-      fi
+      "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
     done
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
-    "$SCRIPT_DIR"/proto_format/proto_format.sh check
-    if [[ $? -ne 0 ]]; then
-      exit 1
-    fi
+    "$SCRIPT_DIR"/proto_format/proto_format.sh check || exit 1
 
-    "$SCRIPT_DIR"/code_format/format_python_tools.sh check
-    if [[ $? -ne 0 ]]; then
-      exit 1
-    fi
+    "$SCRIPT_DIR"/code_format/format_python_tools.sh check || exit 1
 
     # Check correctness of repositories definitions.
     echo "  Checking repositories definitions"
-    if ! "$SCRIPT_DIR"/check_repositories.sh; then
-      exit 1
-    fi
+    "$SCRIPT_DIR"/check_repositories.sh || exit 1
   fi
 done
 

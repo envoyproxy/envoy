@@ -1,13 +1,13 @@
 #!/bin/bash -e
 
 EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^.github|.rst$|.md$"}
+SHEBANG_RE='^#!/bin/bash|^#!/bin/sh|^#!/usr/bin/env bash|^#!/usr/bin/env sh'
 
 
 find_shell_files () {
     local shellfiles
     shellfiles=()
-    shellfiles+=("$(git grep "^#!/bin/bash" | cut -d: -f1)")
-    shellfiles+=("$(git grep "^#!/bin/sh" | cut -d: -f1)")
+    shellfiles+=("$(git grep -E "$SHEBANG_RE" | cut -d: -f1)")
     shellfiles+=("$(git ls-files|grep '\.sh$')")
     shellfiles=("$(echo "${shellfiles[@]}" | tr ' ' '\n' | sort | uniq)")
     for file in "${shellfiles[@]}"; do
