@@ -2384,7 +2384,7 @@ virtual_hosts:
 
   absl::optional<uint64_t> generateHash(const std::vector<absl::string_view>& header_values) {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    Http::LowerCaseString key = "foo_header";
+    Http::LowerCaseString key(std::string("foo_header"));
     for (auto& value : header_values) {
       headers.addCopy(key, value);
     }
