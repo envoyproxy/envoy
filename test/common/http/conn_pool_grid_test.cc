@@ -43,8 +43,17 @@ public:
         .WillByDefault(
             Invoke([&](Http::ResponseDecoder&,
                        ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
-              callbacks_.push_back(&callbacks);
-              return &cancel_;
+              if (immediate_success_) {
+                callbacks.onPoolReady(*encoder_, host(), *info_, absl::nullopt);
+                return nullptr;
+              } else if (immediate_failure_) {
+                callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                        "reason", host());
+                return nullptr;
+              } else {
+                callbacks_.push_back(&callbacks);
+                return &cancel_;
+              }
             }));
     if (pools_.size() == 1) {
       EXPECT_CALL(*first(), protocolDescription())
@@ -74,9 +83,13 @@ public:
 
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
 
+  StreamInfo::MockStreamInfo* info_;
+  NiceMock<MockRequestEncoder>* encoder_;
   void setDestroying() { destroying_ = true; }
   std::vector<ConnectionPool::Callbacks*> callbacks_;
   NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
+  bool immediate_success_{};
+  bool immediate_failure_{};
 };
 
 namespace {
@@ -88,7 +101,10 @@ public:
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
-              state_, simTime(), std::chrono::milliseconds(300), options_) {}
+              state_, simTime(), std::chrono::milliseconds(300), options_) {
+    grid_.info_ = &info_;
+    grid_.encoder_ = &encoder_;
+  }
 
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
@@ -111,13 +127,22 @@ public:
 TEST_F(ConnectivityGridTest, Success) {
   EXPECT_EQ(grid_.first(), nullptr);
 
-  grid_.newStream(decoder_, callbacks_);
+  EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr);
   EXPECT_NE(grid_.first(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test the first pool successfully connecting under the stack of newStream.
+TEST_F(ConnectivityGridTest, ImmediateSuccess) {
+  grid_.immediate_success_ = true;
+
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  EXPECT_EQ(grid_.newStream(decoder_, callbacks_), nullptr);
+  EXPECT_NE(grid_.first(), nullptr);
 }
 
 // Test the first pool failing and the second connecting.
@@ -228,6 +253,13 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
   // Clean up.
   cancel1->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   cancel2->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+}
+
+// Test double failure under the stack of newStream.
+TEST_F(ConnectivityGridTest, ImmediateDoubleFailure) {
+  grid_.immediate_failure_ = true;
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  EXPECT_EQ(grid_.newStream(decoder_, callbacks_), nullptr);
 }
 
 // Test both connections happening in parallel and both failing.

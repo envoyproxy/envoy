@@ -38,6 +38,9 @@ public:
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
 
+      // Returns true if a stream is immediately created, false if it is pending.
+      bool newStream();
+
       // ConnectionPool::Callbacks
       void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                          absl::string_view transport_failure_reason,
@@ -61,8 +64,9 @@ public:
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
-    // Attempt to create a new stream for pool();
-    void newStream();
+    // Attempt to create a new stream for pool(). Returns true if the stream has
+    // been created.
+    bool newStream();
 
     // Removes this from the owning list, deleting it.
     void deleteThis();
@@ -128,8 +132,8 @@ private:
   Random::RandomGenerator& random_generator_;
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
-  const Network::ConnectionSocket::OptionsSharedPtr& options_;
-  const Network::TransportSocketOptionsSharedPtr& transport_socket_options_;
+  const Network::ConnectionSocket::OptionsSharedPtr options_;
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
