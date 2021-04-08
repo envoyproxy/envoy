@@ -941,10 +941,10 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->virtualCluster(test_req_headers),
                   delegating_route_foo->routeEntry()->virtualCluster(test_req_headers));
 
-        EXPECT_EQ(default_route->routeEntry()->virtualHost().statName(),
-                  delegating_route_foo->routeEntry()->virtualHost().statName());
         EXPECT_EQ(default_route->routeEntry()->virtualHost().corsPolicy(),
                   delegating_route_foo->routeEntry()->virtualHost().corsPolicy());
+        EXPECT_EQ(default_route->routeEntry()->virtualHost().rateLimitPolicy().empty(),
+                  delegating_route_foo->routeEntry()->virtualHost().rateLimitPolicy().empty());
 
         EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
                   delegating_route_foo->routeEntry()->autoHostRewrite());
