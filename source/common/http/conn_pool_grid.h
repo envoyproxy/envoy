@@ -95,6 +95,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                   std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
 
@@ -130,6 +131,7 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr& options_;
   const Network::TransportSocketOptionsSharedPtr& transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
+  std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
