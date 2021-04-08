@@ -20,6 +20,7 @@ using Envoy::Event::MockTimer;
 using testing::_;
 using testing::AnyNumber;
 using testing::Return;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
@@ -87,7 +88,7 @@ public:
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
-              state_, simTime(), options_) {}
+              state_, simTime(), std::chrono::milliseconds(300), options_) {}
 
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
@@ -152,7 +153,9 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
-  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+  Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
+  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(2);
+  EXPECT_CALL(*failover_timer, enabled()).WillRepeatedly(Return(false));
 
   grid_.newStream(decoder_, callbacks_);
   EXPECT_NE(grid_.first(), nullptr);
