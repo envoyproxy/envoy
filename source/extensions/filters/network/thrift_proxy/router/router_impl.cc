@@ -535,6 +535,7 @@ void Router::UpstreamRequest::onResponseComplete() {
         std::chrono::duration_cast<std::chrono::milliseconds>(
             dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
     parent_.chargeResponseTiming(response_time);
+    charged_response_timing_ = true;
   }
 
   response_complete_ = true;
@@ -560,6 +561,7 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
         std::chrono::duration_cast<std::chrono::milliseconds>(
             dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
     parent_.chargeResponseTiming(response_time);
+    charged_response_timing_ = true;
   }
 
   switch (reason) {
