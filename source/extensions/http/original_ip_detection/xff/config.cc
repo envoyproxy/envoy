@@ -18,16 +18,12 @@ namespace Xff {
 Envoy::Http::OriginalIPDetectionSharedPtr
 XffIPDetectionFactory::createExtension(const Protobuf::Message& message,
                                        Server::Configuration::FactoryContext& context) {
-  // TODO(rgs1): change message's type to TypedExtensionConfig and use translateAnyToFactoryConfig()
-  // here along with downcastAndValidate().
-  auto config = createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(dynamic_cast<const ProtobufWkt::Any&>(message),
-                                                ProtobufWkt::Struct::default_instance(),
-                                                context.messageValidationVisitor(), *config);
-  const auto& xff_config =
-      dynamic_cast<const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig&>(
-          *config);
-  return std::make_shared<XffIPDetection>(xff_config);
+  auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+  const auto& proto_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig&>(
+      *mptr, context.messageValidationVisitor());
+  return std::make_shared<XffIPDetection>(proto_config);
 }
 
 REGISTER_FACTORY(XffIPDetectionFactory, Envoy::Http::OriginalIPDetectionFactory);

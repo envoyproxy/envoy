@@ -18,16 +18,12 @@ namespace CustomHeader {
 Envoy::Http::OriginalIPDetectionSharedPtr
 CustomHeaderIPDetectionFactory::createExtension(const Protobuf::Message& message,
                                                 Server::Configuration::FactoryContext& context) {
-  // TODO(rgs1): change message's type to TypedExtensionConfig and use translateAnyToFactoryConfig()
-  // here along with downcastAndValidate().
-  auto config = createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(dynamic_cast<const ProtobufWkt::Any&>(message),
-                                                ProtobufWkt::Struct::default_instance(),
-                                                context.messageValidationVisitor(), *config);
-  const auto& custom_header_config = dynamic_cast<
+  auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+  const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::http::original_ip_detection::custom_header::v3::CustomHeaderConfig&>(
-      *config);
-  return std::make_shared<CustomHeaderIPDetection>(custom_header_config);
+      *mptr, context.messageValidationVisitor());
+  return std::make_shared<CustomHeaderIPDetection>(proto_config);
 }
 
 REGISTER_FACTORY(CustomHeaderIPDetectionFactory, Envoy::Http::OriginalIPDetectionFactory);
