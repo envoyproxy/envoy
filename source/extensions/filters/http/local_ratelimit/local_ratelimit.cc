@@ -14,7 +14,7 @@ namespace HttpFilters {
 namespace LocalRateLimitFilter {
 
 const std::string& PerConnectionRateLimiter::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "per_conection_local_rate_limiter");
+  CONSTRUCT_ON_FIRST_USE(std::string, "per_connection_local_rate_limiter");
 }
 
 FilterConfig::FilterConfig(

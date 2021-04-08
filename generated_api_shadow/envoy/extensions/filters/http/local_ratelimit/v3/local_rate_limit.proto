@@ -97,4 +97,6 @@ message LocalRateLimit {
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
   uint32 stage = 9 [(validate.rules).uint32 = {lte: 10}];
+
+  bool per_connection = 10;
 }
