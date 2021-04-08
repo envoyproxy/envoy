@@ -122,13 +122,13 @@ public:
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()))
 #define VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS                                                   \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
-                   testing::Values(TestEnvironment::getsGrpcVersionsForTest()),                    \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(envoy::config::core::v3::ApiVersion::V3,                        \
                                    envoy::config::core::v3::ApiVersion::V2,                        \
                                    envoy::config::core::v3::ApiVersion::AUTO))
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
-                   testing::Values(TestEnvironment::getsGrpcVersionsForTest()),                    \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
 
 } // namespace Grpc
