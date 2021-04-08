@@ -13,7 +13,7 @@ envoy_cc_library(
     name = "xff_lib",
     srcs = ["xff.cc"],
     hdrs = ["xff.h"],
-    # This extensions is core code.
+    # This extension is core code.
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/http:original_ip_detection_interface",
