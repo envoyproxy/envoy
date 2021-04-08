@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/io_error.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -1261,6 +1263,120 @@ TEST_F(OwnedImplTest, FrontSlice) {
   EXPECT_EQ(0, buffer.frontSlice().len_);
   buffer.add("a");
   EXPECT_EQ(1, buffer.frontSlice().len_);
+}
+
+TEST(BufferMemoryAccountTest, ManagesAccountBalance) {
+  std::shared_ptr<BufferMemoryAccount> account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer;
+  buffer.bindAccount(account);
+  ASSERT_EQ(account->balance(), 0);
+
+  // Check the balance increases as expected.
+  {
+    // New slice created
+    buffer.add("Hello");
+    EXPECT_EQ(account->balance(), 4096);
+
+    // Should just be added to existing slice.
+    buffer.add(" World!");
+    EXPECT_EQ(account->balance(), 4096);
+
+    // Trigger new slice creation with add.
+    const std::string long_string(4096, 'a');
+    buffer.add(long_string);
+    EXPECT_EQ(account->balance(), 8192);
+
+    // AppendForTest also adds new slice.
+    buffer.appendSliceForTest("Extra Slice");
+    EXPECT_EQ(account->balance(), 12288);
+  }
+
+  // Check the balance drains as slices are consumed.
+  {
+    // Shouldn't trigger slice free yet
+    buffer.drain(4095);
+    EXPECT_EQ(account->balance(), 12288);
+
+    // Trigger slice reclaim.
+    buffer.drain(1);
+    EXPECT_EQ(account->balance(), 8192);
+
+    // Reclaim next slice
+    buffer.drain(std::string("Hello World!").length());
+    EXPECT_EQ(account->balance(), 4096);
+
+    // Reclaim remaining
+    buffer.drain(std::string("Extra Slice").length());
+    EXPECT_EQ(account->balance(), 0);
+  }
+}
+
+TEST(BufferMemoryAccountTest, BufferAccountsForUnownedSliceMovedInto) {
+  std::shared_ptr<BufferMemoryAccount> account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl accounted_buffer;
+  accounted_buffer.bindAccount(account);
+
+  Buffer::OwnedImpl unowned_buffer;
+  unowned_buffer.add("Unaccounted Slice");
+  ASSERT_EQ(account->balance(), 0);
+
+  // Transfer over buffer
+  accounted_buffer.move(unowned_buffer);
+  EXPECT_EQ(account->balance(), 4096);
+
+  accounted_buffer.drain(std::string("Unaccounted Slice").length());
+  EXPECT_EQ(account->balance(), 0);
+}
+
+TEST(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMoved) {
+  std::shared_ptr<BufferMemoryAccount> buffer_one_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_one;
+  buffer_one.bindAccount(buffer_one_account);
+  ASSERT_EQ(buffer_one_account->balance(), 0);
+
+  std::shared_ptr<BufferMemoryAccount> buffer_two_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_two;
+  buffer_two.bindAccount(buffer_two_account);
+  ASSERT_EQ(buffer_two_account->balance(), 0);
+
+  buffer_one.add("Charged to Account One");
+  EXPECT_EQ(buffer_one_account->balance(), 4096);
+  EXPECT_EQ(buffer_two_account->balance(), 0);
+
+  // Transfer over buffer, still tied to account one.
+  buffer_two.move(buffer_one);
+  EXPECT_EQ(buffer_one_account->balance(), 4096);
+  EXPECT_EQ(buffer_two_account->balance(), 0);
+
+  buffer_two.drain(std::string("Charged to Account One").length());
+  EXPECT_EQ(buffer_one_account->balance(), 0);
+  EXPECT_EQ(buffer_two_account->balance(), 0);
+}
+
+TEST(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMovedUnlessCoalesced) {
+  std::shared_ptr<BufferMemoryAccount> buffer_one_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_one;
+  buffer_one.bindAccount(buffer_one_account);
+  ASSERT_EQ(buffer_one_account->balance(), 0);
+
+  std::shared_ptr<BufferMemoryAccount> buffer_two_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_two;
+  buffer_two.bindAccount(buffer_two_account);
+  ASSERT_EQ(buffer_two_account->balance(), 0);
+
+  buffer_one.add("Will Coalesce");
+  buffer_two.add("To be Coalesce into:");
+  EXPECT_EQ(buffer_one_account->balance(), 4096);
+  EXPECT_EQ(buffer_two_account->balance(), 4096);
+
+  // Transfer over buffer, slices coalesce, crediting account one.
+  buffer_two.move(buffer_one);
+  EXPECT_EQ(buffer_one_account->balance(), 0);
+  EXPECT_EQ(buffer_two_account->balance(), 4096);
+
+  buffer_two.drain(std::string("To be Coalesce into:Will Coalesce").length());
+  EXPECT_EQ(buffer_one_account->balance(), 0);
+  EXPECT_EQ(buffer_two_account->balance(), 0);
 }
 
 } // namespace
