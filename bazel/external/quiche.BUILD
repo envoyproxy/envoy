@@ -58,13 +58,12 @@ quiche_common_copts = [
     "-Wno-unused-function",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
-    # Remove these after upstream fix.
-    "-Wno-attributes",
 ]
 
 quiche_copts = select({
     # Ignore unguarded #pragma GCC statements in QUICHE sources
     "@envoy//bazel:windows_x86_64": ["-wd4068"],
+    # Remove these after upstream fix.
     "//conditions:default": quiche_common_copts,
 })
 
