@@ -45,9 +45,12 @@ bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 # TODO(phlax): update to use bazel and python_flake8/python_check
 CURRENT=python
-"${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
-git diff HEAD | tee "${DIFF_OUTPUT}"
-
+"${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check || {
+    "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
+    git diff HEAD | tee "${DIFF_OUTPUT}"
+    # this is to trigger error without exit
+    [[ "test" = "unhappy" ]]
+}
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:" >&2
