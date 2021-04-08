@@ -182,7 +182,6 @@ std::tuple<absl::string_view, absl::string_view> AttrUtils::tokenizePath(absl::s
 }
 
 void AttrUtils::findValue(absl::string_view path) {
-  ENVOY_LOG(debug, "findValue: {}", path);
   auto [root_tok, sub_tok] = tokenizePath(path);
   auto root_id = property_tokens.find(root_tok);
   if (root_id == property_tokens.end()) {
@@ -223,7 +222,6 @@ void AttrUtils::findValue(absl::string_view path) {
 }
 
 void AttrUtils::requestSet(absl::string_view path){
-  ENVOY_LOG(debug, "requestSet: {}", path);
   auto attr_fields = getOrInsert(REQUEST_TOKEN);
 
   auto part_token = request_tokens.find(path);
@@ -235,29 +233,19 @@ void AttrUtils::requestSet(absl::string_view path){
   auto headers = request_headers_;
   int end;
 
-  ENVOY_LOG(debug, "attempting deref");
-  auto snd = part_token->second;
-  ENVOY_LOG(debug, "pre switch");
-
-
-  switch (snd) {
+  switch (part_token->second) {
     case RequestToken::PATH:
-      ENVOY_LOG(debug, "1");
       if (headers != nullptr) {
-        ENVOY_LOG(debug, "in request.path");
-        // ENVOY_LOG(debug, "in request.path setter val: {}", headers->Path()->value().getStringView());
         attr_fields[REQUEST_PATH_TOKEN] = ValueUtil::stringValue(std::string(headers->getPathValue()));
       }
       break;
     case RequestToken::URL_PATH:
-      ENVOY_LOG(debug, "2");
       if (headers != nullptr && headers->Path() != nullptr && headers->Path()->value() != nullptr) {
         end = std::max(path.find('\0'), path.find('?'));
         attr_fields[REQUEST_URL_PATH_TOKEN] = ValueUtil::stringValue(std::string(headers->Path()->value().getStringView().substr(0, end)));
       }
       break;
     case RequestToken::HOST:
-      ENVOY_LOG(debug, "3");
       if (headers != nullptr) {
         attr_fields[REQUEST_HOST_TOKEN] = ValueUtil::stringValue(std::string(headers->getHostValue()));
       }
@@ -315,7 +303,6 @@ void AttrUtils::requestSet(absl::string_view path){
       attr_fields[REQUEST_TOTAL_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived() + headers != nullptr ? headers->byteSize() : 0);
       break;
   }
-    ENVOY_LOG(debug, "end");
 }
 
 void AttrUtils::responseSet(absl::string_view path) {
@@ -378,7 +365,6 @@ void AttrUtils::destinationSet(absl::string_view path){
 }
 
 void AttrUtils::sourceSet(absl::string_view path){
-  ENVOY_LOG(debug, "sourceSet: {}", path);
   if (!attributes_.contains(SOURCE_TOKEN)) {
     attributes_[SOURCE_TOKEN] = ProtobufWkt::Struct();
   }
@@ -581,21 +567,14 @@ ProtobufWkt::Map<std::string, ProtobufWkt::Value>& AttrUtils::getOrInsert(std::s
 
 // todo(eas): this seems to result in a nullptr exception when empty headers are used.
 ProtobufWkt::Value AttrUtils::getGrpcStatus() {
-  // todo(eas): what about a trailers only response?
-  if (response_headers_ == nullptr) {
-    return ValueUtil::nullValue();
-  }
   Http::ResponseHeaderMap& hs = response_headers_ != nullptr ? *response_headers_ : *Envoy::Http::StaticEmptyHeaders::get().response_headers;
   Http::ResponseTrailerMap& ts = response_trailers_ != nullptr ? *response_trailers_ : *Envoy::Http::StaticEmptyHeaders::get().response_trailers;
-  ENVOY_LOG(debug, "checking if grpc");
 
   if (!Envoy::Grpc::Common::hasGrpcContentType(hs)) {
     return ValueUtil::nullValue();
   }
 
-  ENVOY_LOG(debug, "is grpc");
   auto const& optional_status = Envoy::Grpc::Common::getGrpcStatus(ts, hs, info_);
-  ENVOY_LOG(debug, "grpc status got");
 
   if (optional_status.has_value()) {
     return ValueUtil::numberValue(optional_status.value());
