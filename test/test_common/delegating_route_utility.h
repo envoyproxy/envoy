@@ -3,9 +3,7 @@
 namespace Envoy {
 namespace Router {
 
-// For testing purposes only. Used in both unit tests
-// (HttpConnectionManagerImplTest.FilterSetRouteToDelegatingRouteWithClusterOverride) and
-// integration tests (DownstreamProtocolIntegrationTest.RouterClusterFromDelegatingRoute).
+// For testing purposes only. Used in both HCM unit tests and integration_test.
 
 // Example derived class of DelegatingRouteEntry.
 class ExampleDerivedDelegatingRouteEntry : public Router::DelegatingRouteEntry {
