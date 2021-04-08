@@ -67,11 +67,9 @@ if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" =~ "clang-cl" ]]; then
   FAIL_GROUP=clang_cl
 fi
 
-# Test to validate updates of all dependency libraries in bazel/external and bazel/foreign_cc
-# bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //bazel/... --build_tag_filters=-skip_on_windows
-
-# Complete envoy-static build (nothing needs to be skipped, build failure indicates broken dependencies)
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
+# Pre-Validate updates of all dependency libraries in bazel/foreign_cc and bazel/external
+# and complete envoy-static build
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //bazel/... //source/exe:envoy-static --build_tag_filters=-skip_on_windows
 
 # Copy binary to delivery directory
 cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
