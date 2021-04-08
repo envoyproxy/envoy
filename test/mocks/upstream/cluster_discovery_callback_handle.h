@@ -9,6 +9,7 @@ namespace Envoy {
 namespace Upstream {
 
 class MockClusterDiscoveryCallbackHandle : public ClusterDiscoveryCallbackHandle {
+public:
   MockClusterDiscoveryCallbackHandle();
   ~MockClusterDiscoveryCallbackHandle() override;
 };

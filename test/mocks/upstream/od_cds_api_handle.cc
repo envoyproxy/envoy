@@ -5,6 +5,7 @@
 namespace Envoy {
 namespace Upstream {
 
+using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
 
