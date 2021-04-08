@@ -1,4 +1,6 @@
-#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
+#include "extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
+
+#include "common/common/logger.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
@@ -17,17 +19,14 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     // Expect Server Challenge packet
     ServerGreeting greeting;
     greeting.decode(message, seq, len);
-    callbacks_.onServerGreeting(greeting);
-
     session_.setState(MySQLSession::State::ChallengeReq);
+    callbacks_.onServerGreeting(greeting);
     break;
   }
   case MySQLSession::State::ChallengeReq: {
     // Process Client Handshake Response
     ClientLogin client_login{};
     client_login.decode(message, seq, len);
-    callbacks_.onClientLogin(client_login);
-
     if (client_login.isSSLRequest()) {
       session_.setState(MySQLSession::State::SslPt);
     } else if (client_login.isResponse41()) {
@@ -35,6 +34,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     } else {
       session_.setState(MySQLSession::State::ChallengeResp320);
     }
+    callbacks_.onClientLogin(client_login);
     break;
   }
   case MySQLSession::State::SslPt:
@@ -85,8 +85,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   case MySQLSession::State::AuthSwitchResp: {
     ClientSwitchResponse client_switch_resp{};
     client_switch_resp.decode(message, seq, len);
-    callbacks_.onClientSwitchResponse(client_switch_resp);
     session_.setState(MySQLSession::State::AuthSwitchMore);
+    callbacks_.onClientSwitchResponse(client_switch_resp);
     break;
   }
 
@@ -141,9 +141,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   case MySQLSession::State::Req: {
     Command command{};
     command.decode(message, seq, len);
-    callbacks_.onCommand(command);
-
     session_.setState(MySQLSession::State::ReqResp);
+    callbacks_.onCommand(command);
     break;
   }
 
@@ -151,10 +150,11 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   case MySQLSession::State::ReqResp: {
     CommandResponse command_resp{};
     command_resp.decode(message, seq, len);
-    callbacks_.onCommandResponse(command_resp);
-
     session_.setState(MySQLSession::State::Req);
-    session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
+    callbacks_.onCommandResponse(command_resp);
+    if (session_.getState() == MySQLSession::State::Req) {
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
+    }
     break;
   }
 
@@ -178,10 +178,11 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     data.drain(data.length());
     return true;
   }
+
   if (BufferHelper::peekHdr(data, len, seq) != DecodeStatus::Success) {
     throw EnvoyException("error parsing mysql packet header");
   }
-
+  ENVOY_LOG(trace, "mysql_proxy: seq {}, len {}", seq, len);
   // If message is split over multiple packets, hold off until the entire message is available.
   // Consider the size of the header here as it's not consumed yet.
   if (sizeof(uint32_t) + len > data.length()) {
@@ -198,7 +199,6 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     data.drain(len); // Ensure that the whole message was consumed
     return true;
   }
-
   session_.setExpectedSeq(seq + 1);
 
   const ssize_t data_len = data.length();
@@ -215,6 +215,12 @@ void DecoderImpl::onData(Buffer::Instance& data) {
   // https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_packets.html#sect_protocol_basic_packets_sending_mt_16mb.
   while (!BufferHelper::endOfBuffer(data) && decode(data)) {
   }
+}
+
+DecoderFactoryImpl DecoderFactoryImpl::instance_;
+
+DecoderPtr DecoderFactoryImpl::create(DecoderCallbacks& callbacks) {
+  return std::make_unique<DecoderImpl>(callbacks);
 }
 
 } // namespace MySQLProxy

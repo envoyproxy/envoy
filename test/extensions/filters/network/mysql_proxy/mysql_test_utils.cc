@@ -14,6 +14,27 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
+std::string MySQLTestUtils::encodeUint32Hex(const uint32_t* data, size_t len) {
+  static const char* const digits = "0123456789abcdef";
+
+  std::string ret;
+  ret.reserve(len * sizeof(uint32_t) * 2);
+
+  for (size_t i = 0; i < len; i++) {
+    uint32_t d = data[i];
+    ret.push_back(digits[(d >> (8 * 3 + 4)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 3)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 2 + 4)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 2)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 1 + 4)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 1)) & 0xf]);
+    ret.push_back(digits[(d >> 4) & 0xf]);
+    ret.push_back(digits[d & 0xf]);
+  }
+
+  return ret;
+}
+
 std::string MySQLTestUtils::encodeServerGreeting(int protocol) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(protocol);
@@ -46,6 +67,7 @@ std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string u
 }
 
 std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, uint8_t seq_force) {
+
   ClientLoginResponse* mysql_login_resp_encode = nullptr;
   auto encodeToString = [it, seq_force, &mysql_login_resp_encode]() {
     ASSERT(mysql_login_resp_encode != nullptr);
@@ -102,8 +124,7 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, 
 
 std::string MySQLTestUtils::encodeAuthSwitchResp() {
   ClientSwitchResponse mysql_switch_resp_encode{};
-  std::string resp_opaque_data("mysql_opaque");
-  mysql_switch_resp_encode.setAuthPluginResp(resp_opaque_data);
+  mysql_switch_resp_encode.setAuthPluginResp(getAuthPluginData20());
   Buffer::OwnedImpl buffer;
   mysql_switch_resp_encode.encode(buffer);
   BufferHelper::encodeHdr(buffer, AUTH_SWITH_RESP_SEQ);

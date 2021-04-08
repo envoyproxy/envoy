@@ -1,10 +1,12 @@
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
+#include <openssl/digest.h>
+#include <openssl/rand.h>
+#include <openssl/sha.h>
+
 #include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,7 +46,9 @@ void BufferHelper::addLengthEncodedInteger(Buffer::Instance& buffer, uint64_t va
   }
 }
 
-void BufferHelper::addString(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
+void BufferHelper::addBytes(Buffer::Instance& buffer, const char* str, int size) {
+  buffer.add(str, size);
+}
 
 void BufferHelper::encodeHdr(Buffer::Instance& pkg, uint8_t seq) {
   // the pkg buffer should only contain one package data
@@ -133,13 +137,13 @@ DecodeStatus BufferHelper::readLengthEncodedInteger(Buffer::Instance& buffer, ui
   return DecodeStatus::Success;
 }
 
-DecodeStatus BufferHelper::readBytes(Buffer::Instance& buffer, size_t skip_bytes) {
+DecodeStatus BufferHelper::skipBytes(Buffer::Instance& buffer, size_t skip_bytes) {
   if (buffer.length() < skip_bytes) {
     return DecodeStatus::Failure;
-  }
+  } // namespace MySQLProxy
   buffer.drain(skip_bytes);
   return DecodeStatus::Success;
-}
+} // namespace NetworkFilters
 
 DecodeStatus BufferHelper::readString(Buffer::Instance& buffer, std::string& str) {
   char end = MYSQL_STR_END;
@@ -147,7 +151,19 @@ DecodeStatus BufferHelper::readString(Buffer::Instance& buffer, std::string& str
   if (index == -1) {
     return DecodeStatus::Failure;
   }
-  str.assign(std::string(static_cast<char*>(buffer.linearize(index)), index));
+  str.assign(static_cast<char*>(buffer.linearize(index)), index);
+  buffer.drain(index + 1);
+  return DecodeStatus::Success;
+}
+
+DecodeStatus BufferHelper::readVector(Buffer::Instance& buffer, std::vector<uint8_t>& str) {
+  char end = MYSQL_STR_END;
+  ssize_t index = buffer.search(&end, sizeof(end), 0);
+  if (index == -1) {
+    return DecodeStatus::Failure;
+  }
+  auto arr = reinterpret_cast<uint8_t*>(buffer.linearize(index));
+  str.assign(arr, arr + index);
   buffer.drain(index + 1);
   return DecodeStatus::Success;
 }
@@ -157,7 +173,18 @@ DecodeStatus BufferHelper::readStringBySize(Buffer::Instance& buffer, size_t len
   if (buffer.length() < len) {
     return DecodeStatus::Failure;
   }
-  str.assign(std::string(static_cast<char*>(buffer.linearize(len)), len));
+  str.assign(static_cast<char*>(buffer.linearize(len)), len);
+  buffer.drain(len);
+  return DecodeStatus::Success;
+}
+
+DecodeStatus BufferHelper::readVectorBySize(Buffer::Instance& buffer, size_t len,
+                                            std::vector<uint8_t>& data) {
+  if (buffer.length() < len) {
+    return DecodeStatus::Failure;
+  }
+  uint8_t* arr = reinterpret_cast<uint8_t*>(buffer.linearize(len));
+  data.assign(&arr[0], &arr[len]);
   buffer.drain(len);
   return DecodeStatus::Success;
 }
