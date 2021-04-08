@@ -33,8 +33,6 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         "HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
   }
 
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-
   // if (!config.ip_tags().empty()) {
   //   tag_data = IpTaggingFilterSetTagData(config);
   // else if (!config.path().empty()) {
@@ -43,16 +41,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // else
   //   throw EnvoyException("Only one of path or ip_tags can be specified");
   // }
-  tag_data = IpTaggingFilterSetTagData(config);
-  trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
-}
-
-std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-IpTaggingFilterConfig::IpTaggingFilterSetTagData(
-    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config) {
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(config.ip_tags().size());
+
   for (const auto& ip_tag : config.ip_tags()) {
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
@@ -72,7 +64,8 @@ IpTaggingFilterConfig::IpTaggingFilterSetTagData(
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
     stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
-  return tag_data;
+
+  trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
 ValueSet::~ValueSet() = default;
