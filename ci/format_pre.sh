@@ -44,12 +44,16 @@ CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
 # TODO(phlax): update to use bazel and python_flake8/python_check
+#              this will simplify this code to a single line
 CURRENT=python
 "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check || {
     "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
     git diff HEAD | tee "${DIFF_OUTPUT}"
-    # this is to trigger error without exit
-    [[ "test" = "unhappy" ]]
+    raise () {
+        # this throws an error without exiting
+        return 1
+    }
+    raise
 }
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
