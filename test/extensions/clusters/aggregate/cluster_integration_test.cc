@@ -288,7 +288,7 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
   waitForNextUpstreamRequest(SecondUpstreamIndex);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
 
   EXPECT_TRUE(response->complete());
