@@ -44,7 +44,6 @@ public:
 
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
-      absl::InlinedVector<std::string, 1> rewritten_header_values;
       absl::InlinedVector<absl::string_view, 1> header_values;
 
       size_t num_headers_to_hash = 1;
@@ -57,6 +56,7 @@ public:
         header_values.push_back(header[i]->value().getStringView());
       }
 
+      absl::InlinedVector<std::string, 1> rewritten_header_values;
       if (regex_rewrite_ != nullptr) {
         rewritten_header_values.reserve(num_headers_to_hash);
         for (auto& value : header_values) {

@@ -2384,8 +2384,9 @@ virtual_hosts:
 
   absl::optional<uint64_t> generateHash(const std::vector<absl::string_view>& header_values) {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Http::LowerCaseString key = "foo_header";
     for (auto& value : header_values) {
-      headers.addCopy("foo_header", std::string(value));
+      headers.addCopy(key, value);
     }
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     return route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,

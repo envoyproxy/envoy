@@ -27,7 +27,7 @@ public:
   }
 
   /**
-   * Return 64-bit hash from the xxHash algorithm.
+   * Return 64-bit hash from the xxHash algorithm for a collection of strings.
    * @param input supplies the absl::Span<absl::string_view> to hash.
    * @param seed supplies the hash seed which defaults to 0.
    * See https://github.com/Cyan4973/xxHash for details.
