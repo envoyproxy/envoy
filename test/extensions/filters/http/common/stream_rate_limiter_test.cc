@@ -1,9 +1,9 @@
-
 #include "envoy/event/dispatcher.h"
-#include "extensions/filters/http/common/stream_rate_limiter.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+
+#include "extensions/filters/http/common/stream_rate_limiter.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
@@ -29,7 +29,8 @@ namespace Common {
 
 class StreamRateLimiterTest : public testing::Test {
 public:
-  void setUpTest(uint16_t limit_kbps, uint16_t fill_interval, std::shared_ptr<TokenBucket> token_bucket = nullptr) {
+  void setUpTest(uint16_t limit_kbps, uint16_t fill_interval,
+                 std::shared_ptr<TokenBucket> token_bucket = nullptr) {
     EXPECT_CALL(decoder_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
     EXPECT_CALL(decoder_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
 
@@ -40,13 +41,12 @@ public:
         [this](Buffer::Instance& data, bool end_stream) {
           decoder_callbacks_.injectDecodedDataToFilterChain(data, end_stream);
         },
-        [this] {
-          decoder_callbacks_.continueDecoding();
-        },
+        [this] { decoder_callbacks_.continueDecoding(); },
         [](uint64_t /*len*/) {
           // config->stats().decode_allowed_size_.set(len);
         },
-        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope(), token_bucket, std::chrono::milliseconds(fill_interval));
+        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope(), token_bucket,
+        std::chrono::milliseconds(fill_interval));
   }
 
   void setUpTest(uint16_t limit_kbps) {
@@ -60,9 +60,7 @@ public:
         [this](Buffer::Instance& data, bool end_stream) {
           decoder_callbacks_.injectDecodedDataToFilterChain(data, end_stream);
         },
-        [this] {
-          decoder_callbacks_.continueDecoding();
-        },
+        [this] { decoder_callbacks_.continueDecoding(); },
         [](uint64_t /*len*/) {
           // config->stats().decode_allowed_size_.set(len);
         },
