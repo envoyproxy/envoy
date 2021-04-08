@@ -1,11 +1,11 @@
 #
 # Runs pytest against the target:
 #
-#    //tools/testing/python_pytest
+#   //tools/testing/python_pytest
 #
 # Can be run as follows:
 #
-# bazel run //tools/testing:pytest_python_pytest
+#   bazel run //tools/testing:pytest_python_pytest
 #
 
 import sys

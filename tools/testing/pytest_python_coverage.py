@@ -1,11 +1,11 @@
 #
 # Runs pytest against the target:
 #
-#    //tools/testing/python_coverage
+#   //tools/testing/python_coverage
 #
 # Can be run as follows:
 #
-# bazel run //tools/testing:pytest_python_coverage
+#   bazel run //tools/testing:pytest_python_coverage
 #
 
 import sys

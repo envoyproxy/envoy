@@ -43,7 +43,7 @@ def test_coverage_coverage_args(patches):
             runner.coverage_args("COVERAGERC")
             == (["html"]
                 + m_args.return_value
-                + [f"--rcfile=COVERAGERC", "-d", m_cov_html.return_value]))
+                + ["--rcfile=COVERAGERC", "-d", m_cov_html.return_value]))
 
 
 def test_coveragepytest_add_arguments():

@@ -12,7 +12,7 @@
 import argparse
 import sys
 
-from coverage import cmdline # type:ignore
+from coverage import cmdline  # type:ignore
 
 from tools.base import runner, utils
 

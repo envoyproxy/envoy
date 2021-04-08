@@ -49,7 +49,7 @@ def test_pytest_pytest_args(patches):
         assert (
             runner.pytest_args("COVERAGERC")
             == (m_args.return_value
-                + [f"--rcfile=COVERAGERC"]))
+                + ["--rcfile=COVERAGERC"]))
 
 
 @pytest.mark.parametrize("cov_data", ["", "SOMEPATH"])
