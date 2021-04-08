@@ -42,7 +42,7 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+                                       10 * TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
