@@ -1472,11 +1472,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     // Also the bad http response status from upstream over HTTP2/3 (e.g. overflown status value)
     // reaches here.
     const auto request_headers = requestHeaders();
-    sendLocalReply(request_headers.has_value() &&
-                       Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
-                   Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
-                   absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
-                                "{", status.message(), "}"));
+    sendLocalReply(
+        request_headers.has_value() && Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
+        Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
+                     "{", status.message(), "}"));
     return;
   }
   filter_manager_.streamInfo().onFirstDownstreamTxByteSent();

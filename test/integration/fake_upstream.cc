@@ -114,8 +114,8 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
       }
       sendLocalReply(
           is_grpc, Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
-          absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
-                       status.message(), "}"));
+          absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
+                       "{", status.message(), "}"));
     };
   });
 }
