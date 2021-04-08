@@ -37,8 +37,12 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemp
     : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
 
 bool ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
-  cancellable_ = pool().newStream(parent_.decoder_, *this);
-  return (cancellable_ == nullptr);
+  auto* cancellable = pool().newStream(parent_.decoder_, *this);
+  if (cancellable == nullptr) {
+    return true;
+  }
+  cancellable_ = cancellable;
+  return false;
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailure(
