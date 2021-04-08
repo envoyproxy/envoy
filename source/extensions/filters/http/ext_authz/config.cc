@@ -68,15 +68,15 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     if (proto_config.hidden_envoy_deprecated_use_alpha()) {
       throw EnvoyException("The use_alpha field is deprecated and is no longer supported.");
     }
-
+Grpc::RawAsyncClientSharedPtr raw_client = context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(proto_config.grpc_service(), context.scope(),
+            true);
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    callback = [grpc_service = proto_config.grpc_service(), &context, filter_config, timeout_ms,
+    callback = [raw_client, filter_config, timeout_ms,
                 transport_api_version = Config::Utility::getAndCheckTransportVersion(proto_config)](
                    Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(grpc_service, context.scope(),
-            true), std::chrono::milliseconds(timeout_ms),
+          raw_client, std::chrono::milliseconds(timeout_ms),
           transport_api_version);
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
