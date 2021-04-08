@@ -26,6 +26,12 @@ stages:
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
             displayName: "Run format pre-checks"
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.StagingDirectory)/fix_format_pre.diff"
+              artifactName: format
+            # not all have fixes so improve condition/handling
+            condition: failed()
 
       - job: format
         dependsOn: ["format_pre"]
