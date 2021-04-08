@@ -115,6 +115,11 @@ public:
   }
 
   struct MutateRequestRet {
+    MutateRequestRet() = default;
+    MutateRequestRet(const std::string& downstream_address, bool internal,
+                     Tracing::Reason trace_reason)
+        : downstream_address_(downstream_address), internal_(internal),
+          trace_reason_(trace_reason) {}
     bool operator==(const MutateRequestRet& rhs) const {
       return downstream_address_ == rhs.downstream_address_ && internal_ == rhs.internal_ &&
              trace_reason_ == rhs.trace_reason_;
@@ -123,6 +128,7 @@ public:
     std::string downstream_address_;
     bool internal_;
     Tracing::Reason trace_reason_;
+    absl::optional<OriginalIPRejectRequestOptions> reject_request_{absl::nullopt};
   };
 
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
@@ -133,6 +139,7 @@ public:
     const auto result = ConnectionManagerUtility::mutateRequestHeaders(
         headers, connection_, config_, route_config_, local_info_);
     ret.downstream_address_ = result.final_remote_address->asString();
+    ret.reject_request_ = result.reject_request;
     ret.trace_reason_ =
         ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
@@ -1598,7 +1605,7 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
   }
 }
 
-// Test an extension to detect the original IP for the request.
+// Test detecting the original IP via a header (no rejection if it fails).
 TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
   const std::string header_name = "x-cdn-detected-ip";
   auto detection_extension = std::make_shared<
@@ -1613,6 +1620,7 @@ TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
     TestRequestHeaderMapImpl headers{{header_name, "2.1.3.4"}};
     auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
     EXPECT_EQ(ret.downstream_address_, "2.1.3.4:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
   }
 
   // Header missing -- fallbacks to default behavior.
@@ -1620,6 +1628,7 @@ TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
     TestRequestHeaderMapImpl headers;
     auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
     EXPECT_EQ(ret.downstream_address_, "10.0.0.3:50000");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
   }
 }
 
