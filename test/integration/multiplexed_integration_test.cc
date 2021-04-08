@@ -1,4 +1,4 @@
-#include "test/integration/multiplexed_integration_test.h"
+ginclude "test/integration/multiplexed_integration_test.h"
 
 #include <algorithm>
 #include <string>
@@ -41,17 +41,20 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
+  EXCLUDE_DOWNSTREAM_HTTP3;  // sort out timeouts
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
-                                       10 * TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
+  EXCLUDE_DOWNSTREAM_HTTP3;  // sort out timeouts
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBody) {
+  EXCLUDE_DOWNSTREAM_HTTP3;  // sort out timeouts
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
@@ -63,17 +66,20 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoB
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
+  EXCLUDE_DOWNSTREAM_HTTP3;  // sort out timeouts
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
+  EXCLUDE_DOWNSTREAM_HTTP3;  // sort out timeouts
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  EXCLUDE_DOWNSTREAM_HTTP3;  // sort out timeouts
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
