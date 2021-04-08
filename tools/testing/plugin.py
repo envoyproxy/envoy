@@ -16,6 +16,15 @@ def nested(*contexts) -> Iterator[list]:
 
 
 def _patches(*args, prefix: str = "") -> ContextManager:
+    """Takes a list of module/class paths to patch and an optional prefix
+
+    The prefix is used to prefix all of the paths
+
+    The patches are applied in a nested set of context managers.
+
+    The yields (mocks) are yielded as a tuple.
+    """
+
     patched = []
     prefix = f"{prefix}." if prefix else ""
     for arg in args:

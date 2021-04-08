@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Runs pytest
+#
 # Usage:
 #
 #   bazel run //tools/testing:python_pytest -- -h
@@ -21,6 +23,7 @@ class PytestRunner(runner.Runner):
 
     @property
     def cov_collect(self) -> str:
+        """The path to a file to collect coverage in"""
         return self.args.cov_collect
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:

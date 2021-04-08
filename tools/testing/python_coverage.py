@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+#
+# Takes a coverage file and generates html
+#
 # Usage:
 #
 #   bazel run //tools/testing:python_coverage -- -h
@@ -21,10 +24,12 @@ class CoverageRunner(runner.Runner):
 
     @property
     def cov_data(self):
+        """The path to a file to a file containing coverage data"""
         return self.args.cov_data
 
     @property
     def cov_html(self):
+        """The path to a file to a file containing coverage data"""
         return self.args.cov_html
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
