@@ -1188,7 +1188,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr 
       // nothing to do.
       return;
     }
-    auto& odcds = odcds_handle.getOdCds();
+    auto& odcds = odcds_handle->getOdCds();
     odcds.updateOnDemand(name);
     auto timer_cb = Event::TimerCb([this, name] { notifyExpiredDiscovery(name); });
     auto timer = dispatcher_.createTimer(timer_cb);

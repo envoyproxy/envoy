@@ -301,10 +301,10 @@ public:
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(const std::string& name,
                                     ClusterDiscoveryCallbackWeakPtr callback) override {
-      parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move(callback));
+      return parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move(callback));
     }
 
-    OdCdsApiImpl& getOdCds() const { return *odcds_; }
+    OdCdsApi& getOdCds() const { return *odcds_; }
 
   private:
     ClusterManagerImpl& parent_;
