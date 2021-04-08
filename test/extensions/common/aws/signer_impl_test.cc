@@ -40,7 +40,7 @@ public:
   void setBody(const std::string& body) { message_->body().add(body); }
 
   void expectSignHeaders(absl::string_view service_name, absl::string_view signature,
-                         absl::string_view payload, bool unsigned_payload) {
+                         absl::string_view payload, bool use_unsigned_payload) {
     auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
     EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
     Http::TestRequestHeaderMapImpl headers{};
@@ -50,7 +50,7 @@ public:
 
     SignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
                       time_system_);
-    signer.sign(headers, unsigned_payload);
+    signer.sign(headers, use_unsigned_payload);
 
     EXPECT_EQ(fmt::format("AWS4-HMAC-SHA256 Credential=akid/20180102/region/{}/aws4_request, "
                           "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "

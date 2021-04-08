@@ -12,9 +12,9 @@ namespace AwsRequestSigningFilter {
 
 FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
                                    const std::string& stats_prefix, Stats::Scope& scope,
-                                   const std::string& host_rewrite, bool unsigned_payload)
+                                   const std::string& host_rewrite, bool use_unsigned_payload)
     : signer_(std::move(signer)), stats_(Filter::generateStats(stats_prefix, scope)),
-      host_rewrite_(host_rewrite), unsigned_payload_{unsigned_payload} {}
+      host_rewrite_(host_rewrite), use_unsigned_payload_{use_unsigned_payload} {}
 
 Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
 
@@ -23,7 +23,7 @@ Extensions::Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
 FilterStats& FilterConfigImpl::stats() { return stats_; }
 
 const std::string& FilterConfigImpl::hostRewrite() const { return host_rewrite_; }
-bool FilterConfigImpl::useUnsignedPayload() const { return unsigned_payload_; }
+bool FilterConfigImpl::useUnsignedPayload() const { return use_unsigned_payload_; }
 
 FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + "aws_request_signing.";
@@ -32,22 +32,24 @@ FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   const auto& host_rewrite = config_->hostRewrite();
-  bool unsigned_payload = config_->useUnsignedPayload();
+  const bool use_unsigned_payload = config_->useUnsignedPayload();
 
   if (!host_rewrite.empty()) {
     headers.setHost(host_rewrite);
   }
 
-  if (!unsigned_payload && !end_stream) {
+  if (!use_unsigned_payload && !end_stream) {
     request_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   try {
-    ENVOY_LOG(debug, "aws request signing from decodeHeaders");
-    config_->signer().sign(headers, unsigned_payload);
+    ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
+              use_unsigned_payload);
+    config_->signer().sign(headers, use_unsigned_payload);
     config_->stats().signing_added_.inc();
   } catch (const EnvoyException& e) {
+    // TODO: sign should not throw to avoid exceptions in the request path
     ENVOY_LOG(debug, "signing failed: {}", e.what());
     config_->stats().signing_failed_.inc();
   }
@@ -76,9 +78,12 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     ASSERT(request_headers_ != nullptr);
     config_->signer().sign(*request_headers_, hash);
     config_->stats().signing_added_.inc();
+    config_->stats().payload_signing_added_.inc();
   } catch (const EnvoyException& e) {
+    // TODO: sign should not throw to avoid exceptions in the request path
     ENVOY_LOG(debug, "signing failed: {}", e.what());
     config_->stats().signing_failed_.inc();
+    config_->stats().payload_signing_failed_.inc();
   }
 
   return Http::FilterDataStatus::Continue;

@@ -17,9 +17,11 @@ namespace AwsRequestSigningFilter {
  * All stats for the AWS request signing filter. @see stats_macros.h
  */
 // clang-format off
-#define ALL_AWS_REQUEST_SIGNING_FILTER_STATS(COUNTER)                                                           \
-  COUNTER(signing_added)                                                                        \
-  COUNTER(signing_failed)
+#define ALL_AWS_REQUEST_SIGNING_FILTER_STATS(COUNTER)                                              \
+  COUNTER(signing_added)                                                                           \
+  COUNTER(signing_failed)                                                                          \
+  COUNTER(payload_signing_added)                                                                   \
+  COUNTER(payload_signing_failed)
 // clang-format on
 
 /**
@@ -65,7 +67,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite, bool unsigned_payload);
+                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
@@ -76,7 +78,7 @@ private:
   Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
   std::string host_rewrite_;
-  const bool unsigned_payload_;
+  const bool use_unsigned_payload_;
 };
 
 /**

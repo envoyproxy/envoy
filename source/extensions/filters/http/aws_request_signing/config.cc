@@ -27,7 +27,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   auto filter_config =
       std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, context.scope(),
-                                         config.host_rewrite(), config.unsigned_payload());
+                                         config.host_rewrite(), config.use_unsigned_payload());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);

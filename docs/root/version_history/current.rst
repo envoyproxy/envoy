@@ -25,7 +25,7 @@ Minor Behavior Changes
   never buffered, which only produced correct signatures for requests without a body, or for
   requests to S3, ES or Glacier, which used the literal string ``UNSIGNED-PAYLOAD``. Buffering can
   be now be disabled in favor of using unsigned payloads with compatible services via the new
-  ``unsigned_payload`` filter option (default ``false``).
+  `use_unsigned_payload` filter option (default false).
 * dns: both the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and
   :ref:`logical DNS <arch_overview_service_discovery_types_logical_dns>` cluster types now honor the
   :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field if not empty.

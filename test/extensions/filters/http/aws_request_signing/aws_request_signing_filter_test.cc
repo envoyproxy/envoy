@@ -28,20 +28,20 @@ public:
   Common::Aws::Signer& signer() override { return *signer_; }
   FilterStats& stats() override { return stats_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
-  bool useUnsignedPayload() const override { return unsigned_payload_; }
+  bool useUnsignedPayload() const override { return use_unsigned_payload_; }
 
   std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
   FilterStats stats_{Filter::generateStats("test", stats_store_)};
   std::string host_rewrite_;
-  bool unsigned_payload_;
+  bool use_unsigned_payload_;
 };
 
 class AwsRequestSigningFilterTest : public testing::Test {
 public:
   void setup() {
     filter_config_ = std::make_shared<MockFilterConfig>();
-    filter_config_->unsigned_payload_ = false;
+    filter_config_->use_unsigned_payload_ = false;
     filter_ = std::make_unique<Filter>(filter_config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -61,27 +61,27 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
 }
 
-// Verify decodeHeaders signs when unsigned_payload is true and end_stream is false.
+// Verify decodeHeaders signs when use_unsigned_payload is true and end_stream is false.
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
   setup();
-  filter_config_->unsigned_payload_ = true;
+  filter_config_->use_unsigned_payload_ = true;
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), true));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
-// Verify decodeHeaders signs when unsigned_payload is true and end_stream is true.
+// Verify decodeHeaders signs when use_unsigned_payload is true and end_stream is true.
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayloadHeaderOnly) {
   setup();
-  filter_config_->unsigned_payload_ = true;
+  filter_config_->use_unsigned_payload_ = true;
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), true));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
-// Verify decodeHeaders does not sign when unsigned_payload is false and end_stream is false.
+// Verify decodeHeaders does not sign when use_unsigned_payload is false and end_stream is false.
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersStopsIterationWithoutSigning) {
   setup();
 
@@ -111,6 +111,8 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsEmptyPayloadAndContinues) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*(filter_config_->signer_), sign(HeaderMapEqualRef(&headers), hash));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
+  EXPECT_EQ(1UL, filter_config_->stats_.payload_signing_added_.value());
 }
 
 // Verify decodeData signs when end_stream is true (empty payload).
@@ -141,7 +143,7 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
 }
 
-// Verify filter functionality when signing fails for header only request.
+// Verify filter functionality when signing fails in decodeHeaders.
 TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), false))
@@ -150,6 +152,26 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
+}
+
+// Verify filter functionality when signing fails in decodeData.
+TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
+  setup();
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(*(filter_config_->signer_),
+              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>()))
+      .WillOnce(Invoke(
+          [](Http::HeaderMap&, const std::string&) -> void { throw EnvoyException("failed"); }));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
+  EXPECT_EQ(1UL, filter_config_->stats_.payload_signing_failed_.value());
 }
 
 // Verify FilterConfigImpl getters.

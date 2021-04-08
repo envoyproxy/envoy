@@ -52,7 +52,7 @@ public:
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
   void sign(Http::RequestMessage& message, bool sign_body = false) override;
-  void sign(Http::RequestHeaderMap& headers, bool unsigned_payload = false) override;
+  void sign(Http::RequestHeaderMap& headers, bool use_unsigned_payload = false) override;
 
 private:
   std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
