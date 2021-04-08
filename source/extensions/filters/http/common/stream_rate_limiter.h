@@ -30,10 +30,9 @@ namespace Common {
  */
 class StreamRateLimiter : Logger::Loggable<Logger::Id::filter> {
 public:
-  // We currently divide each second into 16 segments for the token bucket. Thus, the rate limit is
-  // KiB per second, divided into 16 segments, ~63ms apart. 16 is used because it divides into 1024
-  // evenly.
-  static constexpr uint64_t DefaultFillRate = 16;
+  static constexpr std::chrono::milliseconds DefaultFillInterval = std::chrono::milliseconds(50);
+
+  static constexpr uint64_t kiloBytesToBytes(const uint64_t val) { return val * 1024; }
 
   /**
    * @param max_kbps maximum rate in KiB/s.
@@ -50,10 +49,11 @@ public:
   StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
-                    std::function<void()> continue_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
+                    std::function<void()> continue_cb, std::function<void(uint64_t)> write_stats_cb,
+                    TimeSource& time_source, Event::Dispatcher& dispatcher,
+                    const ScopeTrackedObject& scope,
                     std::shared_ptr<TokenBucket> token_bucket = nullptr,
-                    uint64_t fill_rate = DefaultFillRate);
+                    std::chrono::milliseconds fill_interval = DefaultFillInterval);
 
   /**
    * Called by the stream to write data. All data writes happen asynchronously, the stream should
@@ -75,17 +75,18 @@ public:
   bool destroyed() { return token_timer_ == nullptr; }
 
 private:
+  friend class StreamRateLimiterTest;
   using TimerPtr = std::unique_ptr<Event::Timer>;
 
   void onTokenTimer();
 
-  const uint64_t bytes_per_time_slice_;
+  const std::chrono::milliseconds fill_interval_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
+  const std::function<void(uint64_t)> write_stats_cb_;
   const ScopeTrackedObject& scope_;
   std::shared_ptr<TokenBucket> token_bucket_;
   Event::TimerPtr token_timer_;
-  bool saw_data_{};
   bool saw_end_stream_{};
   bool saw_trailers_{};
   Buffer::WatermarkBuffer buffer_;
