@@ -32,7 +32,7 @@ message QuicProtocolOptions {
   // if not specified.
   google.protobuf.UInt32Value max_concurrent_streams = 1;
 
-  // `Initial stream-level flow-control window
+  // `Initial stream-level flow-control receive window
   // <https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-4.1>`_ size. Valid values range from
   // 1 to 16777216 (2^24, maximum supported by QUICHE) and defaults to 65536 (2^16).
   //
