@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/network/filter.h"
@@ -181,6 +182,7 @@ std::tuple<absl::string_view, absl::string_view> AttrUtils::tokenizePath(absl::s
 }
 
 void AttrUtils::findValue(absl::string_view path) {
+  ENVOY_LOG(debug, "findValue: {}", path);
   auto [root_tok, sub_tok] = tokenizePath(path);
   auto root_id = property_tokens.find(root_tok);
   if (root_id == property_tokens.end()) {
@@ -221,6 +223,7 @@ void AttrUtils::findValue(absl::string_view path) {
 }
 
 void AttrUtils::requestSet(absl::string_view path){
+  ENVOY_LOG(debug, "requestSet: {}", path);
   auto attr_fields = getOrInsert(REQUEST_TOKEN);
 
   auto part_token = request_tokens.find(path);
@@ -229,22 +232,32 @@ void AttrUtils::requestSet(absl::string_view path){
     return;
   }
 
-  auto headers = info_.getRequestHeaders();
+  auto headers = request_headers_;
   int end;
 
-  switch (part_token->second) {
+  ENVOY_LOG(debug, "attempting deref");
+  auto snd = part_token->second;
+  ENVOY_LOG(debug, "pre switch");
+
+
+  switch (snd) {
     case RequestToken::PATH:
-      if (headers != nullptr && headers->Path() != nullptr && headers->Path()->value() != nullptr) {
-        attr_fields[REQUEST_PATH_TOKEN] = ValueUtil::stringValue(std::string(headers->Path()->value().getStringView()));
+      ENVOY_LOG(debug, "1");
+      if (headers != nullptr) {
+        ENVOY_LOG(debug, "in request.path");
+        // ENVOY_LOG(debug, "in request.path setter val: {}", headers->Path()->value().getStringView());
+        attr_fields[REQUEST_PATH_TOKEN] = ValueUtil::stringValue(std::string(headers->getPathValue()));
       }
       break;
     case RequestToken::URL_PATH:
+      ENVOY_LOG(debug, "2");
       if (headers != nullptr && headers->Path() != nullptr && headers->Path()->value() != nullptr) {
         end = std::max(path.find('\0'), path.find('?'));
         attr_fields[REQUEST_URL_PATH_TOKEN] = ValueUtil::stringValue(std::string(headers->Path()->value().getStringView().substr(0, end)));
       }
       break;
     case RequestToken::HOST:
+      ENVOY_LOG(debug, "3");
       if (headers != nullptr) {
         attr_fields[REQUEST_HOST_TOKEN] = ValueUtil::stringValue(std::string(headers->getHostValue()));
       }
@@ -260,7 +273,7 @@ void AttrUtils::requestSet(absl::string_view path){
       }
       break;
     case RequestToken::HEADERS:
-      ENVOY_LOG(debug, "request.headers unimplemented");
+      ENVOY_LOG(debug, "ignoring unimplemented attribute request.headers");
       break;
     case RequestToken::REFERER:
       if (headers != nullptr) {
@@ -302,6 +315,7 @@ void AttrUtils::requestSet(absl::string_view path){
       attr_fields[REQUEST_TOTAL_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived() + headers != nullptr ? headers->byteSize() : 0);
       break;
   }
+    ENVOY_LOG(debug, "end");
 }
 
 void AttrUtils::responseSet(absl::string_view path) {
@@ -326,13 +340,14 @@ void AttrUtils::responseSet(absl::string_view path) {
       attr_fields[RESPONSE_FLAGS_TOKEN] = ValueUtil::numberValue(info_.responseFlags());
       break;
     case ResponseToken::GRPC_STATUS:
-      attr_fields[RESPONSE_GRPC_STATUS_TOKEN] = getGrpcStatus();
+      ENVOY_LOG(debug, "ignoring unimplemented attribute response.grpc_status");
+      // attr_fields[RESPONSE_GRPC_STATUS_TOKEN] = getGrpcStatus();
       break;
     case ResponseToken::HEADERS:
-      ENVOY_LOG(debug, "attribute response.headers unimplemented");
+      ENVOY_LOG(debug, "ignoring unimplemented attribute response.headers");
       break;
     case ResponseToken::TRAILERS:
-      ENVOY_LOG(debug, "attribute response.trailers unimplemented");
+      ENVOY_LOG(debug, "ignoring unimplemented attribute response.trailers");
       break;
     case ResponseToken::SIZE:
       attr_fields[RESPONSE_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesSent());
@@ -363,11 +378,15 @@ void AttrUtils::destinationSet(absl::string_view path){
 }
 
 void AttrUtils::sourceSet(absl::string_view path){
+  ENVOY_LOG(debug, "sourceSet: {}", path);
   if (!attributes_.contains(SOURCE_TOKEN)) {
     attributes_[SOURCE_TOKEN] = ProtobufWkt::Struct();
   }
   auto attr_fields = *attributes_[SOURCE_TOKEN].mutable_fields();
 
+  if (info_.upstreamHost() == nullptr) {
+    return;
+  }
   auto addr = info_.upstreamHost()->address();
   if (addr == nullptr) {
     return;
@@ -532,21 +551,18 @@ void AttrUtils::metadataSet() {
 
 }
 
+// todo(eas): there are two issues here
+// 1. FilterState seems to be an opaque data store and therefore does not have an iterator implemented on it,
+//   it seems incorrect to just attach all of this data, need to check with envoy maintainers.
+// 2. Encoding as a [`ProtobufWkt::Value`](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#value)
+//   is problematic. In the [attribute docs](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes)
+//   it is indicated that the filter state values should be binary data, but `Value` only allows the following:
+//   [null, number, string, bool, struct, list] where struct is simply a `map<string, value>`.
 void AttrUtils::filterStateSet() {
-    ENVOY_LOG(debug, "filter_state unimplemented");
-  auto attr_fields = getOrInsert(FILTER_STATE_TOKEN);
-    
-    // todo(eas): we'll need to impl iterator for FilterState in order to do this
-    // for (auto const& [k, s]: info_.filterState()) {
-    // // the question is how to represent the bytes values of map<string, bytes>
-    //   (*filter_state.mutable_fields())[k] = ValueUtil::stringValue(s);
-    // }
+  ENVOY_LOG(debug, "ignoring unimplemented attribute filter_state");
 }
 
 std::string AttrUtils::formatDuration(absl::Duration duration) {
-  // ProtobufWkt::Duration proto_dur;
-  // proto_dur.set_seconds(duration / absl::Seconds(1));
-  // proto_dur.set_nanos(duration / absl::Nanoseconds(1));
   return absl::FormatDuration(duration);
 }
 
@@ -563,22 +579,40 @@ ProtobufWkt::Map<std::string, ProtobufWkt::Value>& AttrUtils::getOrInsert(std::s
   return *attributes_[key].mutable_fields();
 }
 
+// todo(eas): this seems to result in a nullptr exception when empty headers are used.
 ProtobufWkt::Value AttrUtils::getGrpcStatus() {
-  auto const& optional_status = Envoy::Grpc::Common::getGrpcStatus(
-      response_trailers_ != nullptr ? *response_trailers_ : *Http::StaticEmptyHeaders::get().response_trailers,
-      response_headers_ != nullptr ? *response_headers_ : *Http::StaticEmptyHeaders::get().response_headers,
-      info_);
+  // todo(eas): what about a trailers only response?
+  if (response_headers_ == nullptr) {
+    return ValueUtil::nullValue();
+  }
+  Http::ResponseHeaderMap& hs = response_headers_ != nullptr ? *response_headers_ : *Envoy::Http::StaticEmptyHeaders::get().response_headers;
+  Http::ResponseTrailerMap& ts = response_trailers_ != nullptr ? *response_trailers_ : *Envoy::Http::StaticEmptyHeaders::get().response_trailers;
+  ENVOY_LOG(debug, "checking if grpc");
+
+  if (!Envoy::Grpc::Common::hasGrpcContentType(hs)) {
+    return ValueUtil::nullValue();
+  }
+
+  ENVOY_LOG(debug, "is grpc");
+  auto const& optional_status = Envoy::Grpc::Common::getGrpcStatus(ts, hs, info_);
+  ENVOY_LOG(debug, "grpc status got");
 
   if (optional_status.has_value()) {
     return ValueUtil::numberValue(optional_status.value());
   }
   return ValueUtil::nullValue();
 }
-void AttrUtils::setResponseHeaders(Http::ResponseHeaderMap& response_headers){
-  response_headers_ = &response_headers;
+void AttrUtils::setRequestHeaders(Http::RequestHeaderMap* request_headers){
+  request_headers_ = request_headers;
 }
-void AttrUtils::setResponseTrailers(Http::ResponseTrailerMap& response_trailers){
-  response_trailers_ = &response_trailers;
+void AttrUtils::setRequestTrailers(Http::RequestTrailerMap* request_trailers){
+  request_trailers_ = request_trailers;
+}
+void AttrUtils::setResponseHeaders(Http::ResponseHeaderMap* response_headers){
+  response_headers_ = response_headers;
+}
+void AttrUtils::setResponseTrailers(Http::ResponseTrailerMap* response_trailers){
+  response_trailers_ = response_trailers;
 }
 
 } // ExternalProcessing

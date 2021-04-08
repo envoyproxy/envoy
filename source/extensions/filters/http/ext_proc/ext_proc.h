@@ -43,14 +43,15 @@ public:
                const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()), request_attributes_(config.request_attributes()) {}
+        processing_mode_(config.processing_mode()),
+        request_attributes_(config.request_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   const ExtProcFilterStats& stats() const { return stats_; }
-  
+
   const google::protobuf::RepeatedPtrField<std::string>& requestAttributesSpecified() const {
     return request_attributes_;
   }
@@ -108,11 +109,14 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
+  // as of yet unused in the ext_proc service since we are not yet processing trailers
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
@@ -166,6 +170,14 @@ private:
   // Set to true when an "immediate response" has been delivered. This helps us
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
+
+  // The trailers received.
+  Http::RequestTrailerMap* request_trailers_ = nullptr;
+  Http::ResponseTrailerMap* response_trailers_ = nullptr;
+
+  // The processing mode. May be locally overridden by any response,
+  // So every instance of the filter has a copy.
+  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
 };
 
 } // namespace ExternalProcessing
