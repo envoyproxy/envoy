@@ -153,18 +153,8 @@ void TestEnvironment::removePath(const std::string& path) {
 }
 
 void TestEnvironment::renameFile(const std::string& old_name, const std::string& new_name) {
-#ifdef WIN32
-  // use MoveFileEx, since ::rename will not overwrite an existing file. See
-  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
-  // Note MoveFileEx cannot overwrite a directory as documented, nor a symlink, apparently.
-  const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
-  ASSERT_NE(0, rc) << fmt::format("failed to rename file from  {} to {} with error {}", old_name,
-                                  new_name, ::GetLastError());
-#else
-  const int rc = ::rename(old_name.c_str(), new_name.c_str());
-  ASSERT_EQ(0, rc);
-#endif
-};
+  Filesystem::fileSystemForTest().renameFile(old_name, new_name);
+}
 
 void TestEnvironment::createSymlink(const std::string& target, const std::string& link) {
 #ifdef WIN32
