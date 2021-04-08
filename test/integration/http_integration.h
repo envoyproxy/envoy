@@ -89,13 +89,6 @@ using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
-  // TODO(jmarantz): Remove this once
-  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
-  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::httpProxyConfig())
-      : HttpIntegrationTest(downstream_protocol, version, config) {}
-
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
@@ -136,6 +129,8 @@ protected:
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
   // bytes of body downstream.
+  // Waits |time| ms for both the request to be proxied upstream and the
+  // response to be proxied downstream.
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
@@ -192,9 +187,10 @@ protected:
   void testRouterVirtualClusters();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
 
-  void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
-                                            bool big_header, bool set_content_length_header = false,
-                                            ConnectionCreationFunction* creator = nullptr);
+  void testRouterRequestAndResponseWithBody(
+      uint64_t request_size, uint64_t response_size, bool big_header,
+      bool set_content_length_header = false, ConnectionCreationFunction* creator = nullptr,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",

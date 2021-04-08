@@ -104,7 +104,7 @@ protected:
   }
 
   void verifyDownstreamResponse(IntegrationStreamDecoder& response, int status_code) {
-    response.waitForEndStream();
+    ASSERT_TRUE(response.waitForEndStream());
     EXPECT_TRUE(response.complete());
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }

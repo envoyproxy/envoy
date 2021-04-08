@@ -39,10 +39,7 @@ def validate_format(fix=False):
     successful_update_files = set()
     for python_file in collect_files():
         reformatted_source, encoding, changed = FormatFile(
-            python_file,
-            style_config='tools/code_format/.style.yapf',
-            in_place=fix,
-            print_diff=not fix)
+            python_file, style_config='.style.yapf', in_place=fix, print_diff=not fix)
         if not fix:
             fixes_required = True if changed else fixes_required
             if reformatted_source:
@@ -68,10 +65,8 @@ def display_fix_results(successful_files, failed_files):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool to format python files.')
-    parser.add_argument('action',
-                        choices=['check', 'fix'],
-                        default='check',
-                        help='Fix invalid syntax in files.')
+    parser.add_argument(
+        'action', choices=['check', 'fix'], default='check', help='Fix invalid syntax in files.')
     args = parser.parse_args()
     is_valid = validate_format(args.action == 'fix')
     sys.exit(0 if is_valid else 1)

@@ -14,8 +14,8 @@ from udpa.annotations import status_pb2
 from google.api import annotations_pb2
 
 ENVOY_API_TYPE_REGEX_STR = 'envoy_api_(msg|enum_value|field|enum)_([\w\.]+)'
-ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<%s>|:ref:`%s`' %
-                                           (ENVOY_API_TYPE_REGEX_STR, ENVOY_API_TYPE_REGEX_STR))
+ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile(
+    '<%s>|:ref:`%s`' % (ENVOY_API_TYPE_REGEX_STR, ENVOY_API_TYPE_REGEX_STR))
 
 
 class UpgradeVisitor(visitor.Visitor):
@@ -68,8 +68,8 @@ class UpgradeVisitor(visitor.Visitor):
                     residual = 'host_rewrite_literal'
                 elif residual == 'auto_host_rewrite_header':
                     residual = 'auto_host_rewrite'
-            new_ref = 'envoy_api_%s_%s%s' % (ref_type, repl_type,
-                                             '.' + residual if residual else '')
+            new_ref = 'envoy_api_%s_%s%s' % (
+                ref_type, repl_type, '.' + residual if residual else '')
             if label_ref_type is not None:
                 return '<%s>' % new_ref
             else:

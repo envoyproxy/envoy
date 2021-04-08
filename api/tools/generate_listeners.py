@@ -10,6 +10,7 @@ import sys
 # in sys.path first.
 from pkgutil import extend_path
 import google
+
 google.__path__ = extend_path(google.__path__, google.__name__)
 
 from google.protobuf import json_format
@@ -58,8 +59,9 @@ def generate_listeners(listeners_pb_path, output_pb_path, output_json_path, frag
 
 if __name__ == '__main__':
     if len(sys.argv) < 4:
-        print('Usage: %s <path to listeners.pb> <output listeners.pb> <output '
-              'listeners.json> <filter config fragment paths>') % sys.argv[0]
+        print(
+            'Usage: %s <path to listeners.pb> <output listeners.pb> <output '
+            'listeners.json> <filter config fragment paths>') % sys.argv[0]
         sys.exit(1)
 
     generate_listeners(sys.argv[1], sys.argv[2], sys.argv[3], iter(sys.argv[4:]))

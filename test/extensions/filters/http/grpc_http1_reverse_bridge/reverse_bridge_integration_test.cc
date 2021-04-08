@@ -103,7 +103,7 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
   response_trailers.setGrpcStatus(std::string("0"));
   upstream_request_->encodeTrailers(response_trailers);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ(response->body(), response_data.toString());
@@ -152,7 +152,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   Buffer::OwnedImpl response_data{"defgh"};
   upstream_request_->encodeData(response_data, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   // Ensure that we restored the content-type and that we added the length prefix.

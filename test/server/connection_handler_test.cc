@@ -2,7 +2,6 @@
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
-#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/utility.h"
@@ -11,10 +10,11 @@
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/raw_buffer_socket.h"
-#include "common/network/udp_default_writer_config.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/network/utility.h"
 
+#include "server/active_raw_udp_listener_config.h"
 #include "server/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -81,14 +81,9 @@ public:
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
           init_manager_(nullptr) {
       envoy::config::listener::v3::UdpListenerConfig udp_config;
-      const std::string default_type_url =
-          "type.googleapis.com/envoy.config.listener.v3.ActiveRawUdpListenerConfig";
-      udp_config.mutable_listener_config()->mutable_typed_config()->set_type_url(default_type_url);
       udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
       udp_listener_config_->listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
-              udp_config.listener_config())
-              .createActiveUdpListenerFactory(udp_config, /*concurrency=*/1);
+          std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
       udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }

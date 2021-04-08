@@ -10,11 +10,14 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/codec_impl.h"
+#endif
 
 #include "server/connection_handler_impl.h"
 
@@ -297,8 +300,8 @@ class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
 public:
   using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
 
-  void onMessageComplete() override {
-    ServerConnectionImpl::onMessageComplete();
+  Http::Http1::ParserStatus onMessageCompleteBase() override {
+    auto rc = ServerConnectionImpl::onMessageCompleteBase();
 
     if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
       // Undo the read disable from the base class - we have many tests which
@@ -306,6 +309,7 @@ public:
       // receive the disconnect if reading is disabled.
       activeRequest().value().response_encoder_.readDisable(false);
     }
+    return rc;
   }
   ~TestHttp1ServerConnectionImpl() override {
     if (activeRequest().has_value()) {
@@ -338,12 +342,14 @@ FakeHttpConnection::FakeHttpConnection(
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     ASSERT(type == Type::HTTP3);
-    envoy::config::core::v3::Http3ProtocolOptions http3_options;
-    codec_ = std::unique_ptr<Http::ServerConnection>(
-        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(shared_connection_.connection(), *this,
-                                        max_request_headers_kb, headers_with_underscores_action));
+#ifdef ENVOY_ENABLE_QUIC
+    Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
+    codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
+        fake_upstream.http3Options(), max_request_headers_kb, headers_with_underscores_action);
+#else
+    ASSERT(false, "running a QUIC integration test without compiling QUIC");
+#endif
   }
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
@@ -514,6 +520,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
+      http3_options_(config.http3_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),

@@ -862,10 +862,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
-  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
-    request_headers_->setPath("/");
-  }
 
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_.isRoutable()) {
@@ -1192,6 +1188,9 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
       const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
       if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
         timeout = max_stream_duration.value();
+      } else if (route->timeout().count() != 0) {
+        // If max stream duration is not set either at route/HCM level, use the route timeout.
+        timeout = route->timeout();
       } else {
         disable_timer = true;
       }

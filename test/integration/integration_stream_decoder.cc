@@ -15,6 +15,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AssertionFailure;
+using testing::AssertionResult;
+using testing::AssertionSuccess;
+
 namespace Envoy {
 
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
@@ -44,11 +48,25 @@ void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   }
 }
 
-void IntegrationStreamDecoder::waitForEndStream() {
+AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
+  bool timer_fired = false;
   if (!saw_end_stream_) {
+    Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
+      timer_fired = true;
+      dispatcher_.exit();
+    }));
+    timer->enableTimer(timeout);
     waiting_for_end_stream_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
+    if (!saw_end_stream_) {
+      // HTTP/1.1 may end stream by disconnecting.
+      ENVOY_LOG_MISC(warn, "No explicit end stream detected.");
+    }
+    if (timer_fired) {
+      return AssertionFailure() << "Timed out waiting for end stream\n";
+    }
   }
+  return AssertionSuccess();
 }
 
 void IntegrationStreamDecoder::waitForReset() {

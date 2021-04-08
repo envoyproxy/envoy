@@ -27,7 +27,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
       fallbacks.push_back(Http::Utility::AlpnNames::get().Http2);
       break;
     case Http::Protocol::Http3:
-      // TODO(#14829) hard-code H3 ALPN, consider failing if other things are negotiated.
+      // HTTP3 ALPN is set in the QUIC stack based on supported versions.
       break;
     }
   }
@@ -96,7 +96,7 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
-  if (state_ != ActiveClient::State::DRAINING) {
+  if (state() != ActiveClient::State::DRAINING) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {
