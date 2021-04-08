@@ -30,8 +30,7 @@ enum class StartStatus {
 /**
  * An interface for on-demand CDS. Defined to allow mocking.
  */
-class OdCdsApi
-{
+class OdCdsApi {
 public:
   virtual ~OdCdsApi();
 

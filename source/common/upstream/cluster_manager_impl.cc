@@ -1140,9 +1140,9 @@ ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a way
   // to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds = OdCdsApiImpl::create(
-      odcds_config, odcds_resources_locator, *this, stats_, validation_visitor);
-  return OdCdsApiHandleImpl::create(*this, std::move (odcds));
+  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, stats_,
+                                    validation_visitor);
+  return OdCdsApiHandleImpl::create(*this, std::move(odcds));
 }
 
 ClusterDiscoveryCallbackHandlePtr

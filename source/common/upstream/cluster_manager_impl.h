@@ -294,20 +294,17 @@ public:
     }
 
     OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiPtr odcds)
-      : parent_(parent), odcds_(std::move(odcds))
-    {
+        : parent_(parent), odcds_(std::move(odcds)) {
       ASSERT(odcds_ != nullptr);
     }
 
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(const std::string& name,
                                     ClusterDiscoveryCallbackWeakPtr callback) override {
-      parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move (callback));
+      parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move(callback));
     }
 
-    OdCdsApiImpl& getOdCds() const {
-      return *odcds_;
-    }
+    OdCdsApiImpl& getOdCds() const { return *odcds_; }
 
   private:
     ClusterManagerImpl& parent_;

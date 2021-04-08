@@ -171,7 +171,8 @@ public:
     create(defaultConfig());
     auto odcds = MockOdCdsApi::create();
     odcds_ = odcds.get();
-    odcds_handle_ = ClusterManagerImpl::OdCdsApiHandleImpl::create(*cluster_manager_, std::move (odcds));
+    odcds_handle_ =
+        ClusterManagerImpl::OdCdsApiHandleImpl::create(*cluster_manager_, std::move(odcds));
     // These tmp things are kept to keep the cluster lifecycle callback,
     // because mock would cause the callback to be removed while
     // iterating the list of those callbacks.

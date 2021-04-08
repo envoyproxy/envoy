@@ -8,11 +8,10 @@
 #include "test/mocks/tcp/mocks.h"
 
 #include "cluster_manager_factory.h"
-#include "od_cds_api_handle.h"
-#include "thread_local_cluster.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "od_cds_api_handle.h"
+#include "thread_local_cluster.h"
 
 namespace Envoy {
 namespace Upstream {

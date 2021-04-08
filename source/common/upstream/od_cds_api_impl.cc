@@ -12,8 +12,8 @@ OdCdsApiPtr OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& od
                                  const xds::core::v3::ResourceLocator* odcds_resources_locator,
                                  ClusterManager& cm, Stats::Scope& scope,
                                  ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return OdCdsApiPtr(new OdCdsApiImpl(
-      odcds_config, odcds_resources_locator, cm, scope, validation_visitor));
+  return OdCdsApiPtr(
+      new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, scope, validation_visitor));
 }
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
