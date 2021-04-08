@@ -1,3 +1,5 @@
+#include "envoy/http/filter.h"
+
 #include "extensions/common/aws/signer.h"
 #include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
@@ -13,11 +15,15 @@ namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 namespace {
 
+using Common::Aws::MockSigner;
 using ::testing::An;
+using ::testing::InSequence;
+using ::testing::NiceMock;
+using ::testing::StrictMock;
 
 class MockFilterConfig : public FilterConfig {
 public:
-  MockFilterConfig() { signer_ = std::make_shared<Common::Aws::MockSigner>(); }
+  MockFilterConfig() { signer_ = std::make_shared<StrictMock<MockSigner>>(); }
 
   Common::Aws::Signer& signer() override { return *signer_; }
   FilterStats& stats() override { return stats_; }
@@ -35,11 +41,14 @@ class AwsRequestSigningFilterTest : public testing::Test {
 public:
   void setup() {
     filter_config_ = std::make_shared<MockFilterConfig>();
+    filter_config_->unsigned_payload_ = false;
     filter_ = std::make_unique<Filter>(filter_config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
   std::shared_ptr<MockFilterConfig> filter_config_;
   std::unique_ptr<Filter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
 // Verify filter functionality when signing works for header only request.
@@ -50,6 +59,74 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
+}
+
+// Verify decodeHeaders signs when unsigned_payload is true and end_stream is false.
+TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
+  setup();
+  filter_config_->unsigned_payload_ = true;
+  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), true));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+// Verify decodeHeaders signs when unsigned_payload is true and end_stream is true.
+TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayloadHeaderOnly) {
+  setup();
+  filter_config_->unsigned_payload_ = true;
+  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), true));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+// Verify decodeHeaders does not sign when unsigned_payload is false and end_stream is false.
+TEST_F(AwsRequestSigningFilterTest, DecodeHeadersStopsIterationWithoutSigning) {
+  setup();
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+// Verify decodeData does not sign when end_stream is false.
+TEST_F(AwsRequestSigningFilterTest, DecodeDataStopsIterationWithoutSigning) {
+  setup();
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+}
+
+// Verify decodeData signs when end_stream is true (empty payload).
+TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsEmptyPayloadAndContinues) {
+  InSequence seq;
+  setup();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  // echo -n '' | shasum -a 256
+  const std::string hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(*(filter_config_->signer_), sign(HeaderMapEqualRef(&headers), hash));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Verify decodeData signs when end_stream is true (empty payload).
+TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
+  InSequence seq;
+  setup();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  // echo -n 'Action=SignThis' | shasum -a 256
+  const std::string hash = "1db26ef86fca9f7c54d2273d4673a4f2a614fadf3185d16288d454619f1cf491";
+  Buffer::OwnedImpl buffer("Action=SignThis");
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  EXPECT_CALL(*(filter_config_->signer_), sign(HeaderMapEqualRef(&headers), hash));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Verify filter functionality when a host rewrite happens for header only request.
@@ -67,25 +144,25 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
 // Verify filter functionality when signing fails for header only request.
 TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), false)).WillOnce(Invoke([](Http::HeaderMap&, bool) -> void {
-    throw EnvoyException("failed");
-  }));
+  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), false))
+      .WillOnce(Invoke([](Http::HeaderMap&, bool) -> void { throw EnvoyException("failed"); }));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
 }
 
-// Verify FilterConfigImpl's getters.
+// Verify FilterConfigImpl getters.
 TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   Stats::IsolatedStoreImpl stats;
   auto signer = std::make_unique<Common::Aws::MockSigner>();
   const auto* signer_ptr = signer.get();
-  FilterConfigImpl config(std::move(signer), "prefix", stats, "foo", false);
+  FilterConfigImpl config(std::move(signer), "prefix", stats, "foo", true);
 
   EXPECT_EQ(signer_ptr, &config.signer());
   EXPECT_EQ(0UL, config.stats().signing_added_.value());
   EXPECT_EQ("foo", config.hostRewrite());
+  EXPECT_EQ(true, config.useUnsignedPayload());
 }
 
 } // namespace
