@@ -60,6 +60,12 @@ getSdsTestsParams(bool test_quic) {
   std::vector<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> ret;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto grpc_type : {Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc}) {
+#ifndef ENVOY_GOOGLE_GRPC
+      if (grpc_type == Grpc::ClientType::GoogleGrpc) {
+        continue;
+      }
+#endif
+
       ret.push_back({ip_version, grpc_type, false});
       if (test_quic) {
 #ifdef ENVOY_ENABLE_QUIC
