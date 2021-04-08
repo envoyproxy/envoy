@@ -137,7 +137,8 @@ protected:
         .WillRepeatedly(
             Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                          Envoy::Config::OpaqueResourceDecoder&, bool) {
+                          Envoy::Config::OpaqueResourceDecoder&,
+                          const Envoy::Config::SubscriptionOptions&) {
               auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
               rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
               EXPECT_CALL(*ret, start(_))

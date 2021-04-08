@@ -3,6 +3,7 @@ import unittest
 import merge_active_shadow
 
 from tools.api_proto_plugin import type_context as api_type_context
+from tools.protoxform import utils
 
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
@@ -105,8 +106,8 @@ value {
         text_format.Merge(shadow_pb_text, shadow_proto)
         target_proto = descriptor_pb2.EnumDescriptorProto()
         target_proto_dependencies = []
-        merge_active_shadow.merge_active_shadow_enum(active_proto, shadow_proto, target_proto,
-                                                     target_proto_dependencies)
+        merge_active_shadow.merge_active_shadow_enum(
+            active_proto, shadow_proto, target_proto, target_proto_dependencies)
         target_pb_text = """
 value {
   name: "foo"
@@ -391,8 +392,8 @@ location {
 """
         self.maxDiff = None
         self.assert_text_proto_eq(target_pb_text, str(target_proto))
-        self.assert_text_proto_eq(target_source_code_info_text,
-                                  str(fake_type_context.source_code_info.proto))
+        self.assert_text_proto_eq(
+            target_source_code_info_text, str(fake_type_context.source_code_info.proto))
 
     def testmerge_active_shadow_message(self):
         """merge_active_shadow_message recovers shadow fields with oneofs."""
@@ -466,9 +467,9 @@ oneof_decl {
         text_format.Merge(shadow_pb_text, shadow_proto)
         target_proto = descriptor_pb2.DescriptorProto()
         target_proto_dependencies = []
-        merge_active_shadow.merge_active_shadow_message(self.fake_type_context(), active_proto,
-                                                        shadow_proto, target_proto,
-                                                        target_proto_dependencies)
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
         target_pb_text = """
 field {
   name: "foo"
@@ -525,9 +526,9 @@ reserved_range {
         active_proto.nested_type.add().name = 'foo'
         target_proto = descriptor_pb2.DescriptorProto()
         target_proto_dependencies = []
-        merge_active_shadow.merge_active_shadow_message(self.fake_type_context(), active_proto,
-                                                        shadow_proto, target_proto,
-                                                        target_proto_dependencies)
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
         self.assertEqual(target_proto.nested_type[0].name, 'foo')
 
     def testmerge_active_shadow_message_no_shadow_enum(self):
@@ -537,9 +538,9 @@ reserved_range {
         active_proto.enum_type.add().name = 'foo'
         target_proto = descriptor_pb2.DescriptorProto()
         target_proto_dependencies = []
-        merge_active_shadow.merge_active_shadow_message(self.fake_type_context(), active_proto,
-                                                        shadow_proto, target_proto,
-                                                        target_proto_dependencies)
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
         self.assertEqual(target_proto.enum_type[0].name, 'foo')
 
     def testmerge_active_shadow_message_missing(self):
@@ -549,9 +550,9 @@ reserved_range {
         shadow_proto.nested_type.add().name = 'foo'
         target_proto = descriptor_pb2.DescriptorProto()
         target_proto_dependencies = []
-        merge_active_shadow.merge_active_shadow_message(self.fake_type_context(), active_proto,
-                                                        shadow_proto, target_proto,
-                                                        target_proto_dependencies)
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
         self.assertEqual(target_proto.nested_type[0].name, 'foo')
 
     def testmerge_active_shadow_file_missing(self):
@@ -585,4 +586,5 @@ reserved_range {
 # TODO(htuch): add some test for recursion.
 
 if __name__ == '__main__':
+    utils.load_protos(merge_active_shadow.PROTO_PACKAGES)
     unittest.main()

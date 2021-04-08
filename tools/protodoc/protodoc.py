@@ -8,8 +8,6 @@ import json
 import functools
 import os
 import pathlib
-import re
-import string
 import sys
 
 from google.protobuf import json_format
@@ -55,7 +53,8 @@ DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d
     os.environ['ENVOY_BLOB_SHA'])
 
 # Template for formating extension descriptions.
-EXTENSION_TEMPLATE = Template("""
+EXTENSION_TEMPLATE = Template(
+    """
 .. _extension_{{extension}}:
 
 This extension may be referenced by the qualified name *{{extension}}*
@@ -75,7 +74,8 @@ This extension may be referenced by the qualified name *{{extension}}*
 """)
 
 # Template for formating an extension category.
-EXTENSION_CATEGORY_TEMPLATE = Template("""
+EXTENSION_CATEGORY_TEMPLATE = Template(
+    """
 .. _extension_category_{{category}}:
 
 .. tip::
@@ -137,29 +137,29 @@ def hide_not_implemented(comment):
 def github_url(type_context):
     """Obtain data plane API Github URL by path from a TypeContext.
 
-  Args:
-    type_context: type_context.TypeContext for node.
+    Args:
+        type_context: type_context.TypeContext for node.
 
-  Returns:
-    A string with a corresponding data plane API GitHub Url.
-  """
+    Returns:
+        A string with a corresponding data plane API GitHub Url.
+    """
     if type_context.location is not None:
-        return DATA_PLANE_API_URL_FMT % (type_context.source_code_info.name,
-                                         type_context.location.span[0])
+        return DATA_PLANE_API_URL_FMT % (
+            type_context.source_code_info.name, type_context.location.span[0])
     return ''
 
 
 def format_comment_with_annotations(comment, type_name=''):
     """Format a comment string with additional RST for annotations.
 
-  Args:
-    comment: comment string.
-    type_name: optional, 'message' or 'enum' may be specified for additional
-      message/enum specific annotations.
+    Args:
+        comment: comment string.
+        type_name: optional, 'message' or 'enum' may be specified for additional
+           message/enum specific annotations.
 
-  Returns:
-    A string with additional RST from annotations.
-  """
+    Returns:
+        A string with additional RST from annotations.
+    """
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
         extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
@@ -175,13 +175,13 @@ def format_comment_with_annotations(comment, type_name=''):
 def map_lines(f, s):
     """Apply a function across each line in a flat string.
 
-  Args:
-    f: A string transform function for a line.
-    s: A string consisting of potentially multiple lines.
+    Args:
+        f: A string transform function for a line.
+        s: A string consisting of potentially multiple lines.
 
-  Returns:
-    A flat string with f applied to each line.
-  """
+    Returns:
+        A flat string with f applied to each line.
+    """
     return '\n'.join(f(line) for line in s.split('\n'))
 
 
@@ -206,25 +206,25 @@ def format_external_link(text, ref):
 def format_header(style, text):
     """Format RST header.
 
-  Args:
-    style: underline style, e.g. '=', '-'.
-    text: header text
+    Args:
+        style: underline style, e.g. '=', '-'.
+        text: header text
 
-  Returns:
-    RST formatted header.
-  """
+    Returns:
+        RST formatted header.
+    """
     return '%s\n%s\n\n' % (text, style * len(text))
 
 
 def format_extension(extension):
     """Format extension metadata as RST.
 
-  Args:
-    extension: the name of the extension, e.g. com.acme.foo.
+    Args:
+        extension: the name of the extension, e.g. com.acme.foo.
 
-  Returns:
-    RST formatted extension description.
-  """
+    Returns:
+        RST formatted extension description.
+    """
     try:
         extension_metadata = EXTENSION_DB[extension]
         status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
@@ -236,41 +236,42 @@ def format_extension(extension):
         )
         exit(1)  # Raising the error buries the above message in tracebacks.
 
-    return EXTENSION_TEMPLATE.render(extension=extension,
-                                     status=status,
-                                     security_posture=security_posture,
-                                     categories=categories)
+    return EXTENSION_TEMPLATE.render(
+        extension=extension,
+        status=status,
+        security_posture=security_posture,
+        categories=categories)
 
 
 def format_extension_category(extension_category):
     """Format extension metadata as RST.
 
-  Args:
-    extension_category: the name of the extension_category, e.g. com.acme.
+    Args:
+        extension_category: the name of the extension_category, e.g. com.acme.
 
-  Returns:
-    RST formatted extension category description.
-  """
+    Returns:
+        RST formatted extension category description.
+    """
     try:
         extensions = EXTENSION_CATEGORIES[extension_category]
     except KeyError as e:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-    return EXTENSION_CATEGORY_TEMPLATE.render(category=extension_category,
-                                              extensions=sorted(extensions))
+    return EXTENSION_CATEGORY_TEMPLATE.render(
+        category=extension_category, extensions=sorted(extensions))
 
 
 def format_header_from_file(style, source_code_info, proto_name):
     """Format RST header based on special file level title
 
-  Args:
-    style: underline style, e.g. '=', '-'.
-    source_code_info: SourceCodeInfo object.
-    proto_name: If the file_level_comment does not contain a user specified
-      title, use this as page title.
+    Args:
+        style: underline style, e.g. '=', '-'.
+        source_code_info: SourceCodeInfo object.
+        proto_name: If the file_level_comment does not contain a user specified
+           title, use this as page title.
 
-  Returns:
-    RST formatted header, and file level comment without page title strings.
-  """
+    Returns:
+        RST formatted header, and file level comment without page title strings.
+    """
     anchor = format_anchor(file_cross_ref_label(proto_name))
     stripped_comment = annotations.without_annotations(
         strip_leading_space('\n'.join(c + '\n' for c in source_code_info.file_level_comments)))
@@ -288,11 +289,11 @@ def format_header_from_file(style, source_code_info, proto_name):
 def format_field_type_as_json(type_context, field):
     """Format FieldDescriptorProto.Type as a pseudo-JSON string.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    field: FieldDescriptor proto.
-  Return: RST formatted pseudo-JSON string representation of field type.
-  """
+    Args:
+        type_context: contextual information for message/enum/field.
+        field: FieldDescriptor proto.
+    Return: RST formatted pseudo-JSON string representation of field type.
+    """
     if type_name_from_fqn(field.type_name) in type_context.map_typenames:
         return '"{...}"'
     if field.label == field.LABEL_REPEATED:
@@ -305,11 +306,11 @@ def format_field_type_as_json(type_context, field):
 def format_message_as_json(type_context, msg):
     """Format a message definition DescriptorProto as a pseudo-JSON block.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    msg: message definition DescriptorProto.
-  Return: RST formatted pseudo-JSON string representation of message definition.
-  """
+    Args:
+        type_context: contextual information for message/enum/field.
+        msg: message definition DescriptorProto.
+    Return: RST formatted pseudo-JSON string representation of message definition.
+    """
     lines = []
     for index, field in enumerate(msg.field):
         field_type_context = type_context.extend_field(index, field.name)
@@ -327,14 +328,14 @@ def format_message_as_json(type_context, msg):
 def normalize_field_type_name(field_fqn):
     """Normalize a fully qualified field type name, e.g.
 
-  .envoy.foo.bar.
+    .envoy.foo.bar.
 
-  Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
+    Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
 
-  Args:
-    field_fqn: a fully qualified type name from FieldDescriptorProto.type_name.
-  Return: Normalized type name.
-  """
+    Args:
+        field_fqn: a fully qualified type name from FieldDescriptorProto.type_name.
+    Return: Normalized type name.
+    """
     if field_fqn.startswith(ENVOY_API_NAMESPACE_PREFIX):
         return field_fqn[len(ENVOY_API_NAMESPACE_PREFIX):]
     if field_fqn.startswith(ENVOY_PREFIX):
@@ -345,14 +346,14 @@ def normalize_field_type_name(field_fqn):
 def normalize_type_context_name(type_name):
     """Normalize a type name, e.g.
 
-  envoy.foo.bar.
+    envoy.foo.bar.
 
-  Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
+    Strips leading ENVOY_API_NAMESPACE_PREFIX and ENVOY_PREFIX.
 
-  Args:
-    type_name: a name from a TypeContext.
-  Return: Normalized type name.
-  """
+    Args:
+        type_name: a name from a TypeContext.
+    Return: Normalized type name.
+    """
     return normalize_field_type_name(qualify_type_name(type_name))
 
 
@@ -367,14 +368,14 @@ def type_name_from_fqn(fqn):
 def format_field_type(type_context, field):
     """Format a FieldDescriptorProto type description.
 
-  Adds cross-refs for message types.
-  TODO(htuch): Add cross-refs for enums as well.
+    Adds cross-refs for message types.
+    TODO(htuch): Add cross-refs for enums as well.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    field: FieldDescriptor proto.
-  Return: RST formatted field type.
-  """
+    Args:
+        type_context: contextual information for message/enum/field.
+        field: FieldDescriptor proto.
+    Return: RST formatted field type.
+    """
     if field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(
             ENVOY_PREFIX):
         type_name = normalize_field_type_name(field.type_name)
@@ -382,7 +383,8 @@ def format_field_type(type_context, field):
             if type_context.map_typenames and type_name_from_fqn(
                     field.type_name) in type_context.map_typenames:
                 return 'map<%s, %s>' % tuple(
-                    map(functools.partial(format_field_type, type_context),
+                    map(
+                        functools.partial(format_field_type, type_context),
                         type_context.map_typenames[type_name_from_fqn(field.type_name)]))
             return format_internal_link(type_name, message_cross_ref_label(type_name))
         if field.type == field.TYPE_ENUM:
@@ -390,14 +392,13 @@ def format_field_type(type_context, field):
     elif field.type_name.startswith(WKT_NAMESPACE_PREFIX):
         wkt = field.type_name[len(WKT_NAMESPACE_PREFIX):]
         return format_external_link(
-            wkt,
-            'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s' %
-            wkt.lower())
+            wkt, 'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s'
+            % wkt.lower())
     elif field.type_name.startswith(RPC_NAMESPACE_PREFIX):
         rpc = field.type_name[len(RPC_NAMESPACE_PREFIX):]
         return format_external_link(
-            rpc, 'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s' %
-            rpc.lower())
+            rpc, 'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s'
+            % rpc.lower())
     elif field.type_name:
         return field.type_name
 
@@ -465,8 +466,8 @@ def format_security_options(security_option, field, type_context, edge_config):
 
     if security_option.configure_for_untrusted_downstream:
         sections.append(
-            indent(4,
-                   'This field should be configured in the presence of untrusted *downstreams*.'))
+            indent(
+                4, 'This field should be configured in the presence of untrusted *downstreams*.'))
     if security_option.configure_for_untrusted_upstream:
         sections.append(
             indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
@@ -478,37 +479,37 @@ def format_security_options(security_option, field, type_context, edge_config):
     field_name = type_context.name.split('.')[-1]
     example = {field_name: example_dict}
     sections.append(
-        indent(4, 'Example configuration for untrusted environments:\n\n') +
-        indent(4, '.. code-block:: yaml\n\n') +
-        '\n'.join(indent_lines(6,
-                               yaml.dump(example).split('\n'))))
+        indent(4, 'Example configuration for untrusted environments:\n\n')
+        + indent(4, '.. code-block:: yaml\n\n')
+        + '\n'.join(indent_lines(6,
+                                 yaml.dump(example).split('\n'))))
 
     return '.. attention::\n' + '\n\n'.join(sections)
 
 
-def format_field_as_definition_list_item(outer_type_context, type_context, field,
-                                         protodoc_manifest):
+def format_field_as_definition_list_item(
+        outer_type_context, type_context, field, protodoc_manifest):
     """Format a FieldDescriptorProto as RST definition list item.
 
-  Args:
-    outer_type_context: contextual information for enclosing message.
-    type_context: contextual information for message/enum/field.
-    field: FieldDescriptorProto.
-    protodoc_manifest: tools.protodoc.Manifest for proto.
+    Args:
+        outer_type_context: contextual information for enclosing message.
+        type_context: contextual information for message/enum/field.
+        field: FieldDescriptorProto.
+        protodoc_manifest: tools.protodoc.Manifest for proto.
 
-  Returns:
-    RST formatted definition list item.
-  """
+    Returns:
+        RST formatted definition list item.
+    """
     field_annotations = []
 
     anchor = format_anchor(field_cross_ref_label(normalize_type_context_name(type_context.name)))
     if field.options.HasExtension(validate_pb2.rules):
         rule = field.options.Extensions[validate_pb2.rules]
-        if ((rule.HasField('message') and rule.message.required) or
-            (rule.HasField('duration') and rule.duration.required) or
-            (rule.HasField('string') and rule.string.min_len > 0) or
-            (rule.HasField('string') and rule.string.min_bytes > 0) or
-            (rule.HasField('repeated') and rule.repeated.min_items > 0)):
+        if ((rule.HasField('message') and rule.message.required)
+                or (rule.HasField('duration') and rule.duration.required)
+                or (rule.HasField('string') and rule.string.min_len > 0)
+                or (rule.HasField('string') and rule.string.min_bytes > 0)
+                or (rule.HasField('repeated') and rule.repeated.min_items > 0)):
             field_annotations = ['*REQUIRED*']
     leading_comment = type_context.leading_comment
     formatted_leading_comment = format_comment_with_annotations(leading_comment)
@@ -516,8 +517,8 @@ def format_field_as_definition_list_item(outer_type_context, type_context, field
         return ''
 
     if field.HasField('oneof_index'):
-        oneof_context = outer_type_context.extend_oneof(field.oneof_index,
-                                                        type_context.oneof_names[field.oneof_index])
+        oneof_context = outer_type_context.extend_oneof(
+            field.oneof_index, type_context.oneof_names[field.oneof_index])
         oneof_comment = oneof_context.leading_comment
         formatted_oneof_comment = format_comment_with_annotations(oneof_comment)
         if hide_not_implemented(oneof_comment):
@@ -557,23 +558,24 @@ def format_field_as_definition_list_item(outer_type_context, type_context, field
         field.LABEL_REPEATED: '**repeated** ',
     }
     comment = '(%s) ' % ', '.join(
-        [pretty_label_names[field.label] + format_field_type(type_context, field)] +
-        field_annotations) + formatted_leading_comment
-    return anchor + field.name + '\n' + map_lines(functools.partial(
-        indent, 2), comment + formatted_oneof_comment) + formatted_security_options
+        [pretty_label_names[field.label] + format_field_type(type_context, field)]
+        + field_annotations) + formatted_leading_comment
+    return anchor + field.name + '\n' + map_lines(
+        functools.partial(indent, 2),
+        comment + formatted_oneof_comment) + formatted_security_options
 
 
 def format_message_as_definition_list(type_context, msg, protodoc_manifest):
     """Format a DescriptorProto as RST definition list.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    msg: DescriptorProto.
-    protodoc_manifest: tools.protodoc.Manifest for proto.
+    Args:
+        type_context: contextual information for message/enum/field.
+        msg: DescriptorProto.
+        protodoc_manifest: tools.protodoc.Manifest for proto.
 
-  Returns:
-    RST formatted definition list item.
-  """
+    Returns:
+        RST formatted definition list item.
+    """
     type_context.oneof_fields = defaultdict(list)
     type_context.oneof_required = defaultdict(bool)
     type_context.oneof_names = defaultdict(list)
@@ -597,13 +599,13 @@ def format_message_as_definition_list(type_context, msg, protodoc_manifest):
 def format_enum_value_as_definition_list_item(type_context, enum_value):
     """Format a EnumValueDescriptorProto as RST definition list item.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    enum_value: EnumValueDescriptorProto.
+    Args:
+        type_context: contextual information for message/enum/field.
+        enum_value: EnumValueDescriptorProto.
 
-  Returns:
-    RST formatted definition list item.
-  """
+    Returns:
+        RST formatted definition list item.
+    """
     anchor = format_anchor(
         enum_value_cross_ref_label(normalize_type_context_name(type_context.name)))
     default_comment = '*(DEFAULT)* ' if enum_value.number == 0 else ''
@@ -618,13 +620,13 @@ def format_enum_value_as_definition_list_item(type_context, enum_value):
 def format_enum_as_definition_list(type_context, enum):
     """Format a EnumDescriptorProto as RST definition list.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    enum: DescriptorProto.
+    Args:
+        type_context: contextual information for message/enum/field.
+        enum: DescriptorProto.
 
-  Returns:
-    RST formatted definition list item.
-  """
+    Returns:
+        RST formatted definition list item.
+    """
     return '\n'.join(
         format_enum_value_as_definition_list_item(
             type_context.extend_enum_value(index, enum_value.name), enum_value)
@@ -634,16 +636,16 @@ def format_enum_as_definition_list(type_context, enum):
 def format_proto_as_block_comment(proto):
     """Format a proto as a RST block comment.
 
-  Useful in debugging, not usually referenced.
-  """
+    Useful in debugging, not usually referenced.
+    """
     return '\n\nproto::\n\n' + map_lines(functools.partial(indent, 2), str(proto)) + '\n'
 
 
 class RstFormatVisitor(visitor.Visitor):
     """Visitor to generate a RST representation from a FileDescriptor proto.
 
-  See visitor.Visitor for visitor method docs comments.
-  """
+    See visitor.Visitor for visitor method docs comments.
+    """
 
     def __init__(self):
         r = runfiles.Create()
@@ -694,16 +696,16 @@ class RstFormatVisitor(visitor.Visitor):
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
         # in the common case.
         if (has_messages and not annotations.DOC_TITLE_ANNOTATION
-                in type_context.source_code_info.file_level_annotations and
-                file_proto.name.startswith('envoy')):
+                in type_context.source_code_info.file_level_annotations
+                and file_proto.name.startswith('envoy')):
             raise ProtodocError(
                 'Envoy API proto file missing [#protodoc-title:] annotation: {}'.format(
                     file_proto.name))
 
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
-        header, comment = format_header_from_file('=', type_context.source_code_info,
-                                                  file_proto.name)
+        header, comment = format_header_from_file(
+            '=', type_context.source_code_info, file_proto.name)
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
         # toctrees.
@@ -712,8 +714,9 @@ class RstFormatVisitor(visitor.Visitor):
         warnings = ''
         if file_proto.options.HasExtension(status_pb2.file_status):
             if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
-                warnings += ('.. warning::\n   This API is work-in-progress and is '
-                             'subject to breaking changes.\n\n')
+                warnings += (
+                    '.. warning::\n   This API is work-in-progress and is '
+                    'subject to breaking changes.\n\n')
         debug_proto = format_proto_as_block_comment(file_proto)
         return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 

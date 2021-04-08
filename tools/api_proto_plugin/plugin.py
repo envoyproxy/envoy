@@ -30,24 +30,24 @@ OutputDescriptor = namedtuple(
 
 
 def direct_output_descriptor(output_suffix, visitor, want_params=False):
-    return OutputDescriptor(output_suffix, visitor,
-                            (lambda x, _: x) if want_params else lambda x: x, want_params)
+    return OutputDescriptor(
+        output_suffix, visitor, (lambda x, _: x) if want_params else lambda x: x, want_params)
 
 
 # TODO(phlax): make this into a class
 def plugin(output_descriptors):
     """Protoc plugin entry point.
 
-  This defines protoc plugin and manages the stdin -> stdout flow. An
-  api_proto_plugin is defined by the provided visitor.
+    This defines protoc plugin and manages the stdin -> stdout flow. An
+    api_proto_plugin is defined by the provided visitor.
 
-  See
-  http://www.expobrain.net/2015/09/13/create-a-plugin-for-google-protocol-buffer/
-  for further details on protoc plugin basics.
+    See
+        http://www.expobrain.net/2015/09/13/create-a-plugin-for-google-protocol-buffer/
+          for further details on protoc plugin basics.
 
-  Args:
-    output_descriptors: a list of OutputDescriptors.
-  """
+    Args:
+        output_descriptors: a list of OutputDescriptors.
+    """
     request = plugin_pb2.CodeGeneratorRequest()
     request.ParseFromString(sys.stdin.buffer.read())
     response = plugin_pb2.CodeGeneratorResponse()
@@ -75,13 +75,13 @@ def plugin(output_descriptors):
             else:
                 xformed_proto = od.xform(file_proto)
                 visitor_factory = od.visitor_factory()
-            f.content = traverse.traverse_file(xformed_proto,
-                                               visitor_factory) if xformed_proto else ''
+            f.content = traverse.traverse_file(
+                xformed_proto, visitor_factory) if xformed_proto else ''
         if cprofile_enabled:
             pr.disable()
             stats_stream = io.StringIO()
-            ps = pstats.Stats(pr, stream=stats_stream).sort_stats(
-                os.getenv('CPROFILE_SORTBY', 'cumulative'))
+            ps = pstats.Stats(
+                pr, stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
             stats_file = response.file.add()
             stats_file.name = file_proto.name + '.profile'
             ps.print_stats()

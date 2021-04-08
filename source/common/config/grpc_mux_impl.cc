@@ -82,7 +82,8 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoder& resource_decoder, const bool) {
+                                      OpaqueResourceDecoder& resource_decoder,
+                                      const SubscriptionOptions&) {
   auto watch =
       std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
   ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
@@ -198,7 +199,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // the delta state. The proper fix for this is to converge these implementations,
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
     // We have to walk all watches (and need an efficient map as a result) to
@@ -263,7 +264,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // would do that tracking here.
     apiStateFor(type_url).request_.set_version_info(message->version_info());
     Memory::Utils::tryShrinkHeap();
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     for (auto watch : apiStateFor(type_url).watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
