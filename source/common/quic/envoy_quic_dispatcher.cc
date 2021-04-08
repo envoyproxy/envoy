@@ -49,7 +49,7 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
 std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
     const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
-    const quic::ParsedQuicVersion& version) {
+    const quic::ParsedQuicVersion& version, absl::string_view /*sni*/) {
   quic::QuicConfig quic_config = config();
   // TODO(danzh) setup flow control window via config.
   quic_config.SetInitialStreamFlowControlWindowToSend(
