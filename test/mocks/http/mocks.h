@@ -106,6 +106,7 @@ public:
   MOCK_METHOD(void, onLocalReply, (Code code));
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(bool, enableInternalRedirectsWithBody, (), (const));
 
   ResponseHeaderMapPtr continue_headers_;
   ResponseHeaderMapPtr response_headers_;

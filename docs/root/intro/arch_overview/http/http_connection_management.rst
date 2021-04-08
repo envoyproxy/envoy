@@ -153,7 +153,9 @@ Internal redirects
 
 Envoy supports handling 3xx redirects internally, that is capturing a configurable 3xx redirect
 response, synthesizing a new request, sending it to the upstream specified by the new route match,
-and returning the redirected response as the response to the original request.
+and returning the redirected response as the response to the original request. The headers and body
+of the original request will be sent in the redirect to the new location. Trailers are not yet
+supported.
 
 Internal redirects are configured via the :ref:`internal redirect policy
 <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field in route configuration.
@@ -162,6 +164,11 @@ When redirect handling is on, any 3xx response from upstream, that matches
 <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
 is subject to the redirect being handled by Envoy.
 
+If Envoy is configured to internally redirect HTTP 303 and receives an HTTP 303 response, it will
+dispatch the redirect with a bodiless HTTP GET if the original request was not a GET or HEAD
+request. Otherwise, Envoy will preserve the original HTTP method. For more information, see `RFC
+7231 Section 6.4.4 <https://tools.ietf.org/html/rfc7231#section-6.4.4>`_.
+
 For a redirect to be handled successfully it must pass the following checks:
 
 1. Have a response code matching one of :ref:`redirect_response_codes
@@ -169,7 +176,8 @@ For a redirect to be handled successfully it must pass the following checks:
    either 302 (by default), or a set of 3xx codes (301, 302, 303, 307, 308).
 2. Have a *location* header with a valid, fully qualified URL.
 3. The request must have been fully processed by Envoy.
-4. The request must not have a body.
+4. The request must be smaller than the :ref:`per_request_buffer_limit_bytes
+   <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>` limit.
 5. :ref:`allow_cross_scheme_redirect
    <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true (default to false),
    or the scheme of the downstream request and the *location* header are the same.

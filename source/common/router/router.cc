@@ -625,6 +625,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
+  internal_redirects_with_body_enabled_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body");
+
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
   // Hang onto the modify_headers function for later use in handling upstream responses.
@@ -687,7 +690,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // a backoff timer.
   ASSERT(upstream_requests_.size() <= 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty();
+  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty() ||
+                   (internal_redirects_with_body_enabled_ && route_entry_ &&
+                    route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
@@ -695,6 +700,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     retry_state_.reset();
     buffering = false;
     active_shadow_policies_.clear();
+    request_buffer_overflowed_ = true;
 
     // If we had to abandon buffering and there's no request in progress, abort the request and
     // clean up. This happens if the initial upstream request failed, and we are currently waiting
@@ -1475,7 +1481,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
   // destruction of this filter before the stream is marked as complete, and onDestroy will reset
   // the stream.
   //
-  // Normally when a stream is complete we signal this by resetting the upstream but this cam not
+  // Normally when a stream is complete we signal this by resetting the upstream but this cannot
   // be done in this case because if recreateStream fails, the "failure" path continues to call
   // code in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy
   // performing a spurious stream reset in the case recreateStream() succeeds, we explicitly track
@@ -1484,11 +1490,14 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstreamTiming().last_upstream_rx_byte_received_ && downstream_end_stream_;
 
+  const uint64_t status_code = Http::Utility::getResponseStatus(headers);
+
   // Redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
-      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
+      ((internal_redirects_with_body_enabled_ && !request_buffer_overflowed_) ||
+       !callbacks_->decodingBuffer()) &&
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location) &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
       callbacks_->recreateStream(&headers)) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
@@ -1502,7 +1511,8 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
 }
 
 bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                      const Http::HeaderEntry& internal_redirect) {
+                                                      const Http::HeaderEntry& internal_redirect,
+                                                      uint64_t status_code) {
   if (!downstream_headers.Path()) {
     ENVOY_STREAM_LOG(trace, "no path in downstream_headers", *callbacks_);
     return false;
@@ -1579,6 +1589,15 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
                        route_name, predicate->name());
       return false;
     }
+  }
+
+  // See https://tools.ietf.org/html/rfc7231#section-6.4.4.
+  if (status_code == enumToInt(Http::Code::SeeOther) &&
+      downstream_headers.getMethodValue() != Http::Headers::get().MethodValues.Get &&
+      downstream_headers.getMethodValue() != Http::Headers::get().MethodValues.Head) {
+    downstream_headers.setMethod(Http::Headers::get().MethodValues.Get);
+    downstream_headers.remove(Http::Headers::get().ContentLength);
+    callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
   }
 
   num_internal_redirect.increment();
