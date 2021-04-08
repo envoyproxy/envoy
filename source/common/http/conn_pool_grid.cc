@@ -29,14 +29,21 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
     : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it) {
-  newStream();
-}
+      current_(pool_it) {}
 
 // TODO(#15649) add trace logging.
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
-    : parent_(parent), pool_it_(it), cancellable_(pool().newStream(parent_.decoder_, *this)) {}
+    : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
+
+bool ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
+  auto* cancellable = pool().newStream(parent_.decoder_, *this);
+  if (cancellable == nullptr) {
+    return true;
+  }
+  cancellable_ = cancellable;
+  return false;
+}
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
@@ -64,7 +71,7 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
   removeFromList(grid_.wrapped_callbacks_);
 }
 
-void ConnectivityGrid::WrapperCallbacks::newStream() {
+bool ConnectivityGrid::WrapperCallbacks::newStream() {
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
             describePool(**current_), grid_.host_->hostname());
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
@@ -72,6 +79,8 @@ void ConnectivityGrid::WrapperCallbacks::newStream() {
   if (!next_attempt_timer_->enabled()) {
     next_attempt_timer_->enableTimer(grid_.next_attempt_duration_);
   }
+  // Note that in the case of immediate attempt/failure, newStream will delete this.
+  return connection_attempts_.front()->newStream();
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
@@ -175,6 +184,12 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       std::make_unique<WrapperCallbacks>(*this, decoder, pools_.begin(), callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
+  // Note that in the case of immediate attempt/failure, newStream will delete this.
+  if (wrapped_callbacks_.front()->newStream()) {
+    // If newStream succeeds, return nullptr as the caller has received their
+    // callback and does not need a cancellable handle.
+    return nullptr;
+  }
   return ret;
 }
 
