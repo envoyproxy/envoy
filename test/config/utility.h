@@ -229,6 +229,12 @@ public:
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                           HttpConnectionManager::CodecType type);
 
+  // Add TLS configuration for either SSL or QUIC transport socket according to listener config.
+  void configDownstreamTransportSocketWitTls(
+      envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+          fill_tls_stuff);
+
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }

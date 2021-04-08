@@ -59,13 +59,7 @@ std::vector<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>
 getSdsTestsParams(bool test_quic) {
   std::vector<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> ret;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (auto grpc_type : {Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc}) {
-#ifndef ENVOY_GOOGLE_GRPC
-      if (grpc_type == Grpc::ClientType::GoogleGrpc) {
-        continue;
-      }
-#endif
-
+    for (auto grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
       ret.push_back({ip_version, grpc_type, false});
       if (test_quic) {
 #ifdef ENVOY_ENABLE_QUIC
@@ -201,31 +195,19 @@ public:
   SdsDynamicDownstreamIntegrationTest()
       : SdsDynamicIntegrationBaseTest((std::get<2>(GetParam()) ? Http::CodecClient::Type::HTTP3
                                                                : Http::CodecClient::Type::HTTP1),
-                                      ipVersion(),
+                                      std::get<0>(GetParam()),
                                       ConfigHelper::httpProxyConfig(std::get<2>(GetParam()))) {}
 
   void initialize() override {
+    ASSERT(test_quic_ ? downstream_protocol_ == Http::CodecClient::Type::HTTP3
+                      : downstream_protocol_ == Http::CodecClient::Type::HTTP1);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* transport_socket = bootstrap.mutable_static_resources()
-                                   ->mutable_listeners(0)
-                                   ->mutable_filter_chains(0)
-                                   ->mutable_transport_socket();
-      if (!test_quic_) {
-        transport_socket->set_name("envoy.transport_sockets.tls");
-        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-        auto* common_tls_context = tls_context.mutable_common_tls_context();
-        configToUseSds(common_tls_context);
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
-      } else {
-        ASSERT(downstream_protocol_ == Http::CodecClient::Type::HTTP3);
-        transport_socket->set_name("envoy.transport_sockets.quic");
-        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
-            transport_socket_config;
-        auto* common_tls_context =
-            transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
-        configToUseSds(common_tls_context);
-        transport_socket->mutable_typed_config()->PackFrom(transport_socket_config);
-      }
+      config_helper_.configDownstreamTransportSocketWitTls(
+          bootstrap,
+          [this](
+              envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+            configToUseSds(common_tls_context);
+          });
     });
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -241,18 +223,18 @@ public:
   }
 
   void configToUseSds(
-      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* common_tls_context) {
-    common_tls_context->add_alpn_protocols(downstream_protocol_ == Http::CodecClient::Type::HTTP1
-                                               ? Http::Utility::AlpnNames::get().Http11
-                                               : Http::Utility::AlpnNames::get().Http3);
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+    common_tls_context.add_alpn_protocols(downstream_protocol_ == Http::CodecClient::Type::HTTP1
+                                              ? Http::Utility::AlpnNames::get().Http11
+                                              : Http::Utility::AlpnNames::get().Http3);
 
-    auto* validation_context = common_tls_context->mutable_validation_context();
+    auto* validation_context = common_tls_context.mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
     // Modify the listener ssl cert to use SDS from sds_cluster
-    auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
+    auto* secret_config = common_tls_context.add_tls_certificate_sds_secret_configs();
     setUpSdsConfig(secret_config, "server_cert");
   }
 

@@ -1062,6 +1062,30 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
   }
 }
 
+void ConfigHelper::configDownstreamTransportSocketWitTls(
+    envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+        fill_tls_stuff) {
+  for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
+    ASSERT(listener.filter_chains_size() > 0);
+    auto* filter_chain = listener.mutable_filter_chains(0);
+    auto* transport_socket = filter_chain->mutable_transport_socket();
+    if (listener.has_udp_listener_config() && listener.udp_listener_config().has_quic_options()) {
+      transport_socket->set_name("envoy.transport_sockets.quic");
+      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+          quic_transport_socket_config;
+      fill_tls_stuff(*quic_transport_socket_config.mutable_downstream_tls_context()
+                          ->mutable_common_tls_context());
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    } else if (!listener.has_udp_listener_config()) {
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      fill_tls_stuff(*tls_context.mutable_common_tls_context());
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    }
+  }
+}
+
 void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -1078,20 +1102,16 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 }
 
 void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
-  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
-      quic_transport_socket_config;
-  auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
-  ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
-                              *tls_context->mutable_common_tls_context());
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
-      ASSERT(listener.filter_chains_size() > 0);
-      auto* filter_chain = listener.mutable_filter_chains(0);
-      auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
       listener.set_reuse_port(reuse_port);
     }
   }
+  configDownstreamTransportSocketWitTls(
+      bootstrap_,
+      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
+      });
 }
 
 bool ConfigHelper::setAccessLog(
