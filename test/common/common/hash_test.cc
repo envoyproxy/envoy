@@ -14,8 +14,6 @@ TEST(Hash, xxHash) {
 TEST(Hash, xxHashWithVector) {
   absl::InlinedVector<absl::string_view, 2> v{"foo", "bar"};
   EXPECT_EQ(17745830980996999794U, HashUtil::xxHash64(absl::MakeSpan(v)));
-  absl::InlinedVector<absl::string_view, 1> empty_vector;
-  EXPECT_EQ(17241709254077376921U, HashUtil::xxHash64(absl::MakeSpan(empty_vector)));
 }
 
 TEST(Hash, djb2CaseInsensitiveHash) {

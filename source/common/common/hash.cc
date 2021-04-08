@@ -5,12 +5,8 @@
 namespace Envoy {
 
 uint64_t HashUtil::xxHash64(absl::Span<absl::string_view> input, uint64_t seed) {
-  if (input.empty()) {
-    seed = XXH64(input.data(), input.size(), seed);
-  } else {
-    for (auto& i : input) {
-      seed = XXH64(i.data(), i.size(), seed);
-    }
+  for (auto& i : input) {
+    seed = XXH64(i.data(), i.size(), seed);
   }
   return seed;
 }
