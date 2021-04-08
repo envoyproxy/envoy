@@ -378,7 +378,7 @@ public:
   virtual OdCdsApiHandleSharedPtr
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                    const xds::core::v3::ResourceLocator* odcds_resources_locator,
-                   ProtobufMessage::ValidationVisitor& validation_visitor);
+                   ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

@@ -32,9 +32,9 @@ enum class StartStatus {
  */
 class OdCdsApi {
 public:
-  virtual ~OdCdsApi();
+  virtual ~OdCdsApi() = default;
 
-  virtual void updateOnDemand(const std::string& cluster_name);
+  virtual void updateOnDemand(const std::string& cluster_name) PURE;
 };
 
 using OdCdsApiPtr = std::unique_ptr<OdCdsApi>;
