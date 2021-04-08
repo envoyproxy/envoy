@@ -544,8 +544,9 @@ TEST_P(FilterChainAccessLogTest, FilterChainName) {
     filter_chain->set_name("foo_filter_chain");
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");
@@ -647,7 +648,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
   Buffer::OwnedImpl response_data{"greetings"};
   upstream_request_->encodeData(response_data, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("greetings", response->body());

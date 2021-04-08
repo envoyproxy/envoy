@@ -155,6 +155,6 @@ message CidrRange {
   // IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
   string address_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Length of prefix, e.g. 0, 32.
+  // Length of prefix, e.g. 0, 32. Defaults to 0 when unset.
   google.protobuf.UInt32Value prefix_len = 2 [(validate.rules).uint32 = {lte: 128}];
 }

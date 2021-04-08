@@ -57,6 +57,8 @@ void MockInstance::poolReady(Network::MockClientConnection& conn) {
   connection_data_->release_callback_ = [&]() -> void { released(conn); };
 
   cb->onPoolReady(std::move(connection_data_), host_);
+
+  connection_data_ = std::make_unique<NiceMock<MockConnectionData>>();
 }
 
 } // namespace ConnectionPool

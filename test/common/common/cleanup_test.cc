@@ -114,4 +114,24 @@ TEST(RaiiMapOfListElement, MultipleEntriesSameKey) {
   EXPECT_EQ(map.size(), 0);
 }
 
+TEST(RaiiMapOfListElement, DeleteAfterMapRehash) {
+  absl::flat_hash_map<int, std::list<int>> map;
+  std::list<RaiiMapOfListElement<int, int>> list;
+  // According to https://abseil.io/docs/cpp/guides/container the max load factor on
+  // absl::flat_hash_map is 87.5%. Using bucket_count and multiplying by 2 should give us enough
+  // head room to cause rehashing.
+  int rehash_limit = (map.bucket_count() == 0 ? 1 : map.bucket_count()) * 2;
+
+  for (int i = 0; i <= rehash_limit; i++) {
+    list.emplace_back(map, i, i);
+    EXPECT_EQ(map.size(), i + 1);
+    auto it = map.find(i);
+    ASSERT_NE(map.end(), it);
+    EXPECT_EQ(it->second.size(), 1);
+  }
+
+  list.clear();
+  EXPECT_EQ(map.size(), 0);
+}
+
 } // namespace Envoy

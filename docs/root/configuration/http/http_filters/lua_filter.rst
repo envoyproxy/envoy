@@ -490,7 +490,7 @@ verifySignature()
 
 .. code-block:: lua
 
-  local ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
+  local ok, error = handle:verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
 Verify signature using provided parameters. *hashFunction* is the variable for the hash function which be used
 for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
@@ -511,6 +511,17 @@ base64Escape()
 Encodes the input string as base64. This can be useful for escaping binary data.
 
 .. _config_http_filters_lua_header_wrapper:
+
+timestamp()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  timestamp = handle:timestamp(format)
+
+High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
+*EnvoyTimestampResolution.MILLISECOND* is supported
+The function returns timestamp in milliseconds since epoch by default if format is not set.
 
 Header object API
 -----------------
@@ -691,6 +702,16 @@ Returns :repo:`information <include/envoy/ssl/connection.h>` related to the curr
 Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
 .. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
+
+requestedServerName()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:requestedServerName()
+
+Returns the string representation of :repo:`requested server name <include/envoy/stream_info/stream_info.h>`
+(e.g. SNI in TLS) for the current request if present.
 
 Dynamic metadata object API
 ---------------------------
@@ -886,7 +907,7 @@ urlEncodedPemEncodedPeerCertificateChain()
 
   downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
 
-Returnns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
+Returns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
 leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
 
 dnsSansPeerCertificate()
@@ -967,6 +988,6 @@ tlsVersion()
 
 .. code-block:: lua
 
-  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+  downstreamSslConnection:tlsVersion()
 
 Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS connection.

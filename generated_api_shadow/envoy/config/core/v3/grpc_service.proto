@@ -10,6 +10,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -124,7 +125,8 @@ message GrpcService {
         oneof config_type {
           google.protobuf.Any typed_config = 3;
 
-          google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+          google.protobuf.Struct hidden_envoy_deprecated_config = 2
+              [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
         }
       }
 

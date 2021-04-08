@@ -31,6 +31,7 @@ envoy_cc_library(
     name = "wasm_hdr",
     hdrs = [
         "context.h",
+        "plugin.h",
         "wasm.h",
         "wasm_extension.h",
         "wasm_vm.h",
@@ -44,6 +45,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_object",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
         "//source/common/version:version_includes",
@@ -62,6 +64,7 @@ envoy_cc_library(
     srcs = [
         "context.cc",
         "foreign.cc",
+        "plugin.cc",
         "wasm.cc",
         "wasm_extension.cc",
         "wasm_vm.cc",
@@ -81,6 +84,7 @@ envoy_cc_library(
         "//include/envoy/server:lifecycle_notifier_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:safe_memcpy_lib",
         "//source/common/config:remote_data_fetcher_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",

@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -65,10 +66,10 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
         "//source/common/network:filter_lib",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:codec_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -149,6 +150,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_pool_grid",
+    srcs = ["conn_pool_grid.cc"],
+    hdrs = ["conn_pool_grid.h"],
+    deps = [
+        ":mixed_conn_pool",
+        "//source/common/http/http3:conn_pool_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [
@@ -181,6 +192,8 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
@@ -247,8 +260,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
         "//source/common/http/match_wrapper:config",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
@@ -425,6 +436,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -457,18 +469,14 @@ envoy_cc_library(
     name = "request_id_extension_lib",
     srcs = [
         "request_id_extension_impl.cc",
-        "request_id_extension_uuid_impl.cc",
     ],
     hdrs = [
         "request_id_extension_impl.h",
-        "request_id_extension_uuid_impl.h",
     ],
     deps = [
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/server:request_id_extension_config_interface",
-        "//source/common/common:random_generator_lib",
         "//source/common/config:utility_lib",
-        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

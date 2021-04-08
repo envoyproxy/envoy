@@ -10,10 +10,12 @@
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http3/quic_codec_factory.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/http/status.h"
 #include "common/http/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/codec_impl.h"
+#endif
 
 namespace Envoy {
 namespace Http {
@@ -99,11 +101,21 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
+    StreamResetReason reason = StreamResetReason::ConnectionFailure;
+    if (connected_) {
+      reason = StreamResetReason::ConnectionTermination;
+      if (protocol_error_) {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
+          reason = StreamResetReason::ProtocolError;
+          connection_->streamInfo().setResponseFlag(
+              StreamInfo::ResponseFlag::UpstreamProtocolError);
+        }
+      }
+    }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
-      active_requests_.front()->encoder_->getStream().resetStream(
-          connected_ ? StreamResetReason::ConnectionTermination
-                     : StreamResetReason::ConnectionFailure);
+      active_requests_.front()->encoder_->getStream().resetStream(reason);
     }
   }
 }
@@ -135,14 +147,15 @@ void CodecClient::onData(Buffer::Instance& data) {
 
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
-    close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
     if (!isPrematureResponseError(status) ||
         (!active_requests_.empty() ||
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
       host_->cluster().stats().upstream_cx_protocol_error_.inc();
+      protocol_error_ = true;
     }
+    close();
   }
 
   // All data should be consumed at this point if the connection remains open.
@@ -171,11 +184,16 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
   }
   case Type::HTTP3: {
-    codec_ = std::unique_ptr<ClientConnection>(
-        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche)
-            .createQuicClientConnection(*connection_, *this));
+#ifdef ENVOY_ENABLE_QUIC
+    codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
+        dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_), *this,
+        host->cluster().http3CodecStats(), host->cluster().http3Options(),
+        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
     break;
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   }
   }
 }
