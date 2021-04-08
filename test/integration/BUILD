@@ -299,7 +299,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
         "//source/common/protobuf",
-        "//source/extensions/original_ip_detection/xff:config",
+        "//source/extensions/http/original_ip_detection/xff:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -1730,8 +1730,8 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/extensions/original_ip_detection/custom_header:config",
+        "//source/extensions/http/original_ip_detection/custom_header:config",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/original_ip_detection/custom_header/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg_cc_proto",
     ],
 )

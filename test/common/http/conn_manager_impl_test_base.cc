@@ -35,7 +35,7 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
 
   ip_detection_extensions_.push_back(
-      std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(0));
+      std::make_shared<Extensions::Http::OriginalIPDetection::Xff::XffIPDetection>(0));
 }
 
 HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {

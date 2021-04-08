@@ -45,7 +45,7 @@ use_remote_address: false
 original_ip_detection_extensions:
 - name: envoy.http.original_ip_detection.xff
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.original_ip_detection.xff.v3.XffConfig
+    "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
     xff_num_trusted_hops: 1
 stat_prefix: header_test
 route_config:

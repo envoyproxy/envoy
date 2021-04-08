@@ -275,8 +275,8 @@ EXTENSIONS = {
     #
 
     # Disabled by default
-    "envoy.http.original_ip_detection.custom_header":        "//source/extensions/original_ip_detection/custom_header:config",
-    "envoy.http.original_ip_detection.xff":                  "//source/extensions/original_ip_detection/xff:config",
+    "envoy.http.original_ip_detection.custom_header":        "//source/extensions/http/original_ip_detection/custom_header:config",
+    "envoy.http.original_ip_detection.xff":                  "//source/extensions/http/original_ip_detection/xff:config",
 
 }
 

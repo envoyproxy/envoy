@@ -41,7 +41,7 @@
 #endif
 
 #include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/original_ip_detection/xff/xff.h"
+#include "extensions/http/original_ip_detection/xff/xff.h"
 
 namespace Envoy {
 namespace Extensions {

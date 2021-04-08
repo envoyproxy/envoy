@@ -202,7 +202,7 @@ to XFF) are:
   node's connection to Envoy.
 
 In an environment where there are one or more trusted proxies in front of an edge
-Envoy instance, the :ref:`XFF extension <envoy_v3_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`
+Envoy instance, the :ref:`XFF extension <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
 can be configured via the :ref:`original_ip_detection_extensions field
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
 to set the *xff_num_trusted_hops* option which controls the number of additional

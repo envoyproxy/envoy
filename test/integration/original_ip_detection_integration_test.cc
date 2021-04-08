@@ -1,4 +1,4 @@
-#include "envoy/extensions/original_ip_detection/custom_header/v3/custom_header.pb.h"
+#include "envoy/extensions/http/original_ip_detection/custom_header/v3/custom_header.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -22,7 +22,8 @@ TEST_F(OriginalIPDetectionIntegrationTest, HeaderBasedDetection) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
+        envoy::extensions::http::original_ip_detection::custom_header::v3::CustomHeaderConfig
+            config;
         config.set_header_name("x-cdn-detected-ip");
 
         auto* extension = hcm.add_original_ip_detection_extensions();

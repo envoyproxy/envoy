@@ -2990,9 +2990,9 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
 
 TEST_F(HttpConnectionManagerImplTest, RequestRejectedViaIPDetection) {
   OriginalIPRejectRequestOptions reject_options = {Http::Code::Forbidden, "ip detection failed"};
-  auto extension =
-      std::make_shared<Extensions::OriginalIPDetection::CustomHeader::CustomHeaderIPDetection>(
-          "x-ip", reject_options);
+  auto extension = std::make_shared<
+      Extensions::Http::OriginalIPDetection::CustomHeader::CustomHeaderIPDetection>("x-ip",
+                                                                                    reject_options);
   ip_detection_extensions_.push_back(extension);
 
   use_remote_address_ = false;

@@ -472,7 +472,7 @@ message HttpConnectionManager {
   // .. note::
   //    This field is deprecated and instead :ref:`original_ip_detection_extensions
   //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
-  //    should be used to configure the :ref:`xff extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`
+  //    should be used to configure the :ref:`xff extension <envoy_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
   //    to configure IP detection using the :ref:`config_http_conn_man_headers_x-forwarded-for` header. To replace
   //    this field use a config like the following:
   //
@@ -480,7 +480,7 @@ message HttpConnectionManager {
   //
   //    original_ip_detection_extensions:
   //      typed_config:
-  //        "@type": type.googleapis.com/envoy.extensions.original_ip_detection.xff.v3.XffConfig
+  //        "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
   //        xff_num_trusted_hops: 1
   //
   uint32 xff_num_trusted_hops = 19
@@ -496,7 +496,7 @@ message HttpConnectionManager {
   // configuration option to detect the remote address. Once :ref:`xff_num_trusted_hops
   // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`
   // is removed, leaving this field empty will retain the default behavior when that field is unset. See
-  // the :ref:`xff extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>` for how to
+  // the :ref:`xff extension <envoy_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` for how to
   // configure xff_num_trusted_hops when using extensions.
   //
   // Furthermore, relying on the :ref:`config_http_conn_man_headers_x-forwarded-for`

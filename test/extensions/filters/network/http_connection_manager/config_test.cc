@@ -10,7 +10,7 @@
 #include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
-#include "extensions/original_ip_detection/custom_header/custom_header.h"
+#include "extensions/http/original_ip_detection/custom_header/custom_header.h"
 #include "extensions/request_id/uuid/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
@@ -1779,7 +1779,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
   route_config:
     name: local_route
   original_ip_detection_extensions:
-  - name: envoy.ip_detection.UnknownOriginalIPDetectionExtension
+  - name: envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   http_filters:
@@ -1788,7 +1788,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
 
   EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                           "Original IP detection extension not found: "
-                          "'envoy.ip_detection.UnknownOriginalIPDetectionExtension'");
+                          "'envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension'");
 }
 
 namespace {
@@ -1820,16 +1820,17 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) 
   route_config:
     name: local_route
   original_ip_detection_extensions:
-  - name: envoy.http.ip_detection.OriginalIPDetectionExtensionNotCreated
+  - name: envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated
     typed_config:
       "@type": type.googleapis.com/google.protobuf.UInt32Value
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                          "Original IP detection extension could not be created: "
-                          "'envoy.http.ip_detection.OriginalIPDetectionExtensionNotCreated'");
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Original IP detection extension could not be created: "
+      "'envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
@@ -1840,7 +1841,7 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   original_ip_detection_extensions:
   - name: envoy.http.original_ip_detection.custom_header
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
       header_name: x-ip-header
   http_filters:
   - name: envoy.filters.http.router
