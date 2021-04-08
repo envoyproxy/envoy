@@ -6,6 +6,8 @@
 
 #include "absl/base/call_once.h"
 #include "extension_registry.h"
+
+// #include "library/common/common/lambda_logger_delegate.h"
 #include "library/common/envoy_mobile_main_common.h"
 #include "library/common/http/dispatcher.h"
 #include "library/common/types/c_types.h"
@@ -17,12 +19,13 @@ public:
   /**
    * Constructor for a new engine instance.
    * @param callbacks, the callbacks to use for engine lifecycle monitoring.
+   * @param logger, the callbacks to use for engine logging.
    * @param config, the Envoy configuration to use when starting the instance.
    * @param log_level, the log level with which to configure the engine.
    * @param preferred_network, hook to obtain the preferred network for new streams.
    */
-  Engine(envoy_engine_callbacks callbacks, const char* config, const char* log_level,
-         std::atomic<envoy_network_t>& preferred_network);
+  Engine(envoy_engine_callbacks callbacks, envoy_logger logger, const char* config,
+         const char* log_level, std::atomic<envoy_network_t>& preferred_network);
 
   /**
    * Engine destructor.
@@ -86,10 +89,12 @@ private:
   Stats::ScopePtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
   envoy_engine_callbacks callbacks_;
+  // envoy_logger logger_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
   std::unique_ptr<Http::Dispatcher> http_dispatcher_;
   std::unique_ptr<MobileMainCommon> main_common_ GUARDED_BY(mutex_);
+  // Logger::LambdaDelegatePtr lambda_logger_{};
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
   Event::Dispatcher* event_dispatcher_;

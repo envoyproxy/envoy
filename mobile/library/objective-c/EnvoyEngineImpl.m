@@ -398,7 +398,9 @@ static envoy_data ios_get_string(const void *context) {
   @try {
     envoy_engine_callbacks native_callbacks = {ios_on_engine_running, ios_on_exit,
                                                (__bridge void *)(self)};
-    return (int)run_engine(_engineHandle, native_callbacks, configYAML.UTF8String,
+    // TODO(junr03): wire up once https://github.com/envoyproxy/envoy-mobile/pull/1356 lands.
+    envoy_logger logger = {NULL, NULL};
+    return (int)run_engine(_engineHandle, native_callbacks, logger, configYAML.UTF8String,
                            logLevel.UTF8String);
   } @catch (NSException *exception) {
     NSLog(@"[Envoy] exception caught: %@", exception);

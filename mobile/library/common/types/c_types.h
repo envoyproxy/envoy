@@ -280,10 +280,20 @@ typedef void (*envoy_on_exit_f)(void* context);
 
 /**
  * Called when the envoy has finished its async setup and returned post-init callbacks.
+ *
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
 typedef void (*envoy_on_engine_running_f)(void* context);
+
+/**
+ * Called when envoy's logger logs data.
+ *
+ * @param data, the logged data.
+ * @param context, contains the necessary state to carry out platform-specific dispatch and
+ * execution.
+ */
+typedef void (*envoy_log_f)(envoy_data data, void* context);
 
 #ifdef __cplusplus
 } // function pointers
@@ -313,3 +323,12 @@ typedef struct {
   // Context passed through to callbacks to provide dispatch and execution state.
   void* context;
 } envoy_engine_callbacks;
+
+/**
+ * Interface for logging.
+ */
+typedef struct {
+  envoy_log_f log;
+  // Context passed through to callbacks to provide dispatch and execution state.
+  void* context;
+} envoy_logger;
