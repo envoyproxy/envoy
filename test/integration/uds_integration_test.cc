@@ -136,7 +136,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
