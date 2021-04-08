@@ -1,10 +1,8 @@
 import subprocess
 import sys
 
-FLAKE8_CONFIG = "tools/code_format/flake8.conf"
-
 # explicitly use python3 linter
-FLAKE8_COMMAND = ("python3", "-m", "flake8", "--config", FLAKE8_CONFIG, ".")
+FLAKE8_COMMAND = ("python3", "-m", "flake8", ".")
 
 
 def main():

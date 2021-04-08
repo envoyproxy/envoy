@@ -8,6 +8,8 @@
 FAILED=()
 CURRENT=""
 
+DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
+
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
 
@@ -33,16 +35,26 @@ trap exit 1 INT
 
 # TODO: move these to bazel
 CURRENT=glint
-./tools/code_format/glint.sh
+"${ENVOY_SRCDIR}"/tools/code_format/glint.sh
 
 CURRENT=shellcheck
-./tools/code_format/check_shellcheck_format.sh check
+"${ENVOY_SRCDIR}"/tools/code_format/check_shellcheck_format.sh check
 
 CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
-CURRENT=flake8
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_flake8 "$(pwd)"
+# TODO(phlax): update to use bazel and python_flake8/python_check
+#              this will simplify this code to a single line
+CURRENT=python
+"${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check || {
+    "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
+    git diff HEAD | tee "${DIFF_OUTPUT}"
+    raise () {
+        # this throws an error without exiting
+        return 1
+    }
+    raise
+}
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:" >&2
