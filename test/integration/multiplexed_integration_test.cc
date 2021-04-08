@@ -879,9 +879,10 @@ TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
   response->waitForReset();
 }
 
-TEST_P(Http2IntegrationTest, BadMagic) {
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
-    return; // protocol-specific framing.
+TEST_P(Http2IntegrationTest, Http2BadMagic) {
+  if (downistreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    // The "magic" payload is an HTTP/2 specific thing.
+    return;
   }
   initialize();
   std::string response;
