@@ -28,7 +28,7 @@ public:
   Common::Aws::Signer& signer() override { return *signer_; }
   FilterStats& stats() override { return stats_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
-  bool useUnsignedPayload() override { return unsigned_payload_; }
+  bool useUnsignedPayload() const override { return unsigned_payload_; }
 
   std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;

@@ -23,7 +23,7 @@ Extensions::Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
 FilterStats& FilterConfigImpl::stats() { return stats_; }
 
 const std::string& FilterConfigImpl::hostRewrite() const { return host_rewrite_; }
-bool FilterConfigImpl::useUnsignedPayload() { return unsigned_payload_; }
+bool FilterConfigImpl::useUnsignedPayload() const { return unsigned_payload_; }
 
 FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + "aws_request_signing.";
@@ -69,10 +69,11 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
+  const std::string hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
 
   try {
     ENVOY_LOG(debug, "aws request signing from decodeData");
+    ASSERT(request_headers_ != nullptr);
     config_->signer().sign(*request_headers_, hash);
     config_->stats().signing_added_.inc();
   } catch (const EnvoyException& e) {

@@ -23,6 +23,8 @@ public:
   /**
    * Sign an AWS request.
    * @param headers AWS API request headers.
+   * @param unsigned_payload use the literal string ``UNSIGNED-PAYLOAD`` to calculate the payload
+   * hash.
    * @throws EnvoyException if the request cannot be signed.
    */
   virtual void sign(Http::RequestHeaderMap& headers, bool unsigned_payload = false) PURE;

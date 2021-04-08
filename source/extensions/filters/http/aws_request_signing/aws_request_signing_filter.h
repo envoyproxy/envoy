@@ -54,7 +54,7 @@ public:
   /**
    * @return  whether or not to buffer and sign the payload.
    */
-  virtual bool useUnsignedPayload() PURE;
+  virtual bool useUnsignedPayload() const PURE;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -70,13 +70,13 @@ public:
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
   const std::string& hostRewrite() const override;
-  bool useUnsignedPayload() override;
+  bool useUnsignedPayload() const override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
   std::string host_rewrite_;
-  bool unsigned_payload_;
+  const bool unsigned_payload_;
 };
 
 /**
@@ -94,7 +94,7 @@ public:
 
 private:
   std::shared_ptr<FilterConfig> config_;
-  Http::RequestHeaderMap* request_headers_ = nullptr;
+  Http::RequestHeaderMap* request_headers_{};
 };
 
 } // namespace AwsRequestSigningFilter
