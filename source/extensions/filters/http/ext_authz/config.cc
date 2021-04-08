@@ -51,6 +51,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
 
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
+
     callback = [&context, filter_config, timeout_ms, proto_config,
                 transport_api_version = Config::Utility::getAndCheckTransportVersion(proto_config)](
                    Http::FilterChainFactoryCallbacks& callbacks) {
