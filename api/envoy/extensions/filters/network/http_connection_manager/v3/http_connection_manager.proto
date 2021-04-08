@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 45]
+// [#next-free-field: 46]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -640,7 +640,7 @@ message HttpConnectionManager {
   // This affects the upstream host header.
   // Without setting this option, incoming requests with host `example.com.` will not match against
   // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
-  bool strip_trailing_host_dot = 44;
+  bool strip_trailing_host_dot = 45;
 }
 
 // The configuration to customize local reply returned by Envoy.
