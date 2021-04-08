@@ -32,6 +32,18 @@ Adds `@someone` as an assignee to the issue or pull request that this comment is
 ```
 Removes `@someone` as an assignee.
 
+```
+/assign-from @envoyproxy/some-team [@envoyproxy/another-team..]
+```
+Assign a random member from `@envoyproxy/some-team` to an issue or pull request. Additional teams may be specified as
+extra args. Example teams include:
+- `@envoyproxy/senior-maintainers` (Senior maintainers)
+- `@envoyproxy/maintainers` (All maintainers)
+- `@envoyproxy/api-shepherds` (API shepherds)
+- `@envoyproxy/dependency-shepherds` (Dependency shepherds)
+- `@envoyproxy/first-pass-reviewers` (Contributors that provide first-pass
+  reviews, typically non-senior maintainers and maintainer applicants)
+
 Only organization members can assign or unassign other users, who must be organization members as well.
 
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/6)
