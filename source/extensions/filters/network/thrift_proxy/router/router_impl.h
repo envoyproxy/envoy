@@ -180,15 +180,16 @@ public:
          Stats::Scope& scope)
       : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
         stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
-        request_call_(stat_name_set_->add("request_call")),
-        request_oneway_(stat_name_set_->add("request_oneway")),
-        request_invalid_type_(stat_name_set_->add("request_invalid_type")),
-        response_reply_(stat_name_set_->add("response_reply")),
-        response_reply_success_(stat_name_set_->add("response_success")),
-        response_reply_error_(stat_name_set_->add("response_error")),
-        response_exception_(stat_name_set_->add("response_exception")),
-        response_invalid_type_(stat_name_set_->add("response_invalid_type")),
-        passthrough_supported_(false) {}
+        symbol_table_(scope.symbolTable()), thrift_(stat_name_set_->add("thrift")),
+        upstream_rq_call_(stat_name_set_->add("upstream_rq_call")),
+        upstream_rq_oneway_(stat_name_set_->add("upstream_rq_oneway")),
+        upstream_rq_invalid_type_(stat_name_set_->add("upstream_rq_invalid_type")),
+        upstream_resp_reply_(stat_name_set_->add("upstream_resp_reply")),
+        upstream_resp_reply_success_(stat_name_set_->add("upstream_resp_success")),
+        upstream_resp_reply_error_(stat_name_set_->add("upstream_resp_error")),
+        upstream_resp_exception_(stat_name_set_->add("upstream_resp_exception")),
+        upstream_resp_invalid_type_(stat_name_set_->add("upstream_resp_invalid_type")),
+        upstream_rq_time_(stat_name_set_->add("upstream_rq_time")), passthrough_supported_(false) {}
 
   ~Router() override = default;
 
@@ -198,8 +199,23 @@ public:
   bool passthroughSupported() const override { return passthrough_supported_; }
 
   // Stats
-  void incClusterScopeCounter(Stats::StatName name) {
-    cluster_->statsScope().counterFromStatName(name).inc();
+  void incClusterScopeCounter(const Stats::StatNameVec& names) const {
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+    cluster_->statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+  }
+
+  void recordClusterScopeHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+                                   uint64_t count) const {
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+    cluster_->statsScope()
+        .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
+        .recordValue(count);
+  }
+
+  void chargeResponseTiming(const std::chrono::milliseconds response_time) const {
+    const uint64_t count = response_time.count();
+    recordClusterScopeHistogram({thrift_, upstream_rq_time_}, Stats::Histogram::Unit::Milliseconds,
+                                count);
   }
 
   // ProtocolConverter
@@ -261,6 +277,9 @@ private:
     bool request_complete_ : 1;
     bool response_started_ : 1;
     bool response_complete_ : 1;
+
+    bool charged_response_timing_{false};
+    MonotonicTime downstream_request_complete_time_;
   };
 
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
@@ -274,14 +293,17 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
   Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName request_call_;
-  const Stats::StatName request_oneway_;
-  const Stats::StatName request_invalid_type_;
-  const Stats::StatName response_reply_;
-  const Stats::StatName response_reply_success_;
-  const Stats::StatName response_reply_error_;
-  const Stats::StatName response_exception_;
-  const Stats::StatName response_invalid_type_;
+  Stats::SymbolTable& symbol_table_;
+  const Stats::StatName thrift_;
+  const Stats::StatName upstream_rq_call_;
+  const Stats::StatName upstream_rq_oneway_;
+  const Stats::StatName upstream_rq_invalid_type_;
+  const Stats::StatName upstream_resp_reply_;
+  const Stats::StatName upstream_resp_reply_success_;
+  const Stats::StatName upstream_resp_reply_error_;
+  const Stats::StatName upstream_resp_exception_;
+  const Stats::StatName upstream_resp_invalid_type_;
+  const Stats::StatName upstream_rq_time_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};
