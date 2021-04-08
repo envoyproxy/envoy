@@ -70,8 +70,7 @@ void ConnectivityGrid::WrapperCallbacks::newStream() {
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (!next_attempt_timer_->enabled()) {
-    // TODO(#15649) When adding config for the grid, make this configurable.
-    next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
+    next_attempt_timer_->enableTimer(grid_.next_attempt_duration_);
   }
 }
 
@@ -117,10 +116,10 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    ConnectivityOptions connectivity_options)
+    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), time_source_(time_source) {
+      state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source) {
   // TODO(#15649) support v6/v4, WiFi/cellular.
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(contains(connectivity_options.protocols_,
