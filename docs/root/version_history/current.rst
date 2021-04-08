@@ -47,6 +47,7 @@ Minor Behavior Changes
   whether receiving `x-envoy-immediate-health-check-fail` will cause exclusion or not. Thus,
   depending on the Envoy deployment, the feature flag may need to be flipped on both downstream
   and upstream instances, depending on the reason.
+* http: added support for internal redirects with bodies. This behavior can be disabled temporarily by setting `envoy.reloadable_features.internal_redirects_with_body` to false.
 * http: allow to use path canonicalizer from `googleurl <https://quiche.googlesource.com/googleurl>`_
   instead of `//source/common/chromium_url`. The new path canonicalizer is enabled by default. To
   revert to the legacy path canonicalizer, enable the runtime flag

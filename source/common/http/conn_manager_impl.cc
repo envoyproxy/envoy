@@ -101,7 +101,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
-      time_source_(time_source) {}
+      time_source_(time_source),
+      enable_internal_redirects_with_body_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_redirects_with_body")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -1613,6 +1615,14 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   ResponseEncoder* response_encoder = response_encoder_;
   response_encoder_ = nullptr;
 
+  Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
+  const auto& buffered_request_data = filter_manager_.bufferedRequestData();
+  const bool proxy_body = connection_manager_.enable_internal_redirects_with_body_ &&
+                          buffered_request_data != nullptr && buffered_request_data->length() > 0;
+  if (proxy_body) {
+    request_data->move(*buffered_request_data);
+  }
+
   response_encoder->getStream().removeCallbacks(*this);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
@@ -1631,7 +1641,13 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
             filter_state->parent(), StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  new_stream.decodeHeaders(std::move(request_headers_), true);
+  new_stream.decodeHeaders(std::move(request_headers_), !proxy_body);
+  if (proxy_body) {
+    // This functionality is currently only used for internal redirects, which the router only
+    // allows if the full request has been read (end_stream = true) so we don't need to handle the
+    // case of upstream sending an early response mid-request.
+    new_stream.decodeData(*request_data, true);
+  }
 }
 
 Http1StreamEncoderOptionsOptRef ConnectionManagerImpl::ActiveStream::http1StreamEncoderOptions() {
