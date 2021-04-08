@@ -1,8 +1,6 @@
 import importlib
 from unittest.mock import patch, PropertyMock
 
-# import pytest
-
 from tools.base import pytest_runner, runner
 
 
