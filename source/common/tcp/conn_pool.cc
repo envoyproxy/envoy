@@ -6,7 +6,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -31,10 +30,7 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
                                    host->cluster().stats().upstream_cx_tx_bytes_buffered_,
                                    &host->cluster().stats().bind_errors_, nullptr});
-
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
-    connection_->noDelay(true);
-  }
+  connection_->noDelay(true);
   connection_->connect();
 }
 
@@ -43,7 +39,7 @@ ActiveTcpClient::~ActiveTcpClient() {
   // TcpConnectionData. Make sure the TcpConnectionData will not refer to this ActiveTcpClient
   // and handle clean up normally done in clearCallbacks()
   if (tcp_connection_data_) {
-    ASSERT(state_ == ActiveClient::State::CLOSED);
+    ASSERT(state() == ActiveClient::State::CLOSED);
     tcp_connection_data_->release();
     parent_.onStreamClosed(*this, true);
     parent_.checkForDrained();
@@ -51,7 +47,7 @@ ActiveTcpClient::~ActiveTcpClient() {
 }
 
 void ActiveTcpClient::clearCallbacks() {
-  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
+  if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
     pool->scheduleOnUpstreamReady();
   }

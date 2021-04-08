@@ -485,7 +485,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
     }
   }
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   codec_client_->close();
 

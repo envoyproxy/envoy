@@ -272,6 +272,8 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   idle_timeout_ = (std::chrono::milliseconds(10));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   Event::MockTimer* idle_timer = setUpTimer();
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   setup(false, "");
@@ -350,6 +352,8 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   max_connection_duration_ = (std::chrono::milliseconds(10));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
   setup(false, "");
@@ -2055,15 +2059,12 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
   Stats::IsolatedStoreImpl stats;
   ConnectionManagerTracingStats tracing_stats{CONN_MAN_TRACING_STATS(POOL_COUNTER(stats))};
 
-  EXPECT_THROW(
-      ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::HealthCheck, tracing_stats),
-      std::invalid_argument);
-
   ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::ClientForced, tracing_stats);
   EXPECT_EQ(1UL, tracing_stats.client_enabled_.value());
 
-  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::NotTraceableRequestId, tracing_stats);
-  EXPECT_EQ(1UL, tracing_stats.not_traceable_.value());
+  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::HealthCheck, tracing_stats);
+  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::NotTraceable, tracing_stats);
+  EXPECT_EQ(2UL, tracing_stats.not_traceable_.value());
 
   ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::Sampling, tracing_stats);
   EXPECT_EQ(1UL, tracing_stats.random_sampling_.value());

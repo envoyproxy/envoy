@@ -1,0 +1,8 @@
+// NOLINT(namespace-envoy)
+constexpr char TEST_SPIFFE_SAN_CERT_256_HASH[] =
+    "a47deda8919638a962a988a602116229ffe5a7bbc65cfb38a418e1e07753e8f9";
+constexpr char TEST_SPIFFE_SAN_CERT_1_HASH[] = "1ca4cde36e36dd032766680b5b81e7019b7c9fd5";
+constexpr char TEST_SPIFFE_SAN_CERT_SPKI[] = "x9Klc+szHFuefJihflHvoXnIQfHcpHT6yQ5cDRIJOI8=";
+constexpr char TEST_SPIFFE_SAN_CERT_SERIAL[] = "2d768514806913160afe80874264cd8c92354b1c";
+constexpr char TEST_SPIFFE_SAN_CERT_NOT_BEFORE[] = "Mar 22 03:09:21 2021 GMT";
+constexpr char TEST_SPIFFE_SAN_CERT_NOT_AFTER[] = "Mar 22 03:09:21 2023 GMT";

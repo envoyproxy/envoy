@@ -19,6 +19,8 @@ constexpr char kTestHeaderKey[] = "test-header";
 class RedirectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
+    setMaxRequestHeadersKb(60);
+    setMaxRequestHeadersCount(100);
     envoy::config::route::v3::RetryPolicy retry_policy;
 
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
@@ -61,9 +63,8 @@ protected:
     // connections because connection reuse may or may not be triggered.
     while (new_stream == nullptr) {
       FakeHttpConnectionPtr new_connection = nullptr;
-
       AssertionResult result = fake_upstreams_[0]->waitForHttpConnection(
-          *dispatcher_, new_connection, std::chrono::milliseconds(50), 60, 100);
+          *dispatcher_, new_connection, std::chrono::milliseconds(50));
       if (result) {
         ASSERT(new_connection);
         upstream_connections_.push_back(std::move(new_connection));
@@ -156,7 +157,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
@@ -200,7 +201,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
     upstream_requests.back()->encodeHeaders(redirect_response_, true);
   }
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ(
@@ -257,7 +258,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
   upstream_request_->encodeHeaders(response_with_big_body, false);
   upstream_request_->encodeData(2000000, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
@@ -313,7 +314,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
   redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("http://handle.internal.redirect.max.three.hop/yet/another/path",
@@ -381,7 +382,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
   redirect_response_.setLocation("http://handle.internal.redirect/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("http://handle.internal.redirect/yet/another/path",
@@ -451,7 +452,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredic
   redirect_response_.setLocation("https://handle.internal.redirect/yet/another/path");
   third_request->encodeHeaders(redirect_response_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("https://handle.internal.redirect/yet/another/path",

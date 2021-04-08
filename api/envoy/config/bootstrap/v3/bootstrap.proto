@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
@@ -20,6 +21,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -186,10 +188,12 @@ message Bootstrap {
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
   // Deprecated in favor of *watchdogs* which has finer granularity.
-  Watchdog watchdog = 8 [deprecated = true];
+  Watchdog watchdog = 8
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
+  // [#extension-category: envoy.guarddog_actions]
   Watchdogs watchdogs = 27;
 
   // Configuration for an external tracing provider.
@@ -197,7 +201,8 @@ message Bootstrap {
   // .. attention::
   //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
   //  <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
-  trace.v3.Tracing tracing = 9 [deprecated = true];
+  trace.v3.Tracing tracing = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
@@ -249,6 +254,7 @@ message Bootstrap {
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
+  // [#extension-category: envoy.bootstrap]
   repeated core.v3.TypedExtensionConfig bootstrap_extensions = 21;
 
   // Specifies optional extensions instantiated at startup time and
@@ -293,13 +299,20 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
+// [#next-free-field: 6]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the administration server.
+  repeated accesslog.v3.AccessLog access_log = 5;
 
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
   // :ref:`address <envoy_api_field_config.bootstrap.v3.Admin.address>` is set.
-  string access_log_path = 1;
+  // Deprecated in favor of *access_log* which offers more options.
+  string access_log_path = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The cpu profiler output path for the administration server. If no profile
   // path is specified, the default is ‘/var/log/envoy/envoy.prof’.

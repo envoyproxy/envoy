@@ -5,8 +5,10 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/http/kill_request/kill_request_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -18,6 +20,7 @@ namespace HttpFilters {
 namespace KillRequest {
 namespace {
 
+using ::testing::AnyNumber;
 using ::testing::Return;
 
 class KillRequestFilterTest : public testing::Test {
@@ -25,11 +28,17 @@ protected:
   void
   setUpTest(const envoy::extensions::filters::http::kill_request::v3::KillRequest& kill_request) {
     filter_ = std::make_unique<KillRequestFilter>(kill_request, random_generator_);
+
+    filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+    EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
+    EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
 
   std::unique_ptr<KillRequestFilter> filter_;
   testing::NiceMock<Random::MockRandomGenerator> random_generator_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
 };
 
 TEST_F(KillRequestFilterTest, KillRequestCrashEnvoy) {
@@ -71,6 +80,42 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledWhenIsKillRequestEnabledReturns
   request_headers_.addCopy("x-envoy-kill-request", "true");
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(1));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Kill request should be enabled when isKillRequestEnabled returns true
+// from the route level configuration.
+TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(0);
+  setUpTest(kill_request);
+  request_headers_.addCopy("x-envoy-kill-request", "true");
+
+  envoy::extensions::filters::http::kill_request::v3::KillRequest route_level_kill_request;
+  route_level_kill_request.mutable_probability()->set_numerator(1);
+  route_level_kill_request.set_kill_request_header("x-custom-kill-request");
+
+  KillSettings kill_settings = KillSettings(route_level_kill_request);
+
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
+      .WillByDefault(Return(&kill_settings));
+  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
+}
+
+// Kill request should be disabled when isKillRequestEnabled returns false
+// from the route level configuration.
+TEST_F(KillRequestFilterTest, KillRequestDisabledRouteLevelConfiguration) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(0);
+  setUpTest(kill_request);
+  request_headers_.addCopy("x-envoy-kill-request", "true");
+
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
+      .WillByDefault(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -127,6 +172,36 @@ TEST_F(KillRequestFilterTest, EncodeMetadataReturnsContinue) {
   setUpTest(kill_request);
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
+}
+
+TEST_F(KillRequestFilterTest, CanKillOnResponse) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(1);
+  kill_request.set_direction(
+      envoy::extensions::filters::http::kill_request::v3::KillRequest::RESPONSE);
+  setUpTest(kill_request);
+
+  // We should crash on the OUTBOUND request
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  response_headers_.addCopy("x-envoy-kill-request", "true");
+  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false), "");
+}
+
+TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(1);
+  kill_request.set_direction(
+      envoy::extensions::filters::http::kill_request::v3::KillRequest::RESPONSE);
+  setUpTest(kill_request);
+
+  // We shouldn't crash on the REQUEST direction kill request
+  request_headers_.addCopy("x-envoy-kill-request", "true");
+  ASSERT_EQ(filter_->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
+
+  // We should crash on the RESPONSE kill request
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  response_headers_.addCopy("x-envoy-kill-request", "true");
+  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false), "");
 }
 
 } // namespace
