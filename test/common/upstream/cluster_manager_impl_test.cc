@@ -16,7 +16,7 @@
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
-#include "test/mocks/upstream/odcds_api.h"
+#include "test/mocks/upstream/od_cds_api.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/test_runtime.h"
 
@@ -169,18 +169,22 @@ class ODCDTest : public ClusterManagerImplTest {
 public:
   void SetUp() override {
     create(defaultConfig());
-    odcds_ = MockOdCdsApi::createShared();
+    auto odcds = MockOdCdsApi::create();
+    odcds_ = odcds.get();
+    odcds_handle_ = ClusterManagerImpl::OdCdsApiHandleImpl::create(*cluster_manager_, std::move (odcds));
     // These tmp things are kept to keep the cluster lifecycle callback,
     // because mock would cause the callback to be removed while
     // iterating the list of those callbacks.
     tmp_cb_ = std::make_shared<ClusterDiscoveryCallback>([](ClusterDiscoveryStatus) {});
     EXPECT_CALL(*odcds_, updateOnDemand("cluster_tmp"));
-    tmp_handle_ = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_tmp", tmp_cb_);
+    tmp_handle_ = odcds_handle_->requestOnDemandClusterDiscovery("cluster_tmp", tmp_cb_);
   }
 
   void TearDown() override {
     tmp_cb_.reset();
     tmp_handle_.reset();
+    odcds_ = nullptr;
+    odcds_handle_.reset();
     factory_.tls_.shutdownThread();
   }
 
@@ -188,7 +192,7 @@ public:
     return std::make_shared<ClusterDiscoveryCallback>(
         [this](ClusterDiscoveryStatus cluster_status) {
           UNREFERENCED_PARAMETER(cluster_status);
-          this->testFunction();
+          testFunction();
         });
   }
 
@@ -196,13 +200,14 @@ public:
     return std::make_shared<ClusterDiscoveryCallback>(
         [this, expected_cluster_status](ClusterDiscoveryStatus cluster_status) {
           EXPECT_EQ(expected_cluster_status, cluster_status);
-          this->testFunction();
+          testFunction();
         });
   }
 
   MOCK_METHOD(void, testFunction, ());
 
-  MockOdCdsApiSharedPtr odcds_;
+  MockOdCdsApi* odcds_;
+  OdCdsApiHandleSharedPtr odcds_handle_;
   ClusterDiscoveryCallbackSharedPtr tmp_cb_;
   ClusterDiscoveryCallbackHandlePtr tmp_handle_;
 };
@@ -211,7 +216,7 @@ TEST_F(ODCDTest, TestRequest) {
   auto cb = createCallback();
   EXPECT_CALL(*this, testFunction()).Times(0);
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
-  auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
+  auto handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb);
 }
 
 TEST_F(ODCDTest, TestRequestRepeated) {
@@ -219,31 +224,31 @@ TEST_F(ODCDTest, TestRequestRepeated) {
   auto cb2 = createCallback();
   EXPECT_CALL(*this, testFunction()).Times(0);
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
-  auto handle1 = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb1);
-  auto handle2 = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb2);
+  auto handle1 = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb1);
+  auto handle2 = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb2);
 }
 
 TEST_F(ODCDTest, TestClusterRediscovered) {
   auto cb = createCallback(ClusterDiscoveryStatus::Available);
   EXPECT_CALL(*this, testFunction());
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
-  auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
+  auto handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb);
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
   handle.reset();
   cluster_manager_->removeCluster("cluster_foo");
   cb = createCallback();
-  handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb);
 }
 
 TEST_F(ODCDTest, TestClusterRediscoveredAfterFail) {
   auto cb = createCallback(ClusterDiscoveryStatus::Missing);
   EXPECT_CALL(*this, testFunction());
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
-  auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
+  auto handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb);
   cluster_manager_->notifyExpiredDiscovery("cluster_foo");
   handle.reset();
   cb = createCallback();
-  handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb);
 }
 
 TEST_F(ODCDTest, TestDiscoveryManagerIgnoresIrrelevantClusters) {
@@ -251,7 +256,7 @@ TEST_F(ODCDTest, TestDiscoveryManagerIgnoresIrrelevantClusters) {
     ADD_FAILURE() << "The callback should not be called for irrelevant clusters";
   });
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
-  auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
+  auto handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb);
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_irrelevant"), "version1");
 }
 
@@ -268,10 +273,10 @@ TEST_F(ODCDTest, TestDroppingHandles) {
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo2"));
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo3"));
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo4"));
-  auto handle1 = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo1", cb1);
-  auto handle2 = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo2", cb2);
-  auto handle3 = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo3", cb3);
-  auto handle4 = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo4", cb4);
+  auto handle1 = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo1", cb1);
+  auto handle2 = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo2", cb2);
+  auto handle3 = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo3", cb3);
+  auto handle4 = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo4", cb4);
 
   handle2.reset();
   handle3.reset();
@@ -289,14 +294,14 @@ TEST_F(ODCDTest, TestCallbackWithExistingCluster) {
   EXPECT_CALL(*this, testFunction());
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(0);
-  auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", cb);
+  auto handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", cb);
 }
 
 TEST_F(ODCDTest, TestExpiredCallbackWithExistingCluster) {
   cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
   ClusterDiscoveryCallbackSharedPtr null_cb;
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(0);
-  auto handle = cluster_manager_->requestOnDemandClusterDiscovery(odcds_, "cluster_foo", null_cb);
+  auto handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", null_cb);
 }
 
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {

@@ -2,7 +2,7 @@
 #include "envoy/config/subscription.h"
 
 #include "common/stats/isolated_store_impl.h"
-#include "common/upstream/odcds_api_impl.h"
+#include "common/upstream/od_cds_api_impl.h"
 
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"

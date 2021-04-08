@@ -1133,8 +1133,20 @@ void ClusterManagerImpl::ClusterDiscoveryManager::maybePostResetCallbacks() {
   }
 }
 
+OdCdsApiHandleSharedPtr
+ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+                                     const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
+  // return an already existing one if the config or locator matches. Note that this may need a way
+  // to clean up the unused handles, so we can close the unnecessary connections.
+  auto odcds = OdCdsApiImpl::create(
+      odcds_config, odcds_resources_locator, *this, stats_, validation_visitor);
+  return OdCdsApiHandleImpl::create(*this, std::move (odcds));
+}
+
 ClusterDiscoveryCallbackHandlePtr
-ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds,
+ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr odcds_handle,
                                                     const std::string& name,
                                                     ClusterDiscoveryCallbackWeakPtr weak_callback) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
@@ -1147,7 +1159,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds,
     // this name, so nothing more left to do here.
     return std::move(handle);
   }
-  dispatcher_.post([this, odcds = std::move(odcds), weak_callback, name,
+  dispatcher_.post([this, odcds_handle = std::move(odcds_handle), weak_callback, name,
                     &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
     // Check for the cluster here too. It might have been added
     // between the time when this callback was posted and when it is
@@ -1176,13 +1188,14 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds,
       // nothing to do.
       return;
     }
-    odcds->updateOnDemand(name);
+    auto& odcds = odcds_handle.getOdCds();
+    odcds.updateOnDemand(name);
     auto timer_cb = Event::TimerCb([this, name] { notifyExpiredDiscovery(name); });
     auto timer = dispatcher_.createTimer(timer_cb);
     timer->enableTimer(std::chrono::milliseconds(5000));
     // Keep odcds alive for the duration of the discovery process.
     pending_cluster_creations_.insert(
-        {std::move(name), ClusterCreation{std::move(odcds), std::move(timer)}});
+        {std::move(name), ClusterCreation{std::move(odcds_handle), std::move(timer)}});
   });
 
   return std::move(handle);

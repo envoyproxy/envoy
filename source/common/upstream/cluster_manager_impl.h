@@ -31,6 +31,7 @@
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
+#include "common/upstream/od_cds_api_impl.h"
 #include "common/upstream/priority_conn_pool_map.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -285,9 +286,44 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
+  class OdCdsApiHandleImpl : public std::enable_shared_from_this<OdCdsApiHandleImpl>,
+                             public OdCdsApiHandle {
+  public:
+    static OdCdsApiHandleSharedPtr create(ClusterManagerImpl& parent, OdCdsApiPtr odcds) {
+      return std::make_shared<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    }
+
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiPtr odcds)
+      : parent_(parent), odcds_(std::move(odcds))
+    {
+      ASSERT(odcds_ != nullptr);
+    }
+
+    ClusterDiscoveryCallbackHandlePtr
+    requestOnDemandClusterDiscovery(const std::string& name,
+                                    ClusterDiscoveryCallbackWeakPtr callback) override {
+      parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move (callback));
+    }
+
+    OdCdsApiImpl& getOdCds() const {
+      return *odcds_;
+    }
+
+  private:
+    ClusterManagerImpl& parent_;
+    OdCdsApiPtr odcds_;
+  };
+
+  using OdCdsApiHandleImplSharedPtr = std::shared_ptr<OdCdsApiHandleImpl>;
+
+  OdCdsApiHandleSharedPtr
+  allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+                   const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                   ProtobufMessage::ValidationVisitor& validation_visitor) override;
+
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, const std::string& name,
-                                  ClusterDiscoveryCallbackWeakPtr callback) override;
+  requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr odcds_handle, const std::string& name,
+                                  ClusterDiscoveryCallbackWeakPtr callback);
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
@@ -623,7 +659,7 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   struct ClusterCreation {
-    OdCdsApiSharedPtr odcds_;
+    OdCdsApiHandleImplSharedPtr odcds_handle_;
     Event::TimerPtr expiration_timer_;
   };
 

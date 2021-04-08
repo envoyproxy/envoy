@@ -28,6 +28,19 @@ enum class StartStatus {
 };
 
 /**
+ * An interface for on-demand CDS. Defined to allow mocking.
+ */
+class OdCdsApi
+{
+public:
+  virtual ~OdCdsApi();
+
+  virtual void updateOnDemand(const std::string& cluster_name);
+};
+
+using OdCdsApiPtr = std::unique_ptr<OdCdsApi>;
+
+/**
  * ODCDS API implementation that fetches via Subscription.
  */
 class OdCdsApiImpl : public OdCdsApi,

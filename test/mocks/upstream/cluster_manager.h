@@ -8,9 +8,11 @@
 #include "test/mocks/tcp/mocks.h"
 
 #include "cluster_manager_factory.h"
+#include "od_cds_api_handle.h"
+#include "thread_local_cluster.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "thread_local_cluster.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -68,9 +70,10 @@ public:
   const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const override {
     return cluster_timeout_budget_stat_names_;
   }
-  MOCK_METHOD(ClusterDiscoveryCallbackHandlePtr, requestOnDemandClusterDiscovery,
-              (OdCdsApiSharedPtr odcds, const std::string& name,
-               ClusterDiscoveryCallbackWeakPtr callback));
+  MOCK_METHOD(OdCdsApiHandleSharedPtr, allocateOdCdsApi,
+              (const envoy::config::core::v3::ConfigSource& odcds_config,
+               const xds::core::v3::ResourceLocator* odcds_resources_locator,
+               ProtobufMessage::ValidationVisitor& validation_visitor));
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::config::core::v3::BindConfig bind_config_;
@@ -87,7 +90,7 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+  std::shared_ptr<NiceMock<MockOdCdsApiHandle>> odcds_handle_;
 };
 } // namespace Upstream
-
 } // namespace Envoy

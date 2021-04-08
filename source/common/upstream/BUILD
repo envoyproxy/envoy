@@ -45,9 +45,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "odcds_api_lib",
-    srcs = ["odcds_api_impl.cc"],
-    hdrs = ["odcds_api_impl.h"],
+    name = "od_cds_api_lib",
+    srcs = ["od_cds_api_impl.cc"],
+    hdrs = ["od_cds_api_impl.h"],
     deps = [
         ":cds_api_helper_lib",
         "//include/envoy/config:subscription_interface",
@@ -71,7 +71,7 @@ envoy_cc_library(
         ":cds_api_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
-        ":odcds_api_lib",
+        ":od_cds_api_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
         "//include/envoy/api:api_interface",
