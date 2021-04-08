@@ -2339,6 +2339,7 @@ envoy_cc_library(
     deps = [
         ":quic_core_alarm_interface_lib",
         ":quic_core_crypto_encryption_lib",
+        ":quic_core_http_server_initiated_spdy_stream_lib",
         ":quic_core_http_spdy_session_lib",
         ":quic_core_packets_lib",
         ":quic_core_qpack_qpack_streams_lib",
@@ -2348,7 +2349,6 @@ envoy_cc_library(
         ":quic_core_utils_lib",
         ":quic_platform_base",
         ":spdy_core_framer_lib",
-        ":quic_core_http_server_initiated_spdy_stream_lib",
         ":spdy_core_protocol_lib",
         "@envoy//source/common/quic:spdy_server_push_utils_for_envoy_lib",
     ],
