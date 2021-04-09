@@ -104,7 +104,6 @@ Create a file `tools/sometools/mytool.py` with the following content:
 ```python
 #!/usr/bin/env python3
 
-import json
 import sys
 
 import requests
@@ -313,8 +312,6 @@ A `patches` fixture has been added to make this easier.
 The above test can be rewritten to make use of it as follows:
 
 ```python
-from unittest.mock import patch
-
 from tools.sometools import mytool
 
 
@@ -397,7 +394,6 @@ With this dependency in place we could rewrite the tool as follows:
 ```python
 #!/usr/bin/env python3
 
-import json
 import sys
 
 import requests

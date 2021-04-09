@@ -1,7 +1,6 @@
 import importlib
-from unittest.mock import patch
 
-from tools.base import pytest_utils, utils
+from tools.base import utils
 
 
 # this is necessary to fix coverage

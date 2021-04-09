@@ -1,7 +1,7 @@
 import importlib
 from unittest.mock import patch, PropertyMock
 
-from tools.base import pytest_runner, runner
+from tools.base import runner
 
 
 # this is necessary to fix coverage

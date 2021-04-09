@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.testing import pytest_python_coverage, python_coverage
+from tools.testing import python_coverage
 
 
 def test_pytest_python_coverage(check_pytest_target):

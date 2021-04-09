@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.testing import plugin, pytest_python_pytest, python_pytest
+from tools.testing import plugin, python_pytest
 
 
 # this is necessary to fix coverage
@@ -14,15 +14,6 @@ importlib.reload(plugin)
 
 def test_pytest_python_pytest(check_pytest_target):
     check_pytest_target("tools.testing.pytest_python_pytest")
-
-
-def test_pytest_python_pytest():
-    with patch("tools.testing.pytest_python_pytest.python_pytest") as m_pytest:
-        pytest_python_pytest.main("arg1", "arg2", "arg3")
-
-    assert (
-        list(m_pytest.main.call_args)
-        == [('arg1', 'arg2', 'arg3', '--cov', 'tools.testing'), {}])
 
 
 def test_pytest_cov_collect():
