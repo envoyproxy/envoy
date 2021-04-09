@@ -10,7 +10,7 @@ We will assume that `sometools` does not yet exist and will also need a `require
 and `bazel` rule to configure the dependencies.
 
 In most cases of adding a tool, it is likely you will not need to create a new set of dependencies, and
-you can skip to the "Add python requirements" section.
+you can skip to the ("Add python requirements")[#add-python-requirements] section.
 
 We will also assume that you have `python3` and `pip` installed and working in your local environment.
 
@@ -123,7 +123,8 @@ if __name__ == "__main__":
 
 ### Create the `BUILD` file for `sometools`
 
-If you are adding a tool to an existing toolset you can skip this step.
+If you are adding a tool to an existing toolset you may be able skip this step -
+just make sure that `load` line is present for `@sometools_pip3` or similar.
 
 Add the following content to the file `tools/sometools/BUILD`
 
@@ -249,7 +250,7 @@ directory. Create it now.
 $ mkdir tools/sometools/tests
 ```
 
-Now add the following content to the `tools/sometools/test_mytool.py` file:
+Now add the following content to the `tools/sometools/tests/test_mytool.py` file:
 
 ```python
 from unittest.mock import patch
@@ -357,7 +358,7 @@ A fixture - `check_pytest_target` is available for this purpose.
 Add the following to `tools/sometools/tests/test_mytool.py`:
 
 ```python
-def test_pytest_python_coverage(check_pytest_target):
+def test_pytest_mytool(check_pytest_target):
     check_pytest_target("tools.sometools.pytest_mytool")
 ```
 
