@@ -7,10 +7,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/header_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/http/status.h"
 
@@ -22,6 +24,10 @@ struct CodecStats;
 }
 
 namespace Http2 {
+struct CodecStats;
+}
+
+namespace Http3 {
 struct CodecStats;
 }
 
@@ -213,6 +219,11 @@ public:
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
+
+  /**
+   * @return StreamInfo::StreamInfo& the stream_info for this stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 /**
@@ -433,10 +444,15 @@ struct Http1Settings {
     // Performs proper casing of header keys: the first and all alpha characters following a
     // non-alphanumeric character is capitalized.
     ProperCase,
+    // A stateful formatter extension has been configured.
+    StatefulFormatter,
   };
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
+
+  // Non-null IFF header_key_format_ is configured to StatefulFormatter.
+  StatefulHeaderKeyFormatterFactorySharedPtr stateful_header_key_formatter_;
 
   // Behaviour on invalid HTTP messaging:
   // - if true, the HTTP/1.1 connection is left open (where possible)

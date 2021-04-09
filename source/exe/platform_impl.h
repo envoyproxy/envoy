@@ -1,17 +1,16 @@
 #pragma once
 
-#include "envoy/filesystem/filesystem.h"
-#include "envoy/thread/thread.h"
+#include "envoy/server/platform.h"
 
 namespace Envoy {
 
-class PlatformImpl {
+class PlatformImpl : public Server::Platform {
 public:
   PlatformImpl();
-  virtual ~PlatformImpl();
-  Thread::ThreadFactory& threadFactory() { return *thread_factory_; }
-  Filesystem::Instance& fileSystem() { return *file_system_; }
-  virtual bool enableCoreDump();
+  ~PlatformImpl() override;
+  Thread::ThreadFactory& threadFactory() override { return *thread_factory_; }
+  Filesystem::Instance& fileSystem() override { return *file_system_; }
+  bool enableCoreDump() override;
 
 private:
   Thread::ThreadFactoryPtr thread_factory_;

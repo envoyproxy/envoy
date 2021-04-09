@@ -274,7 +274,8 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   }
   )EOF";
 
-  EXPECT_CALL(log_manager_, createAccessLog("foo"));
+  EXPECT_CALL(log_manager_, createAccessLog(Filesystem::FilePathAndType{
+                                Filesystem::DestinationType::File, "foo"}));
   create(parseBootstrapFromV3Json(json));
 }
 

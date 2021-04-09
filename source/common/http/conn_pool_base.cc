@@ -13,10 +13,6 @@ namespace Http {
 Network::TransportSocketOptionsSharedPtr
 wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
                            std::vector<Protocol> protocols) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_default_alpn")) {
-    return transport_socket_options;
-  }
-
   std::vector<std::string> fallbacks;
   for (auto protocol : protocols) {
     // If configured to do so, we override the ALPN to use for the upstream connection to match the
@@ -31,7 +27,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
       fallbacks.push_back(Http::Utility::AlpnNames::get().Http2);
       break;
     case Http::Protocol::Http3:
-      // TODO(#14829) hard-code H3 ALPN, consider failing if other things are negotiated.
+      // HTTP3 ALPN is set in the QUIC stack based on supported versions.
       break;
     }
   }
@@ -100,7 +96,7 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
-  if (state_ != ActiveClient::State::DRAINING) {
+  if (state() != ActiveClient::State::DRAINING) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {
@@ -176,21 +172,23 @@ uint64_t maxStreamsPerConnection(uint64_t max_streams_config) {
 }
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
+                                                         uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          parent.host()->cluster().http2Options().max_concurrent_streams().value()) {
+          max_concurrent_streams) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();
 }
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
+                                                         uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total,
                                                          Upstream::Host::CreateConnectionData& data)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
+          max_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();
@@ -198,10 +196,11 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& p
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
                                                          Upstream::Host::CreateConnectionData& data,
+                                                         uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
+          max_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();

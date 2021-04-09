@@ -997,7 +997,19 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
                              uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
+      return WasmResult::ParseFailure;
+    }
   }
   uint32_t token = nextGrpcCallToken();
   auto& handler = grpc_call_request_[token];
@@ -1055,7 +1067,19 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
                                uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
+      return WasmResult::ParseFailure;
+    }
   }
   uint32_t token = nextGrpcStreamToken();
   auto& handler = grpc_stream_[token];
@@ -1536,6 +1560,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
       wasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
     }
     break;
+  case WasmStreamType::Downstream:
+    if (network_read_filter_callbacks_) {
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { network_read_filter_callbacks_->continueReading(); });
+    }
+    return WasmResult::Ok;
+  case WasmStreamType::Upstream:
+    return WasmResult::Unimplemented;
   default:
     return WasmResult::BadArgument;
   }
@@ -1571,8 +1603,10 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
-    network_write_filter_callbacks_->connection().close(
-        Envoy::Network::ConnectionCloseType::FlushWrite);
+    if (network_write_filter_callbacks_) {
+      network_write_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;
