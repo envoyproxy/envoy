@@ -208,10 +208,10 @@ from tools.sometools import mytool
 
 
 def test_mytool_main():
-	with patch("tools.sometools.mytool.requests.get") as m_get:
-		with patch("tools.sometools.mytool.yaml.dump") as m_yaml:
-			with patch("tools.sometools.mytool.sys.stdout.write") as m_stdout:
-				assert mytool.main("PACKAGENAME") == 0
+    with patch("tools.sometools.mytool.requests.get") as m_get:
+        with patch("tools.sometools.mytool.yaml.dump") as m_yaml:
+            with patch("tools.sometools.mytool.sys.stdout.write") as m_stdout:
+                assert mytool.main("PACKAGENAME") == 0
     assert (
         list(m_get.call_args)
         == [('https://pypi.python.org/pypi/PACKAGENAME/json',), {}])
