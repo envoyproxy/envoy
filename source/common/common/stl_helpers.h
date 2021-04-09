@@ -19,7 +19,7 @@ template <class Container, class T> bool containsReference(const Container& c, c
 }
 
 /**
- * Accumulates a container of into a string of the format [string_func(element_0),
+ * Accumulates a container of elements into a string of the format [string_func(element_0),
  * string_func(element_1), ...]
  */
 template <class T, class ContainerT>
