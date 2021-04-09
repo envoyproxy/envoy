@@ -13,7 +13,7 @@
 
 namespace Envoy {
 
-// A test filter that control whether it's a termianl filter by protobuf.
+// A test filter that control whether it's a terminal filter by protobuf.
 class SetIsTerminalFilter : public Http::PassThroughFilter {};
 
 class SetIsTerminalFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<

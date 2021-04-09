@@ -59,10 +59,6 @@ private:
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
   }
-  bool isTerminalFilterByProtoTyped(const test::integration::filters::SetResponseCodeFilterConfig&,
-                                    Server::Configuration::FactoryContext&) override {
-    return true;
-  }
 };
 
 REGISTER_FACTORY(SetResponseCodeFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
