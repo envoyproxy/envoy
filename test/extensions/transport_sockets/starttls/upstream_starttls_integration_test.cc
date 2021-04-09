@@ -67,6 +67,12 @@ private:
 // messages.
 class StartTlsSwitchFilter : public Network::ReadFilter {
 public:
+  ~StartTlsSwitchFilter() {
+    if (upstream_connection_) {
+      upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
+  }
+
   void upstreamWrite(Buffer::Instance& data, bool end_stream);
 
   // Network::ReadFilter
@@ -361,9 +367,9 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   Buffer::OwnedImpl buffer;
   buffer.add("usetls");
   conn_->write(buffer, false);
-  // while (client_write_buffer_->bytesDrained() != 6) {
-  //   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // }
+  while (client_write_buffer_->bytesDrained() != 6) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   ASSERT_TRUE(payload_reader_->waitForLength(6, std::chrono::milliseconds(100)));
 
@@ -384,6 +390,11 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   // // Send few messages over encrypted connection.
   buffer.add("hola");
   conn_->write(buffer, false);
+  while (client_write_buffer_->bytesDrained() != 10) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  std::cout << "Waiting for 'hola' to echo" << std::endl;
 
   // Make sure we get our echo back
   ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(1000)));
