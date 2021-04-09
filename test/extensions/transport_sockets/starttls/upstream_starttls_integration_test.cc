@@ -25,6 +25,7 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buf, bool) override {
     auto message = buf.toString();
+    std::cout << "TerminalServerTlsFilter received: " << message << std::endl;
     if (message != "usetls") {
       // Just echo anything other than the 'usetls' command.
       read_callbacks_->connection().write(buf, false);
@@ -94,6 +95,8 @@ public:
     UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
 
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      std::cout << "TerminalServerTlsFilter received from backend: " << data.toString() << std::endl;
+
       if (auto parent = parent_.lock()) {
         parent->upstreamWrite(data, end_stream);
         return Network::FilterStatus::Continue;
@@ -134,6 +137,7 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
 }
 
 Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool end_stream) {
+  std::cout << "StartTlsSwitchFilter received from frontend " << data.toString() << std::endl;
   if (end_stream) {
     upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
