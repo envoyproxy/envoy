@@ -3,9 +3,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
+
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -224,20 +225,19 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
   return sign_alg;
 }
 
-const Network::FilterChain* getFilterChain(Network::IoHandle& io_handle, Network::FilterChainManager& filter_chain_manager, const quic::QuicSocketAddress& self_address,
-                                                     const quic::QuicSocketAddress& peer_address,
-                                                     const std::string& hostname,
-                                                     std::string_view alpn) {
-  Network::ConnectionSocketImpl connection_socket(
-      std::make_unique<QuicIoHandleWrapper>(io_handle),
-      quicAddressToEnvoyAddressInstance(self_address),
-      quicAddressToEnvoyAddressInstance(peer_address));
+const Network::FilterChain* getFilterChain(Network::IoHandle& io_handle,
+                                           Network::FilterChainManager& filter_chain_manager,
+                                           const quic::QuicSocketAddress& self_address,
+                                           const quic::QuicSocketAddress& peer_address,
+                                           const std::string& hostname, std::string_view alpn) {
+  Network::ConnectionSocketImpl connection_socket(std::make_unique<QuicIoHandleWrapper>(io_handle),
+                                                  quicAddressToEnvoyAddressInstance(self_address),
+                                                  quicAddressToEnvoyAddressInstance(peer_address));
   connection_socket.setDetectedTransportProtocol(
       Extensions::TransportSockets::TransportProtocolNames::get().Quic);
   connection_socket.setRequestedServerName(hostname);
   connection_socket.setRequestedApplicationProtocols({alpn});
-  return       filter_chain_manager.findFilterChain(connection_socket);
-
+  return filter_chain_manager.findFilterChain(connection_socket);
 }
 
 } // namespace Quic

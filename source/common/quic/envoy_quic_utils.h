@@ -126,10 +126,11 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::str
 // not supported, return 0 with error_details populated correspondingly.
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
 
-const Network::FilterChain* getFilterChain(Network::IoHandle& io_handle, Network::FilterChainManager& filter_chain_manager, const quic::QuicSocketAddress& self_address,
-                                                     const quic::QuicSocketAddress& peer_address,
-                                                     const std::string& hostname,
-                                                     std::string_view alpn);
+const Network::FilterChain* getFilterChain(Network::IoHandle& io_handle,
+                                           Network::FilterChainManager& filter_chain_manager,
+                                           const quic::QuicSocketAddress& self_address,
+                                           const quic::QuicSocketAddress& peer_address,
+                                           const std::string& hostname, std::string_view alpn);
 
 } // namespace Quic
 } // namespace Envoy

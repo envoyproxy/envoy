@@ -65,12 +65,14 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_.perConnectionBufferLimitBytes(), listener_config_);
 
-  const Network::FilterChain* filter_chain = getFilterChain(listen_socket_.ioHandle(), listener_config_.filterChainManager(),  self_address, peer_address, std::string(sni), alpn);
-   if (filter_chain != nullptr) {
+  const Network::FilterChain* filter_chain =
+      getFilterChain(listen_socket_.ioHandle(), listener_config_.filterChainManager(), self_address,
+                     peer_address, std::string(sni), alpn);
+  if (filter_chain != nullptr) {
     const bool has_filter_initialized =
-      listener_config_.filterChainFactory().createNetworkFilterChain(
-          *quic_session, filter_chain->networkFilterFactories());
-     ASSERT(has_filter_initialized);
+        listener_config_.filterChainFactory().createNetworkFilterChain(
+            *quic_session, filter_chain->networkFilterFactories());
+    ASSERT(has_filter_initialized);
   }
   quic_session->Initialize();
   // Filter chain can't be retrieved here as self address is unknown at this

@@ -35,17 +35,17 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
   // Do not start handshake for H3 connection till it is initialized.
- if (type_ != Type::HTTP3) {
-  // In general, codecs are handed new not-yet-connected connections, but in the
-  // case of ALPN, the codec may be handed an already connected connection.
-  if (!connection_->connecting()) {
-    ASSERT(connection_->state() == Network::Connection::State::Open);
-    connected_ = true;
-  } else {
-    ENVOY_CONN_LOG(debug, "connecting", *connection_);
-    connection_->connect();
+  if (type_ != Type::HTTP3) {
+    // In general, codecs are handed new not-yet-connected connections, but in the
+    // case of ALPN, the codec may be handed an already connected connection.
+    if (!connection_->connecting()) {
+      ASSERT(connection_->state() == Network::Connection::State::Open);
+      connected_ = true;
+    } else {
+      ENVOY_CONN_LOG(debug, "connecting", *connection_);
+      connection_->connect();
+    }
   }
- }
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
@@ -189,19 +189,19 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
 #ifdef ENVOY_ENABLE_QUIC
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        quic_session, *this,
-        host->cluster().http3CodecStats(), host->cluster().http3Options(),
+        quic_session, *this, host->cluster().http3CodecStats(), host->cluster().http3Options(),
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
-    // Initialize the session after max request header size is changed in above http client connection creation.
+    // Initialize the session after max request header size is changed in above http client
+    // connection creation.
     quic_session.Initialize();
     // The other two codecs have already connected in base class.
-if (!connection_->connecting()) {
-    ASSERT(connection_->state() == Network::Connection::State::Open);
-    connected_ = true;
-  } else {
-    ENVOY_CONN_LOG(debug, "connecting", *connection_);
-    connection_->connect();
-  }
+    if (!connection_->connecting()) {
+      ASSERT(connection_->state() == Network::Connection::State::Open);
+      connected_ = true;
+    } else {
+      ENVOY_CONN_LOG(debug, "connecting", *connection_);
+      connection_->connect();
+    }
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.

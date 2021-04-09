@@ -1662,7 +1662,7 @@ envoy_cc_test(
 # selects.
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "small",
+    size = "large",
     srcs = envoy_select_enable_http3([
         "quic_protocol_integration_test.cc",
     ]),
