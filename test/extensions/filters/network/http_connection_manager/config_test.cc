@@ -1047,7 +1047,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
+  EXPECT_EQ(Envoy::Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that when configured, we remove port.
@@ -1065,7 +1065,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(Http::StripPortType::MatchingHost, config.stripPortType());
+  EXPECT_EQ(Envoy::Http::StripPortType::MatchingHost, config.stripPortType());
 }
 
 // Validated that when both strip options are configured, we throw exception.
@@ -1104,7 +1104,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
+  EXPECT_EQ(Envoy::Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that when configured, we remove any port.
@@ -1122,7 +1122,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(Http::StripPortType::Any, config.stripPortType());
+  EXPECT_EQ(Envoy::Http::StripPortType::Any, config.stripPortType());
 }
 
 // Validated that when explicitly set false, we don't remove any port.
@@ -1140,7 +1140,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
+  EXPECT_EQ(Envoy::Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that by default we allow requests with header names containing underscores.
@@ -1646,20 +1646,21 @@ TEST_F(HttpConnectionManagerConfigTest, AlwaysSetRequestIdInResponseConfigured) 
 
 namespace {
 
-class TestRequestIDExtension : public Http::RequestIDExtension {
+class TestRequestIDExtension : public Envoy::Http::RequestIDExtension {
 public:
   TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
       : config_(config) {}
 
-  void set(Http::RequestHeaderMap&, bool) override {}
-  void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
+  void set(Envoy::Http::RequestHeaderMap&, bool) override {}
+  void setInResponse(Envoy::Http::ResponseHeaderMap&,
+                     const Envoy::Http::RequestHeaderMap&) override {}
+  absl::optional<uint64_t> toInteger(const Envoy::Http::RequestHeaderMap&) const override {
     return absl::nullopt;
   }
-  Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
+  Tracing::Reason getTraceReason(const Envoy::Http::RequestHeaderMap&) override {
     return Tracing::Reason::Sampling;
   }
-  void setTraceReason(Http::RequestHeaderMap&, Tracing::Reason) override {}
+  void setTraceReason(Envoy::Http::RequestHeaderMap&, Tracing::Reason) override {}
 
   std::string testField() { return config_.test_field(); }
 
@@ -1677,7 +1678,7 @@ public:
     return std::make_unique<test::http_connection_manager::CustomRequestIDExtension>();
   }
 
-  Http::RequestIDExtensionSharedPtr
+  Envoy::Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
                           Server::Configuration::FactoryContext& context) override {
     const auto& custom_config = MessageUtil::downcastAndValidate<
@@ -1793,9 +1794,10 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
 
 namespace {
 
-class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
+class OriginalIPDetectionExtensionNotCreatedFactory
+    : public Envoy::Http::OriginalIPDetectionFactory {
 public:
-  Http::OriginalIPDetectionSharedPtr
+  Envoy::Http::OriginalIPDetectionSharedPtr
   createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
     return nullptr;
   }
@@ -1813,7 +1815,7 @@ public:
 
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) {
   OriginalIPDetectionExtensionNotCreatedFactory factory;
-  Registry::InjectFactory<Http::OriginalIPDetectionFactory> registration(factory);
+  Registry::InjectFactory<Envoy::Http::OriginalIPDetectionFactory> registration(factory);
 
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -1855,8 +1857,9 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   auto original_ip_detection_extensions = config.originalIpDetectionExtensions();
   EXPECT_EQ(1, original_ip_detection_extensions.size());
 
-  auto* extension = dynamic_cast<OriginalIPDetection::CustomHeader::CustomHeaderIPDetection*>(
-      original_ip_detection_extensions[0].get());
+  auto* extension =
+      dynamic_cast<Extensions::Http::OriginalIPDetection::CustomHeader::CustomHeaderIPDetection*>(
+          original_ip_detection_extensions[0].get());
   EXPECT_NE(nullptr, extension);
 }
 
