@@ -3,12 +3,9 @@ import importlib
 from tools.base import utils
 
 
-# this is necessary to fix coverage
+# this is necessary to fix coverage as these libs are imported before pytest
+# is invoked
 importlib.reload(utils)
-
-
-def test_pytest_utils(check_pytest_target):
-    check_pytest_target("tools.base.pytest_utils")
 
 
 def test_util_custom_coverage_data(patches):

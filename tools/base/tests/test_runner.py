@@ -4,12 +4,9 @@ from unittest.mock import patch, PropertyMock
 from tools.base import runner
 
 
-# this is necessary to fix coverage
+# this is necessary to fix coverage as these libs are imported before pytest
+# is invoked
 importlib.reload(runner)
-
-
-def test_pytest_runner(check_pytest_target):
-    check_pytest_target("tools.base.pytest_runner")
 
 
 def test_runner_constructor():

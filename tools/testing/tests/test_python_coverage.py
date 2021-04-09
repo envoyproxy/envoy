@@ -6,10 +6,6 @@ import pytest
 from tools.testing import python_coverage
 
 
-def test_pytest_python_coverage(check_pytest_target):
-    check_pytest_target("tools.testing.pytest_python_coverage")
-
-
 def test_coverage_cov_data():
     runner = python_coverage.CoverageRunner("path1", "path2", "path3")
     args_mock = patch("tools.testing.python_coverage.CoverageRunner.args", new_callable=PropertyMock)

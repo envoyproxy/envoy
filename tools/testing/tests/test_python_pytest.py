@@ -7,13 +7,10 @@ import pytest
 from tools.testing import plugin, python_pytest
 
 
-# this is necessary to fix coverage
+# this is necessary to fix coverage as these libs are imported before pytest
+# is invoked
 importlib.reload(python_pytest)
 importlib.reload(plugin)
-
-
-def test_pytest_python_pytest(check_pytest_target):
-    check_pytest_target("tools.testing.pytest_python_pytest")
 
 
 def test_pytest_cov_collect():
