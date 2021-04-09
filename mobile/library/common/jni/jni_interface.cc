@@ -66,6 +66,11 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
                     env->GetStringUTFChars(jvm_log_level, nullptr));
 }
 
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_terminateEngine(
+    JNIEnv* env, jclass, jlong engine_handle) {
+  terminate_engine(static_cast<envoy_engine_t>(engine_handle));
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_templateString(JNIEnv* env,
                                                                 jclass // class
