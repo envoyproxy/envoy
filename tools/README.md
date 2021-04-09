@@ -156,7 +156,7 @@ py_binary(
 )
 ```
 
-With this added users that have bazel installed can run the tool with the following command:
+With this added users that have `bazel` installed can run the tool with the following command:
 
 ```console
 $ bazel run //tools/sometools:mytool PACKAGENAME
@@ -165,7 +165,7 @@ $ bazel run //tools/sometools:mytool PACKAGENAME
 
 ### Make the tool runnable without bazel
 
-If you want users to be able to run the tool directly without bazel, you will need
+If you want users to be able to run the tool directly without `bazel`, you will need
 to make it executable:
 
 ```console
@@ -425,4 +425,29 @@ def main(*args) -> int:
 
 if __name__ == "__main__":
     sys.exit(main(*sys.argv[1:]))
+```
+
+This will add `help` to the tool and improve the end users experience of using it.
+
+You can invoke the help menu using `bazel`:
+
+
+```console
+
+$ bazel run //tools/sometools:mytool -- -h
+...
+usage: mytool.py [-h] package
+
+positional arguments:
+  package     Package to fetch info for
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+or directly with `python`:
+
+```console
+$ ./tools/sometools/mytool.py -h
+
 ```
