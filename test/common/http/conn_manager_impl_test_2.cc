@@ -2667,16 +2667,17 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamRequestHeadersSize) {
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
-      new NiceMock<Upstream::MockHostDescription>()};
-  filter_callbacks_.upstreamHost(host_);
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
 
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  auto& req_resp_stats = cluster->cluster_.info_->request_response_size_stats_store_;
+
+  EXPECT_CALL(req_resp_stats, deliverHistogramToSinks(
+                                  Property(&Stats::Metric::name, "upstream_rq_headers_size"), 163));
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 0));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 0));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2709,16 +2710,17 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamRequestBodySize) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
-      new NiceMock<Upstream::MockHostDescription>()};
-  filter_callbacks_.upstreamHost(host_);
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
 
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  auto& req_resp_stats = cluster->cluster_.info_->request_response_size_stats_store_;
+
+  EXPECT_CALL(req_resp_stats, deliverHistogramToSinks(
+                                  Property(&Stats::Metric::name, "upstream_rq_headers_size"), 163));
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 5));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 0));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2753,24 +2755,24 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseHeadersSize) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
-      new NiceMock<Upstream::MockHostDescription>()};
-  filter_callbacks_.upstreamHost(host_);
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
 
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
+  auto& req_resp_stats = cluster->cluster_.info_->request_response_size_stats_store_;
+
+  EXPECT_CALL(req_resp_stats, deliverHistogramToSinks(
+                                  Property(&Stats::Metric::name, "upstream_rq_headers_size"), 163));
 
   // Response headers are internally mutated and we record final response headers.
   // for example in the below test case, response headers are modified as
   // {':status', '200' 'date', 'Mon, 06 Jul 2020 06:08:55 GMT' 'server', ''}
   // whose size is 49 instead of original response headers size 10({":status", "200"}).
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 49));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  EXPECT_CALL(req_resp_stats, deliverHistogramToSinks(
+                                  Property(&Stats::Metric::name, "upstream_rs_headers_size"), 49));
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 4));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 0));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2809,19 +2811,19 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseBodySize) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
-      new NiceMock<Upstream::MockHostDescription>()};
-  filter_callbacks_.upstreamHost(host_);
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
 
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 49));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  auto& req_resp_stats = cluster->cluster_.info_->request_response_size_stats_store_;
+
+  EXPECT_CALL(req_resp_stats, deliverHistogramToSinks(
+                                  Property(&Stats::Metric::name, "upstream_rq_headers_size"), 163));
+  EXPECT_CALL(req_resp_stats, deliverHistogramToSinks(
+                                  Property(&Stats::Metric::name, "upstream_rs_headers_size"), 49));
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 4));
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
+  EXPECT_CALL(req_resp_stats,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 11));
 
   Buffer::OwnedImpl fake_input("1234");

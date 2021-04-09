@@ -670,15 +670,17 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
 
-  const auto& cluster_info = clusterInfo();
-  if (cluster_info != nullptr) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        cluster_info->requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rq_body_size_.recordValue(
-          filter_manager_.streamInfo().bytesReceived());
-      req_resp_stats->get().upstream_rs_body_size_.recordValue(
-          filter_manager_.streamInfo().bytesSent());
+  if (cached_cluster_info_.has_value()) {
+    auto& cluster_info = cached_cluster_info_.value();
+    if (cluster_info) {
+      Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+          cluster_info->requestResponseSizeStats();
+      if (req_resp_stats.has_value()) {
+        req_resp_stats->get().upstream_rq_body_size_.recordValue(
+            filter_manager_.streamInfo().bytesReceived());
+        req_resp_stats->get().upstream_rs_body_size_.recordValue(
+            filter_manager_.streamInfo().bytesSent());
+      }
     }
   }
 
@@ -776,12 +778,14 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
-  const auto& cluster_info = clusterInfo();
-  if (cluster_info != nullptr) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        cluster_info->requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
+  if (cached_cluster_info_.has_value()) {
+    auto& cluster_info = cached_cluster_info_.value();
+    if (cluster_info) {
+      Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+          cluster_info->requestResponseSizeStats();
+      if (req_resp_stats.has_value()) {
+        req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
+      }
     }
   }
 
@@ -973,12 +977,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ASSERT(!cached_route_);
   refreshCachedRoute();
 
-  const auto& cluster_info = clusterInfo();
-  if (cluster_info != nullptr) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      cluster_info->requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
+  if (cached_cluster_info_.has_value()) {
+    auto& cluster_info = cached_cluster_info_.value();
+    if (cluster_info) {
+      Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+          cluster_info->requestResponseSizeStats();
+      if (req_resp_stats.has_value()) {
+        req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
+      }
     }
   }
 
