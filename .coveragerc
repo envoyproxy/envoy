@@ -1,6 +1,7 @@
 [run]
 omit =
-	tools/*
+     tools/
+     */pytest_*.py
 
 [report]
 exclude_lines =
