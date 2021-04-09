@@ -39,7 +39,7 @@ message CustomHeaderConfig {
   //
   // Note: in the case of a multi-valued header, only the first value is tried and the rest are ignored.
   string header_name = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: true}];
 
   // If set to true, the extension is allowed to decide if the detected address should be treated as
   // trusted. If a detected address is considered trusted, it might be used as input to determine

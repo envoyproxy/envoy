@@ -32,6 +32,26 @@ TEST(CustomHeaderFactoryTest, Basic) {
   EXPECT_NE(factory->createExtension(typed_config.typed_config(), context), nullptr);
 }
 
+TEST(CustomHeaderFactoryTest, InvalidHeaderName) {
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::OriginalIPDetectionFactory>::getFactory(
+      "envoy.http.original_ip_detection.custom_header");
+  ASSERT_NE(factory, nullptr);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  const std::string yaml = R"EOF(
+    name: envoy.formatter.TestFormatter
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+        header_name: "   "
+)EOF";
+  TestUtility::loadFromYaml(yaml, typed_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_REGEX(factory->createExtension(typed_config.typed_config(), context),
+                          EnvoyException,
+                          "Proto constraint validation failed.*does not match regex pattern.*");
+}
+
 } // namespace CustomHeader
 } // namespace OriginalIPDetection
 } // namespace Http
