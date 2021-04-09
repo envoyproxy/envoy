@@ -178,6 +178,9 @@ ActiveInternalConnection::~ActiveInternalConnection() {
 }
 
 void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
+  // Unlike tcp listener, no rebalancer is applied and won't call pickTargetHandler to account
+  // connections.
+  incNumConnections();
 
   auto active_socket = std::make_unique<ActiveInternalSocket>(
       *this, std::move(socket), false /* do not handle off at internal listener */);

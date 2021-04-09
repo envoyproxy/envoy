@@ -60,7 +60,7 @@ public:
     EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
     EXPECT_CALL(listener_config_, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
     EXPECT_CALL(listener_config_, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
-    auto mock_listener_will_be_moved = std::unique_ptr<Network::MockListener>();
+    auto mock_listener_will_be_moved = std::make_unique<Network::MockListener>();
     generic_listener_ = mock_listener_will_be_moved.get();
     internal_listener_ = std::make_shared<ActiveInternalListener>(
         conn_handler_, dispatcher_, std::move(mock_listener_will_be_moved), listener_config_);
@@ -86,7 +86,10 @@ public:
   std::shared_ptr<ActiveInternalListener> internal_listener_;
 };
 
-TEST_F(ActiveInternalListenerTest, BasicInternalListener) { addListener(); }
+TEST_F(ActiveInternalListenerTest, BasicInternalListener) {
+  addListener();
+  EXPECT_CALL(*generic_listener_, onDestroy());
+}
 TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
   addListener();
   expectFilterChainFactory();
@@ -112,6 +115,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
   EXPECT_CALL(*test_listener_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_CALL(*generic_listener_, onDestroy());
 }
 
 TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
@@ -153,15 +157,15 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
-
   EXPECT_CALL(conn_handler_, decNumConnections());
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
-  // EXPECT_CALL(*generic_listener_, onDestroy());
+  EXPECT_CALL(*generic_listener_, onDestroy());
 }
 
 TEST_F(ActiveInternalListenerTest, StopListener) {
   addListener();
+  EXPECT_CALL(*generic_listener_, onDestroy());
   internal_listener_->shutdownListener();
 }
 } // namespace
