@@ -48,6 +48,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.access_loggers.http_grpc",
     deps = [
         "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/grpc:grpc_mocks",
