@@ -7,6 +7,7 @@ namespace Envoy {
 namespace StreamInfo {
 
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
+  // The vector reserves number of different flags on the stack. It guarantees no allocation.
   absl::InlinedVector<absl::string_view,
                       std::numeric_limits<std::underlying_type_t<ResponseFlag>>::digits>
       flag_strings;
@@ -22,7 +23,8 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
-  static_assert(ResponseFlag::LastFlag == 0x1000000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x1000000,
+                "A flag has been added. Add the new flag to ALL_RESPONSE_STRING_FLAGS.");
   absl::flat_hash_map<std::string, ResponseFlag> res;
   for (auto [str, flag] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
     res.emplace(str, flag);
