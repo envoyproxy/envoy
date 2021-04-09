@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-class WamrRuntimeFactory : public WamrFactory {
+class WamrRuntimeFactory : public WasmRuntimeFactory {
 public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createWamrVm(); }
 
