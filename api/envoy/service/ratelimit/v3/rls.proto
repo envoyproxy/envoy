@@ -142,9 +142,18 @@ message RateLimitResponse {
     // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for
     // all matching descriptors.
     //
-    // If there is not sufficient quota, a RLS request will be made. When the result is returned,
-    // a single unit will be consumed from the quota for all matching descriptors. When quota
-    // expires due to timeout, a new RLS request will also be made.
+    // If there is not sufficient quota, there are three cases:
+    // 1. A cached entry exists for a RLS descriptor that is out-of-quota, but not expired.
+    //    In this case, the request will be treated as OVER_LIMIT.
+    // 2. Some RLS descriptors have a cached entry that has valid quota but some RLS descriptors
+    //    have no cached entry. This will trigger a new RLS request.
+    //    When the result is returned, a single unit will be consumed from the quota for all
+    //    matching descriptors.
+    // 3. All RLS descriptors lack a cached entry, this will trigger a new RLS request,
+    //    When the result is returned, a single unit will be consumed from the quota for all
+    //    matching descriptors.
+    //
+    // When quota expires due to timeout, a new RLS request will also be made.
     // [#not-implemented-hide:]
     Quota quota = 5;
   }
