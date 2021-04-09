@@ -50,12 +50,12 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                Api::Api& api, const StatNames& stat_names)
     : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
       raw_async_client_cache_(tls_) {
+  raw_async_client_cache_.set(
+      [](Event::Dispatcher&) { return std::make_shared<RawAsyncClientCache>(); });
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(
       [&api](Event::Dispatcher&) { return std::make_shared<GoogleAsyncClientThreadLocal>(api); });
-  raw_async_client_cache_.set(
-      [](Event::Dispatcher&) { return std::make_shared<RawAsyncClientCache>(); });
 #else
   UNREFERENCED_PARAMETER(api_);
 #endif
