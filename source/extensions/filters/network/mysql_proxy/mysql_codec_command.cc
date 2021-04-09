@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/logger.h"
+#include "common/common/macros.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
@@ -40,14 +41,13 @@ DecodeStatus Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
     setDb(db);
     break;
   }
-
   case Command::Cmd::Query:
     is_query_ = true;
+    FALLTHRU;
   default:
     BufferHelper::readStringBySize(buffer, len - 1, data_);
     break;
   }
-
   return DecodeStatus::Success;
 }
 
