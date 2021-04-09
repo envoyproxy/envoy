@@ -47,7 +47,7 @@ public:
  * This is an HTTP client that multiple stream management and underlying connection management
  * across multiple HTTP codec types.
  */
-class CodecClient : Logger::Loggable<Logger::Id::client>,
+class CodecClient : protected Logger::Loggable<Logger::Id::client>,
                     public Http::ConnectionCallbacks,
                     public Network::ConnectionCallbacks,
                     public Event::DeferredDeletable {
@@ -177,6 +177,7 @@ protected:
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  bool connected_{};
 
 private:
   /**
@@ -254,7 +255,6 @@ private:
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};
   CodecClientCallbacks* codec_client_callbacks_{};
-  bool connected_{};
   bool remote_closed_{};
   bool protocol_error_{false};
 };

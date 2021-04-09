@@ -3,6 +3,7 @@
 #include "common/http/utility.h"
 #include "common/quic/envoy_quic_server_connection.h"
 #include "common/quic/envoy_quic_server_session.h"
+#include "common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -48,8 +49,8 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
 
 std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
-    const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
-    const quic::ParsedQuicVersion& version, absl::string_view /*sni*/) {
+    const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
+    const quic::ParsedQuicVersion& version, absl::string_view sni) {
   quic::QuicConfig quic_config = config();
   // TODO(danzh) setup flow control window via config.
   quic_config.SetInitialStreamFlowControlWindowToSend(
@@ -63,6 +64,14 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_.perConnectionBufferLimitBytes(), listener_config_);
+
+  const Network::FilterChain* filter_chain = getFilterChain(listen_socket_.ioHandle(), listener_config_.filterChainManager(),  self_address, peer_address, std::string(sni), alpn);
+   if (filter_chain != nullptr) {
+    const bool has_filter_initialized =
+      listener_config_.filterChainFactory().createNetworkFilterChain(
+          *quic_session, filter_chain->networkFilterFactories());
+     ASSERT(has_filter_initialized);
+  }
   quic_session->Initialize();
   // Filter chain can't be retrieved here as self address is unknown at this
   // point.

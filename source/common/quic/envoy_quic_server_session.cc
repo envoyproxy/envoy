@@ -111,15 +111,6 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
-void EnvoyQuicServerSession::OnNewEncryptionKeyAvailable(
-    quic::EncryptionLevel level, std::unique_ptr<quic::QuicEncrypter> encrypter) {
-  if (!filters_created_ && level == quic::ENCRYPTION_FORWARD_SECURE) {
-    // Instantiate filters before sending SETTINGS below.
-    maybeCreateNetworkFilters();
-  }
-  quic::QuicServerSessionBase::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
-}
-
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {

@@ -49,11 +49,11 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
       info_impl->alarm_factory_, quic::ParsedQuicVersionVector{info_impl->supported_versions_[0]},
       local_addr, dispatcher, nullptr);
   auto& static_info = StaticInfo::get();
+  SetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead, false);
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       static_info.quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
       dispatcher, 0);
-  ret->Initialize();
   return ret;
 }
 

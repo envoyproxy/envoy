@@ -69,11 +69,12 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
     EnvoyQuicClientSession& session, Http::ConnectionCallbacks& callbacks,
     Http::Http3::CodecStats& stats,
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-    const uint32_t /*max_request_headers_kb*/)
+    const uint32_t max_request_headers_kb)
     : QuicHttpConnectionImplBase(session, stats), quic_client_session_(session) {
   session.setCodecStats(stats);
   session.setHttp3Options(http3_options);
   session.setHttpConnectionCallbacks(callbacks);
+  session.set_max_inbound_header_list_size(max_request_headers_kb * 1024);
 }
 
 Http::RequestEncoder&

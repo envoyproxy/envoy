@@ -354,7 +354,9 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
+        "//source/common/quic:quic_io_handle_wrapper_lib",
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
+        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -59,8 +59,6 @@ public:
   void OnTlsHandshakeComplete() override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
-  void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
-                                   std::unique_ptr<quic::QuicEncrypter> encrypter) override;
   size_t WriteHeadersOnHeadersStream(
       quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
       const spdy::SpdyStreamPrecedence& precedence,
