@@ -1,7 +1,7 @@
 #
 # Runs pytest against the target:
 #
-#   //tools/testing/python_pytest
+#   //tools/testing:python_pytest
 #
 # Can be run as follows:
 #

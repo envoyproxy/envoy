@@ -1,0 +1,260 @@
+
+
+
+## Add a python tool
+
+To demonstrate adding a python tool to the Envoy tooling lets go through the steps.
+
+For this example a tool with the name `mytool.py` will be added to the `/tools/sometools` directory.
+
+We will assume that `sometools` does not yet exist and will also need a `requirements.txt` file,
+and `bazel` rule to configure the dependencies.
+
+In most cases of adding a tool, it is likely you will not need to create a new set of dependencies, and
+you can skip to the "Add python requirements" section.
+
+We will also assume that you have `python3` and `pip` installed and working in your local environment.
+
+The tool *must* be runnable with `bazel`, but we can also make it runnable directly without bazel, although the user
+will then have to ensure they have the necessary dependencies locally installed themselves.
+
+### Create the bazel boilerplate for a new set of python requirements
+
+All python requirements for Envoy tooling  must be pinned with hashes to ensure the integrity of the dependencies.
+
+Let's add the `bazel` boilerplate to setup a new `requirements.txt` file. This uses `rules_python`.
+
+Open `bazel/repositories_extra.bzl` with your editor, and find the `_python_deps` function.
+
+To this function, add the following bazel target:
+
+```starlark
+    pip_install(
+        name = "sometools_pip3",
+        requirements = "@envoy//tools/sometools:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+```
+
+Lets add an empty `tools/sometools/requirements.txt`:
+
+```console
+
+$ mkdir tools/sometools
+$ touch tools/sometools/requirements.txt
+
+```
+
+We can now use `sometools_pip3` in the `BUILD` file for our python tool, although we will need
+some actual requirements for it to be useful.
+
+### Add python requirements
+
+For the purpose of this example, `mytool.py` will have dependencies on the `requests` and `pyyaml`
+libraries.
+
+Check on pypi for the most recent versions.
+
+At the time of writing these were `2.25.1` and `5.4.1` for `requests` and `pyyaml` respectively.
+
+Add the pinned dependencies to the `tools/sometools/requirements.txt` file:
+
+```console
+
+$ echo pyyaml==5.4.1 >> tools/sometools/requirements.txt
+$ echo requests==2.25.1 >> tools/sometools/requirements.txt
+
+```
+
+So far we have not set the hashes for the requirements.
+
+The easiest way to add the necessary hashes and dependencies is to use `pip-compile` from `pip-tools`.
+
+This will pin all dependencies *of* these libraries too.
+
+Run the following to update the `requirements.txt`:
+
+```console
+
+$ pip install pip-tools
+$ pip-compile --generate-hashes tools/sometools/requirements.txt
+
+```
+
+### Add the python tool
+
+For the purpose of this example we will add a trivial tool that dumps information
+about a python package as `yaml`
+
+Create a file `tools/sometools/mytool.py` with the following content:
+
+
+```python
+#!/usr/bin/env python3
+
+import json
+import sys
+
+import requests
+import yaml
+
+
+def main(*args) -> int:
+    print(
+        yaml.dump(
+            requests.get(f"https://pypi.python.org/pypi/{args[0]}/json").json()))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(*sys.argv[1:]))
+```
+
+### Create the `BUILD` file for `sometools`
+
+If you are adding a tool to an existing toolset you can skip this step.
+
+Add the following content to the file `tools/sometools/BUILD`
+
+```starlark
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@sometools_pip3//:requirements.bzl", "requirement")
+
+licenses(["notice"])  # Apache 2
+```
+
+Note the loading of `requirement` from `@sometools_pip3`. We will use this
+in the next section.
+
+### Create the bazel target for the tool
+
+Add `mytool.py` as a `py_binary` to the `tools/sometools/BUILD` file.
+
+This will make the `mytool.py` file runnable as a `bazel` target.
+
+```starlark
+py_binary(
+    name = "mytool",
+    srcs = ["mytool.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("requests"),
+        requirement("pyyaml"),
+    ],
+)
+```
+
+With this added users that have bazel installed can run the tool with the following command:
+
+```console
+$ bazel run //tools/sometools:mytool PACKAGENAME
+```
+
+
+### Make the tool runnable without bazel
+
+If you want users to be able to run the tool directly without bazel, you will need
+to make it executable:
+
+```console
+$ chmod +x tools/sometools/mytool.py
+```
+
+With this added users that have the necessary python dependencies locally installed
+can run the tool with the following command:
+
+```console
+$ ./tools/sometools/mytool.py PACKAGENAME
+
+```
+
+### Add unit tests for the tool
+
+Envoy tooling is tested with `pytest`.
+
+In order to use it with `bazel` we will need to add some boilerplate code.
+
+Firstly add the following target to the `tools/sometools/BUILD` file:
+
+```starlark
+py_binary(
+    name = "pytest_mytool",
+    srcs = [
+        "pytest_mytool.py",
+        "tests/test_mytool.py",
+    ],
+    deps = [
+        "//tools/testing:python_pytest",
+    ],
+    visibility = ["//visibility:public"],
+)
+```
+
+The name is important and should be `pytest_TOOLNAME` - in this case `pytest_mytool`.
+
+This target references two additional files that we need to add, the `pytest` runner file,
+and the test file itself.
+
+For the test runner create a file `tools/sometools/pytest_mytool.py` with the following code:
+
+```python
+#
+# Runs pytest against the target:
+#
+#   //tools/sometools:mytool
+#
+# Can be run as follows:
+#
+#   bazel run //tools/sometools:pytest_mytool
+#
+
+import sys
+
+from tools.testing import python_pytest
+
+
+def main(*args) -> int:
+    return python_pytest.main(*args, "--cov", "tools.sometools")
+
+
+if __name__ == "__main__":
+    sys.exit(main(*sys.argv[1:]))
+```
+
+Note the `--cov` argument. This should be set to the package name - in
+this case `tools.sometools`.
+
+This tells `pytest` to collect coverage in this package.
+
+Finally we need the actual test file. This should be located in the `tools/sometools/tests`
+directory. Create it now.
+
+```console
+$ mkdir tools/sometools/tests
+```
+
+Now add the following content to the `tools/sometools/test_mytool.py` file:
+
+```python
+from unittest.mock import patch
+
+from tools.sometools import mytool
+
+
+def test_mytool_main():
+    with patch("tools.sometools.mytool.requests.get") as m_get:
+        with patch("tools.sometools.mytool.yaml.dump") as m_yaml:
+            assert mytool.main("PACKAGENAME") == 0
+    assert (
+        list(m_get.call_args)
+        == [('https://pypi.python.org/pypi/PACKAGENAME/json',), {}])
+    assert (
+        list(m_get.return_value.json.call_args)
+        == [(), {}])
+    assert (
+        list(m_yaml.call_args)
+        == [(m_get.return_value.json.return_value,), {}])
+```
+
+This example use the mock library to patch all of the method calls, and
+then tests that they have been called with the expected values.

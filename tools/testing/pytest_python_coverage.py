@@ -1,7 +1,7 @@
 #
 # Runs pytest against the target:
 #
-#   //tools/testing/python_coverage
+#   //tools/testing:python_coverage
 #
 # Can be run as follows:
 #
