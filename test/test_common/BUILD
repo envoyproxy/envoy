@@ -322,3 +322,11 @@ envoy_basic_cc_library(
     srcs = ["test_version_linkstamp.cc"],
     alwayslink = 1,
 )
+
+envoy_cc_test_library(
+    name = "delegating_route_utility_lib",
+    srcs = ["delegating_route_utility.h"],
+    deps = [
+        "//source/common/router:delegating_route_lib",
+    ],
+)

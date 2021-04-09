@@ -361,6 +361,7 @@ private:
   Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  void setRoute(Router::RouteConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }

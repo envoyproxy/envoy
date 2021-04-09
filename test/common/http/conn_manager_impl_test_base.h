@@ -16,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/delegating_route_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"

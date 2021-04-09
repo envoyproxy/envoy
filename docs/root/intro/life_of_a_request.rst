@@ -434,8 +434,9 @@ When ``decodeHeaders()`` is invoked on the :ref:`router <arch_overview_http_rout
 route selection is finalized and a cluster is picked. The HCM selects a route from its
 ``RouteConfiguration`` at the start of HTTP filter chain execution. This is referred to as the
 *cached route*. Filters may modify headers and cause a new route to be selected, by asking HCM to
-clear the route cache and requesting HCM to reevaluate the route selection. When the router filter
-is invoked, the route is finalized. The selected route’s configuration will point at an upstream
+clear the route cache and requesting HCM to reevaluate the route selection. Filters may also
+directly set this cached route selection via a `setRoute` callback. When the router filter is
+invoked, the route is finalized. The selected route’s configuration will point at an upstream
 cluster name. The router filter then asks the `ClusterManager` for an HTTP :ref:`connection pool
 <arch_overview_conn_pool>` for the cluster. This involves load balancing and the connection pool,
 discussed in the next section.
