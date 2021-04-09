@@ -447,3 +447,20 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "set_route_filter_lib",
+    srcs = [
+        "set_route_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/router:delegating_route_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/test_common:delegating_route_utility_lib",
+    ],
+)

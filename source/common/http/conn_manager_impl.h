@@ -270,6 +270,7 @@ private:
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
     absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
     Tracing::Span& activeSpan() override;
