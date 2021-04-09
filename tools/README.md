@@ -35,7 +35,7 @@ To this function, add the following bazel target:
     )
 ```
 
-Lets add an empty `tools/sometools/requirements.txt`:
+Let's add an empty `tools/sometools/requirements.txt`:
 
 ```console
 
