@@ -147,8 +147,8 @@ This will make the `mytool.py` file runnable as a `bazel` target, and will
 add a test runner to ensure the file is tested.
 
 ```starlark
-py_binary(
-    name = "mytool",
+envoy_py_binary(
+    name = "tools.sometools.mytool",
     srcs = ["mytool.py"],
     visibility = ["//visibility:public"],
     deps = [
@@ -157,6 +157,11 @@ py_binary(
     ],
 )
 ```
+
+Note that the `envoy_py_binary` expects the full dotted name of the module - in this case,
+`tools.sometool.mytool`.
+
+This will create a runnable target with the name of just `mytool`.
 
 With this added users that have `bazel` installed can run the tool with the following command:
 
@@ -174,8 +179,8 @@ to make it executable:
 $ chmod +x tools/sometools/mytool.py
 ```
 
-With this added users that have the necessary Python dependencies locally installed
-can run the tool with the following command:
+With this, users that have the necessary Python dependencies locally installed
+can run the tool directly with the following command:
 
 ```console
 $ ./tools/sometools/mytool.py PACKAGENAME
@@ -314,7 +319,7 @@ To make use of it in this example we will need to add the runner as a dependency
 Edit `tools/sometools/BUILD` and change the `mytool` target to the following:
 
 ```starlark
-py_binary(
+envoy_py_binary(
     name = "mytool",
     srcs = ["mytool.py"],
     visibility = ["//visibility:public"],
