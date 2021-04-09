@@ -468,9 +468,9 @@ public:
    */
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
-  virtual PathTransformer* forwardingPathTransformer() const { return nullptr; }
+  virtual const PathTransformer& forwardingPathTransformer() const PURE;
 
-  virtual PathTransformer* filterPathTransformer() const { return nullptr; }
+  virtual const PathTransformer& filterPathTransformer() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

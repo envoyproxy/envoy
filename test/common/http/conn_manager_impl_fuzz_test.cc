@@ -20,6 +20,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
+#include "common/http/path_utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -204,6 +205,13 @@ public:
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  const Http::PathTransformer& forwardingPathTransformer() const override {
+    return forwarding_path_transformer_;
+  }
+
+  const Http::PathTransformer& filterPathTransformer() const override {
+    return filter_path_transformer_;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -249,6 +257,8 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
+  Http::PathTransformer forwarding_path_transformer_;
+  Http::PathTransformer filter_path_transformer_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks

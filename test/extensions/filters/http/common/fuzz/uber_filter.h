@@ -34,13 +34,13 @@ protected:
   void cleanFuzzedConfig(absl::string_view filter_name, Protobuf::Message* message);
 
 private:
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   Http::FilterFactoryCb cb_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   Network::Address::InstanceConstSharedPtr addr_;
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
   envoy::config::core::v3::Metadata listener_metadata_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;

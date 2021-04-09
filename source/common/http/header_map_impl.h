@@ -7,6 +7,7 @@
 #include <string>
 #include <type_traits>
 
+#include "envoy/common/optref.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"
@@ -100,6 +101,10 @@ public:
   size_t size() const { return headers_.size(); }
   bool empty() const { return headers_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const;
+  StatefulHeaderKeyFormatterOptConstRef formatter() const {
+    return StatefulHeaderKeyFormatterOptConstRef(makeOptRefFromPtr(formatter_.get()));
+  }
+  StatefulHeaderKeyFormatterOptRef formatter() { return makeOptRefFromPtr(formatter_.get()); }
 
 protected:
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
@@ -327,6 +332,11 @@ protected:
   virtual HeaderEntryImpl** inlineHeaders() PURE;
 
   HeaderList headers_;
+  // TODO(mattklein123): The formatter does not currently get copied when a header map gets
+  // copied. This may be problematic in certain cases like request shadowing. This is omitted
+  // on purpose until someone asks for it, at which point a clone() method can be created to
+  // avoid using extra space/processing for a shared_ptr.
+  StatefulHeaderKeyFormatterPtr formatter_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
   const bool header_map_correctly_coalesce_cookies_ = Runtime::runtimeFeatureEnabled(
@@ -340,6 +350,10 @@ protected:
  */
 template <class Interface> class TypedHeaderMapImpl : public HeaderMapImpl, public Interface {
 public:
+  void setFormatter(StatefulHeaderKeyFormatterPtr&& formatter) {
+    formatter_ = std::move(formatter);
+  }
+
   // Implementation of Http::HeaderMap that passes through to HeaderMapImpl.
   bool operator==(const HeaderMap& rhs) const override { return HeaderMapImpl::operator==(rhs); }
   bool operator!=(const HeaderMap& rhs) const override { return HeaderMapImpl::operator!=(rhs); }
@@ -394,6 +408,10 @@ public:
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     HeaderMapImpl::dumpState(os, indent_level);
   }
+  StatefulHeaderKeyFormatterOptConstRef formatter() const override {
+    return HeaderMapImpl::formatter();
+  }
+  StatefulHeaderKeyFormatterOptRef formatter() override { return HeaderMapImpl::formatter(); }
 
   // Generic custom header functions for each fully typed interface. To avoid accidental issues,
   // the Handle type is different for each interface, which is why these functions live here vs.

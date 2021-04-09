@@ -435,17 +435,17 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
 
 bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
-  if (!request_headers.Path() || !config.forwardingPathTransformer()) {
+  if (!request_headers.Path()) {
     return true; // It's as valid as it is going to get.
   }
   bool is_valid_path = true;
   const auto original_path = request_headers.getPathValue();
   absl::optional<std::string> forwarding_path =
-      config.forwardingPathTransformer()->transform(original_path);
+      config.forwardingPathTransformer().transform(original_path);
   absl::optional<std::string> filter_path;
   if (forwarding_path.has_value()) {
     request_headers.setForwardingPath(forwarding_path.value());
-    filter_path = config.filterPathTransformer()->transform(forwarding_path.value());
+    filter_path = config.filterPathTransformer().transform(forwarding_path.value());
   } else {
     return false;
   }

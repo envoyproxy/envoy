@@ -10,23 +10,15 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "buffer_helper_lib",
-    srcs = ["buffer_helper.cc"],
-    hdrs = ["buffer_helper.h"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:byte_order_lib",
-        "//source/common/common:safe_memcpy_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "hessian_utils_lib",
     srcs = ["hessian_utils.cc"],
     hdrs = ["hessian_utils.h"],
+    external_deps = [
+        "hessian2_codec_codec_impl",
+        "hessian2_codec_object_codec_lib",
+    ],
     deps = [
-        ":buffer_helper_lib",
+        "//include/envoy/buffer:buffer_interface",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -35,7 +27,6 @@ envoy_cc_library(
     name = "protocol_interface",
     hdrs = ["protocol.h"],
     deps = [
-        ":buffer_helper_lib",
         ":message_lib",
         ":metadata_lib",
         ":serializer_interface",
@@ -59,13 +50,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "serializer_interface",
-    srcs = ["serializer_impl.cc"],
     hdrs = [
         "protocol_constants.h",
         "serializer.h",
-        "serializer_impl.h",
     ],
     deps = [
+        ":hessian_utils_lib",
         ":message_lib",
         ":metadata_lib",
         "//include/envoy/buffer:buffer_interface",
@@ -83,7 +73,6 @@ envoy_cc_library(
         "dubbo_hessian2_serializer_impl.h",
     ],
     deps = [
-        ":buffer_helper_lib",
         ":hessian_utils_lib",
         ":serializer_interface",
         "//source/common/singleton:const_singleton",
@@ -141,12 +130,17 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "message_lib",
+    srcs = [
+        "message_impl.cc",
+    ],
     hdrs = [
         "message.h",
         "message_impl.h",
     ],
     deps = [
+        ":hessian_utils_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
     ],
 )
 

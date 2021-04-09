@@ -29,6 +29,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/path_utility.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -194,6 +195,14 @@ public:
                   Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
       return runCallback(path_and_query, response_headers, response, filter);
     };
+  }
+
+  const Http::PathTransformer& forwardingPathTransformer() const override {
+    return forwarding_path_transformer_;
+  }
+
+  const Http::PathTransformer& filterPathTransformer() const override {
+    return filter_path_transformer_;
   }
 
 private:
@@ -441,6 +450,8 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
+  Http::PathTransformer forwarding_path_transformer_;
+  Http::PathTransformer filter_path_transformer_;
 };
 
 } // namespace Server

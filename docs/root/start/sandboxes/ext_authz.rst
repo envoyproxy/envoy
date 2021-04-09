@@ -8,7 +8,7 @@ External authorization (``ext_authz``) filter
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 The External Authorization sandbox demonstrates Envoy's :ref:`ext_authz filter <config_http_filters_ext_authz>`
 capability to delegate authorization of incoming requests through Envoy to an external services.

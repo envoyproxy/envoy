@@ -141,10 +141,10 @@ public:
     return headers_with_underscores_action_;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  PathTransformer* forwardingPathTransformer() const override {
-    return forwarding_path_transformer_.get();
+  const PathTransformer& forwardingPathTransformer() const override {
+    return forwarding_path_transformer_;
   }
-  PathTransformer* filterPathTransformer() const override { return filter_path_transformer_.get(); }
+  const PathTransformer& filterPathTransformer() const override { return filter_path_transformer_; }
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
@@ -216,8 +216,8 @@ public:
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
-  std::unique_ptr<PathTransformer> forwarding_path_transformer_;
-  std::unique_ptr<PathTransformer> filter_path_transformer_;
+  PathTransformer forwarding_path_transformer_;
+  PathTransformer filter_path_transformer_;
 };
 
 } // namespace Http
