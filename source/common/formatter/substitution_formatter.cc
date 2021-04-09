@@ -371,8 +371,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
 
   if (absl::StartsWith(token, "%%")) {
     return std::make_unique<EscapeFormatter>();
-  }
-  else if (absl::StartsWith(token, "REQ(")) {
+  } else if (absl::StartsWith(token, "REQ(")) {
     std::string main_header, alternative_header;
     absl::optional<size_t> max_length;
 
@@ -459,7 +458,8 @@ SubstitutionFormatParser::parse(const std::string& format,
                                 const std::vector<CommandParserPtr>& commands) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
-  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%)|^%%)EOF");
+  const std::regex command_w_args_regex(
+      R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%)|^%%)EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] != '%') {
@@ -487,7 +487,7 @@ SubstitutionFormatParser::parse(const std::string& format,
     std::string token = "";
     size_t command_end_position = pos;
 
-    if(match == "%%") {
+    if (match == "%%") {
       token = match;
     } else {
       token = match.substr(1, match.length() - 2);
