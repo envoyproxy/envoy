@@ -27,7 +27,6 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -45,8 +44,6 @@
 #include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
-#include "quiche/quic/platform/api/quic_pcc_sender.h"
-#include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
@@ -55,7 +52,6 @@
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
-#include "quiche/quic/platform/api/quic_uint128.h"
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -90,13 +86,13 @@ protected:
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
 TEST_F(QuicPlatformTest, QuicBugTracker) {
-  EXPECT_DEBUG_DEATH(QUIC_BUG << "Here is a bug,", " bug");
-  EXPECT_DEBUG_DEATH(QUIC_BUG_IF(true) << "There is a bug,", " bug");
-  EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_BUG_IF(false) << "A feature is not a bug.");
+  EXPECT_DEBUG_DEATH(QUIC_BUG(bug_id) << "Here is a bug,", " bug");
+  EXPECT_DEBUG_DEATH(QUIC_BUG_IF(bug_id, true) << "There is a bug,", " bug");
+  EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_BUG_IF(bug_id, false) << "A feature is not a bug.");
 
-  EXPECT_LOG_CONTAINS("error", " bug", QUIC_PEER_BUG << "Everywhere's a bug,");
-  EXPECT_LOG_CONTAINS("error", " here", QUIC_PEER_BUG_IF(true) << "Including here.");
-  EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_PEER_BUG_IF(false) << "But not there.");
+  EXPECT_LOG_CONTAINS("error", " bug", QUIC_PEER_BUG(bug_id) << "Everywhere's a bug,");
+  EXPECT_LOG_CONTAINS("error", " here", QUIC_PEER_BUG_IF(bug_id, true) << "Including here.");
+  EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_PEER_BUG_IF(bug_id, false) << "But not there.");
 }
 
 TEST_F(QuicPlatformTest, QuicClientStats) {
@@ -114,9 +110,9 @@ TEST_F(QuicPlatformTest, QuicClientStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicExpectBug) {
-  auto bug = [](const char* error_message) { QUIC_BUG << error_message; };
+  auto bug = [](const char* error_message) { QUIC_BUG(bug_id) << error_message; };
 
-  auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG << error_message; };
+  auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG(bug_id) << error_message; };
 
   EXPECT_QUIC_BUG(bug("bug one is expected"), "bug one");
   EXPECT_QUIC_BUG(bug("bug two is expected"), "bug two");
@@ -275,17 +271,6 @@ TEST_F(QuicPlatformTest, QuicThread) {
   // QuicThread will panic if it's started but not joined.
   EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
                "QuicThread should be joined before destruction");
-}
-
-TEST_F(QuicPlatformTest, QuicUint128) {
-  QuicUint128 i = MakeQuicUint128(16777216, 315);
-  EXPECT_EQ(315, QuicUint128Low64(i));
-  EXPECT_EQ(16777216, QuicUint128High64(i));
-}
-
-TEST_F(QuicPlatformTest, QuicPtrUtil) {
-  auto p = QuicWrapUnique(new std::string("aaa"));
-  EXPECT_EQ("aaa", *p);
 }
 
 TEST_F(QuicPlatformTest, QuicLog) {
@@ -580,15 +565,6 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-}
-
-TEST_F(QuicPlatformTest, QuicPccSender) {
-  EXPECT_DEATH(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
-                                     /*unacked_packets=*/nullptr, /*random=*/nullptr,
-                                     /*stats=*/nullptr,
-                                     /*initial_congestion_window=*/0,
-                                     /*max_congestion_window=*/0),
-               "PccSender is not supported.");
 }
 
 class FileUtilsTest : public testing::Test {

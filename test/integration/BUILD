@@ -611,6 +611,7 @@ envoy_cc_test_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:metadata_interface",
         "//source/common/common:dump_state_utils",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -1687,7 +1688,7 @@ envoy_cc_test(
     size = "large",
     srcs = envoy_select_enable_http3(["quic_http_integration_test.cc"]),
     data = ["//test/config/integration/certs"],
-    shard_count = 8,
+    shard_count = 6,
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     # TODO(envoyproxy/windows-dev): Diagnose timeout, why opt build test under Windows GCP RBE
@@ -1712,6 +1713,7 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/injected_resource:config",
         "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/common/quic:test_utils_lib",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",

@@ -51,6 +51,8 @@ cat <<EOF >sed_commands
 
 # Use envoy specific implementations for below platform APIs.
 /^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"common/quic/platform/quiche_logging_impl.h!
+
+# The reset platform APIs use the QUICHE default implementations.
 /^#include/ s!"quiche_platform_impl/!"quiche/common/platform/default/quiche_platform_impl/!
 
 # Rewrite gmock & gtest includes.
