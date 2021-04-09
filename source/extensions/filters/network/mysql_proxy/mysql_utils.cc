@@ -1,9 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include <openssl/digest.h>
-#include <openssl/rand.h>
-#include <openssl/sha.h>
-
 #include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"

@@ -53,9 +53,7 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         ":util_lib",
-        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:datasource_lib",
         "//source/extensions/common/sqlutils:sqlutils_lib",
     ],
 )
@@ -80,9 +78,6 @@ envoy_cc_library(
     name = "util_lib",
     srcs = ["mysql_utils.cc"],
     hdrs = ["mysql_utils.h"],
-    external_deps = [
-        "ssl",
-    ],
     deps = [
         ":codec_interface",
         "//source/common/buffer:buffer_lib",
