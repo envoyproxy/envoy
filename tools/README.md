@@ -82,7 +82,7 @@ So far we have not set the hashes for the requirements.
 
 The easiest way to add the necessary hashes and dependencies is to use `pip-compile` from `pip-tools`.
 
-This will pin all dependencies *of* these libraries too.
+This will pin all dependencies *of these libraries* too.
 
 Run the following to update the `requirements.txt`:
 
@@ -367,3 +367,62 @@ breakpoint()
 ```
 
 This will drop you into the python debugger (`pdb`) at the breakpoint.
+
+
+### Using the `tools.base.runner.Runner` class
+
+A base class for writing tools that need to parse command line arguments has been provided.
+
+To make use of it in this example we will need to add the runner as a dependency to the `mytool` target.
+
+Edit `tools/sometools/BUILD` and change the `mytool` target to the following:
+
+```starlark
+
+py_binary(
+    name = "mytool",
+    srcs = ["mytool.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//tools/base:runner",
+        requirement("requests"),
+        requirement("pyyaml"),
+    ],
+)
+
+```
+
+With this dependency in place we could rewrite the tool as follows:
+
+```python
+#!/usr/bin/env python3
+
+import json
+import sys
+
+import requests
+import yaml
+
+from tools.base.runner import Runner
+
+
+class Mytool(Runner):
+
+    def add_arguments(self, parser):
+        parser.add_argument("package", help="Package to fetch info for")
+
+    def run(self) -> int:
+        sys.stdout.write(
+            yaml.dump(
+                requests.get(
+                    f"https://pypi.python.org/pypi/{self.args.package}/json").json()))
+        return 0
+
+
+def main(*args) -> int:
+    return Mytool(*args).run()
+
+
+if __name__ == "__main__":
+    sys.exit(main(*sys.argv[1:]))
+```
