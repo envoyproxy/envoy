@@ -1,6 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
-
 def envoy_py_test(name, package, visibility):
     native.genrule(
         name = "generate_pytest_" + name,
@@ -27,7 +26,6 @@ def envoy_py_test(name, package, visibility):
         visibility = visibility,
     )
 
-
 def envoy_py_library(
         name = None,
         deps = [],
@@ -47,13 +45,11 @@ def envoy_py_library(
 
     envoy_py_test(name, package, visibility)
 
-
 def envoy_py_binary(
         name = None,
         deps = [],
         data = [],
         visibility = ["//visibility:public"]):
-
     _parts = name.split(".")
     package = ".".join(_parts[:-1])
     name = _parts[-1]
