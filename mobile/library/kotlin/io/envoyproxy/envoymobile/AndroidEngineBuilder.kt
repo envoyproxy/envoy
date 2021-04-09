@@ -1,13 +1,13 @@
 package io.envoyproxy.envoymobile
 
-import android.app.Application
+import android.content.Context
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
 
 class AndroidEngineBuilder @JvmOverloads constructor(
-  application: Application,
+  context: Context,
   baseConfiguration: BaseConfiguration = Standard()
 ) : EngineBuilder(baseConfiguration) {
   init {
-    addEngineType { AndroidEngineImpl(application) }
+    addEngineType { AndroidEngineImpl(context) }
   }
 }
