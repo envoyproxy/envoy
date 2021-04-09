@@ -66,7 +66,7 @@ public:
   ~FilterConfig() override = default;
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit&
+  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit
   proto_config() const {
     return proto_config_;
   }
@@ -103,7 +103,7 @@ private:
   Router::HeaderParserPtr response_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
-  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config_;
+  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit proto_config_;
   Event::Dispatcher& dispatcher_;
 };
 
