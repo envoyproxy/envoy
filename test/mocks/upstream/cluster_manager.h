@@ -71,7 +71,7 @@ public:
   }
   MOCK_METHOD(OdCdsApiHandleSharedPtr, allocateOdCdsApi,
               (const envoy::config::core::v3::ConfigSource& odcds_config,
-               const xds::core::v3::ResourceLocator* odcds_resources_locator,
+               OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;

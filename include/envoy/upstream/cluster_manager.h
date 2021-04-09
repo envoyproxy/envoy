@@ -105,6 +105,9 @@ public:
 
 using ClusterDiscoveryCallbackHandlePtr = std::unique_ptr<ClusterDiscoveryCallbackHandle>;
 
+/**
+ * A handle to an on-demand CDS.
+ */
 class OdCdsApiHandle {
 public:
   virtual ~OdCdsApiHandle() = default;
@@ -124,7 +127,7 @@ public:
    */
   virtual ClusterDiscoveryCallbackHandlePtr
   requestOnDemandClusterDiscovery(const std::string& name,
-                                  ClusterDiscoveryCallbackWeakPtr callback) PURE;
+                                  ClusterDiscoveryCallbackSharedPtr callback) PURE;
 };
 
 using OdCdsApiHandleSharedPtr = std::shared_ptr<OdCdsApiHandle>;
@@ -370,14 +373,14 @@ public:
   /**
    * Allocates an on-demand CDS API provider from configuration proto or locator.
    *
-   * @param odcds_config is a configuration proto. Used when odcds_resources_locator is a nullptr.
-   * @param odcds_resources_locator is a locator for ODCDS.
+   * @param odcds_config is a configuration proto. Used when odcds_resources_locator is a nullopt.
+   * @param odcds_resources_locator is a locator for ODCDS. Used over odcds_config if not a nullopt.
    * @param validation_visitor
    * @return OdCdsApiHandleSharedPtr the ODCDS handle.
    */
   virtual OdCdsApiHandleSharedPtr
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
-                   const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                   OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 

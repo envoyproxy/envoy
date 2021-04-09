@@ -286,41 +286,10 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
-  class OdCdsApiHandleImpl : public std::enable_shared_from_this<OdCdsApiHandleImpl>,
-                             public OdCdsApiHandle {
-  public:
-    static OdCdsApiHandleSharedPtr create(ClusterManagerImpl& parent, OdCdsApiPtr odcds) {
-      return std::make_shared<OdCdsApiHandleImpl>(parent, std::move(odcds));
-    }
-
-    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiPtr odcds)
-        : parent_(parent), odcds_(std::move(odcds)) {
-      ASSERT(odcds_ != nullptr);
-    }
-
-    ClusterDiscoveryCallbackHandlePtr
-    requestOnDemandClusterDiscovery(const std::string& name,
-                                    ClusterDiscoveryCallbackWeakPtr callback) override {
-      return parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move(callback));
-    }
-
-    OdCdsApi& getOdCds() const { return *odcds_; }
-
-  private:
-    ClusterManagerImpl& parent_;
-    OdCdsApiPtr odcds_;
-  };
-
-  using OdCdsApiHandleImplSharedPtr = std::shared_ptr<OdCdsApiHandleImpl>;
-
   OdCdsApiHandleSharedPtr
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
-                   const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                   OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) override;
-
-  ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr odcds_handle, const std::string& name,
-                                  ClusterDiscoveryCallbackWeakPtr callback);
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
@@ -369,51 +338,129 @@ protected:
     std::vector<PerPriority> per_priority_update_params_;
   };
 
+  /**
+   * An implementation of an on-demand CDS handle. It forwards the discovery request to the cluster
+   * manager that created the handle.
+   *
+   * It's a protected type, so unit tests can use it.
+   */
+  class OdCdsApiHandleImpl : public std::enable_shared_from_this<OdCdsApiHandleImpl>,
+                             public OdCdsApiHandle {
+  public:
+    static OdCdsApiHandleSharedPtr create(ClusterManagerImpl& parent, OdCdsApiPtr odcds) {
+      return std::make_shared<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    }
+
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiPtr odcds)
+        : parent_(parent), odcds_(std::move(odcds)) {
+      ASSERT(odcds_ != nullptr);
+    }
+
+    ClusterDiscoveryCallbackHandlePtr
+    requestOnDemandClusterDiscovery(const std::string& name,
+                                    ClusterDiscoveryCallbackSharedPtr callback) override {
+      return parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move(callback));
+    }
+
+    OdCdsApi& getOdCds() const { return *odcds_; }
+
+  private:
+    ClusterManagerImpl& parent_;
+    const OdCdsApiPtr odcds_;
+  };
+
+  using OdCdsApiHandleImplSharedPtr = std::shared_ptr<OdCdsApiHandleImpl>;
+
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
                                             ThreadLocalClusterUpdateParams&& params);
+
+  /**
+   * Notifies cluster discovery managers in each worker thread that
+   * the discovery process for the cluster with a passed name has
+   * timed out.
+   */
+  void notifyExpiredDiscovery(const std::string& name);
 
 private:
   struct ThreadLocalClusterManagerImpl;
 
+  /** A thread-local on-demand cluster discovery manager. It takes care of invoking the discovery
+   *  callbacks in the event of a finished discovery. It does it by installing a cluster lifecycle
+   *  callback that invokes the discovery callbacks when a matching cluster just got added. If there
+   *  is no pending cluster discovery in the thread, it removes the cluster lifecycle callback.
+   */
   class ClusterDiscoveryManager {
   public:
     ClusterDiscoveryManager(ThreadLocalClusterManagerImpl& parent);
 
-    void ensureCallbacksAreInstalled();
+    /**
+     * Invoke the callbacks for the given cluster name. The discovery status is passed to the
+     * callbacks. After invoking the callbacks, they are dropped from the manager. This may also
+     * result in a deferred removal of the life-cycle callback.
+     */
     void processClusterName(const std::string& name, ClusterDiscoveryStatus cluster_status);
 
+    /**
+     * A pair containing a discovery handle and information whether a discovery for a given cluster
+     * was already requested in this thread.
+     */
     struct Pair {
       ClusterDiscoveryCallbackHandlePtr handle_ptr_;
       bool discovery_in_progress_;
     };
 
-    Pair addCallback(const std::string& name, ClusterDiscoveryCallbackWeakPtr weak_callback);
-
-    void erase(const std::string& name, ClusterDiscoveryCallbackWeakPtr cb);
+    /**
+     * Adds the discovery callback. Returns a handle and a boolean indicating whether this worker
+     * thread has already requested the discovery of a cluster with a given name.
+     */
+    Pair addCallback(const std::string& name, const ClusterDiscoveryCallbackSharedPtr& callback);
 
   private:
-    bool eraseFromDeque(const std::string& name, ClusterDiscoveryCallbackWeakPtr cb);
+    using CallbackList = std::list<ClusterDiscoveryCallbackWeakPtr>;
+    using CallbackListIterator = CallbackList::iterator;
+
+    /**
+     * An implementation of discovery handle. Destroy it to drop the callback from the discovery
+     * manager. It won't stop the discovery process, though.
+     */
+    class ClusterDiscoveryCallbackHandleImpl : public ClusterDiscoveryCallbackHandle {
+    public:
+      ClusterDiscoveryCallbackHandleImpl(ClusterDiscoveryManager& parent, std::string name,
+                                         CallbackListIterator it)
+          : parent_(parent), name_(std::move(name)), it_(std::move(it)) {}
+
+      ~ClusterDiscoveryCallbackHandleImpl() override { parent_.erase(name_, std::move(it_)); }
+
+    private:
+      ClusterDiscoveryManager& parent_;
+      const std::string name_;
+      CallbackListIterator it_;
+    };
+
+    /**
+     * Install a cluster lifecycle callback if it wasn't yet installed.
+     */
+    void ensureLifecycleCallbacksAreInstalled();
+    /**
+     * Drops a callback from under the iterator from the manager without invoking the callback.
+     */
+    void erase(const std::string& name, CallbackListIterator it);
+    /**
+     * Try to erase a callback from under the given iterator. It returns a boolean value indicating
+     * whether the dropped callback was a last one for the given cluster.
+     */
+    bool eraseFromList(const std::string& name, CallbackListIterator it);
+    /**
+     * Posts a callback to worker's dispatcher to drop the cluster lifecycle callbacks. Posting this
+     * action is to avoid dropping the callbacks from the callback list while iterating it.
+     */
     void maybePostResetCallbacks();
 
     ThreadLocalClusterManagerImpl& parent_;
-    absl::flat_hash_map<std::string, std::deque<ClusterDiscoveryCallbackWeakPtr>> pending_clusters_;
+    absl::flat_hash_map<std::string, CallbackList> pending_clusters_;
     ClusterUpdateCallbacksHandlePtr callbacks_handle_;
     std::unique_ptr<ClusterUpdateCallbacks> callbacks_;
     bool callbacks_handle_cleanup_posted_ = false;
-  };
-
-  class ClusterDiscoveryCallbackHandleImpl : public ClusterDiscoveryCallbackHandle {
-  public:
-    ClusterDiscoveryCallbackHandleImpl(ClusterDiscoveryManager& parent,
-                                       ClusterDiscoveryCallbackWeakPtr cb, std::string name)
-        : parent_(parent), cb_(std::move(cb)), name_(std::move(name)) {}
-
-    ~ClusterDiscoveryCallbackHandleImpl() override { parent_.erase(name_, cb_); }
-
-  private:
-    ClusterDiscoveryManager& parent_;
-    ClusterDiscoveryCallbackWeakPtr cb_;
-    std::string name_;
   };
 
   /**
@@ -634,6 +681,17 @@ private:
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
   using ClusterUpdatesMap = absl::node_hash_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
+  /**
+   * Holds a reference to an on-demand CDS handle to keep it alive for the duration of a cluster
+   * discovery, and an expiration timer notifying worker threads about discovery timing out.
+   */
+  struct ClusterCreation {
+    OdCdsApiHandleImplSharedPtr odcds_handle_;
+    Event::TimerPtr expiration_timer_;
+  };
+
+  using ClusterCreationsMap = absl::flat_hash_map<std::string, ClusterCreation>;
+
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
@@ -655,20 +713,9 @@ private:
                               const ClusterConnectivityState& cluster_manager_state,
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
-  struct ClusterCreation {
-    OdCdsApiHandleImplSharedPtr odcds_handle_;
-    Event::TimerPtr expiration_timer_;
-  };
-
-  using ClusterCreationsMap = absl::flat_hash_map<std::string, ClusterCreation>;
-
-protected:
-  /**
-   * Notifies cluster discovery managers in each worker thread that
-   * the discovery process for the cluster with a passed name has
-   * timed out.
-   */
-  void notifyExpiredDiscovery(const std::string& name);
+  ClusterDiscoveryCallbackHandlePtr
+  requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr odcds_handle, const std::string& name,
+                                  ClusterDiscoveryCallbackSharedPtr callback);
 
 private:
   ClusterManagerFactory& factory_;

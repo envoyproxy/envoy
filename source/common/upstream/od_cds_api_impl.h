@@ -47,7 +47,7 @@ class OdCdsApiImpl : public OdCdsApi,
                      Logger::Loggable<Logger::Id::upstream> {
 public:
   static OdCdsApiPtr create(const envoy::config::core::v3::ConfigSource& odcds_config,
-                            const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                             ClusterManager& cm, Stats::Scope& scope,
                             ProtobufMessage::ValidationVisitor& validation_visitor);
 
@@ -65,7 +65,7 @@ private:
                             const EnvoyException* e) override;
 
   OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
-               const xds::core::v3::ResourceLocator* odcds_resources_locator, ClusterManager& cm,
+               OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
                Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void sendAwaiting();
 

@@ -22,7 +22,8 @@ class OdCdsApiImplTest : public testing::Test {
 public:
   void SetUp() override {
     envoy::config::core::v3::ConfigSource odcds_config;
-    odcds_ = OdCdsApiImpl::create(odcds_config, nullptr, cm_, store_, validation_visitor_);
+    OptRef<xds::core::v3::ResourceLocator> null_locator;
+    odcds_ = OdCdsApiImpl::create(odcds_config, null_locator, cm_, store_, validation_visitor_);
     odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 

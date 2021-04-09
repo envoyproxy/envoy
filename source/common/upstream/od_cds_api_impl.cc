@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Upstream {
 
 OdCdsApiPtr OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
-                                 const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                                 OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                  ClusterManager& cm, Stats::Scope& scope,
                                  ProtobufMessage::ValidationVisitor& validation_visitor) {
   return OdCdsApiPtr(
@@ -17,7 +17,7 @@ OdCdsApiPtr OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& od
 }
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
-                           const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                           OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                            ClusterManager& cm, Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
@@ -27,7 +27,7 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
   const auto resource_name = getResourceName();
-  if (odcds_resources_locator == nullptr) {
+  if (!odcds_resources_locator.has_value()) {
     subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
         odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {

@@ -14,7 +14,7 @@ public:
   ~MockOdCdsApiHandle() override;
 
   MOCK_METHOD(ClusterDiscoveryCallbackHandlePtr, requestOnDemandClusterDiscovery,
-              (const std::string& name, ClusterDiscoveryCallbackWeakPtr callback));
+              (const std::string& name, ClusterDiscoveryCallbackSharedPtr callback));
 };
 
 } // namespace Upstream

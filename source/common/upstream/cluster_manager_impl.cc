@@ -1050,7 +1050,7 @@ ClusterManagerImpl::ClusterDiscoveryManager::ClusterDiscoveryManager(
     ThreadLocalClusterManagerImpl& parent)
     : parent_(parent) {}
 
-void ClusterManagerImpl::ClusterDiscoveryManager::ensureCallbacksAreInstalled() {
+void ClusterManagerImpl::ClusterDiscoveryManager::ensureLifecycleCallbacksAreInstalled() {
   if (callbacks_handle_) {
     return;
   }
@@ -1063,6 +1063,10 @@ void ClusterManagerImpl::ClusterDiscoveryManager::ensureCallbacksAreInstalled() 
 
 void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(
     const std::string& name, ClusterDiscoveryStatus cluster_status) {
+  // Extracting the list of callbacks from the map makes resetting the
+  // handle inside the callback safe, because handle would try to find
+  // the list of callbacks in the map and would find nothing, instead
+  // of removing an item from the list while iterating the list.
   auto map_node_handle = pending_clusters_.extract(name);
   if (map_node_handle.empty()) {
     return;
@@ -1078,51 +1082,40 @@ void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(
 
 ClusterManagerImpl::ClusterDiscoveryManager::Pair
 ClusterManagerImpl::ClusterDiscoveryManager::addCallback(
-    const std::string& name, ClusterDiscoveryCallbackWeakPtr weak_callback) {
-  auto& callbacks_deque = pending_clusters_[name];
-  callbacks_deque.emplace_back(weak_callback);
-  auto handle =
-      std::make_unique<ClusterDiscoveryCallbackHandleImpl>(*this, std::move(weak_callback), name);
-  auto discovery_in_progress = (callbacks_deque.size() > 1);
+    const std::string& name, const ClusterDiscoveryCallbackSharedPtr& callback) {
+  ensureLifecycleCallbacksAreInstalled();
+
+  auto& callbacks_list = pending_clusters_[name];
+  auto it = callbacks_list.emplace(callbacks_list.end(), callback);
+  auto handle = std::make_unique<ClusterDiscoveryCallbackHandleImpl>(*this, name, it);
+  auto discovery_in_progress = (callbacks_list.size() > 1);
   return {std::move(handle), discovery_in_progress};
 }
 
 void ClusterManagerImpl::ClusterDiscoveryManager::erase(const std::string& name,
-                                                        ClusterDiscoveryCallbackWeakPtr cb) {
-  const bool drop_deque = eraseFromDeque(name, cb);
-  if (drop_deque) {
+                                                        CallbackListIterator it) {
+  const bool drop_list = eraseFromList(name, it);
+  if (drop_list) {
     pending_clusters_.erase(name);
   }
   maybePostResetCallbacks();
 }
 
-bool ClusterManagerImpl::ClusterDiscoveryManager::eraseFromDeque(
-    const std::string& name, ClusterDiscoveryCallbackWeakPtr cb) {
-  auto it = pending_clusters_.find(name);
-  if (it == pending_clusters_.end()) {
+bool ClusterManagerImpl::ClusterDiscoveryManager::eraseFromList(const std::string& name,
+                                                                CallbackListIterator it) {
+  auto map_it = pending_clusters_.find(name);
+  if (map_it == pending_clusters_.end()) {
     return false;
   }
-  auto& deque = it->second;
-  // Could use std::erase_if, but it's only in C++20.
-  auto it2 = std::remove_if(deque.begin(), deque.end(),
-                            [cb](ClusterDiscoveryCallbackWeakPtr const& weak_ptr) {
-                              if (cb.owner_before(weak_ptr)) {
-                                return false;
-                              }
-                              if (weak_ptr.owner_before(cb)) {
-                                return false;
-                              }
-                              return true;
-                            });
-  deque.erase(it2, deque.end());
-  return deque.empty();
+  auto& list = map_it->second;
+  list.erase(it);
+  return list.empty();
 }
 
 void ClusterManagerImpl::ClusterDiscoveryManager::maybePostResetCallbacks() {
   if (!callbacks_handle_cleanup_posted_ && pending_clusters_.empty()) {
     parent_.thread_local_dispatcher_.post([this] {
-      // Something might got added in the meantime, so check the
-      // map again.
+      // Something might got added in the meantime, so check the map again.
       if (pending_clusters_.empty()) {
         callbacks_handle_.reset();
         callbacks_.reset();
@@ -1135,7 +1128,7 @@ void ClusterManagerImpl::ClusterDiscoveryManager::maybePostResetCallbacks() {
 
 OdCdsApiHandleSharedPtr
 ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
-                                     const xds::core::v3::ResourceLocator* odcds_resources_locator,
+                                     OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a way
@@ -1148,52 +1141,54 @@ ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource
 ClusterDiscoveryCallbackHandlePtr
 ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr odcds_handle,
                                                     const std::string& name,
-                                                    ClusterDiscoveryCallbackWeakPtr weak_callback) {
+                                                    ClusterDiscoveryCallbackSharedPtr callback) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
-  cluster_manager.cdm_.ensureCallbacksAreInstalled();
-
-  auto [handle, discovery_in_progress] = cluster_manager.cdm_.addCallback(name, weak_callback);
+  auto [handle, discovery_in_progress] = cluster_manager.cdm_.addCallback(name, callback);
   if (discovery_in_progress) {
-    // We have already started a discovery process for a cluster with
-    // this name, so nothing more left to do here.
+    // This worker thread has already requested a discovery of a cluster with this name, so nothing
+    // more left to do here.
     return std::move(handle);
   }
-  dispatcher_.post([this, odcds_handle = std::move(odcds_handle), weak_callback, name,
+  // This seems to be the first request for discovery of this cluster in this worker thread. Rest of
+  // the process may only happen in the main thread.
+  dispatcher_.post([this, odcds_handle = std::move(odcds_handle),
+                    weak_callback = ClusterDiscoveryCallbackWeakPtr(callback), name,
                     &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
-    // Check for the cluster here too. It might have been added
-    // between the time when this callback was posted and when it is
-    // being executed.
+    // Check for the cluster here too. It might have been added between the time when this closure
+    // was posted and when it is being executed.
     if (getThreadLocalCluster(name) != nullptr) {
       if (weak_callback.expired()) {
-        // Not only the cluster was added, but it was also already
-        // handled, so don't bother with posting the callback back to
-        // the worker thread.
+        // Not only the cluster was added, but it was also already handled, so don't bother with
+        // posting the callback back to the worker thread.
         return;
       }
       thread_local_dispatcher.post([weak_callback] {
         if (auto callback = weak_callback.lock(); callback != nullptr) {
-          // If this gets called here, it means that we requested a
-          // discovery of a cluster without checking if that cluster
-          // is already known by cluster manager.
+          // If this gets called here, it means that we requested a discovery of a cluster without
+          // checking if that cluster is already known by cluster manager.
           (*callback)(ClusterDiscoveryStatus::Available);
         }
       });
       return;
     }
 
-    auto it = pending_cluster_creations_.find(name);
-    if (it != pending_cluster_creations_.end()) {
-      // We already began the discovery process for this cluster,
-      // nothing to do.
+    if (auto it = pending_cluster_creations_.find(name); it != pending_cluster_creations_.end()) {
+      // We already began the discovery process for this cluster, nothing to do. If we got here, it
+      // means that it was other worker thread that requested the discovery.
       return;
     }
     auto& odcds = odcds_handle->getOdCds();
+    // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
+    // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
     odcds.updateOnDemand(name);
+    // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
     auto timer_cb = Event::TimerCb([this, name] { notifyExpiredDiscovery(name); });
     auto timer = dispatcher_.createTimer(timer_cb);
+    // TODO(krnowak): This timeout period is arbitrary. Should it be a parameter or do we keep it,
+    // but rather with a name?
     timer->enableTimer(std::chrono::milliseconds(5000));
-    // Keep odcds alive for the duration of the discovery process.
+    // Keep odcds handle alive for the duration of the discovery process.
     pending_cluster_creations_.insert(
         {std::move(name), ClusterCreation{std::move(odcds_handle), std::move(timer)}});
   });
@@ -1206,12 +1201,13 @@ void ClusterManagerImpl::notifyExpiredDiscovery(const std::string& name) {
   if (map_node_handle.empty()) {
     return;
   }
-  // Defer destroying the timer, so it's not destroyed during its
-  // callback. TimerPtr is a unique_ptr, which is not copyable, but
-  // std::function is copyable, we turn a move-only unique_ptr into a
-  // copyable shared_ptr and pass that to the std::function.
+  // Defer destroying the timer, so it's not destroyed during its callback. TimerPtr is a
+  // unique_ptr, which is not copyable, but std::function is copyable, we turn a move-only
+  // unique_ptr into a copyable shared_ptr and pass that to the std::function.
   dispatcher_.post([timer = std::shared_ptr<Event::Timer>(
                         std::move(map_node_handle.mapped().expiration_timer_))] {});
+
+  // Let all the worker threads know that the discovery timed out.
   tls_.runOnAllThreads([name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     if (!cluster_manager.has_value()) {
       return;

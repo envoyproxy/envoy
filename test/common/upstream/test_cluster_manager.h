@@ -184,6 +184,15 @@ public:
     return clusters;
   }
 
+  class TestOdCdsApiHandleImpl : public ClusterManagerImpl::OdCdsApiHandleImpl {
+  public:
+    static OdCdsApiHandleSharedPtr create(ClusterManagerImpl& parent, OdCdsApiPtr odcds) {
+      return std::make_shared<TestOdCdsApiHandleImpl>(parent, std::move(odcds));
+    }
+
+    using ClusterManagerImpl::OdCdsApiHandleImpl::OdCdsApiHandleImpl;
+  };
+
   void notifyExpiredDiscovery(const std::string& name) {
     ClusterManagerImpl::notifyExpiredDiscovery(name);
   }
