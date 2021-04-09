@@ -669,12 +669,11 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
-  Upstream::HostDescriptionConstSharedPtr upstream_host =
-      connection_manager_.read_callbacks_->upstreamHost();
 
-  if (upstream_host != nullptr) {
+  const auto& cluster_info = clusterInfo();
+  if (cluster_info != nullptr) {
     Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        upstream_host->cluster().requestResponseSizeStats();
+        cluster_info->requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
       req_resp_stats->get().upstream_rq_body_size_.recordValue(
           filter_manager_.streamInfo().bytesReceived());
@@ -777,12 +776,10 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
-  Upstream::HostDescriptionConstSharedPtr upstream_host =
-      connection_manager_.read_callbacks_->upstreamHost();
-
-  if (upstream_host != nullptr) {
+  const auto& cluster_info = clusterInfo();
+  if (cluster_info != nullptr) {
     Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        upstream_host->cluster().requestResponseSizeStats();
+        cluster_info->requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
       req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
     }
@@ -849,12 +846,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     request_header_timer_.reset();
   }
 
-  Upstream::HostDescriptionConstSharedPtr upstream_host =
-      connection_manager_.read_callbacks_->upstreamHost();
-
-  if (upstream_host != nullptr) {
+  const auto& cluster_info = clusterInfo();
+  if (cluster_info != nullptr) {
     Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        upstream_host->cluster().requestResponseSizeStats();
+        cluster_info->requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
       req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
     }
