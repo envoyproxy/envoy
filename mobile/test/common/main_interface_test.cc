@@ -16,6 +16,7 @@ typedef struct {
   absl::Notification on_engine_running;
   absl::Notification on_exit;
   absl::Notification on_log;
+  absl::Notification on_logger_release;
 } engine_test_context;
 
 // This config is the minimal envoy mobile config that allows for running the engine.
@@ -410,7 +411,11 @@ TEST(EngineTest, Logger) {
                         if (!test_context->on_log.HasBeenNotified()) {
                           test_context->on_log.Notify();
                         }
-                      },
+                      } /* log */,
+                      [](void* context) -> void {
+                        auto* test_context = static_cast<engine_test_context*>(context);
+                        test_context->on_logger_release.Notify();
+                      } /* release */,
                       &test_context};
 
   run_engine(0, engine_cbs, logger, MINIMAL_NOOP_CONFIG.c_str(), LEVEL_DEBUG.c_str());
@@ -419,6 +424,7 @@ TEST(EngineTest, Logger) {
   ASSERT_TRUE(test_context.on_log.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   terminate_engine(0);
+  ASSERT_TRUE(test_context.on_logger_release.WaitForNotificationWithTimeout(absl::Seconds(3)));
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 

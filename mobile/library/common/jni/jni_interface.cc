@@ -61,7 +61,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   jobject retained_context = env->NewGlobalRef(context); // Required to keep context in memory
   envoy_engine_callbacks native_callbacks = {jvm_on_engine_running, jvm_on_exit, retained_context};
   // TODO(junr03): wire up once Android support lands.
-  envoy_logger logger = {nullptr, nullptr};
+  envoy_logger logger = {nullptr, nullptr, nullptr};
   return run_engine(engine, native_callbacks, logger, env->GetStringUTFChars(config, nullptr),
                     env->GetStringUTFChars(jvm_log_level, nullptr));
 }

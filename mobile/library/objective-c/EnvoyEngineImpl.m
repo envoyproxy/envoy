@@ -16,10 +16,14 @@ static void ios_on_engine_running(void *context) {
   }
 }
 
-static void ios_on_exit(void *context) {
-  // Currently nothing needs to happen in iOS on exit. Just log.
-  NSLog(@"[Envoy] library is exiting");
+static void ios_on_exit(void *context) { NSLog(@"[Envoy] library is exiting"); }
+
+static void ios_on_log(envoy_data data, void *context) {
+  EnvoyLogger *logger = (__bridge EnvoyLogger *)context;
+  logger.log(to_ios_string(data));
 }
+
+static void ios_on_logger_release(void *context) { CFRelease(context); }
 
 static const void *ios_http_filter_init(const void *context) {
   envoy_http_filter *c_filter = (envoy_http_filter *)context;
@@ -349,7 +353,8 @@ static envoy_data ios_get_string(const void *context) {
 
 - (int)runWithConfig:(EnvoyConfiguration *)config
             logLevel:(NSString *)logLevel
-     onEngineRunning:(nullable void (^)())onEngineRunning {
+     onEngineRunning:(nullable void (^)())onEngineRunning
+              logger:(nullable void (^)(NSString *))logger {
   NSString *templateYAML = [[NSString alloc] initWithUTF8String:config_template];
   NSString *resolvedYAML = [config resolveTemplate:templateYAML];
   if (resolvedYAML == nil) {
@@ -364,13 +369,17 @@ static envoy_data ios_get_string(const void *context) {
     [self registerStringAccessor:name accessor:config.stringAccessors[name]];
   }
 
-  return [self runWithConfigYAML:resolvedYAML logLevel:logLevel onEngineRunning:onEngineRunning];
+  return [self runWithConfigYAML:resolvedYAML
+                        logLevel:logLevel
+                 onEngineRunning:onEngineRunning
+                          logger:logger];
 }
 
 - (int)runWithTemplate:(NSString *)yaml
                 config:(EnvoyConfiguration *)config
               logLevel:(NSString *)logLevel
-       onEngineRunning:(nullable void (^)())onEngineRunning {
+       onEngineRunning:(nullable void (^)())onEngineRunning
+                logger:(nullable void (^)(NSString *))logger {
   NSString *resolvedYAML = [config resolveTemplate:yaml];
   if (resolvedYAML == nil) {
     return kEnvoyFailure;
@@ -384,13 +393,18 @@ static envoy_data ios_get_string(const void *context) {
     [self registerStringAccessor:name accessor:config.stringAccessors[name]];
   }
 
-  return [self runWithConfigYAML:resolvedYAML logLevel:logLevel onEngineRunning:onEngineRunning];
+  return [self runWithConfigYAML:resolvedYAML
+                        logLevel:logLevel
+                 onEngineRunning:onEngineRunning
+                          logger:logger];
 }
 
 - (int)runWithConfigYAML:(NSString *)configYAML
                 logLevel:(NSString *)logLevel
-         onEngineRunning:(nullable void (^)())onEngineRunning {
+         onEngineRunning:(nullable void (^)())onEngineRunning
+                  logger:(nullable void (^)(NSString *))logger {
   self.onEngineRunning = onEngineRunning;
+
   [self startObservingLifecycleNotifications];
 
   // Envoy exceptions will only be caught here when compiled for 64-bit arches.
@@ -398,9 +412,16 @@ static envoy_data ios_get_string(const void *context) {
   @try {
     envoy_engine_callbacks native_callbacks = {ios_on_engine_running, ios_on_exit,
                                                (__bridge void *)(self)};
-    // TODO(junr03): wire up once https://github.com/envoyproxy/envoy-mobile/pull/1356 lands.
-    envoy_logger logger = {NULL, NULL};
-    return (int)run_engine(_engineHandle, native_callbacks, logger, configYAML.UTF8String,
+
+    envoy_logger native_logger = {NULL, NULL, NULL};
+    if (logger) {
+      EnvoyLogger *objcLogger = [[EnvoyLogger alloc] initWithLogClosure:logger];
+      native_logger.log = ios_on_log;
+      native_logger.release = ios_on_logger_release;
+      native_logger.context = CFBridgingRetain(objcLogger);
+    }
+
+    return (int)run_engine(_engineHandle, native_callbacks, native_logger, configYAML.UTF8String,
                            logLevel.UTF8String);
   } @catch (NSException *exception) {
     NSLog(@"[Envoy] exception caught: %@", exception);

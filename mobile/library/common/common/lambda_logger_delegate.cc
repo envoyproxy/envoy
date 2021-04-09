@@ -12,7 +12,10 @@ LambdaDelegate::LambdaDelegate(envoy_logger logger, DelegatingLogSinkSharedPtr l
   setDelegate();
 }
 
-LambdaDelegate::~LambdaDelegate() { restoreDelegate(); }
+LambdaDelegate::~LambdaDelegate() {
+  restoreDelegate();
+  logger_.release(logger_.context);
+}
 
 void LambdaDelegate::log(absl::string_view msg) {
   logger_.log(Data::Utility::copyToBridgeData(msg), logger_.context);

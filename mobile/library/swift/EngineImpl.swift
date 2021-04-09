@@ -14,7 +14,7 @@ final class EngineImpl: NSObject {
   }
 
   private init(configType: ConfigurationType, logLevel: LogLevel, engine: EnvoyEngine,
-               onEngineRunning: (() -> Void)?)
+               onEngineRunning: (() -> Void)?, logger: ((String) -> Void)?)
   {
     self.engine = engine
     self.pulseClientImpl = PulseClientImpl(engine: engine)
@@ -24,10 +24,10 @@ final class EngineImpl: NSObject {
     switch configType {
     case .custom(let yaml, let config):
       self.engine.run(withTemplate: yaml, config: config, logLevel: logLevel.stringValue,
-                      onEngineRunning: onEngineRunning)
+                      onEngineRunning: onEngineRunning, logger: logger)
     case .standard(let config):
       self.engine.run(withConfig: config, logLevel: logLevel.stringValue,
-                      onEngineRunning: onEngineRunning)
+                      onEngineRunning: onEngineRunning, logger: logger)
     }
   }
 
@@ -38,11 +38,12 @@ final class EngineImpl: NSObject {
   /// - parameter engine:          The underlying engine to use for starting Envoy.
   /// - parameter onEngineRunning: Closure called when the engine finishes its async
   ///                              initialization/startup.
+  /// - parameter logger:          Logging interface.
   convenience init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine,
-                   onEngineRunning: (() -> Void)?)
+                   onEngineRunning: (() -> Void)?, logger: ((String) -> Void)?)
   {
     self.init(configType: .standard(config: config), logLevel: logLevel, engine: engine,
-              onEngineRunning: onEngineRunning)
+              onEngineRunning: onEngineRunning, logger: logger)
   }
 
   /// Initialize a new Envoy instance using a string configuration.
@@ -53,11 +54,13 @@ final class EngineImpl: NSObject {
   /// - parameter engine:          The underlying engine to use for starting Envoy.
   /// - parameter onEngineRunning: Closure called when the engine finishes its async
   ///                              initialization/startup.
+  /// - parameter logger:          Logging interface.
   convenience init(yaml: String, config: EnvoyConfiguration, logLevel: LogLevel = .info,
-                   engine: EnvoyEngine, onEngineRunning: (() -> Void)?)
+                   engine: EnvoyEngine, onEngineRunning: (() -> Void)?,
+                   logger: ((String) -> Void)?)
   {
     self.init(configType: .custom(yaml: yaml, config: config), logLevel: logLevel, engine: engine,
-              onEngineRunning: onEngineRunning)
+              onEngineRunning: onEngineRunning, logger: logger)
   }
 }
 

@@ -23,6 +23,7 @@ public final class EngineBuilder: NSObject {
   private var appId: String = "unspecified"
   private var virtualClusters: String = "[]"
   private var onEngineRunning: (() -> Void)?
+  private var logger: ((String) -> Void)?
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
@@ -169,6 +170,17 @@ public final class EngineBuilder: NSObject {
     return self
   }
 
+  /// Set a closure to be called when the engine's logger logs.
+  ///
+  /// - parameter closure: The closure to be called.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setLogger(closure: @escaping (String) -> Void) -> EngineBuilder {
+    self.logger = closure
+    return self
+  }
+
   /// Add the App Version of the App using this Envoy Client.
   ///
   /// - parameter appVersion: The version.
@@ -224,10 +236,10 @@ public final class EngineBuilder: NSObject {
     switch self.base {
     case .custom(let yaml):
       return EngineImpl(yaml: yaml, config: config, logLevel: self.logLevel, engine: engine,
-                        onEngineRunning: self.onEngineRunning)
+                        onEngineRunning: self.onEngineRunning, logger: self.logger)
     case .standard:
       return EngineImpl(config: config, logLevel: self.logLevel, engine: engine,
-                        onEngineRunning: self.onEngineRunning)
+                        onEngineRunning: self.onEngineRunning, logger: self.logger)
     }
   }
 
