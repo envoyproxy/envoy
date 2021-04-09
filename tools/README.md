@@ -135,7 +135,7 @@ load("@sometools_pip3//:requirements.bzl", "requirement")
 licenses(["notice"])  # Apache 2
 ```
 
-Note the loading of `requirement` from `@sometools_pip3`, and `envoy_py_binary`.
+Note the loading of `requirement` from `@sometools_pip3`, and the loading of `envoy_py_binary`.
 
 We will use these in the next section.
 
@@ -314,13 +314,13 @@ This will drop you into the Python debugger (`pdb`) at the breakpoint.
 
 A base class for writing tools that need to parse command line arguments has been provided.
 
-To make use of it in this example we will need to add the runner as a dependency to the `mytool` target.
+To make use of it in this example we will need to add the runner as a dependency to the `tools.base.mytool` target.
 
-Edit `tools/sometools/BUILD` and change the `mytool` target to the following:
+Edit `tools/sometools/BUILD` and change the `tools.base.mytool` target to the following:
 
 ```starlark
 envoy_py_binary(
-    name = "mytool",
+    name = "tools.base.mytool",
     srcs = ["mytool.py"],
     visibility = ["//visibility:public"],
     deps = [
