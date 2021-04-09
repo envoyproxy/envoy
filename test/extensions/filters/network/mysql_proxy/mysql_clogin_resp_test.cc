@@ -80,6 +80,7 @@ AuthMoreMessage MySQLCLoginRespTest::auth_more_ = MySQLCLoginRespTest::initAuthM
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginOkEncDec) {
   OkMessage& mysql_loginok_encode = MySQLCLoginRespTest::getOkMessage();
+
   Buffer::OwnedImpl decode_data;
   mysql_loginok_encode.encode(decode_data);
 
@@ -117,6 +118,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrEncDec) {
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginOldClientLoginResponseAuthSwitch) {
   AuthSwitchMessage& mysql_old_auth_switch_encode = MySQLCLoginRespTest::getOldAuthSwitchMessage();
+
   Buffer::OwnedImpl decode_data;
   mysql_old_auth_switch_encode.encode(decode_data);
 
@@ -153,6 +155,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginClientLoginResponseAuthSwitch) {
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMore) {
   AuthMoreMessage& mysql_auth_more_encode(MySQLCLoginRespTest::getAuthMoreMessage());
+
   Buffer::OwnedImpl decode_data;
   mysql_auth_more_encode.encode(decode_data);
 
@@ -166,6 +169,8 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMore) {
  * - incomplete response code
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteRespCode) {
+  OkMessage mysql_loginok_encode = MySQLCLoginRespTest::getOkMessage();
+
   Buffer::OwnedImpl decode_data;
 
   OkMessage mysql_loginok_decode{};
@@ -179,6 +184,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteRespCode) {
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteAffectedRows) {
   OkMessage& mysql_loginok_encode = MySQLCLoginRespTest::getOkMessage();
+
   Buffer::OwnedImpl buffer;
   mysql_loginok_encode.encode(buffer);
 
@@ -196,6 +202,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteAffectedRows) {
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteLastInsertId) {
   OkMessage& mysql_loginok_encode = MySQLCLoginRespTest::getOkMessage();
+
   Buffer::OwnedImpl buffer;
   mysql_loginok_encode.encode(buffer);
 
@@ -215,6 +222,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteLastInsertId) {
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteServerStatus) {
   OkMessage& mysql_loginok_encode = MySQLCLoginRespTest::getOkMessage();
+
   Buffer::OwnedImpl buffer;
   mysql_loginok_encode.encode(buffer);
 
@@ -424,7 +432,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginData) {
             mysql_login_auth_switch_encode.getRespCode());
   EXPECT_EQ(mysql_login_auth_switch_decode.getAuthPluginName(),
             mysql_login_auth_switch_encode.getAuthPluginName());
-  EXPECT_EQ(mysql_login_auth_switch_decode.getAuthPluginData(), "");
+  EXPECT_EQ(mysql_login_auth_switch_decode.getAuthPluginData().size(), 0);
 }
 
 /*
@@ -445,6 +453,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompleteRespCode) {
  */
 TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompletePluginData) {
   AuthMoreMessage& mysql_login_auth_more_encode = MySQLCLoginRespTest::getAuthMoreMessage();
+
   Buffer::OwnedImpl buffer;
   mysql_login_auth_more_encode.encode(buffer);
 
@@ -453,15 +462,8 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompletePluginData) {
   AuthMoreMessage mysql_login_auth_more_decode{};
   mysql_login_auth_more_decode.decode(buffer, CHALLENGE_SEQ_NUM, incomplete_len);
   EXPECT_EQ(mysql_login_auth_more_decode.getRespCode(), mysql_login_auth_more_encode.getRespCode());
-  EXPECT_EQ(mysql_login_auth_more_decode.getAuthMoreData(), "");
+  EXPECT_EQ(mysql_login_auth_more_decode.getAuthMoreData().size(), 0);
 }
-
-// /*
-//  * Test type convert:
-//  */
-// TEST_F(MySQLCLoginRespTest, MySQLLoginRespTypeConvert) {
-
-// }
 
 } // namespace MySQLProxy
 } // namespace NetworkFilters

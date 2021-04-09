@@ -13,7 +13,7 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 DecodeStatus ClientSwitchResponse::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
-  if (BufferHelper::readStringBySize(buffer, remain_len, auth_plugin_resp_) !=
+  if (BufferHelper::readVectorBySize(buffer, remain_len, auth_plugin_resp_) !=
       DecodeStatus::Success) {
     ENVOY_LOG(debug, "error when parsing auth plugin data of client switch response");
     return DecodeStatus::Failure;
@@ -22,7 +22,7 @@ DecodeStatus ClientSwitchResponse::parseMessage(Buffer::Instance& buffer, uint32
 }
 
 void ClientSwitchResponse::encode(Buffer::Instance& out) const {
-  BufferHelper::addString(out, auth_plugin_resp_);
+  BufferHelper::addVector(out, auth_plugin_resp_);
 }
 
 } // namespace MySQLProxy

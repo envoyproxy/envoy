@@ -47,6 +47,7 @@ public:
   void setCmd(Cmd cmd);
   void setData(const std::string& data);
   void setDb(const std::string& db);
+  void setIsQuery(bool is_query) { is_query_ = is_query; }
   bool isQuery() { return is_query_; }
 
 private:

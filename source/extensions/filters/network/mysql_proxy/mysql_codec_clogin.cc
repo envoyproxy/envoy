@@ -33,7 +33,7 @@ void ClientLogin::setUsername(const std::string& username) {
 
 void ClientLogin::setDb(const std::string& db) { db_ = db; }
 
-void ClientLogin::setAuthResp(const std::string& auth_resp) { auth_resp_.assign(auth_resp); }
+void ClientLogin::setAuthResp(const std::vector<uint8_t>& auth_resp) { auth_resp_ = auth_resp; }
 
 void ClientLogin::setAuthPluginName(const std::string& auth_plugin_name) {
   auth_plugin_name_ = auth_plugin_name;
@@ -88,7 +88,7 @@ DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
     ENVOY_LOG(debug, "error when parsing character of client ssl message");
     return DecodeStatus::Failure;
   }
-  if (BufferHelper::readBytes(buffer, UNSET_BYTES) != DecodeStatus::Success) {
+  if (BufferHelper::skipBytes(buffer, UNSET_BYTES) != DecodeStatus::Success) {
     ENVOY_LOG(debug, "error when parsing reserved bytes of client ssl message");
     return DecodeStatus::Failure;
   }
@@ -110,7 +110,7 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
     ENVOY_LOG(debug, "error when parsing charset of client login message");
     return DecodeStatus::Failure;
   }
-  if (BufferHelper::readBytes(buffer, UNSET_BYTES) != DecodeStatus::Success) {
+  if (BufferHelper::skipBytes(buffer, UNSET_BYTES) != DecodeStatus::Success) {
     ENVOY_LOG(debug, "error when skipping bytes of client login message");
     return DecodeStatus::Failure;
   }
@@ -124,7 +124,7 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
       ENVOY_LOG(debug, "error when parsing length of auth response of client login message");
       return DecodeStatus::Failure;
     }
-    if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
+    if (BufferHelper::readVectorBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(debug, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
@@ -134,12 +134,12 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
       ENVOY_LOG(debug, "error when parsing length of auth response of client login message");
       return DecodeStatus::Failure;
     }
-    if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
+    if (BufferHelper::readVectorBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(debug, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
   } else {
-    if (BufferHelper::readString(buffer, auth_resp_) != DecodeStatus::Success) {
+    if (BufferHelper::readVector(buffer, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(debug, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
@@ -161,6 +161,7 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
 DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer, uint32_t remain_len) {
   int origin_len = buffer.length();
   if (BufferHelper::readUint24(buffer, max_packet_) != DecodeStatus::Success) {
+
     ENVOY_LOG(debug, "error when parsing max packet length of client login message");
     return DecodeStatus::Failure;
   }
@@ -169,7 +170,7 @@ DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer, uint32_t re
     return DecodeStatus::Failure;
   }
   if (client_cap_ & CLIENT_CONNECT_WITH_DB) {
-    if (BufferHelper::readString(buffer, auth_resp_) != DecodeStatus::Success) {
+    if (BufferHelper::readVector(buffer, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(debug, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
@@ -179,7 +180,7 @@ DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer, uint32_t re
     }
   } else {
     int consumed_len = origin_len - buffer.length();
-    if (BufferHelper::readStringBySize(buffer, remain_len - consumed_len, auth_resp_) !=
+    if (BufferHelper::readVectorBySize(buffer, remain_len - consumed_len, auth_resp_) !=
         DecodeStatus::Success) {
       ENVOY_LOG(debug, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
@@ -220,13 +221,13 @@ void ClientLogin::encodeResponse41(Buffer::Instance& out) const {
   BufferHelper::addString(out, username_);
   BufferHelper::addUint8(out, enc_end_string);
   if (client_cap_ & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA) {
-    BufferHelper::addLengthEncodedInteger(out, auth_resp_.length());
-    BufferHelper::addString(out, auth_resp_);
+    BufferHelper::addLengthEncodedInteger(out, auth_resp_.size());
+    BufferHelper::addVector(out, auth_resp_);
   } else if (client_cap_ & CLIENT_SECURE_CONNECTION) {
-    BufferHelper::addUint8(out, auth_resp_.length());
-    BufferHelper::addString(out, auth_resp_);
+    BufferHelper::addUint8(out, auth_resp_.size());
+    BufferHelper::addVector(out, auth_resp_);
   } else {
-    BufferHelper::addString(out, auth_resp_);
+    BufferHelper::addVector(out, auth_resp_);
     BufferHelper::addUint8(out, enc_end_string);
   }
   if (client_cap_ & CLIENT_CONNECT_WITH_DB) {
@@ -246,12 +247,12 @@ void ClientLogin::encodeResponse320(Buffer::Instance& out) const {
   BufferHelper::addString(out, username_);
   BufferHelper::addUint8(out, enc_end_string);
   if (client_cap_ & CLIENT_CONNECT_WITH_DB) {
-    BufferHelper::addString(out, auth_resp_);
+    BufferHelper::addVector(out, auth_resp_);
     BufferHelper::addUint8(out, enc_end_string);
     BufferHelper::addString(out, db_);
     BufferHelper::addUint8(out, enc_end_string);
   } else {
-    BufferHelper::addString(out, auth_resp_);
+    BufferHelper::addVector(out, auth_resp_);
   }
 }
 

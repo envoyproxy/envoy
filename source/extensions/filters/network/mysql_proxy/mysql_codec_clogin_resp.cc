@@ -27,13 +27,14 @@ DecodeStatus AuthSwitchMessage::parseMessage(Buffer::Instance& buffer, uint32_t 
     return DecodeStatus::Success;
   }
   if (BufferHelper::readString(buffer, auth_plugin_name_) != DecodeStatus::Success) {
-    ENVOY_LOG(debug, "error parsing auth plugin name auth switch msg");
+    ENVOY_LOG(debug, "error parsing auth plugin name mysql Login response msg");
     return DecodeStatus::Failure;
   }
   int consumed_len = origin_len - buffer.length();
-  if (BufferHelper::readStringBySize(buffer, remain_len - consumed_len, auth_plugin_data_) !=
+  if (BufferHelper::readVectorBySize(buffer, remain_len - consumed_len, auth_plugin_data_) !=
       DecodeStatus::Success) {
     ENVOY_LOG(debug, "error parsing auth plugin data code of auth switch msg");
+
     return DecodeStatus::Failure;
   }
   setIsOldAuthSwitch(false);
@@ -114,7 +115,7 @@ DecodeStatus AuthMoreMessage::parseMessage(Buffer::Instance& buffer, uint32_t re
     return DecodeStatus::Failure;
   }
   ASSERT(resp_code_ == MYSQL_RESP_MORE);
-  if (BufferHelper::readStringBySize(buffer, remain_len - sizeof(uint8_t), more_plugin_data_) !=
+  if (BufferHelper::readVectorBySize(buffer, remain_len - sizeof(uint8_t), more_plugin_data_) !=
       DecodeStatus::Success) {
     ENVOY_LOG(debug, "error parsing more plugin data of auth more msg");
     return DecodeStatus::Failure;
@@ -129,7 +130,7 @@ void AuthSwitchMessage::encode(Buffer::Instance& out) const {
   }
   BufferHelper::addString(out, auth_plugin_name_);
   BufferHelper::addUint8(out, 0);
-  BufferHelper::addString(out, auth_plugin_data_);
+  BufferHelper::addVector(out, auth_plugin_data_);
 }
 
 void OkMessage::encode(Buffer::Instance& out) const {
@@ -151,7 +152,7 @@ void ErrMessage::encode(Buffer::Instance& out) const {
 
 void AuthMoreMessage::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, resp_code_);
-  BufferHelper::addString(out, more_plugin_data_);
+  BufferHelper::addVector(out, more_plugin_data_);
 }
 
 } // namespace MySQLProxy
