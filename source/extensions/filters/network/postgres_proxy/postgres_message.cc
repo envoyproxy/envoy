@@ -10,7 +10,7 @@ bool String::read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
   // read method uses values set by validate method.
   // This avoids unnecessary repetition of scanning data looking for terminating zero.
   ASSERT(pos == start_);
-  ASSERT(end_ > start_);
+  ASSERT(end_ >= start_);
 
   // Reserve that many bytes in the string.
   const uint64_t size = end_ - start_;
@@ -25,7 +25,8 @@ bool String::read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
 
 std::string String::toString() const { return absl::StrCat("[", value_, "]"); }
 
-Message::ValidationResult String::validate(const Buffer::Instance& data, uint64_t& pos,
+Message::ValidationResult String::validate(const Buffer::Instance& data,
+                                           const uint64_t start_offset, uint64_t& pos,
                                            uint64_t& left) {
   // Try to find the terminating zero.
   // If found, all is good. If not found, we may need more data.
@@ -33,6 +34,7 @@ Message::ValidationResult String::validate(const Buffer::Instance& data, uint64_
   const ssize_t index = data.search(&zero, 1, pos);
   if (index == -1) {
     if (left <= (data.length() - pos)) {
+      // Message ended before finding terminating zero.
       return Message::ValidationFailed;
     } else {
       return Message::ValidationNeedMoreData;
@@ -44,8 +46,8 @@ Message::ValidationResult String::validate(const Buffer::Instance& data, uint64_
     return Message::ValidationFailed;
   }
 
-  start_ = pos;
-  end_ = pos + size;
+  start_ = pos - start_offset;
+  end_ = start_ + size;
 
   pos += (size + 1);
   left -= (size + 1);
@@ -65,8 +67,8 @@ bool ByteN::read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
 }
 // Since ByteN does not have a length field, it is not possible to verify
 // its correctness.
-Message::ValidationResult ByteN::validate(const Buffer::Instance& data, uint64_t& pos,
-                                          uint64_t& left) {
+Message::ValidationResult ByteN::validate(const Buffer::Instance& data, const uint64_t,
+                                          uint64_t& pos, uint64_t& left) {
   if (left > (data.length() - pos)) {
     return Message::ValidationNeedMoreData;
   }
@@ -110,8 +112,8 @@ std::string VarByteN::toString() const {
   return out;
 }
 
-Message::ValidationResult VarByteN::validate(const Buffer::Instance& data, uint64_t& pos,
-                                             uint64_t& left) {
+Message::ValidationResult VarByteN::validate(const Buffer::Instance& data, const uint64_t,
+                                             uint64_t& pos, uint64_t& left) {
   if (left < sizeof(int32_t)) {
     // Malformed message.
     return Message::ValidationFailed;

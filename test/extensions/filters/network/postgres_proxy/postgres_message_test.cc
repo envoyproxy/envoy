@@ -32,10 +32,10 @@ TYPED_TEST(IntTest, BasicRead) {
   uint64_t left;
   // Simulate that message is too short.
   left = sizeof(TypeParam) - 1;
-  ASSERT_THAT(Message::ValidationFailed, this->field_.validate(this->data_, pos, left));
+  ASSERT_THAT(Message::ValidationFailed, this->field_.validate(this->data_, 0, pos, left));
   // Single 4-byte int. Message length is correct.
   left = sizeof(TypeParam);
-  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, pos, left));
+  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, 0, pos, left));
 
   // Read the value after successful validation.
   pos = 0;
@@ -57,7 +57,7 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
   this->data_.template writeBEInt<uint8_t>(11);
   uint64_t pos = 0;
   uint64_t left = this->data_.length();
-  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, pos, left));
+  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, 0, pos, left));
 
   pos = 0;
   left = this->data_.length();
@@ -77,7 +77,7 @@ TYPED_TEST(IntTest, ReadAtOffset) {
 
   uint64_t pos = 1;
   uint64_t left = this->data_.length() - 1;
-  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, pos, left));
+  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, 1, pos, left));
 
   pos = 1;
   left = this->data_.length() - 1;
@@ -95,7 +95,7 @@ TYPED_TEST(IntTest, NotEnoughData) {
   uint64_t pos = 1;
   uint64_t left = this->data_.length();
 
-  ASSERT_THAT(this->field_.validate(this->data_, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(this->field_.validate(this->data_, 0, pos, left), Message::ValidationNeedMoreData);
 }
 
 // Byte1 should format content as char.
@@ -107,7 +107,7 @@ TEST(Byte1, Formatting) {
 
   uint64_t pos = 0;
   uint64_t left = 1;
-  ASSERT_THAT(Message::ValidationOK, field.validate(data, pos, left));
+  ASSERT_THAT(Message::ValidationOK, field.validate(data, 0, pos, left));
   ASSERT_THAT(pos, 1);
   ASSERT_THAT(left, 0);
 
@@ -129,13 +129,13 @@ TEST(StringType, SingleString) {
   // Passed length 3 is too short.
   uint64_t pos = 0;
   uint64_t left = 3;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
   // Correct length, but terminating zero is missing.
   left = 5;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
   // Add terminating zero.
   data.writeBEInt<uint8_t>(0);
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 5);
   ASSERT_THAT(left, 0);
 
@@ -156,9 +156,9 @@ TEST(StringType, NoTerminatingByte) {
   data.add("test");
   uint64_t pos = 0;
   uint64_t left = 4;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
   left = 5;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
 }
 
 // ByteN type is always placed at the end of Postgres message.
@@ -181,17 +181,17 @@ TEST(ByteN, BasicTest) {
   // pass validation.
   pos = 0;
   left = 0;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 0);
   ASSERT_THAT(left, 0);
   pos = 0;
   left = 1;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 1);
   ASSERT_THAT(left, 0);
   pos = 0;
   left = 4;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 4);
   ASSERT_THAT(left, 0);
 
@@ -215,7 +215,7 @@ TEST(ByteN, NotEnoughData) {
   }
   uint64_t pos = 0;
   uint64_t left = 11;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
 }
 
 TEST(ByteN, Empty) {
@@ -225,7 +225,7 @@ TEST(ByteN, Empty) {
   // Write nothing to data buffer.
   uint64_t pos = 0;
   uint64_t left = 0;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_TRUE(field.read(data, pos, left));
 
   auto out = field.toString();
@@ -242,27 +242,27 @@ TEST(VarByteN, BasicTest) {
   // Simulate that message ended and VarByteN's length fields  sticks past the
   // message boundary.
   data.writeBEInt<int32_t>(5);
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 
   // Write VarByteN with length equal to zero. No value follows.
   // Set structure length to be -1 (means no payload).
   left = 4;
   data.drain(data.length());
   data.writeBEInt<int32_t>(-1);
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   // The same for structure length 0.
   pos = 0;
   left = 4;
   data.drain(data.length());
   data.writeBEInt<int32_t>(0);
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
 
   // Simulate that VarByteN would extend past message boundary.
   data.drain(data.length());
   data.writeBEInt<int32_t>(30);
   pos = 0;
   left = 4;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 
   // Simulate that VarByteN length is 6, there are 6 bytes left to the
   // message boundary, but buffer contains only 4 bytes.
@@ -271,7 +271,7 @@ TEST(VarByteN, BasicTest) {
   data.writeBEInt<uint32_t>(16);
   pos = 0;
   left = 6;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
 
   data.drain(data.length());
   // Write first value.
@@ -292,7 +292,7 @@ TEST(VarByteN, BasicTest) {
   uint64_t orig_pos = pos;
   uint64_t orig_left = left;
   // Read the first value.
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   pos = orig_pos;
   left = orig_left;
   ASSERT_TRUE(field.read(data, pos, left));
@@ -305,7 +305,7 @@ TEST(VarByteN, BasicTest) {
   // Read the second value.
   orig_pos = pos;
   orig_left = left;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   pos = orig_pos;
   left = orig_left;
   ASSERT_TRUE(field.read(data, pos, left));
@@ -319,7 +319,7 @@ TEST(VarByteN, BasicTest) {
   // Read the third value.
   orig_pos = pos;
   orig_left = left;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   pos = orig_pos;
   left = orig_left;
   ASSERT_TRUE(field.read(data, pos, left));
@@ -339,7 +339,7 @@ TEST(Array, SingleInt) {
   uint64_t pos = 0;
   uint64_t left = 1;
   data.writeBEInt<int8_t>(1);
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 
   // Write the value of the element into the array.
   data.drain(data.length());
@@ -347,10 +347,10 @@ TEST(Array, SingleInt) {
   data.writeBEInt<uint32_t>(123);
   // Simulate that message length end before end of array.
   left = 5;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 
   left = 6;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 6);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -376,17 +376,17 @@ TEST(Array, MultipleInts) {
   uint64_t pos = 0;
   uint64_t left = 2 + 3 * 1;
 
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
 
   // Add the third element.
   data.writeBEInt<uint8_t>(213);
 
   // Simulate that message ends before end of the array.
   left = 2 + 3 * 1 - 1;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 
   left = 2 + 3 * 1;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 5);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -411,7 +411,7 @@ TEST(Array, Empty) {
 
   uint64_t pos = 0;
   uint64_t left = 2;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 2);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -434,7 +434,7 @@ TEST(Array, NotEnoughDataForLength) {
 
   uint64_t pos = 0;
   uint64_t left = 1;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 }
 
 // Test situation when there is not enough data in the buffer to read one of the elements
@@ -452,7 +452,7 @@ TEST(Array, NotEnoughDataForValues) {
 
   uint64_t pos = 0;
   uint64_t left = 2 + 4 + 2;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 }
 
 // Repeated composite type tests.
@@ -468,17 +468,17 @@ TEST(Repeated, BasicTestWithStrings) {
   uint64_t left = 5;
   // Write the first string without terminating zero.
   data.add("test1");
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
   left = 6;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
   // Add terminating zero.
   data.writeBEInt<int8_t>(0);
   left = 5;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
   left = 7;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
   left = 6;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   // Add two additional strings
   data.add("test2");
   data.writeBEInt<uint8_t>(0);
@@ -486,11 +486,11 @@ TEST(Repeated, BasicTestWithStrings) {
   data.writeBEInt<uint8_t>(0);
   pos = 5;
   left = 3 * 6 - 1;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
   left = 3 * 6 + 1;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationNeedMoreData);
   left = 3 * 6;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 5 + 3 * 6);
   ASSERT_THAT(left, 0);
   pos = 5;
@@ -514,7 +514,7 @@ TEST(Sequence, Int32SingleValue) {
 
   uint64_t pos = 0;
   uint64_t left = 4;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 4);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -535,7 +535,7 @@ TEST(Sequence, Int16SingleValue) {
 
   uint64_t pos = 0;
   uint64_t left = 2;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 2);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -558,7 +558,7 @@ TEST(Sequence, BasicMultipleValues1) {
 
   uint64_t pos = 0;
   uint64_t left = 4 + 5;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, 4 + 5);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -582,7 +582,7 @@ TEST(Sequence, BasicMultipleValues2) {
   uint64_t pos = 0;
   uint64_t left = 4 + 2;
   uint64_t expected_pos = left;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, expected_pos);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -608,7 +608,7 @@ TEST(Sequence, BasicMultipleValues3) {
   uint64_t pos = 0;
   uint64_t left = 4 + 2 + 4 + 2;
   uint64_t expected_pos = left;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationOK);
   ASSERT_THAT(pos, expected_pos);
   ASSERT_THAT(left, 0);
   pos = 0;
@@ -636,7 +636,7 @@ TEST(Sequence, NotEnoughData) {
 
   uint64_t pos = 0;
   uint64_t left = 4 + 4;
-  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  ASSERT_THAT(field.validate(data, 0, pos, left), Message::ValidationFailed);
 }
 
 // Tests for Message interface and helper function createMsgBodyReader.

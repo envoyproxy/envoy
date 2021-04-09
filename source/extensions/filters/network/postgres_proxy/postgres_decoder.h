@@ -119,7 +119,6 @@ protected:
   // is processed.
   using MessageProcessor = std::tuple<std::string, MsgBodyReader, std::vector<MsgAction>>;
 
-  void processMessageBody(Buffer::Instance& data, uint32_t length, MessageProcessor& msg);
   // Frontend and Backend messages.
   using MsgGroup = struct {
     // String describing direction (Frontend or Backend).
@@ -144,6 +143,8 @@ protected:
     MsgAction unknown_;
   };
 
+  void processMessageBody(Buffer::Instance& data, const std::string& direction, uint32_t length,
+                          MessageProcessor& msg, const std::unique_ptr<Message>& parser);
   Result parseHeader(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
@@ -162,16 +163,19 @@ protected:
 
   // Helper method generating currently processed message in
   // displayable format.
-  const std::string genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
+  const std::string genDebugMessage(const std::unique_ptr<Message>& parser, Buffer::Instance& data,
                                     uint32_t message_len);
 
   DecoderCallbacks* callbacks_{};
   PostgresSession session_{};
 
   // The following fields store result of message parsing.
-  char command_{};
+  char command_{'-'};
   std::string message_;
   uint32_t message_len_{};
+
+  static const std::string FRONTEND;
+  static const std::string BACKEND;
 
   bool startup_{true};    // startup stage does not have 1st byte command
   bool encrypted_{false}; // tells if exchange is encrypted

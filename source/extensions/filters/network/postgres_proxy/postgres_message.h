@@ -9,6 +9,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
+#if 0
+class BufferWithOffset {
+  public:
+BufferWithOffset(const Buffer::Instance& data, uint64_t offset) : data_(data), offset_(offset) {}
+private:
+    const Buffer::Instance& data_;
+  //Buffer::OwnedImpl frontend_buffer_;
+    const uint64_t offset_;
+};
+#endif
+
 /**
  * Postgres messages are described in official Postgres documentation:
  * https://www.postgresql.org/docs/current/protocol-message-formats.html
@@ -40,7 +51,8 @@ public:
   // length field. "data" buffer may contain more bytes than "length".
   virtual bool read(const Buffer::Instance& data, const uint64_t length) PURE;
 
-  virtual ValidationResult validate(const Buffer::Instance& data, const uint64_t,  const uint64_t) PURE;
+  virtual ValidationResult validate(const Buffer::Instance& data, const uint64_t,
+                                    const uint64_t) PURE;
 
   // toString method provides displayable representation of
   // the Postgres message.
@@ -73,7 +85,8 @@ public:
     return true;
   }
 
-  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t, uint64_t& pos,
+                                     uint64_t& left) {
     if (left < sizeof(T)) {
       return Message::ValidationFailed;
     }
@@ -110,7 +123,8 @@ public:
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
   std::string toString() const;
-  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t&);
+  Message::ValidationResult validate(const Buffer::Instance&, const uint64_t start_offset,
+                                     uint64_t&, uint64_t&);
 
 private:
   // start and end are set by validate method.
@@ -128,7 +142,7 @@ public:
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
   std::string toString() const;
-  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t&);
+  Message::ValidationResult validate(const Buffer::Instance&, const uint64_t, uint64_t&, uint64_t&);
 
 private:
   std::vector<uint8_t> value_;
@@ -152,7 +166,7 @@ public:
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
   std::string toString() const;
-  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t&);
+  Message::ValidationResult validate(const Buffer::Instance&, const uint64_t, uint64_t&, uint64_t&);
 
 private:
   int32_t len_;
@@ -188,7 +202,8 @@ public:
 
     return out;
   }
-  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t start_offset,
+                                     uint64_t& pos, uint64_t& left) {
     // First read the 16 bits value which indicates how many
     // elements there are in the array.
     if (left < sizeof(uint16_t)) {
@@ -207,7 +222,7 @@ public:
     if (size_ != 0) {
       for (uint16_t i = 0; i < size_; i++) {
         auto item = std::make_unique<T>();
-        Message::ValidationResult result = item->validate(data, pos, left);
+        Message::ValidationResult result = item->validate(data, start_offset, pos, left);
         if (Message::ValidationOK != result) {
 
           pos = orig_pos;
@@ -254,7 +269,8 @@ public:
     }
     return out;
   }
-  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t start_offset,
+                                     uint64_t& pos, uint64_t& left) {
     if ((data.length() - pos) < left) {
       return Message::ValidationNeedMoreData;
     }
@@ -264,7 +280,7 @@ public:
     uint64_t orig_left = left;
     while (left != 0) {
       auto item = std::make_unique<T>();
-      Message::ValidationResult result = item->validate(data, pos, left);
+      Message::ValidationResult result = item->validate(data, start_offset, pos, left);
       if (Message::ValidationOK != result) {
         pos = orig_pos;
         left = orig_left;
@@ -307,12 +323,13 @@ public:
     return remaining_.read(data, pos, left);
   }
 
-  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    Message::ValidationResult result = first_.validate(data, pos, left);
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t start_offset,
+                                     uint64_t& pos, uint64_t& left) {
+    Message::ValidationResult result = first_.validate(data, start_offset, pos, left);
     if (result != Message::ValidationOK) {
       return result;
     }
-    return remaining_.validate(data, pos, left);
+    return remaining_.validate(data, start_offset, pos, left);
   }
 };
 
@@ -323,7 +340,8 @@ public:
   std::string toString() const { return ""; }
   bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
   // bool read(const Buffer::Instance&, const uint64_t) override { return true; }
-  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t& left) {
+  Message::ValidationResult validate(const Buffer::Instance&, const uint64_t, uint64_t&,
+                                     uint64_t& left) {
     return left == 0 ? Message::ValidationOK : Message::ValidationFailed;
   }
 };
@@ -338,10 +356,11 @@ public:
     uint64_t left = length;
     return Sequence<Types...>::read(data, pos, left);
   }
-  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t start_pos, const uint64_t length) override {
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t start_pos,
+                                     const uint64_t length) override {
     uint64_t pos = start_pos;
     uint64_t left = length;
-    validation_result_ = Sequence<Types...>::validate(data, pos, left);
+    validation_result_ = Sequence<Types...>::validate(data, start_pos, pos, left);
     return validation_result_;
   }
   std::string toString() const override { return Sequence<Types...>::toString(); }
