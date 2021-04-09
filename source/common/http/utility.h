@@ -338,6 +338,14 @@ void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callback
 void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
 
+/**
+ * Check configuration for how to handle GRPC response codes
+ *
+ * @param response_headers Headers in which config is passed from ext_authz
+ *                         layer
+ */
+bool propagateHttpCodeToGrpc(ResponseHeaderMapPtr& response_headers);
+
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
   Network::Address::InstanceConstSharedPtr address_;
