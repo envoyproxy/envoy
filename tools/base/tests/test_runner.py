@@ -8,13 +8,8 @@ from tools.base import pytest_runner, runner
 importlib.reload(runner)
 
 
-def test_pytest_runner():
-    with patch("tools.base.pytest_runner.python_pytest") as m_pytest:
-        pytest_runner.main("arg1", "arg2", "arg3")
-
-    assert (
-        list(m_pytest.main.call_args)
-        == [('arg1', 'arg2', 'arg3', '--cov', 'tools.base'), {}])
+def test_pytest_runner(check_pytest_target):
+    check_pytest_target("tools.base.pytest_runner")
 
 
 def test_runner_constructor():

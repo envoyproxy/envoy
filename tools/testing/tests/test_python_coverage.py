@@ -6,13 +6,8 @@ import pytest
 from tools.testing import pytest_python_coverage, python_coverage
 
 
-def test_pytest_python_coverage():
-    with patch("tools.testing.pytest_python_coverage.python_pytest") as m_pytest:
-        pytest_python_coverage.main("arg1", "arg2", "arg3")
-
-    assert (
-        list(m_pytest.main.call_args)
-        == [('arg1', 'arg2', 'arg3', '--cov', 'tools.testing'), {}])
+def test_pytest_python_coverage(check_pytest_target):
+    check_pytest_target("tools.testing.pytest_python_coverage")
 
 
 def test_coverage_cov_data():

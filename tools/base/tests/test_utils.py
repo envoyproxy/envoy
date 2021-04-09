@@ -8,13 +8,8 @@ from tools.base import pytest_utils, utils
 importlib.reload(utils)
 
 
-def test_pytest_utils():
-    with patch("tools.base.pytest_utils.python_pytest") as m_pytest:
-        pytest_utils.main("arg1", "arg2", "arg3")
-
-    assert (
-        list(m_pytest.main.call_args)
-        == [('arg1', 'arg2', 'arg3', '--cov', 'tools.base'), {}])
+def test_pytest_utils(check_pytest_target):
+    check_pytest_target("tools.base.pytest_utils")
 
 
 def test_util_custom_coverage_data(patches):

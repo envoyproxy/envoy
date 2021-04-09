@@ -47,6 +47,19 @@ $ touch tools/sometools/requirements.txt
 We can now use `sometools_pip3` in the `BUILD` file for our python tool, although we will need
 some actual requirements for it to be useful.
 
+In order to ensure that this `requirements.txt` stays up-to-date we will also need to add an entry
+in `.github/dependabot.yml`.
+
+This example requires the following entry:
+
+```yaml
+  - package-ecosystem: "pip"
+    directory: "/tools/sometools"
+    schedule:
+      interval: "daily"
+```
+
+
 ### Add python requirements
 
 For the purpose of this example, `mytool.py` will have dependencies on the `requests` and `pyyaml`
@@ -99,7 +112,7 @@ import yaml
 
 
 def main(*args) -> int:
-    print(
+    sys.stdout.write(
         yaml.dump(
             requests.get(f"https://pypi.python.org/pypi/{args[0]}/json").json()))
     return 0
@@ -297,7 +310,7 @@ When writing unit tests its not uncommon to need to patch a lot of different cod
 
 A `patches` fixture has been added to make this easier.
 
-The above test can be rewritten to make use of it as follow:
+The above test can be rewritten to make use of it as follows:
 
 ```python
 from unittest.mock import patch
@@ -328,3 +341,29 @@ def test_mytool_main(patches):
         == [(m_yaml.return_value,), {}])
 
 ```
+
+### Add a test for the pytest runner target
+
+You will also want to add a test to ensure that the `pytest_mytool` runner target
+is covered and does not have any mistakes.
+
+A fixture - `check_pytest_target` is available for this purpose.
+
+Add the following to `tools/sometools/tests/test_mytool.py`:
+
+```
+def test_pytest_python_coverage(check_pytest_target):
+    check_pytest_target("tools.sometools.pytest_mytool")
+```
+
+### Debugging your code and tests
+
+You will most likely want to make use of source-level debugging when writing tests
+
+Add a breakpoint anywhere in your code or tests as follows:
+
+```python
+breakpoint()
+```
+
+This will drop you into the python debugger (`pdb`) at the breakpoint.
