@@ -195,6 +195,7 @@ py_binary(
         "tests/test_mytool.py",
     ],
     deps = [
+        ":mytool",
         "//tools/testing:python_pytest",
     ],
     visibility = ["//visibility:public"],
@@ -205,6 +206,10 @@ The name is important and should be `pytest_TOOLNAME` - in this case `pytest_myt
 
 This target references two additional files that we need to add, the `pytest` runner file,
 and the test file itself.
+
+It is important that the `deps` for this rule contain only two entries: the target being tested,
+and the `python_pytest` command. This ensures the test environment is as close to the target
+as possible.
 
 For the test runner create a file `tools/sometools/pytest_mytool.py` with the following code:
 
