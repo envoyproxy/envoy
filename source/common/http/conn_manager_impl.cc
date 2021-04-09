@@ -846,15 +846,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     request_header_timer_.reset();
   }
 
-  const auto& cluster_info = clusterInfo();
-  if (cluster_info != nullptr) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        cluster_info->requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
-    }
-  }
-
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
@@ -981,6 +972,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
+
+  const auto& cluster_info = clusterInfo();
+  if (cluster_info != nullptr) {
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      cluster_info->requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
+    }
+  }
 
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
     filter_manager_.streamInfo().setTraceReason(
