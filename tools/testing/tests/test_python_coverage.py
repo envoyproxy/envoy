@@ -54,7 +54,7 @@ def test_coverage_run(patches, cov_data):
         ("CoverageRunner.cov_data", dict(new_callable=PropertyMock)),
         ("CoverageRunner.extra_args", dict(new_callable=PropertyMock)),
         "CoverageRunner.coverage_args",
-        "utils.custom_coverage_data",
+        "utils.coverage_with_data_file",
         "cmdline.main",
         prefix="tools.testing.python_coverage")
 

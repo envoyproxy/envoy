@@ -37,7 +37,7 @@ class PytestRunner(runner.Runner):
         if not self.cov_collect:
             return pytest.main(self.extra_args)
 
-        with utils.custom_coverage_data(self.cov_collect) as coveragerc:
+        with utils.coverage_with_data_file(self.cov_collect) as coveragerc:
             return pytest.main(self.pytest_args(coveragerc))
 
 

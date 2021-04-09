@@ -44,7 +44,7 @@ class CoverageRunner(runner.Runner):
         if not self.cov_data:
             return cmdline.main(self.extra_args)
 
-        with utils.custom_coverage_data(self.cov_data) as coveragerc:
+        with utils.coverage_with_data_file(self.cov_data) as coveragerc:
             return cmdline.main(self.coverage_args(coveragerc))
 
 

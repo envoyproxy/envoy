@@ -11,7 +11,7 @@ from typing import Iterator
 
 # this is testing specific - consider moving to tools.testing.utils
 @contextmanager
-def custom_coverage_data(data_file: str) -> Iterator[str]:
+def coverage_with_data_file(data_file: str) -> Iterator[str]:
     """This context manager takes the path of a data file
     and creates a custom coveragerc with the data file path included.
 

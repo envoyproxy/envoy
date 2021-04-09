@@ -8,7 +8,7 @@ from tools.base import utils
 importlib.reload(utils)
 
 
-def test_util_custom_coverage_data(patches):
+def test_util_coverage_with_data_file(patches):
     patched = patches(
         "ConfigParser",
         "tempfile.TemporaryDirectory",
@@ -17,7 +17,7 @@ def test_util_custom_coverage_data(patches):
         prefix="tools.base.utils")
 
     with patched as (m_config, m_tmp, m_join, m_open):
-        with utils.custom_coverage_data("PATH") as tmprc:
+        with utils.coverage_with_data_file("PATH") as tmprc:
             assert tmprc == m_join.return_value
     assert (
         list(m_config.call_args)
