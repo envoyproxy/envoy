@@ -124,25 +124,27 @@ if __name__ == "__main__":
 ### Create the `BUILD` file for `sometools`
 
 If you are adding a tool to an existing toolset you may be able skip this step -
-just make sure that `load` line is present for `@sometools_pip3` or similar.
+just make sure that `load` lines are present.
 
 Add the following content to the file `tools/sometools/BUILD`
 
 ```starlark
-load("@rules_python//python:defs.bzl", "py_binary")
+load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 load("@sometools_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 ```
 
-Note the loading of `requirement` from `@sometools_pip3`. We will use this
-in the next section.
+Note the loading of `requirement` from `@sometools_pip3`, and `envoy_py_binary`.
+
+We will use these in the next section.
 
 ### Create the bazel target for the tool
 
-Add `mytool.py` as a `py_binary` to the `tools/sometools/BUILD` file.
+Add `mytool.py` as an `envoy_py_binary` to the `tools/sometools/BUILD` file.
 
-This will make the `mytool.py` file runnable as a `bazel` target.
+This will make the `mytool.py` file runnable as a `bazel` target, and will
+add a test runner to ensure the file is tested.
 
 ```starlark
 py_binary(
@@ -184,67 +186,9 @@ $ ./tools/sometools/mytool.py PACKAGENAME
 
 Envoy tooling is tested with `pytest`.
 
-In order to use it with `bazel` we will need to add some boilerplate code.
+The test runner expects a test file, in this case `tools/sometools/tests/test_mytool.py`.
 
-Firstly add the following target to the `tools/sometools/BUILD` file:
-
-```starlark
-py_binary(
-    name = "pytest_mytool",
-    srcs = [
-        "pytest_mytool.py",
-        "tests/test_mytool.py",
-    ],
-    deps = [
-        ":mytool",
-        "//tools/testing:python_pytest",
-    ],
-    visibility = ["//visibility:public"],
-)
-```
-
-The name is important and should be `pytest_TOOLNAME` - in this case `pytest_mytool`.
-
-This target references two additional files that we need to add, the `pytest` runner file,
-and the test file itself.
-
-It is important that the `deps` for this rule contain only two entries: the target being tested,
-and the `python_pytest` command. This ensures the test environment is as close to the target
-as possible.
-
-For the test runner create a file `tools/sometools/pytest_mytool.py` with the following code:
-
-```python
-#
-# Runs pytest against the target:
-#
-#   //tools/sometools:mytool
-#
-# Can be run as follows:
-#
-#   bazel run //tools/sometools:pytest_mytool
-#
-
-import sys
-
-from tools.testing import python_pytest
-
-
-def main(*args) -> int:
-    return python_pytest.main(*args, "--cov", "tools.sometools")
-
-
-if __name__ == "__main__":
-    sys.exit(main(*sys.argv[1:]))
-```
-
-Note the `--cov` argument. This should be set to the package name - in
-this case `tools.sometools`.
-
-This tells `pytest` to collect coverage in this package.
-
-Finally we need the actual test file. This should be located in the `tools/sometools/tests`
-directory. Create it now.
+First, create the required directory if it is not present.
 
 ```console
 $ mkdir tools/sometools/tests
@@ -259,9 +203,10 @@ from tools.sometools import mytool
 
 
 def test_mytool_main():
-    with patch("tools.sometools.mytool.requests.get") as m_get:
-        with patch("tools.sometools.mytool.yaml.dump") as m_yaml:
-            assert mytool.main("PACKAGENAME") == 0
+	with patch("tools.sometools.mytool.requests.get") as m_get:
+		with patch("tools.sometools.mytool.yaml.dump") as m_yaml:
+			with patch("tools.sometools.mytool.sys.stdout.write") as m_stdout:
+				assert mytool.main("PACKAGENAME") == 0
     assert (
         list(m_get.call_args)
         == [('https://pypi.python.org/pypi/PACKAGENAME/json',), {}])
@@ -279,7 +224,7 @@ def test_mytool_main():
 This example use the mock library to patch all of the method calls, and
 then tests that they have been called with the expected values.
 
-You can then run the test:
+You can run the test as follows:
 
 ```console
 $ bazel run //tools/sometools:pytest_mytool
@@ -348,23 +293,9 @@ def test_mytool_main(patches):
 
 ```
 
-### Add a test for the pytest runner target
-
-You will also want to add a test to ensure that the `pytest_mytool` runner target
-is covered and does not have any mistakes.
-
-A fixture - `check_pytest_target` is available for this purpose.
-
-Add the following to `tools/sometools/tests/test_mytool.py`:
-
-```python
-def test_pytest_mytool(check_pytest_target):
-    check_pytest_target("tools.sometools.pytest_mytool")
-```
-
 ### Debugging your code and tests
 
-You will most likely want to make use of source-level debugging when writing tests
+You will most likely want to make use of source-level debugging when writing tests.
 
 Add a breakpoint anywhere in your code or tests as follows:
 
@@ -373,7 +304,6 @@ breakpoint()
 ```
 
 This will drop you into the Python debugger (`pdb`) at the breakpoint.
-
 
 ### Using the `tools.base.runner.Runner` class
 
@@ -384,7 +314,6 @@ To make use of it in this example we will need to add the runner as a dependency
 Edit `tools/sometools/BUILD` and change the `mytool` target to the following:
 
 ```starlark
-
 py_binary(
     name = "mytool",
     srcs = ["mytool.py"],
@@ -395,7 +324,6 @@ py_binary(
         requirement("pyyaml"),
     ],
 )
-
 ```
 
 With this dependency in place we could rewrite the tool as follows:
@@ -454,5 +382,5 @@ or directly with `python`:
 
 ```console
 $ ./tools/sometools/mytool.py -h
-
+...
 ```
