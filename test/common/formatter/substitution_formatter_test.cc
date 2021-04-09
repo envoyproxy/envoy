@@ -1224,6 +1224,21 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, escapeFormatter) {
+  EscapeFormatter formatter;
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  EXPECT_EQ("%", formatter.format(request_headers, response_headers, response_trailers,
+                                      stream_info, body));
+  EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
+                                    stream_info, body),
+              ProtoEq(ValueUtil::stringValue("%")));
+}
+
 /**
  * Populate a metadata object with the following test data:
  * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
@@ -2744,8 +2759,6 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "RESP(FIRST)%",
       "%REQ(valid)% %NOT_VALID%",
       "%REQ(FIRST?SECOND%",
-      "%%",
-      "%%HOSTNAME%PROTOCOL%",
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
@@ -2782,7 +2795,7 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
   SubstitutionFormatParser parser;
 
   std::vector<std::string> test_cases = {"%START_TIME(%E4n%)%", "%START_TIME(%O4n%)%",
-                                         "%DOWNSTREAM_PEER_FINGERPRINT_256%"};
+                                         "%DOWNSTREAM_PEER_FINGERPRINT_256%", "%%%START_TIME(%E4n%)%%%"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_NO_THROW(parser.parse(test_case));
