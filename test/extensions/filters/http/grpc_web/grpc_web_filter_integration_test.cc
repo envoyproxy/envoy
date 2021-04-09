@@ -83,7 +83,7 @@ public:
     waitForNextUpstreamRequest();
 
     ASSERT_TRUE(fake_upstream_connection_->close());
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
 
     EXPECT_EQ("503", response->headers().getStatusValue());
@@ -124,7 +124,7 @@ public:
     upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
     upstream_request_->encodeData(start, /*end_stream=*/false);
     upstream_request_->encodeData(end, /*end_stream=*/true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ(expected, response->headers().getGrpcMessageValue());
@@ -190,7 +190,7 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(1, false);
   upstream_request_->encodeTrailers(response_trailers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(body.length(), upstream_request_->bodyLength());

@@ -100,11 +100,25 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   }
 }
 
-Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error) {
-  if (error == quic::QUIC_NO_ERROR) {
-    return Http::StreamResetReason::ConnectionTermination;
-  } else {
+Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error) {
+  switch (error) {
+  case quic::QUIC_HANDSHAKE_FAILED:
+  case quic::QUIC_HANDSHAKE_TIMEOUT:
     return Http::StreamResetReason::ConnectionFailure;
+  case quic::QUIC_HTTP_FRAME_ERROR:
+    return Http::StreamResetReason::ProtocolError;
+  default:
+    return Http::StreamResetReason::ConnectionTermination;
+  }
+}
+
+Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCode error) {
+  switch (error) {
+  case quic::QUIC_HANDSHAKE_FAILED:
+  case quic::QUIC_HANDSHAKE_TIMEOUT:
+    return Http::StreamResetReason::ConnectionFailure;
+  default:
+    return Http::StreamResetReason::ConnectionTermination;
   }
 }
 

@@ -3,6 +3,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/network/raw_buffer_socket.h"
 
 #include "extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
@@ -32,6 +33,9 @@ using HandshakerFactory = std::function<TsiHandshakerPtr(
  * @return true if the peer is valid or false if the peer is invalid.
  */
 using HandshakeValidator = std::function<bool(const tsi_peer& peer, std::string& err)>;
+
+/* Forward declaration */
+class TsiTransportSocketCallbacks;
 
 /**
  * A implementation of Network::TransportSocket based on gRPC TSI
@@ -76,6 +80,11 @@ private:
   void doHandshakeNext();
   Network::PostIoAction doHandshakeNextDone(NextResultPtr&& next_result);
 
+  // Helper function to perform repeated read and unprotect operations.
+  Network::IoResult repeatReadAndUnprotect(Buffer::Instance& buffer, Network::IoResult prev_result);
+  // Helper function to read from a raw socket and update status.
+  Network::IoResult readFromRawSocket();
+
   HandshakerFactory handshaker_factory_;
   HandshakeValidator handshake_validator_;
   TsiHandshakerPtr handshaker_{};
@@ -90,10 +99,10 @@ private:
   size_t actual_frame_size_to_use_{0};
 
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
-  NoOpTransportSocketCallbacksPtr noop_callbacks_;
+  std::unique_ptr<TsiTransportSocketCallbacks> tsi_callbacks_;
   Network::TransportSocketPtr raw_buffer_socket_;
 
-  Envoy::Buffer::OwnedImpl raw_read_buffer_;
+  Buffer::WatermarkBuffer raw_read_buffer_{[]() {}, []() {}, []() {}};
   Envoy::Buffer::OwnedImpl raw_write_buffer_;
   bool handshake_complete_{};
   bool end_stream_read_{};
@@ -115,6 +124,22 @@ public:
 private:
   HandshakerFactory handshaker_factory_;
   HandshakeValidator handshake_validator_;
+};
+
+/**
+ * An implementation of Network::TransportSocketCallbacks for TsiSocket
+ */
+class TsiTransportSocketCallbacks : public NoOpTransportSocketCallbacks {
+public:
+  TsiTransportSocketCallbacks(Network::TransportSocketCallbacks& parent,
+                              const Buffer::WatermarkBuffer& read_buffer)
+      : NoOpTransportSocketCallbacks(parent), raw_read_buffer_(read_buffer) {}
+  bool shouldDrainReadBuffer() override {
+    return raw_read_buffer_.length() >= raw_read_buffer_.highWatermark();
+  }
+
+private:
+  const Buffer::WatermarkBuffer& raw_read_buffer_;
 };
 
 } // namespace Alts

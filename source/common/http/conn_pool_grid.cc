@@ -29,14 +29,21 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
     : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it) {
-  newStream();
-}
+      current_(pool_it) {}
 
 // TODO(#15649) add trace logging.
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
-    : parent_(parent), pool_it_(it), cancellable_(pool().newStream(parent_.decoder_, *this)) {}
+    : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
+
+bool ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
+  auto* cancellable = pool().newStream(parent_.decoder_, *this);
+  if (cancellable == nullptr) {
+    return true;
+  }
+  cancellable_ = cancellable;
+  return false;
+}
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
@@ -64,15 +71,16 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
   removeFromList(grid_.wrapped_callbacks_);
 }
 
-void ConnectivityGrid::WrapperCallbacks::newStream() {
+bool ConnectivityGrid::WrapperCallbacks::newStream() {
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
             describePool(**current_), grid_.host_->hostname());
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (!next_attempt_timer_->enabled()) {
-    // TODO(#15649) When adding config for the grid, make this configurable.
-    next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
+    next_attempt_timer_->enableTimer(grid_.next_attempt_duration_);
   }
+  // Note that in the case of immediate attempt/failure, newStream will delete this.
+  return connection_attempts_.front()->newStream();
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
@@ -117,10 +125,10 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    ConnectivityOptions connectivity_options)
+    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), time_source_(time_source) {
+      state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source) {
   // TODO(#15649) support v6/v4, WiFi/cellular.
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(contains(connectivity_options.protocols_,
@@ -176,6 +184,12 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       std::make_unique<WrapperCallbacks>(*this, decoder, pools_.begin(), callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
+  // Note that in the case of immediate attempt/failure, newStream will delete this.
+  if (wrapped_callbacks_.front()->newStream()) {
+    // If newStream succeeds, return nullptr as the caller has received their
+    // callback and does not need a cancellable handle.
+    return nullptr;
+  }
   return ret;
 }
 

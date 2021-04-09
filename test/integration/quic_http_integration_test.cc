@@ -315,7 +315,8 @@ TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
   config_helper_.addConfigModifier(setUpstreamTimeout);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
-                                       false);
+                                       false, false, nullptr,
+                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
@@ -329,11 +330,14 @@ TEST_P(QuicHttpIntegrationTest, LargeFlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/128 * 1024,
                                  /*downstream_buffer_limit=*/128 * 1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024,
-                                       /*response_size=*/10 * 1024 * 1024, false, false);
+                                       /*response_size=*/10 * 1024 * 1024, false, false, nullptr,
+                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 // Tests that a connection idle times out after 1s and starts delayed close.
 TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
+  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -358,7 +362,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 
   codec_client_->sendData(*request_encoder_, 1024 * 65, false);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
@@ -409,7 +413,7 @@ TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
   size_t response_size{5u};
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(response_size, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
@@ -441,13 +445,13 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
   // Existing request should be able to finish.
   upstream_request_->encodeData(10, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // New request should be rejected.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("503", response2->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response2->body());
   codec_client_->close();
@@ -466,7 +470,7 @@ TEST_P(QuicHttpIntegrationTest, NoNewStreamsWhenOverloaded) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
@@ -585,7 +589,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeaders) {
                                                                    {"set-cookie", "foo"},
                                                                    {"set-cookie", "bar"}},
                                    true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   const auto out = response->headers().get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);

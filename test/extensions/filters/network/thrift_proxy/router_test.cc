@@ -305,10 +305,16 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void returnResponse() {
+  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
+
+    auto metadata = std::make_shared<MessageMetadata>();
+    metadata->setMessageType(msg_type);
+    metadata->setSequenceId(1);
+    ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
+    ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
@@ -415,6 +421,10 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
 
   startRequest(MessageType::Call);
 
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
@@ -431,6 +441,10 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
 
   startRequest(MessageType::Call);
 
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
@@ -439,6 +453,10 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
   initializeRouter();
 
   startRequest(MessageType::Call);
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
@@ -456,6 +474,10 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
 
   startRequest(MessageType::Call);
 
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
@@ -470,6 +492,10 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
 TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
   initializeRouter();
   startRequest(MessageType::Oneway);
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_oneway")
+                     .value());
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
@@ -534,6 +560,9 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, NoHealthyHosts) {
@@ -556,6 +585,9 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {
@@ -760,6 +792,16 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
   completeRequest();
   returnResponse();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 // Test the case where an upgrade will occur, but the conn pool
@@ -833,6 +875,16 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
   completeRequest();
   returnResponse();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
@@ -873,6 +925,16 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
   completeRequest();
   returnResponse();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, OneWay) {
@@ -884,6 +946,13 @@ TEST_P(ThriftRouterFieldTypeTest, OneWay) {
   sendTrivialStruct(field_type);
   completeRequest();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_oneway")
+                     .value());
+  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, Call) {
@@ -896,6 +965,79 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
   completeRequest();
   returnResponse();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
+}
+
+TEST_P(ThriftRouterFieldTypeTest, Call_Error) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Reply, false);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_error")
+                     .value());
+}
+
+TEST_P(ThriftRouterFieldTypeTest, Exception) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Exception);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_exception")
+                     .value());
+}
+
+TEST_P(ThriftRouterFieldTypeTest, UnknownMessageTypes) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Exception);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Call);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_invalid_type")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_invalid_type")
+                     .value());
 }
 
 // Ensure the service name gets stripped when strip_service_name = true.
@@ -912,6 +1054,16 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceNameEnabled) {
 
   returnResponse();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 // Ensure the service name prefix isn't stripped when strip_service_name = false.
@@ -928,6 +1080,16 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceNameDisabled) {
 
   returnResponse();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, CallWithExistingConnection) {
@@ -944,6 +1106,16 @@ TEST_F(ThriftRouterTest, CallWithExistingConnection) {
 
   returnResponse();
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_success")
+                     .value());
 }
 
 TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {

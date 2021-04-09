@@ -96,7 +96,7 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
-  if (state_ != ActiveClient::State::DRAINING) {
+  if (state() != ActiveClient::State::DRAINING) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {

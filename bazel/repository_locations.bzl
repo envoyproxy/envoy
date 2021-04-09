@@ -490,6 +490,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-07-10",
         cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),
+    com_github_alibaba_hessian2_codec = dict(
+        project_name = "hessian2-codec",
+        project_desc = "hessian2-codec is a C++ library for hessian2 codec",
+        project_url = "https://github.com/alibaba/hessian2-codec.git",
+        version = "dd8e05487a27b367b90ce81f4e6e6f62d693a212",
+        sha256 = "93260c54406e11b7be078a7ea120f7ab0df475c733e68d010fde400c5c8c8162",
+        strip_prefix = "hessian2-codec-{version}",
+        urls = ["https://github.com/alibaba/hessian2-codec/archive/{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.filters.network.dubbo_proxy"],
+        release_date = "2021-04-05",
+        cpe = "N/A",
+    ),
     com_github_tencent_rapidjson = dict(
         project_name = "RapidJSON",
         project_desc = "Fast JSON parser/generator for C++",
@@ -769,12 +782,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2475cc8246d3e77e391347ae319f0ab9db132fb4.tar.gz
-        version = "6fec8e97a1ab1a945b86bd6b7252666294448ddb",
-        sha256 = "3045254cbf03c29ee7166fb01b1072a463c58df405669b8573677d4638869290",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/88c8d5903d851744410ea9840201b6507feae981.tar.gz
+        version = "88c8d5903d851744410ea9840201b6507feae981",
+        sha256 = "b254fa8f363be0637a468c14c3f57bf7aa2ae23b26a8d388ad0f31cb9863332d",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_core"],
-        release_date = "2021-02-24",
+        release_date = "2021-04-07",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
