@@ -45,7 +45,7 @@ class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcClientImpl(Grpc::RawAsyncClientSharedPtr const& async_client,
+  GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout,
                  envoy::config::core::v3::ApiVersion transport_api_version);
   ~GrpcClientImpl() override;

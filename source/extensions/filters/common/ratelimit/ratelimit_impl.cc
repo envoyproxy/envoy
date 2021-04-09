@@ -19,7 +19,7 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr const& async_client,
+GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(std::move(async_client)), timeout_(timeout),

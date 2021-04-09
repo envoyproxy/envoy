@@ -76,10 +76,10 @@ public:
 
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
-  GrpcAccessLogClient(Grpc::RawAsyncClientSharedPtr const& client,
+  GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method)
       : GrpcAccessLogClient(client, service_method, absl::nullopt) {}
-  GrpcAccessLogClient(Grpc::RawAsyncClientSharedPtr const& client,
+  GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method,
                       envoy::config::core::v3::ApiVersion transport_api_version)
       : client_(client), service_method_(service_method),
@@ -168,14 +168,14 @@ class GrpcAccessLogger : public Detail::GrpcAccessLogger<HttpLogProto, TcpLogPro
 public:
   using Interface = Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto>;
 
-  GrpcAccessLogger(Grpc::RawAsyncClientSharedPtr const& client,
+  GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method)
       : GrpcAccessLogger(client, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher,
                          scope, access_log_prefix, service_method, absl::nullopt) {}
-  GrpcAccessLogger(Grpc::RawAsyncClientSharedPtr const& client,
+  GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
@@ -316,7 +316,7 @@ private:
   // Create the specific logger type for this cache.
   virtual typename GrpcAccessLogger::SharedPtr
   createLogger(const ConfigProto& config, envoy::config::core::v3::ApiVersion transport_version,
-               Grpc::RawAsyncClientSharedPtr const& client,
+               const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) PURE;
 

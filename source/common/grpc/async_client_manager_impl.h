@@ -67,8 +67,9 @@ private:
     RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) const;
 
   private:
-    absl::flat_hash_map<uint64_t, RawAsyncClientSharedPtr> cache_;
     uint64_t hashByType(const envoy::config::core::v3::GrpcService& config) const;
+
+    absl::flat_hash_map<uint64_t, RawAsyncClientSharedPtr> cache_;
   };
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
