@@ -2013,12 +2013,16 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
 
   initialize();
 
+  const std::string ip_port_pair =
+      absl::StrCat(Network::Test::getLoopbackAddressString(GetParam()), ":",
+                   fake_upstreams_[1]->localAddress()->ip()->port());
+
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
       {":path", "/some/path"},
       {":scheme", "http"},
       {":authority", "cluster_0"},
-      {"x-envoy-original-dst-host", fake_upstreams_[1]->localAddress()->asString()},
+      {"x-envoy-original-dst-host", ip_port_pair},
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
