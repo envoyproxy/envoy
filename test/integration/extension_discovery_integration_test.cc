@@ -50,14 +50,6 @@ std::string allowAllConfig() { return "code: 200"; }
 
 std::string invalidConfig() { return "code: 90"; }
 
-std::string terminalFilterConfig() {
-  return R"EOF(
-    prefix: "/private"
-    code: 200
-    is_terminal_filter: true
-)EOF";
-}
-
 class ExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                           public HttpIntegrationTest {
 public:
@@ -299,7 +291,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -307,7 +299,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
       {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
   {
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("403", response->headers().getStatusValue());
   }
@@ -317,7 +309,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
     test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
                                    2);
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -432,7 +424,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithMatcher) {
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -440,7 +432,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithMatcher) {
       {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
   {
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("403", response->headers().getStatusValue());
   }
@@ -451,7 +443,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithMatcher) {
                                                                 {":authority", "host"}};
   {
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers_skipped);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -474,7 +466,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicDefaultMatcher) {
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("403", response->headers().getStatusValue());
   }
@@ -484,7 +476,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicDefaultMatcher) {
                                                  {":scheme", "http"},
                                                  {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -518,7 +510,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfig) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterEq("http.config_test.extension_config_discovery.foo.config_conflict",
@@ -559,7 +551,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfigInvalid) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_conflict",
@@ -582,7 +574,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
@@ -603,29 +595,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("500", response->headers().getStatusValue());
-}
-
-// test when terminal filter config not put at last config position
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFitlerNotFit) {
-  on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter("foo", false, false);
-  initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", terminalFilterConfig());
-  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_fail", 1);
-  test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
@@ -645,7 +615,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("403", response->headers().getStatusValue());
   }
@@ -656,7 +626,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
                                  1);
   {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -678,7 +648,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
@@ -701,7 +671,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

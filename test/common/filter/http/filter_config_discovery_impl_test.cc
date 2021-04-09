@@ -355,6 +355,7 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
 TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   InSequence s;
   setup();
+  auto provider2 = createProvider("foo", true, false);
   const std::string response_yaml = R"EOF(
   version_info: "1"
   resources:

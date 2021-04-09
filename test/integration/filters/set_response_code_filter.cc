@@ -59,10 +59,9 @@ private:
       callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
   }
-  bool isTerminalFilterByProtoTyped(
-      const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
-      Server::Configuration::FactoryContext&) override {
-    return proto_config.is_terminal_filter();
+  bool isTerminalFilterByProtoTyped(const test::integration::filters::SetResponseCodeFilterConfig&,
+                                    Server::Configuration::FactoryContext&) override {
+    return true;
   }
 };
 
