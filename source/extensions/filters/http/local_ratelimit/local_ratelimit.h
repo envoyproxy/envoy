@@ -66,8 +66,7 @@ public:
   ~FilterConfig() override = default;
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit
-  proto_config() const {
+  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit proto_config() const {
     return proto_config_;
   }
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
