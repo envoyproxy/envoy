@@ -356,7 +356,7 @@ A fixture - `check_pytest_target` is available for this purpose.
 
 Add the following to `tools/sometools/tests/test_mytool.py`:
 
-```
+```python
 def test_pytest_python_coverage(check_pytest_target):
     check_pytest_target("tools.sometools.pytest_mytool")
 ```
