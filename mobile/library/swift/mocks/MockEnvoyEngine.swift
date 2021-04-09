@@ -27,14 +27,14 @@ final class MockEnvoyEngine: NSObject {
 
 extension MockEnvoyEngine: EnvoyEngine {
   func run(withConfig config: EnvoyConfiguration, logLevel: String,
-           onEngineRunning: (() -> Void)?) -> Int32
+           onEngineRunning: (() -> Void)?, logger: ((String) -> Void)?) -> Int32
   {
     MockEnvoyEngine.onRunWithConfig?(config, logLevel)
     return kEnvoySuccess
   }
 
   func run(withTemplate template: String, config: EnvoyConfiguration, logLevel: String,
-           onEngineRunning: (() -> Void)?) -> Int32
+           onEngineRunning: (() -> Void)?, logger: ((String) -> Void)?) -> Int32
   {
     MockEnvoyEngine.onRunWithTemplate?(template, config, logLevel)
     return kEnvoySuccess

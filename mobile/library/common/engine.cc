@@ -96,6 +96,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   postinit_callback_handler_.reset(nullptr);
   client_scope_.reset(nullptr);
   stat_name_set_.reset();
+  lambda_logger_.reset(nullptr);
   TS_UNCHECKED_READ(main_common_).reset(nullptr);
 
   callbacks_.on_exit(callbacks_.context);

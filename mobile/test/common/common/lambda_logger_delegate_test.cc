@@ -18,11 +18,26 @@ TEST(LambdaDelegate, LogCb) {
                                               *actual_msg = Data::Utility::copyToString(data);
                                               data.release(data.context);
                                             },
-                                            &actual_msg},
+                                            [](void*) -> void {}, &actual_msg},
                                            Registry::getSink());
 
   ENVOY_LOG_MISC(error, expected_msg);
   EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
+}
+
+TEST(LambdaDelegate, ReleaseCb) {
+  bool released = false;
+  LambdaDelegatePtr delegate = LambdaDelegatePtr(
+      new LambdaDelegate({[](envoy_data data, void*) -> void { data.release(data.context); },
+                          [](void* context) -> void {
+                            bool* released = static_cast<bool*>(context);
+                            *released = true;
+                          },
+                          &released},
+                         Registry::getSink()));
+
+  delegate.reset(nullptr);
+  EXPECT_TRUE(released);
 }
 
 } // namespace Logger

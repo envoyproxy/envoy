@@ -312,11 +312,13 @@ extern const int kEnvoyFailure;
  @param logLevel The log level to use when starting Envoy.
  @param onEngineRunning Closure called when the engine finishes its async startup and begins
  running.
+ @param logger Logging interface.
  @return A status indicating if the action was successful.
  */
 - (int)runWithConfig:(EnvoyConfiguration *)config
             logLevel:(NSString *)logLevel
-     onEngineRunning:(nullable void (^)())onEngineRunning;
+     onEngineRunning:(nullable void (^)())onEngineRunning
+              logger:(nullable void (^)(NSString *))logger;
 
 /**
  Run the Envoy engine with the provided yaml string and log level.
@@ -326,12 +328,15 @@ extern const int kEnvoyFailure;
  @param logLevel The log level to use when starting Envoy.
  @param onEngineRunning Closure called when the engine finishes its async startup and begins
  running.
+ @param logger Logging interface.
  @return A status indicating if the action was successful.
  */
 - (int)runWithTemplate:(NSString *)yaml
                 config:(EnvoyConfiguration *)config
               logLevel:(NSString *)logLevel
-       onEngineRunning:(nullable void (^)())onEngineRunning;
+       onEngineRunning:(nullable void (^)())onEngineRunning
+                logger:(nullable void (^)(NSString *))logger;
+;
 
 /**
  Opens a new HTTP stream attached to this engine.
@@ -391,6 +396,20 @@ extern const int kEnvoyFailure;
  @return A status indicating if the action was successful.
  */
 - (int)recordHistogramValue:(NSString *)elements value:(NSUInteger)value;
+
+@end
+
+#pragma mark - EnvoyLogger
+
+// Logging interface.
+@interface EnvoyLogger : NSObject
+
+@property (nonatomic, copy) void (^log)(NSString *);
+
+/**
+ Create a new instance of the logger.
+ */
+- (instancetype)initWithLogClosure:(void (^)(NSString *))log;
 
 @end
 
