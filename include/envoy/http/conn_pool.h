@@ -77,6 +77,12 @@ public:
    */
   virtual Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                  Callbacks& callbacks) PURE;
+
+  /**
+   * Returns a user-friendly protocol description for logging.
+   * @return absl::string_view a protocol description for logging.
+   */
+  virtual absl::string_view protocolDescription() const PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;

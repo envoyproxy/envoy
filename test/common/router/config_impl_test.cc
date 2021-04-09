@@ -148,7 +148,7 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
   // If we're under TestDeprecatedV2Api, allow boosting.
   auto* runtime = Runtime::LoaderSingleton::getExisting();
   if (runtime != nullptr && runtime->threadsafeSnapshot()->runtimeFeatureEnabled(
-                                "envoy.reloadable_features.enable_deprecated_v2_api")) {
+                                "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
     avoid_boosting = false;
   }
   // Load the file and keep the annotations (in case of an upgrade) to make sure
@@ -320,6 +320,9 @@ most_specific_header_mutations_wins: {0}
 
     return fmt::format(yaml, most_specific_wins);
   }
+
+  // TODO(asraa) remove this when flipping fuzzers on.
+  Filesystem::ScopedUseMemfiles use_memfiles_{true};
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Api::ApiPtr api_;
@@ -5530,7 +5533,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "RouteValidationError.Match: \\[\"value is required\"\\]");
+      "RouteValidationError.Match");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, DEPRECATED_FEATURE_TEST(BadRouteEntryConfigPrefixAndRegex)) {

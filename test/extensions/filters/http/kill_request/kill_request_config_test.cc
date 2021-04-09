@@ -39,6 +39,19 @@ TEST(KillRequestConfigTest, KillRequestFilterWithEmptyProto) {
   cb(filter_callback);
 }
 
+TEST(KillRequestConfigTest, RouteSpecificConfig) {
+  KillRequestFilterFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  EXPECT_TRUE(proto_config.get());
+
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                              ProtobufMessage::getNullValidationVisitor());
+  EXPECT_TRUE(route_config.get());
+}
+
 } // namespace
 } // namespace KillRequest
 } // namespace HttpFilters

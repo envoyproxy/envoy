@@ -181,7 +181,10 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
-    } else if (complete() && !hasTrailers() && !bufferedData()) {
+    } else if (complete() && !hasTrailers() && !bufferedData() &&
+               // If the stream is destroyed, no need to handle the data buffer or trailers.
+               // This can occur if the filter calls sendLocalReply.
+               !parent_.state_.destroyed_) {
       // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
       // byte data frame, we need to create an empty buffer to make sure that when commonContinue
       // is called, the pipeline resumes with an empty data frame with end_stream = true
@@ -504,9 +507,6 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "decodeHeaders when end_stream is already false");
-    ENVOY_BUG(
-        !state_.local_complete_ || status == FilterHeadersStatus::StopIteration,
-        "Filters should return FilterHeadersStatus::StopIteration after sending a local reply.");
 
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
@@ -514,8 +514,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     (*entry)->decode_headers_called_ = true;
 
-    const auto continue_iteration =
-        (*entry)->commonHandleAfterHeadersCallback(status, end_stream) && !state_.local_complete_;
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
+    ENVOY_BUG(!continue_iteration || !state_.local_complete_,
+              "Filter did not return StopAll or StopIteration after sending a local reply.");
 
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
@@ -535,7 +536,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
+    if ((!continue_iteration || state_.local_complete_) &&
+        std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
@@ -1372,7 +1374,8 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
+  if (!complete() ||
+      (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
     return false;
   }
 

@@ -155,8 +155,8 @@ public:
         uint64_t old_limit = connecting_client->effectiveConcurrentStreamLimit();
         connecting_client->remaining_streams_ = 1;
         if (connecting_client->effectiveConcurrentStreamLimit() < old_limit) {
-          decrConnectingStreamCapacity(old_limit -
-                                       connecting_client->effectiveConcurrentStreamLimit());
+          decrConnectingAndConnectedStreamCapacity(
+              old_limit - connecting_client->effectiveConcurrentStreamLimit());
         }
       }
     }

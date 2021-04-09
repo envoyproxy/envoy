@@ -123,6 +123,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   const auto thread_local_cluster = filter.clusterManager().getThreadLocalCluster(cluster);
   if (thread_local_cluster == nullptr) {
     luaL_error(state, "http call cluster invalid. Must be configured");
+    return nullptr;
   }
 
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -148,6 +149,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout).setParentSpan(parent_span);
   return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
+
 } // namespace
 
 PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
@@ -165,12 +167,23 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
 
-  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
+  const Filters::Common::Lua::InitializerList initializers(
+      // EnvoyTimestampResolution "enum".
+      {
+          [](lua_State* state) {
+            lua_newtable(state);
+            { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
+            lua_setglobal(state, "EnvoyTimestampResolution");
+          },
+          // Add more initializers here.
+      });
+
+  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request", initializers);
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
   }
 
-  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
+  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response", initializers);
   if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
   }
@@ -178,13 +191,14 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::HeaderMap& headers, bool end_stream, Filter& filter,
-                                         FilterCallbacks& callbacks)
+                                         FilterCallbacks& callbacks, TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
           throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
         }
-      }) {}
+      }),
+      time_source_(time_source) {}
 
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
@@ -314,7 +328,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 
 int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& span) {
   http_request_ = makeHttpCall(state, filter_, span, *this);
-  if (http_request_) {
+  if (http_request_ != nullptr) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
   } else {
@@ -643,6 +657,27 @@ int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaTimestamp(lua_State* state) {
+  auto now = time_source_.systemTime().time_since_epoch();
+
+  absl::string_view unit_parameter = luaL_optstring(state, 2, "");
+
+  auto milliseconds_since_epoch =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+
+  absl::uint128 resolution_as_int_from_state = 0;
+  if (unit_parameter.empty()) {
+    lua_pushnumber(state, milliseconds_since_epoch);
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) &&
+             resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
+    lua_pushnumber(state, milliseconds_since_epoch);
+  } else {
+    luaL_error(state, "timestamp format must be MILLISECOND.");
+  }
+
+  return 1;
+}
+
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api)
@@ -697,7 +732,7 @@ Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
   coroutine = setup->createCoroutine();
 
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
-                                           *this, callbacks),
+                                           *this, callbacks, time_source_),
                true);
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;

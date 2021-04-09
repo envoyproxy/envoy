@@ -231,6 +231,7 @@ envoy_cc_library(
         ":kafka_types_lib",
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:byte_order_lib",
+        "//source/common/common:safe_memcpy_lib",
     ],
 )
 

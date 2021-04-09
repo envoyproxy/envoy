@@ -301,19 +301,11 @@ public:
   Stats::Scope& listenerScope() override { return listener_factory_context_->listenerScope(); }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-    return udp_listener_factory_.get();
-  }
-  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-    return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
-  }
-  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-    return udp_listener_worker_router_
-               ? Network::UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_)
-               : absl::nullopt;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override {
+    return udp_listener_config_ != nullptr ? *udp_listener_config_
+                                           : Network::UdpListenerConfigOptRef();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
-
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
@@ -341,6 +333,24 @@ public:
   SystemTime last_updated_;
 
 private:
+  struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
+    UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
+        : config_(config) {}
+
+    // Network::UdpListenerConfig
+    Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
+    Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+    Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
+      return *listener_worker_router_;
+    }
+    const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+
+    const envoy::config::listener::v3::UdpListenerConfig config_;
+    Network::ActiveUdpListenerFactoryPtr listener_factory_;
+    Network::UdpPacketWriterFactoryPtr writer_factory_;
+    Network::UdpListenerWorkerRouterPtr listener_worker_router_;
+  };
+
   /**
    * Create a new listener from an existing listener and the new config message if the in place
    * filter chain update is decided. Should be called only by newListenerWithFilterChain().
@@ -352,7 +362,6 @@ private:
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
-  void buildUdpWriterFactory(Network::Socket::Type socket_type);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
   void createListenerFilterFactories(Network::Socket::Type socket_type);
   void validateFilterChains(Network::Socket::Type socket_type);
@@ -398,9 +407,7 @@ private:
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
-  Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
-  Network::UdpListenerWorkerRouterPtr udp_listener_worker_router_;
+  std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;

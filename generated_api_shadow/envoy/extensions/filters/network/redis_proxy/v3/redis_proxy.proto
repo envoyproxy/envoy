@@ -178,8 +178,11 @@ message RedisProxy {
     // catch-all route becomes required when no routes are specified.
     Route catch_all_route = 4;
 
-    string hidden_envoy_deprecated_catch_all_cluster = 3
-        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+    string hidden_envoy_deprecated_catch_all_cluster = 3 [
+      deprecated = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // RedisFault defines faults used for fault injection.
@@ -297,8 +300,11 @@ message RedisProxy {
   // AUTH, but no ACL is set" error will be returned.
   config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
 
-  string hidden_envoy_deprecated_cluster = 2
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  string hidden_envoy_deprecated_cluster = 2 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in

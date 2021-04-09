@@ -121,7 +121,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVerifySAN) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection(ClientSslTransportOptions().setSan(true));
+    return makeSslClientConnection(ClientSslTransportOptions().setSan(san_to_match_));
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
@@ -130,7 +130,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVerifySAN) {
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true).setSan(true));
+    return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true).setSan(san_to_match_));
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
@@ -701,7 +701,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   auto result = codec_client_->startRequest(request_headers);
-  auto decoder = std::move(result.second);
+  auto response = std::move(result.second);
   Buffer::OwnedImpl data1("one");
   result.first.encodeData(data1, false);
   Buffer::OwnedImpl data2("two");
@@ -711,10 +711,10 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   upstream_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl data3("three");
   upstream_request_->encodeData(data3, false);
-  decoder->waitForBodyData(5);
+  response->waitForBodyData(5);
   Buffer::OwnedImpl data4("four");
   upstream_request_->encodeData(data4, true);
-  decoder->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   checkStats();
   codec_client_->close();

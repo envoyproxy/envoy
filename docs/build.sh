@@ -42,6 +42,7 @@ fi
 
 SCRIPT_DIR="$(dirname "$0")"
 SRC_DIR="$(dirname "$SCRIPT_DIR")"
+ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
 API_DIR="${SRC_DIR}"/api
 CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
@@ -53,6 +54,8 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
+
+export ENVOY_SRCDIR
 
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
@@ -92,9 +95,13 @@ function generate_api_rst() {
     tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst
 
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
-  # config.
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-    "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
+  # config. We only have v2 support here for version history anchors, which don't point at any empty
+  # configs.
+  if [[ "${API_VERSION}" != "v2" ]]
+  then
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
+      "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
+  fi
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts
   # are nested inside source package targets).
@@ -122,10 +129,17 @@ function generate_api_rst() {
     declare DST="${GENERATED_RST_DIR}/api-${API_VERSION}/${PROTO_FILE_CANONICAL#envoy/}".rst
 
     mkdir -p "$(dirname "${DST}")"
-    cp -f "${SRC}" "$(dirname "${DST}")"
+    if [[ "${API_VERSION}" == "v2" ]]
+    then
+      cat docs/v2-api-header.rst "${SRC}" > "$(dirname "${DST}")/$(basename "${SRC}")"
+    else
+      cp -f "${SRC}" "$(dirname "${DST}")"
+    fi
   done
 }
 
+# TODO(htuch): remove v2 support once we have a good story for version history RST links that refer
+# to v2 APIs.
 generate_api_rst v2
 generate_api_rst v3
 

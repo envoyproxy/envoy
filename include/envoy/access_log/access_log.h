@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -45,10 +46,11 @@ public:
 
   /**
    * Create a new access log file managed by the access log manager.
-   * @param file_name specifies the file to create/open.
+   * @param file_info specifies the file to create/open.
    * @return the opened file.
    */
-  virtual AccessLogFileSharedPtr createAccessLog(const std::string& file_name) PURE;
+  virtual AccessLogFileSharedPtr
+  createAccessLog(const Envoy::Filesystem::FilePathAndType& file_info) PURE;
 };
 
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
