@@ -1,5 +1,4 @@
-
-
+# Tooling docs
 
 ## Add a python tool
 
@@ -258,3 +257,74 @@ def test_mytool_main():
 
 This example use the mock library to patch all of the method calls, and
 then tests that they have been called with the expected values.
+
+You can then run the test:
+
+```console
+$ bazel run //tools/sometools:pytest_mytool
+INFO: Analyzed target //tools/sometools:pytest_mytool (0 packages loaded, 0 targets configured).
+INFO: Found 1 target...
+Target //tools/sometools:pytest_mytool up-to-date:
+  bazel-bin/tools/sometools/pytest_mytool
+INFO: Elapsed time: 0.247s, Critical Path: 0.07s
+INFO: 1 process: 1 internal.
+INFO: Build completed successfully, 1 total action
+================================ test session starts ===========================
+platform linux -- Python 3.8.1, pytest-6.2.3, py-1.10.0, pluggy-0.13.1 -- /usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /root/.cache/bazel/_bazel_root/f704bab1b165ed1368cb88f9f49e7532/execroot/envoy/bazel-out/k8-fastbuild/bin/tools/sometools/pytest_mytool.runfiles/envoy, configfile: pytest.ini
+plugins: cov-2.11.1
+collected 1 item
+
+tools/sometools/tests/test_mytool.py::test_mytool_main PASSED                                                                                                                             [100%]
+
+----------- coverage: platform linux, python 3.8.1-final-0 -----------
+Name                                                        Stmts   Miss  Cover
+-------------------------------------------------------------------------------
+/src/workspace/envoy/tools/sometools/mytool.py                  7      0   100%
+/src/workspace/envoy/tools/sometools/pytest_mytool.py           4      4     0%
+/src/workspace/envoy/tools/sometools/tests/test_mytool.py      11      0   100%
+-------------------------------------------------------------------------------
+TOTAL                                                          22      4    82%
+
+
+================================ 1 passed in 0.46s ============================
+```
+
+### The `patches` pytest fixture
+
+When writing unit tests its not uncommon to need to patch a lot of different code.
+
+A `patches` fixture has been added to make this easier.
+
+The above test can be rewritten to make use of it as follow:
+
+```python
+from unittest.mock import patch
+
+from tools.sometools import mytool
+
+
+def test_mytool_main(patches):
+    patched = patches(
+        "requests.get",
+        "yaml.dump",
+        "sys.stdout.write",
+        prefix="tools.sometools.mytool")
+
+    with patched as (m_get, m_yaml, m_stdout):
+        assert mytool.main("PACKAGENAME") == 0
+    assert (
+        list(m_get.call_args)
+        == [('https://pypi.python.org/pypi/PACKAGENAME/json',), {}])
+    assert (
+        list(m_get.return_value.json.call_args)
+        == [(), {}])
+    assert (
+        list(m_yaml.call_args)
+        == [(m_get.return_value.json.return_value,), {}])
+    assert (
+        list(m_stdout.call_args)
+        == [(m_yaml.return_value,), {}])
+
+```
