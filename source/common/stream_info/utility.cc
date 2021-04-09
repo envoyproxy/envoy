@@ -7,10 +7,9 @@ namespace Envoy {
 namespace StreamInfo {
 
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
-  // The vector reserves number of different flags on the stack. It guarantees no allocation.
-  absl::InlinedVector<absl::string_view,
-                      std::numeric_limits<std::underlying_type_t<ResponseFlag>>::digits>
-      flag_strings;
+  // We don't expect more than 4 flags are set. Relax to 16 since the vector is allocated on stack
+  // anyway.
+  absl::InlinedVector<absl::string_view, 16> flag_strings;
   for (const auto& [flag_string, flag] : ALL_RESPONSE_STRING_FLAGS) {
     if (stream_info.hasResponseFlag(flag)) {
       flag_strings.push_back(flag_string);
