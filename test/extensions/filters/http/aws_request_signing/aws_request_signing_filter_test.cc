@@ -104,7 +104,7 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsEmptyPayloadAndContinues) {
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
-  // echo -n '' | shasum -a 256
+  // sha256('')
   const std::string hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
@@ -122,7 +122,7 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
-  // echo -n 'Action=SignThis' | shasum -a 256
+  // sha256('Action=SignThis')
   const std::string hash = "1db26ef86fca9f7c54d2273d4673a4f2a614fadf3185d16288d454619f1cf491";
   Buffer::OwnedImpl buffer("Action=SignThis");
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
