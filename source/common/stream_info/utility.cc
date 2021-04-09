@@ -1,7 +1,6 @@
 #include "common/stream_info/utility.h"
 
 #include <string>
-#include <type_traits>
 
 namespace Envoy {
 namespace StreamInfo {
