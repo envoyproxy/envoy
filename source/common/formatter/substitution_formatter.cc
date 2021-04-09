@@ -479,7 +479,7 @@ SubstitutionFormatParser::parse(const std::string& format,
       throw EnvoyException(fmt::format(
           "Incorrect configuration: {}. Couldn't find valid command at position {}", format, pos));
     }
-    
+
     const std::string match = m.str(0);
 
     pos += 1;
