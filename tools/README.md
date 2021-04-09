@@ -270,6 +270,9 @@ def test_mytool_main():
     assert (
         list(m_yaml.call_args)
         == [(m_get.return_value.json.return_value,), {}])
+    assert (
+        list(m_stdout.call_args)
+        == [(m_yaml.return_value,), {}])
 ```
 
 This example use the mock library to patch all of the method calls, and
