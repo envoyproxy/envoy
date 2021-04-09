@@ -40,6 +40,7 @@ public:
   std::string fileReadToEnd(const std::string& path) override;
   PathSplitResult splitPathFromFilename(absl::string_view path) override;
   bool illegalPath(const std::string& path) override;
+  bool protectedPath(const std::string& path);
 
 private:
   Api::SysCallStringResult canonicalPath(const std::string& path);

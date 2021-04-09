@@ -224,6 +224,29 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 #endif
 }
 
+#ifndef WIN32
+TEST_F(FileSystemImplTest, ProtectedPath) {
+  EXPECT_TRUE(file_system_.protectedPath("/dev"));
+  EXPECT_TRUE(file_system_.protectedPath("/dev/"));
+  EXPECT_TRUE(file_system_.protectedPath("/dev/some/path"));
+  EXPECT_TRUE(file_system_.protectedPath("/sys"));
+  EXPECT_TRUE(file_system_.protectedPath("/sys/"));
+  EXPECT_TRUE(file_system_.protectedPath("/sys/some/path"));
+  EXPECT_TRUE(file_system_.protectedPath("/proc"));
+  EXPECT_TRUE(file_system_.protectedPath("/proc/"));
+  EXPECT_TRUE(file_system_.protectedPath("/proc/some/path"));
+  EXPECT_FALSE(file_system_.protectedPath("/devel"));
+  EXPECT_FALSE(file_system_.protectedPath("/devel/"));
+  EXPECT_FALSE(file_system_.protectedPath("/devel/some/path"));
+  EXPECT_FALSE(file_system_.protectedPath("/system"));
+  EXPECT_FALSE(file_system_.protectedPath("/system/"));
+  EXPECT_FALSE(file_system_.protectedPath("/system/some/path"));
+  EXPECT_FALSE(file_system_.protectedPath("/process"));
+  EXPECT_FALSE(file_system_.protectedPath("/process/"));
+  EXPECT_FALSE(file_system_.protectedPath("/process/some/path"));
+}
+#endif
+
 TEST_F(FileSystemImplTest, ConstructedFile) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());

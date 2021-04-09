@@ -158,14 +158,17 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
     return true;
   }
 
+  return protectedPath(canonical_path.rc_);
+}
+
+bool InstanceImplPosix::protectedPath(const std::string& path) {
   // Platform specific path sanity; we provide a convenience to avoid Envoy
   // instances poking in bad places. We may have to consider conditioning on
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
   // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(canonical_path.rc_, "/dev/") || canonical_path.rc_ == "/dev" ||
-      absl::StartsWith(canonical_path.rc_, "/sys/") || canonical_path.rc_ == "/sys" ||
-      absl::StartsWith(canonical_path.rc_, "/proc/") || canonical_path.rc_ == "/proc") {
+  if (absl::StartsWith(path, "/dev/") || path == "/dev" || absl::StartsWith(path, "/sys/") ||
+      path == "/sys" || absl::StartsWith(path, "/proc/") || path == "/proc") {
     return true;
   }
   return false;
