@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,7 +10,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-cmake(
+cmake_external(
     name = "libiwasm",
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -19,6 +19,6 @@ cmake(
         "WAMR_BUILD_SIMD": "0",
     },
     lib_source = ":srcs",
-    out_shared_libs = ["libiwasm.so"],
+    static_libraries = ["libvmlib.a"],
     working_directory = "product-mini/platforms/linux"
 )
