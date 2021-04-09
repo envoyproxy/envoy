@@ -35,6 +35,11 @@ public class EnvoyEngineImpl implements EnvoyEngine {
     return stream;
   }
 
+  @Override
+  public void terminate() {
+    JniLibrary.terminateEngine(engineHandle);
+  }
+
   /**
    * Run the Envoy engine with the provided yaml string and log level.
    *

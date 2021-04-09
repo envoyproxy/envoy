@@ -23,6 +23,11 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
+  public void terminate() {
+    envoyEngine.terminate();
+  }
+
+  @Override
   public int runWithConfig(String configurationYAML, String logLevel,
                            EnvoyOnEngineRunning onEngineRunning) {
     // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748

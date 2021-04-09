@@ -1,11 +1,8 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 
 import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Map;
 
 class JniLibrary {
 
@@ -141,6 +138,13 @@ class JniLibrary {
    */
   protected static native int runEngine(long engine, String config, String logLevel,
                                         EnvoyOnEngineRunning onEngineRunning);
+
+  /**
+   * Terminate the engine.
+   *
+   * @param engine handle for the engine to terminate.
+   */
+  protected static native void terminateEngine(long engine);
 
   // Other native methods
 

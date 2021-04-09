@@ -15,6 +15,11 @@ public interface EnvoyEngine {
   EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks);
 
   /**
+   * Terminates the running engine.
+   */
+  void terminate();
+
+  /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
