@@ -1,20 +1,18 @@
 package io.envoyproxy.envoymobile.engine;
 
-import android.app.Application;
+import android.content.Context;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 /* Android-specific implementation of the `EnvoyEngine` interface. */
 public class AndroidEngineImpl implements EnvoyEngine {
-  private final Application application;
   private final EnvoyEngine envoyEngine;
 
-  public AndroidEngineImpl(Application application) {
-    this.application = application;
+  public AndroidEngineImpl(Context context) {
     this.envoyEngine = new EnvoyEngineImpl();
-    AndroidJniLibrary.load(application.getBaseContext());
-    AndroidNetworkMonitor.load(application.getBaseContext());
+    AndroidJniLibrary.load(context);
+    AndroidNetworkMonitor.load(context);
   }
 
   @Override
