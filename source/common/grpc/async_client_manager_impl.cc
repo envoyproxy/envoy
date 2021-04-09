@@ -119,5 +119,50 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
   return nullptr;
 }
 
+RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
+    const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
+    bool skip_cluster_check) {
+  RawAsyncClientSharedPtr client;
+  client = raw_async_client_cache_->getCache(config);
+  if (client != nullptr) {
+    return client;
+  }
+  client = factoryForGrpcService(config, scope, skip_cluster_check)->create();
+  raw_async_client_cache_->setCache(config, client);
+  return client;
+}
+
+uint64_t AsyncClientManagerImpl::RawAsyncClientCache::hashByType(
+    const envoy::config::core::v3::GrpcService& config) const {
+  uint64_t key = 0;
+  switch (config.target_specifier_case()) {
+  case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kEnvoyGrpc:
+    key = MessageUtil::hash(config.envoy_grpc());
+    break;
+  case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
+    key = MessageUtil::hash(config.google_grpc());
+    break;
+  case envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  return key;
+}
+
+RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
+    const envoy::config::core::v3::GrpcService& config) const {
+  uint64_t key = hashByType(config);
+  auto it = cache_.find(key);
+  if (it == cache_.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
+
+void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
+    const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
+  uint64_t key = hashByType(config);
+  cache_[key] = client;
+}
+
 } // namespace Grpc
 } // namespace Envoy

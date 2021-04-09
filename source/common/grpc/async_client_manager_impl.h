@@ -47,24 +47,14 @@ private:
   const StatNames& stat_names_;
 };
 
-class AsyncClientManagerImpl : public AsyncClientManager, Logger::Loggable<Logger::Id::grpc> {
+class AsyncClientManagerImpl : public AsyncClientManager {
 public:
   AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
                          TimeSource& time_source, Api::Api& api, const StatNames& stat_names);
   RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
-                            bool skip_cluster_check) override {
-    RawAsyncClientSharedPtr client;
-    client = raw_async_client_cache_->getCache(config);
-    if (client != nullptr) {
-      ENVOY_LOG(debug, "return client cache.\n");
-      return client;
-    }
-    client = factoryForGrpcService(config, scope, skip_cluster_check)->create();
-    raw_async_client_cache_->setCache(config, client);
-    return client;
-  }
-  // Grpc::AsyncClientManager
+                            bool skip_cluster_check) override;
+
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
                                               bool skip_cluster_check) override;
@@ -73,35 +63,12 @@ private:
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     void setCache(const envoy::config::core::v3::GrpcService& config,
-                  const RawAsyncClientSharedPtr& client) {
-      std::uint64_t key = hashByType(config);
-      cache_[key] = client;
-    }
-    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) const {
-      std::uint64_t key = hashByType(config);
-      auto it = cache_.find(key);
-      if (it == cache_.end()) {
-        return nullptr;
-      }
-      return it->second;
-    }
+                  const RawAsyncClientSharedPtr& client);
+    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) const;
 
   private:
     absl::flat_hash_map<uint64_t, RawAsyncClientSharedPtr> cache_;
-    uint64_t hashByType(const envoy::config::core::v3::GrpcService& config) const {
-      uint64_t key = 0;
-      switch (config.target_specifier_case()) {
-      case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kEnvoyGrpc:
-        key = MessageUtil::hash(config.envoy_grpc());
-        break;
-      case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
-        key = MessageUtil::hash(config.google_grpc());
-        break;
-      case envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-      return key;
-    }
+    uint64_t hashByType(const envoy::config::core::v3::GrpcService& config) const;
   };
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
