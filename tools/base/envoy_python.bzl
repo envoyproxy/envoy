@@ -1,12 +1,10 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
-
 def envoy_py_library(
         name = None,
         deps = [],
         data = [],
         visibility = ["//visibility:public"]):
-
     package = ".".join(name.split(".")[:-1])
     name = name.split(".")[-1]
 
@@ -39,13 +37,11 @@ def envoy_py_library(
         visibility = visibility,
     )
 
-
 def envoy_py_binary(
         name = None,
         deps = [],
         data = [],
         visibility = ["//visibility:public"]):
-
     package = ".".join(name.split(".")[:-1])
     name = name.split(".")[-1]
 
@@ -69,7 +65,7 @@ def envoy_py_binary(
     ]
 
     if name != "python_pytest":
-        test_deps += ["//tools/testing:python_pytest"]
+        test_deps.append("//tools/testing:python_pytest")
 
     py_binary(
         name = "pytest_" + name,

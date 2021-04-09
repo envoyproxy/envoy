@@ -15,10 +15,6 @@ py_library(
 
 envoy_py_binary(
     "tools.testing.python_pytest",
-    deps = [
-        requirement("pytest"),
-        requirement("pytest-cov"),
-    ],
     data = [
         ":plugin",
         "//:.coveragerc",
@@ -26,17 +22,21 @@ envoy_py_binary(
         "//tools/base:runner",
         "//tools/base:utils",
     ],
+    deps = [
+        requirement("pytest"),
+        requirement("pytest-cov"),
+    ],
 )
 
 envoy_py_binary(
     "tools.testing.python_coverage",
-    deps = [
-        requirement("coverage"),
-    ],
     data = [
         ":plugin",
         "//:.coveragerc",
         "//tools/base:runner",
         "//tools/base:utils",
+    ],
+    deps = [
+        requirement("coverage"),
     ],
 )
