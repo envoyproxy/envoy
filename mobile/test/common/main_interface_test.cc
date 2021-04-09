@@ -15,6 +15,7 @@ namespace Envoy {
 typedef struct {
   absl::Notification on_engine_running;
   absl::Notification on_exit;
+  absl::Notification on_log;
 } engine_test_context;
 
 // This config is the minimal envoy mobile config that allows for running the engine.
@@ -392,31 +393,30 @@ TEST(EngineTest, RecordHistogramValue) {
 TEST(EngineTest, Logger) {
   engine_test_context test_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
+                                      auto* test_context =
                                           static_cast<engine_test_context*>(context);
-                                      engine_running->on_engine_running.Notify();
+                                      test_context->on_engine_running.Notify();
                                     } /*on_engine_running*/,
                                     [](void* context) -> void {
-                                      auto* exit = static_cast<engine_test_context*>(context);
-                                      exit->on_exit.Notify();
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_exit.Notify();
                                     } /*on_exit*/,
                                     &test_context /*context*/};
 
-  std::string actual_log;
   envoy_logger logger{[](envoy_data data, void* context) -> void {
-                        auto* actual_log = static_cast<std::string*>(context);
-                        *actual_log = Data::Utility::copyToString(data);
+                        auto* test_context = static_cast<engine_test_context*>(context);
                         data.release(data.context);
+                        if (!test_context->on_log.HasBeenNotified()) {
+                          test_context->on_log.Notify();
+                        }
                       },
-                      &actual_log};
+                      &test_context};
 
   run_engine(0, engine_cbs, logger, MINIMAL_NOOP_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  std::string expected_log = "logging!";
-  ENVOY_LOG_MISC(error, expected_log);
-
-  EXPECT_THAT(actual_log, HasSubstr(expected_log));
+  ASSERT_TRUE(test_context.on_log.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   terminate_engine(0);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
