@@ -1,8 +1,8 @@
 # Tooling docs
 
-## Add a python tool
+## Add a Python tool
 
-To demonstrate adding a python tool to the Envoy tooling lets go through the steps.
+To demonstrate adding a Python tool to the Envoy tooling lets go through the steps.
 
 For this example a tool with the name `mytool.py` will be added to the `/tools/sometools` directory.
 
@@ -10,16 +10,16 @@ We will assume that `sometools` does not yet exist and will also need a `require
 and `bazel` rule to configure the dependencies.
 
 In most cases of adding a tool, it is likely you will not need to create a new set of dependencies, and
-you can skip to the ("Add python requirements")[#add-python-requirements] section.
+you can skip to the ("Add Python requirements")[#add-python-requirements] section.
 
 We will also assume that you have `python3` and `pip` installed and working in your local environment.
 
 The tool *must* be runnable with `bazel`, but we can also make it runnable directly without bazel, although the user
 will then have to ensure they have the necessary dependencies locally installed themselves.
 
-### Create the bazel boilerplate for a new set of python requirements
+### Create the bazel boilerplate for a new set of Python requirements
 
-All python requirements for Envoy tooling  must be pinned with hashes to ensure the integrity of the dependencies.
+All Python requirements for Envoy tooling  must be pinned with hashes to ensure the integrity of the dependencies.
 
 Let's add the `bazel` boilerplate to setup a new `requirements.txt` file. This uses `rules_python`.
 
@@ -44,7 +44,7 @@ $ touch tools/sometools/requirements.txt
 
 ```
 
-We can now use `sometools_pip3` in the `BUILD` file for our python tool, although we will need
+We can now use `sometools_pip3` in the `BUILD` file for our Python tool, although we will need
 some actual requirements for it to be useful.
 
 In order to ensure that this `requirements.txt` stays up-to-date we will also need to add an entry
@@ -60,7 +60,7 @@ This example requires the following entry:
 ```
 
 
-### Add python requirements
+### Add Python requirements
 
 For the purpose of this example, `mytool.py` will have dependencies on the `requests` and `pyyaml`
 libraries.
@@ -93,10 +93,10 @@ $ pip-compile --generate-hashes tools/sometools/requirements.txt
 
 ```
 
-### Add the python tool
+### Add the Python tool
 
 For the purpose of this example we will add a trivial tool that dumps information
-about a python package as `yaml`
+about a Python package as `yaml`
 
 Create a file `tools/sometools/mytool.py` with the following content:
 
@@ -172,7 +172,7 @@ to make it executable:
 $ chmod +x tools/sometools/mytool.py
 ```
 
-With this added users that have the necessary python dependencies locally installed
+With this added users that have the necessary Python dependencies locally installed
 can run the tool with the following command:
 
 ```console
@@ -291,7 +291,7 @@ INFO: Elapsed time: 0.247s, Critical Path: 0.07s
 INFO: 1 process: 1 internal.
 INFO: Build completed successfully, 1 total action
 ================================ test session starts ===========================
-platform linux -- Python 3.8.1, pytest-6.2.3, py-1.10.0, pluggy-0.13.1 -- /usr/bin/python3
+platform linux -- python 3.8.1, pytest-6.2.3, py-1.10.0, pluggy-0.13.1 -- /usr/bin/python3
 cachedir: .pytest_cache
 rootdir: /root/.cache/bazel/_bazel_root/f704bab1b165ed1368cb88f9f49e7532/execroot/envoy/bazel-out/k8-fastbuild/bin/tools/sometools/pytest_mytool.runfiles/envoy, configfile: pytest.ini
 plugins: cov-2.11.1
@@ -372,7 +372,7 @@ Add a breakpoint anywhere in your code or tests as follows:
 breakpoint()
 ```
 
-This will drop you into the python debugger (`pdb`) at the breakpoint.
+This will drop you into the Python debugger (`pdb`) at the breakpoint.
 
 
 ### Using the `tools.base.runner.Runner` class
