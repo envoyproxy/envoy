@@ -459,9 +459,9 @@ SubstitutionFormatParser::parse(const std::string& format,
                                 const std::vector<CommandParserPtr>& commands) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
-  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
+  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%)|^%%)EOF");
 
-  for (size_t pos = 0; pos < format.length(); ++pos) {
+  for (size_t pos = 0; pos < format.length(); ++pos) { 
     if (format[pos] != '%') {
       current_token += format[pos];
       continue;
@@ -474,15 +474,25 @@ SubstitutionFormatParser::parse(const std::string& format,
 
     std::smatch m;
     const std::string search_space = format.substr(pos);
+
     if (!std::regex_search(search_space, m, command_w_args_regex)) {
       throw EnvoyException(fmt::format(
           "Incorrect configuration: {}. Couldn't find valid command at position {}", format, pos));
     }
-
+    
     const std::string match = m.str(0);
-    const std::string token = match.substr(1, match.length() - 2);
+
     pos += 1;
-    const size_t command_end_position = pos + token.length();
+
+    std::string token = "";
+    size_t command_end_position = pos;
+
+    if(match == "%%") {
+      token = match;
+    } else {
+      token = match.substr(1, match.length() - 2);
+      command_end_position += token.length();
+    }
 
     auto formatter = parseBuiltinCommand(token);
     if (formatter) {
@@ -1384,7 +1394,7 @@ ProtobufWkt::Value SystemTimeFormatter::formatValue(
 absl::optional<std::string> EscapeFormatter::format(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& __attribute__((unused)),
     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
-  return absl::nullopt;
+  return "%";
 }
 
 ProtobufWkt::Value EscapeFormatter::formatValue(
