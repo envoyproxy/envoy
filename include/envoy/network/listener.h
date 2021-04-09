@@ -91,6 +91,16 @@ public:
 using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
 
 /**
+ * Configuration for an internal listener.
+ */
+class InternalListenerConfig {
+public:
+  virtual ~InternalListenerConfig() = default;
+};
+
+using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
+
+/**
  * A configuration for an individual listener.
  */
 class ListenerConfig {
@@ -167,6 +177,11 @@ public:
    * @return the UDP configuration for the listener IFF it is a UDP listener.
    */
   virtual UdpListenerConfigOptRef udpListenerConfig() PURE;
+
+  /**
+   * @return the internal configuration for the listener IFF it is an internal listener.
+   */
+  virtual InternalListenerConfigOptRef internalListenerConfig() PURE;
 
   /**
    * @return traffic direction of the listener.
@@ -418,6 +433,8 @@ public:
 
   virtual Event::Dispatcher& dispatcher() PURE;
 };
+using InternalListenerCallbacksOptRef =
+    absl::optional<std::reference_wrapper<InternalListenerCallbacks>>;
 
 class InternalListener {};
 
@@ -427,7 +444,7 @@ using InternalListenerOptRef = absl::optional<std::reference_wrapper<InternalLis
 class InternalListenerManager {
 public:
   virtual ~InternalListenerManager() = default;
-  virtual InternalListenerOptRef
+  virtual InternalListenerCallbacksOptRef
   findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
 };
 

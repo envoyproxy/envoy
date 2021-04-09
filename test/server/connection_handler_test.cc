@@ -202,6 +202,59 @@ public:
     Event::MockDispatcher dispatcher_;
   };
 
+  // TestListener* addInternalListener(
+  //   uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
+  //     const std::string& name, Network::Listener* listener,
+  //     Network::InternalListenerCallbacks** listener_callbacks = nullptr,
+  //     std::shared_ptr<Network::MockConnectionBalancer> connection_balancer = nullptr,
+  //     Network::BalancedConnectionHandler** balanced_connection_handler = nullptr,
+  //     Network::Socket::Type socket_type = Network::Socket::Type::Stream,
+  //     std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
+  //     bool continue_on_listener_filters_timeout = false,
+  //     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
+  //         nullptr,
+  //     uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE) {
+  //   listeners_.emplace_back(std::make_unique<TestListener>(
+  //       *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
+  //       listener_filters_timeout, continue_on_listener_filters_timeout, socket_factory_,
+  //       access_log_, overridden_filter_chain_manager, tcp_backlog_size, connection_balancer));
+  //   EXPECT_CALL(*socket_factory_, socketType()).WillOnce(Return(socket_type));
+
+  //   if (listener == nullptr) {
+  //     // Expecting listener config in place update.
+  //     // If so, dispatcher would not create new network listener.
+  //     return listeners_.back().get();
+  //   }
+  //   EXPECT_CALL(*socket_factory_, getListenSocket()).WillOnce(Return(listeners_.back()->socket_));
+  //   if (socket_type == Network::Socket::Type::Stream) {
+  //     EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+  //         .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
+  //                                                         Network::TcpListenerCallbacks& cb, bool,
+  //                                                         uint32_t) -> Network::Listener* {
+  //           if (listener_callbacks != nullptr) {
+  //             *listener_callbacks = &cb;
+  //           }
+  //           return listener;
+  //         }));
+  //   } else {
+  //     EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
+  //         .WillOnce(Invoke(
+  //             [listener](Network::SocketSharedPtr&&, Network::UdpListenerCallbacks&,
+  //                        const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
+  //               return dynamic_cast<Network::UdpListener*>(listener);
+  //             }));
+  //     listeners_.back()->udp_listener_config_->listener_worker_router_ =
+  //         std::make_unique<Network::UdpListenerWorkerRouterImpl>(1);
+  //   }
+
+  //   if (balanced_connection_handler != nullptr) {
+  //     EXPECT_CALL(*connection_balancer, registerHandler(_))
+  //         .WillOnce(SaveArgAddress(balanced_connection_handler));
+  //   }
+
+  //   return listeners_.back().get();
+  // }
+
   TestListener* addListener(
       uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
       const std::string& name, Network::Listener* listener,

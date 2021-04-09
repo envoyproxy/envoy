@@ -78,6 +78,7 @@ envoy_cc_library(
         "connection_handler_impl.h",
     ],
     deps = [
+        ":active_internal_listener",
         ":active_tcp_listener",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
@@ -215,7 +216,6 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "//source/server:connection_handler_impl",
     ],
 )
 
