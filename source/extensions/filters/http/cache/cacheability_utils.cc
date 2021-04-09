@@ -32,7 +32,7 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
 }
 } // namespace
 
-bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
+bool CacheabilityUtils::CanServeRequestFromCache(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
   const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
@@ -51,7 +51,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // Cache-related headers are checked in HttpCache::LookupRequest.
   return headers.Path() && headers.Host() && !headers.getInline(authorization_handle.handle()) &&
-         (method == header_values.MethodValues.Get) &&
+         (method == header_values.MethodValues.Get || method == header_values.MethodValues.Head) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
 }

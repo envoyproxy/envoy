@@ -15,13 +15,15 @@ public:
   // This does not depend on cache-control headers as
   // request cache-control headers only decide whether
   // validation is required and whether the response can be cached.
-  static bool isCacheableRequest(const Http::RequestHeaderMap& headers);
+  static bool CanServeRequestFromCache(const Http::RequestHeaderMap& headers);
 
   // Checks if a response can be stored in cache.
   // Note that if a request is not cacheable according to 'isCacheableRequest'
   // then its response is also not cacheable.
   // Therefore, isCacheableRequest, isCacheableResponse and CacheFilter::request_allows_inserts_
   // together should cover https://httpwg.org/specs/rfc7234.html#response.cacheability.
+  // ATTOW, head requests are not cacheable. However, this function is never called for head
+  // requests.
   static bool isCacheableResponse(const Http::ResponseHeaderMap& headers,
                                   const VaryHeader& vary_allow_list);
 };
