@@ -1392,18 +1392,18 @@ ProtobufWkt::Value SystemTimeFormatter::formatValue(
 }
 
 absl::optional<std::string> EscapeFormatter::format(const Http::RequestHeaderMap&,
-                                                         const Http::ResponseHeaderMap&,
-                                                         const Http::ResponseTrailerMap&,
-                                                         const StreamInfo::StreamInfo&,
-                                                         absl::string_view) const {
+                                                    const Http::ResponseHeaderMap&,
+                                                    const Http::ResponseTrailerMap&,
+                                                    const StreamInfo::StreamInfo&,
+                                                    absl::string_view) const {
   return "%";
 }
 
 ProtobufWkt::Value EscapeFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                     const Http::ResponseHeaderMap&,
-                                                     const Http::ResponseTrailerMap&,
-                                                     const StreamInfo::StreamInfo&,
-                                                     absl::string_view) const {
+                                                const Http::ResponseHeaderMap&,
+                                                const Http::ResponseTrailerMap&,
+                                                const StreamInfo::StreamInfo&,
+                                                absl::string_view) const {
   return ValueUtil::stringValue(std::string("%"));
 }
 
