@@ -670,18 +670,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
 
-  if (cached_cluster_info_.has_value()) {
-    auto& cluster_info = cached_cluster_info_.value();
-    if (cluster_info) {
-      Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-          cluster_info->requestResponseSizeStats();
-      if (req_resp_stats.has_value()) {
-        req_resp_stats->get().upstream_rq_body_size_.recordValue(
-            filter_manager_.streamInfo().bytesReceived());
-        req_resp_stats->get().upstream_rs_body_size_.recordValue(
-            filter_manager_.streamInfo().bytesSent());
-      }
-    }
+  auto req_resp_stats = clusterRequestResponseSizeStats();
+  if (req_resp_stats.has_value()) {
+    req_resp_stats->get().upstream_rq_body_size_.recordValue(
+        filter_manager_.streamInfo().bytesReceived());
+    req_resp_stats->get().upstream_rs_body_size_.recordValue(
+        filter_manager_.streamInfo().bytesSent());
   }
 
   if (connection_manager_.remote_close_) {
@@ -778,15 +772,9 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
-  if (cached_cluster_info_.has_value()) {
-    auto& cluster_info = cached_cluster_info_.value();
-    if (cluster_info) {
-      Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-          cluster_info->requestResponseSizeStats();
-      if (req_resp_stats.has_value()) {
-        req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
-      }
-    }
+  auto req_resp_stats = clusterRequestResponseSizeStats();
+  if (req_resp_stats.has_value()) {
+    req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
   }
 
   // No response is sent back downstream for internal redirects, so don't charge downstream stats.
@@ -977,15 +965,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ASSERT(!cached_route_);
   refreshCachedRoute();
 
-  if (cached_cluster_info_.has_value()) {
-    auto& cluster_info = cached_cluster_info_.value();
-    if (cluster_info) {
-      Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-          cluster_info->requestResponseSizeStats();
-      if (req_resp_stats.has_value()) {
-        req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
-      }
-    }
+  auto req_resp_stats = clusterRequestResponseSizeStats();
+  if (req_resp_stats.has_value()) {
+    req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
   }
 
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
@@ -1573,6 +1555,18 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::cluster
   }
 
   return cached_cluster_info_.value();
+}
+
+Upstream::ClusterRequestResponseSizeStatsOptRef
+ConnectionManagerImpl::ActiveStream::clusterRequestResponseSizeStats() {
+  if (cached_cluster_info_.has_value()) {
+    auto& cluster_info = cached_cluster_info_.value();
+    if (cluster_info) {
+      return cluster_info->requestResponseSizeStats();
+    }
+  }
+
+  return absl::nullopt;
 }
 
 Router::RouteConstSharedPtr
