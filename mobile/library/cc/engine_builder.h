@@ -11,6 +11,7 @@ namespace Platform {
 
 class EngineBuilder {
 public:
+  EngineBuilder(std::string config_template);
   EngineBuilder();
 
   EngineBuilder& add_log_level(LogLevel log_level);
@@ -37,6 +38,7 @@ private:
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
+  std::string config_template_;
   std::string stats_domain_ = "0.0.0.0";
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;

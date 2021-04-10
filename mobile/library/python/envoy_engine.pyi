@@ -1,11 +1,14 @@
 from typing import Callable
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import overload
-from typing import List
 
 
 class EngineBuilder:
+    @overload
+    def __init__(self, config_template: str): ...
+    @overload
     def __init__(self): ...
     def add_log_level(self, log_level: "LogLevel") -> "EngineBuilder": ...
     def set_on_engine_running(self, on_engine_running: Callable[[], None]) -> "EngineBuilder": ...
