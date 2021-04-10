@@ -43,7 +43,6 @@ TEST(HeaderStringTest, All) {
     LowerCaseString goodbye_string("GOODBYE");
     hello_string = std::move(goodbye_string);
     EXPECT_EQ("goodbye", hello_string.get());
-    EXPECT_EQ("", goodbye_string.get());
   }
   // Static std::string constructor
   {
