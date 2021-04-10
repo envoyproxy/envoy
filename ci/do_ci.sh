@@ -407,7 +407,6 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
 
   echo "fix_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
@@ -418,7 +417,6 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
@@ -458,6 +456,10 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   # Validate repository metadata.
   "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+
+  # Run pip requirements tests
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check "${ENVOY_SRCDIR}"
+
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."

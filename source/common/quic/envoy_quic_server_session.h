@@ -17,6 +17,7 @@
 
 #include <memory>
 
+#include "common/quic/send_buffer_monitor.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
 #include "common/quic/envoy_quic_server_stream.h"
 
@@ -58,6 +59,16 @@ public:
   void OnTlsHandshakeComplete() override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  size_t WriteHeadersOnHeadersStream(
+      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
+      const spdy::SpdyStreamPrecedence& precedence,
+      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
+
+  void setHeadersWithUnderscoreAction(
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action) {
+    headers_with_underscores_action_ = headers_with_underscores_action;
+  }
 
   using quic::QuicSession::PerformActionOnActiveStreams;
 
@@ -86,6 +97,9 @@ private:
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
+
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 } // namespace Quic

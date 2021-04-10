@@ -135,7 +135,7 @@ protected:
       EXPECT_TRUE(upstream_request_->complete());
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->complete(), expect_response_complete);
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
@@ -196,6 +196,7 @@ protected:
     config_helper_.addConfigModifier(modifier);
   }
 };
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -420,7 +421,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData)
   EXPECT_TRUE(upstream_request_->complete());
 
   // Wait for complete / check body to have 3 frames joined
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response->body(), "HelloHelloHello");
 }
@@ -463,7 +464,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
   EXPECT_TRUE(upstream_request_->complete());
 
   // Wait for complete
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   // Ensure that body was actually replaced
   EXPECT_EQ(response->body(), http_body.data());
@@ -1238,7 +1239,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
       {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 };

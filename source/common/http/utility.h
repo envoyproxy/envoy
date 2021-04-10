@@ -24,12 +24,6 @@ namespace Envoy {
 namespace Http {
 namespace Utility {
 
-// This is a wrapper around dispatch calls that may throw an exception or may return an error status
-// while exception removal is in migration.
-// TODO(#10878): Remove this.
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data);
-
 /**
  * Well-known HTTP ALPN values.
  */
@@ -122,7 +116,15 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
                              const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
+namespace Http3 {
+namespace Utility {
+envoy::config::core::v3::Http3ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error);
 
+} // namespace Utility
+} // namespace Http3
 namespace Http {
 namespace Utility {
 
@@ -258,6 +260,13 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
  * @return uint64_t the response code or throws an exception if the headers are invalid.
  */
 uint64_t getResponseStatus(const ResponseHeaderMap& headers);
+
+/**
+ * Get the response status from the response headers.
+ * @param headers supplies the headers to get the status from.
+ * @return absl::optional<uint64_t> the response code or absl::nullopt if the headers are invalid.
+ */
+absl::optional<uint64_t> getResponseStatusNoThrow(const ResponseHeaderMap& headers);
 
 /**
  * Determine whether these headers are a valid Upgrade request or response.

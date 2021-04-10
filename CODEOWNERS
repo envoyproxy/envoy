@@ -166,6 +166,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
+# environment generic input
+/*/extensions/matching/common_inputs/environment @snowp @donyu
 # user space socket pair and event
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
 # Default UUID4 request ID extension

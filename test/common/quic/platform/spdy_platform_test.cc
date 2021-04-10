@@ -26,24 +26,11 @@ namespace Quiche {
 namespace {
 
 TEST(SpdyPlatformTest, SpdyBugTracker) {
-  EXPECT_DEBUG_DEATH(SPDY_BUG << "Here is a bug,", " bug");
-  EXPECT_DEBUG_DEATH(SPDY_BUG_IF(true) << "There is a bug,", " bug");
-  EXPECT_LOG_NOT_CONTAINS("error", "", SPDY_BUG_IF(false) << "A feature is not a bug.");
+  EXPECT_DEBUG_DEATH(SPDY_BUG(bug_id) << "Here is a bug,", " bug");
+  EXPECT_DEBUG_DEATH(SPDY_BUG_IF(bug_id, true) << "There is a bug,", " bug");
+  EXPECT_LOG_NOT_CONTAINS("error", "", SPDY_BUG_IF(bug_id, false) << "A feature is not a bug.");
 
   EXPECT_EQ(true, FLAGS_spdy_always_log_bugs_for_tests);
-}
-
-TEST(SpdyPlatformTest, SpdyHashMap) {
-  spdy::SpdyHashMap<std::string, int> hmap;
-  hmap.insert({"foo", 2});
-  EXPECT_EQ(2, hmap["foo"]);
-}
-
-TEST(SpdyPlatformTest, SpdyHashSet) {
-  spdy::SpdyHashSet<std::string, spdy::SpdyHash<std::string>, std::equal_to<std::string>> hset(
-      {"foo", "bar"});
-  EXPECT_EQ(1, hset.count("bar"));
-  EXPECT_EQ(0, hset.count("qux"));
 }
 
 TEST(SpdyPlatformTest, SpdyEstimateMemoryUsage) {
@@ -79,7 +66,7 @@ TEST(SpdyPlatformTest, SpdyString) {
 }
 
 TEST(SpdyPlatformTest, SpdyTestHelpers) {
-  auto bug = [](const char* error_message) { SPDY_BUG << error_message; };
+  auto bug = [](const char* error_message) { SPDY_BUG(bug_id) << error_message; };
 
   EXPECT_SPDY_BUG(bug("bug one is expected"), "bug one");
   EXPECT_SPDY_BUG(bug("bug two is expected"), "bug two");

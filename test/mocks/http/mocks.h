@@ -96,6 +96,7 @@ public:
   MOCK_METHOD(const Router::RouteEntry::UpgradeMap*, upgradeMap, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback& cb));
+  MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
@@ -106,6 +107,7 @@ public:
   MOCK_METHOD(void, onLocalReply, (Code code));
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(bool, enableInternalRedirectsWithBody, (), (const));
 
   ResponseHeaderMapPtr continue_headers_;
   ResponseHeaderMapPtr response_headers_;
@@ -204,6 +206,7 @@ public:
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback&));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
+  MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
@@ -291,6 +294,7 @@ public:
   MOCK_METHOD(bool, canRequestRouteConfigUpdate, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback&));
+  MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());

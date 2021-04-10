@@ -135,6 +135,8 @@ class StructFormatter {
 public:
   StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                   bool omit_empty_values);
+  StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                  bool omit_empty_values, const std::vector<CommandParserPtr>& commands);
 
   ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& response_headers,
@@ -168,9 +170,19 @@ private:
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
 
   // Methods for building the format map.
-  std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
-  StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
-  StructFormatListWrapper toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+  class FormatBuilder {
+  public:
+    explicit FormatBuilder(const std::vector<CommandParserPtr>& commands) : commands_(commands) {}
+    explicit FormatBuilder() : commands_(absl::nullopt) {}
+    std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
+    StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
+    StructFormatListWrapper
+    toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+
+  private:
+    using CommandsRef = std::reference_wrapper<const std::vector<CommandParserPtr>>;
+    const absl::optional<CommandsRef> commands_;
+  };
 
   // Methods for doing the actual formatting.
   ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,
@@ -189,8 +201,9 @@ private:
   const bool omit_empty_values_;
   const bool preserve_types_;
   const std::string empty_value_;
+
   const StructFormatMapWrapper struct_output_format_;
-}; // namespace Formatter
+};
 
 using StructFormatterPtr = std::unique_ptr<StructFormatter>;
 
@@ -199,6 +212,9 @@ public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                     bool omit_empty_values)
       : struct_formatter_(format_mapping, preserve_types, omit_empty_values) {}
+  JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                    bool omit_empty_values, const std::vector<CommandParserPtr>& commands)
+      : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
