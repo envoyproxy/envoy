@@ -29,3 +29,30 @@ alias(
     name = "jni",
     actual = "@bazel_tools//tools/jdk:jni",
 )
+
+# autoformat requires that there be no @bazel_tools references outside of //bazel,
+# so we alias all of the relevant platforms for determining wheel packaging here
+alias(
+    name = "darwin_arm64",
+    actual = "@bazel_tools//src/conditions:darwin_arm64",
+)
+
+alias(
+    name = "darwin_x86_64",
+    actual = "@bazel_tools//src/conditions:darwin_x86_64",
+)
+
+alias(
+    name = "darwin",
+    actual = "@bazel_tools//src/conditions:darwin",
+)
+
+alias(
+    name = "linux_aarch64",
+    actual = "@bazel_tools//src/conditions:linux_aarch64",
+)
+
+alias(
+    name = "linux_x86_64",
+    actual = "@bazel_tools//src/conditions:linux_x86_64",
+)
