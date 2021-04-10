@@ -1,5 +1,6 @@
 #include "common/quic/quic_filter_manager_connection_impl.h"
 
+#include <initializer_list>
 #include <memory>
 
 namespace Envoy {
@@ -63,6 +64,11 @@ bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
   if (quic_connection_ == nullptr) {
     // Already detached from quic connection.
+    return;
+  }
+  if (!initialized_) {
+    // Delay close till the first OnCanWrite() call.
+    delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     return;
   }
   const bool delayed_close_timeout_configured = delayed_close_timeout_.count() > 0;

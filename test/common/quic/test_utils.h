@@ -39,6 +39,11 @@ public:
     crypto_stream_ = std::make_unique<quic::test::MockQuicCryptoStream>(this);
   }
 
+  void Initialize() override {
+    quic::QuicSpdySession::Initialize();
+    initialized_ = true;
+  }
+
   // From QuicSession.
   MOCK_METHOD(quic::QuicSpdyStream*, CreateIncomingStream, (quic::QuicStreamId id));
   MOCK_METHOD(quic::QuicSpdyStream*, CreateIncomingStream, (quic::PendingStream * pending));

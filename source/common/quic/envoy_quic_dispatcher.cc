@@ -68,6 +68,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   const Network::FilterChain* filter_chain =
       getFilterChain(listen_socket_.ioHandle(), listener_config_.filterChainManager(), self_address,
                      peer_address, std::string(sni), alpn);
+  ASSERT(filter_chain);
   if (filter_chain != nullptr) {
     const bool has_filter_initialized =
         listener_config_.filterChainFactory().createNetworkFilterChain(

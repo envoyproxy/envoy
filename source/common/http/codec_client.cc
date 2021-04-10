@@ -171,6 +171,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
+
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(

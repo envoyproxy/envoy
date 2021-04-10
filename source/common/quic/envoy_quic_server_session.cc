@@ -14,11 +14,11 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     std::unique_ptr<EnvoyQuicConnection> connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit, Network::ListenerConfig& listener_config)
+    uint32_t send_buffer_limit, Network::ListenerConfig& /*listener_config*/)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
-      quic_connection_(std::move(connection)), listener_config_(listener_config) {}
+      quic_connection_(std::move(connection)) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -86,6 +86,7 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 
 void EnvoyQuicServerSession::Initialize() {
   quic::QuicServerSessionBase::Initialize();
+  initialized_ = true;
   quic_connection_->setEnvoyConnection(*this);
 }
 
@@ -106,7 +107,6 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
   if (level != quic::ENCRYPTION_FORWARD_SECURE) {
     return;
   }
-  // maybeCreateNetworkFilters();
   // This is only reached once, when handshake is done.
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
@@ -116,20 +116,6 @@ bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
-}
-
-void EnvoyQuicServerSession::maybeCreateNetworkFilters() {
-  ASSERT(!filters_created_);
-  filters_created_ = true;
-  auto proof_source_details =
-      dynamic_cast<const EnvoyQuicProofSourceDetails*>(GetCryptoStream()->ProofSourceDetails());
-  ASSERT(proof_source_details != nullptr,
-         "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.");
-
-  const bool has_filter_initialized =
-      listener_config_.filterChainFactory().createNetworkFilterChain(
-          *this, proof_source_details->filterChain().networkFilterFactories());
-  ASSERT(has_filter_initialized);
 }
 
 size_t EnvoyQuicServerSession::WriteHeadersOnHeadersStream(

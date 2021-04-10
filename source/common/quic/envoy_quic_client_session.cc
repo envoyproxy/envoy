@@ -38,6 +38,7 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 
 void EnvoyQuicClientSession::Initialize() {
   quic::QuicSpdyClientSession::Initialize();
+  initialized_ = true;
   quic_connection_->setEnvoyConnection(*this);
 }
 

@@ -230,6 +230,7 @@ const Network::FilterChain* getFilterChain(Network::IoHandle& io_handle,
                                            const quic::QuicSocketAddress& self_address,
                                            const quic::QuicSocketAddress& peer_address,
                                            const std::string& hostname, std::string_view alpn) {
+  std::cerr << "============ getFilterChain\n";
   Network::ConnectionSocketImpl connection_socket(std::make_unique<QuicIoHandleWrapper>(io_handle),
                                                   quicAddressToEnvoyAddressInstance(self_address),
                                                   quicAddressToEnvoyAddressInstance(peer_address));
@@ -237,6 +238,7 @@ const Network::FilterChain* getFilterChain(Network::IoHandle& io_handle,
       Extensions::TransportSockets::TransportProtocolNames::get().Quic);
   connection_socket.setRequestedServerName(hostname);
   connection_socket.setRequestedApplicationProtocols({alpn});
+  std::cerr << "============ findFilterChain\n";
   return filter_chain_manager.findFilterChain(connection_socket);
 }
 

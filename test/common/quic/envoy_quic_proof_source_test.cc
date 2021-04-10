@@ -149,7 +149,7 @@ public:
                     *connection_socket.addressProvider().remoteAddress());
           EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                     connection_socket.detectedTransportProtocol());
-          EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+          EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
         }));
     EXPECT_CALL(filter_chain_, transportSocketFactory())
@@ -225,7 +225,7 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoCertConfig) {
                   *connection_socket.addressProvider().remoteAddress());
         EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                   connection_socket.detectedTransportProtocol());
-        EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+        EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
         return &filter_chain_;
       }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())

@@ -800,29 +800,8 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
   http_connection_->goAway();
 }
 
-TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
-  read_filter_ = std::make_shared<Network::MockReadFilter>();
-  Network::MockFilterChain filter_chain;
-  crypto_stream_->setProofSourceDetails(
-      std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain));
-  std::vector<Network::FilterFactoryCb> filter_factory{[this](
-                                                           Network::FilterManager& filter_manager) {
-    filter_manager.addReadFilter(read_filter_);
-    read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
-    read_filter_->callbacks_->connection().setConnectionStats(
-        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
-  }};
-  EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
-  EXPECT_CALL(*read_filter_, onNewConnection())
-      // Stop iteration to avoid calling getRead/WriteBuffer().
-      .WillOnce(Return(Network::FilterStatus::StopIteration));
-  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const std::vector<Network::FilterFactoryCb>& filter_factories) {
-        EXPECT_EQ(1u, filter_factories.size());
-        Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
-        return true;
-      }));
+TEST_P(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
+  installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
   if (!quic_version_[0].UsesTls()) {
     envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);

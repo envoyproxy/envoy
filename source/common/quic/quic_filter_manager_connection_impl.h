@@ -73,13 +73,14 @@ public:
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
-    if (quic_connection_ != nullptr && quic_connection_->connected()) {
+    if (!initialized_ || (quic_connection_ != nullptr && quic_connection_->connected())) {
       return Network::Connection::State::Open;
     }
     return Network::Connection::State::Closed;
   }
   bool connecting() const override {
-    if (quic_connection_ != nullptr && !quic_connection_->IsHandshakeComplete()) {
+    if (!initialized_ ||
+        (quic_connection_ != nullptr && !quic_connection_->IsHandshakeComplete())) {
       return true;
     }
     return false;
@@ -143,6 +144,8 @@ protected:
   absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
   absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
       http3_options_;
+  // If false, do not call into quic_connection_.
+  bool initialized_{false};
 
 private:
   friend class Envoy::TestPauseFilterForQuic;

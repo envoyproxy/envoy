@@ -90,14 +90,11 @@ protected:
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
-  void maybeCreateNetworkFilters();
 
   std::unique_ptr<EnvoyQuicConnection> quic_connection_;
-  Network::ListenerConfig& listener_config_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
-  bool filters_created_{false};
 
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
