@@ -47,6 +47,7 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def("terminate", &Engine::terminate);
 
   py::class_<EngineBuilder, EngineBuilderSharedPtr>(m, "EngineBuilder")
+      .def(py::init<std::string>())
       .def(py::init<>())
       .def("add_log_level", &EngineBuilder::add_log_level)
       .def("set_on_engine_running", &Envoy::Python::EngineBuilder::set_on_engine_running_shim)

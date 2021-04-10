@@ -5,7 +5,8 @@
 namespace Envoy {
 namespace Platform {
 
-EngineBuilder::EngineBuilder() {}
+EngineBuilder::EngineBuilder(std::string config_template) : config_template_(config_template) {}
+EngineBuilder::EngineBuilder() : EngineBuilder(std::string(config_template)) {}
 
 EngineBuilder& EngineBuilder::add_log_level(LogLevel log_level) {
   this->log_level_ = log_level;
@@ -77,7 +78,7 @@ EngineSharedPtr EngineBuilder::build() {
       {"{{ virtual_clusters }}", this->virtual_clusters_},
   };
 
-  std::string config_str(config_template);
+  std::string config_str = this->config_template_;
   for (const auto& pair : replacements) {
     const auto& key = pair.first;
     const auto& value = pair.second;
