@@ -21,7 +21,7 @@ Example plugin configuration:
           "@type": type.googleapis.com/google.protobuf.StringValue
           value: |
             {
-              "my_config_value": "value"
+              "my_config_value": "my_value"
             }
         vm_config:
           runtime: "envoy.wasm.runtime.v8"
