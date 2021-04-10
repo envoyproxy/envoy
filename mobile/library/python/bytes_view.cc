@@ -4,20 +4,16 @@ namespace Envoy {
 namespace Python {
 
 struct EnvoyDataViewContext {
-  const py::bytes& handle;
+  py::bytes handle;
 };
 
 static void release_envoy_data_view(void* context) {
   auto envoy_data_view_context = static_cast<EnvoyDataViewContext*>(context);
-  envoy_data_view_context->handle.dec_ref();
+  delete envoy_data_view_context;
 }
 
-envoy_data py_bytes_as_envoy_data(const py::bytes& bytes) {
-  auto context = new EnvoyDataViewContext{
-      .handle = bytes,
-  };
-  bytes.inc_ref();
-
+envoy_data py_bytes_as_envoy_data(py::bytes bytes) {
+  auto context = new EnvoyDataViewContext{bytes};
   py::buffer_info info(py::buffer(bytes).request());
   return envoy_data{
       .length = static_cast<size_t>(info.itemsize * info.size),
