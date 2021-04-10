@@ -86,8 +86,10 @@ public:
 
     /**
      * Called when the DNS cache load is complete (or failed).
+     *
+     * @param host_info the DnsHostInfo for the resolved host.
      */
-    virtual void onLoadDnsCacheComplete() PURE;
+    virtual void onLoadDnsCacheComplete(const DnsHostInfoSharedPtr& host_info) PURE;
   };
 
   /**
@@ -160,6 +162,7 @@ public:
   struct LoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandlePtr handle_;
+    absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,

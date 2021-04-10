@@ -164,6 +164,18 @@ enum class FilterMetadataStatus {
 };
 
 /**
+ * Return codes for onLocalReply filter invocations.
+ */
+enum class LocalErrorStatus {
+  // Continue sending the local reply after onLocalError has been sent to all filters.
+  Continue,
+
+  // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
+  // informed rather than sending the local reply.
+  ContinueAndResetStream,
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -212,6 +224,24 @@ public:
    * resolution or make it an independent entity like filters that gets called on route resolution.
    */
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
+
+  /**
+   * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
+   *
+   * Similar to route(const Router::RouteCallback& cb), this route that is set will be
+   * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
+   * of the filter chain.
+   *
+   * NOTE: Passing nullptr in as the route parameter is equivalent to route resolution being
+   * attempted and failing to find a route. An example of when this happens is when
+   * RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers, const
+   * StreamInfo::StreamInfo& stream_info, uint64_t random_value) returns nullptr during a
+   * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
+   * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
+   * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
+   * absl::optional ptrs instead of null ptrs.
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
 
   /**
    * Returns the clusterInfo for the cached route.
@@ -596,6 +626,36 @@ public:
    * @param action the resulting match action
    */
   virtual void onMatchCallback(const Matcher::Action&) {}
+
+  struct LocalReplyData {
+    // The error code which (barring reset) will be sent to the client.
+    Http::Code code_;
+    // The details of why a local reply is being sent.
+    absl::string_view details_;
+    // True if a reset will occur rather than the local reply (some prior filter
+    // has returned ContinueAndResetStream)
+    bool reset_imminent_;
+  };
+
+  /**
+   * Called after sendLocalReply is called, and before any local reply is
+   * serialized either to filters, or downstream.
+   * This will be called on both encoder and decoder filters starting at the
+   * terminal filter (generally the router filter) and working towards the first filter configured.
+   *
+   * Note that in some circumstances, onLocalReply may be called more than once
+   * for a given stream, because it is possible that a filter call
+   * sendLocalReply while processing the original local reply response.
+   *
+   * Filters implementing onLocalReply are responsible for never calling sendLocalReply
+   * from onLocalReply, as that has the potential for looping.
+   *
+   * @param data data associated with the sendLocalReply call.
+   * @param LocalErrorStatus the action to take after onLocalError completes.
+   */
+  virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
+    return LocalErrorStatus::Continue;
+  }
 };
 
 /**
@@ -898,7 +958,9 @@ public:
   virtual ~HttpMatchingData() = default;
 
   virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;
+  virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
+  virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
 };
 
 /**

@@ -7,6 +7,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -303,6 +304,7 @@ envoy_cc_test(
     srcs = ["load_balancer_simulation_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -522,6 +524,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/common:random_generator_lib",
         "//source/common/memory:stats_lib",
         "//source/common/upstream:maglev_lb_lib",
         "//source/common/upstream:ring_hash_lb_lib",
@@ -589,6 +592,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         ":utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -621,7 +625,9 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_transport_socket_factory_lib",
+    ]),
 )
 
 envoy_cc_test_library(

@@ -11,7 +11,7 @@ static_resources:
           route_config:
             virtual_hosts:
             - name: default
-              domains: "*"
+              domains: ["*"]
               routes:
               - match: { prefix: "/" }
                 route:
@@ -47,11 +47,11 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         common_tls_context:
           tls_certificates:
-            certificate_chain: { "filename": "certs/servercert.pem" }
+          - certificate_chain: { "filename": "certs/servercert.pem" }
             private_key: { "filename": "certs/serverkey.pem" }
             ocsp_staple: { "filename": "certs/server_ocsp_resp.der" }
           validation_context:
             match_subject_alt_names:
-              exact: "foo"
+            - exact: "foo"
             trusted_ca:
               filename: /etc/ssl/certs/ca-certificates.crt

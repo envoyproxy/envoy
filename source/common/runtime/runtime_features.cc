@@ -16,7 +16,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
         feature);
   }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), debug,
                       "Unable to use runtime singleton for feature {}", feature);
   return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
 }
@@ -27,7 +27,7 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
         std::string(feature), default_value);
   }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), debug,
                       "Unable to use runtime singleton for feature {}", feature);
   return default_value;
 }
@@ -62,33 +62,42 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
+    "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
+    "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
+    "envoy.reloadable_features.enable_compression_without_content_length_header",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
+    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
+    "envoy.reloadable_features.hash_multiple_header_values",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
-    "envoy.reloadable_features.http_default_alpn",
     "envoy.reloadable_features.http_match_on_all_headers",
     "envoy.reloadable_features.http_set_copy_replace_all_headers",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http_upstream_wait_connect_response",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
+    "envoy.reloadable_features.improved_stream_limit_handling",
+    "envoy.reloadable_features.internal_redirects_with_body",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
-    "envoy.reloadable_features.preserve_query_string_in_path_redirects",
+    "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_ocsp_response_for_must_staple_certs",
-    "envoy.reloadable_features.stop_faking_paths",
+    "envoy.reloadable_features.return_502_for_upstream_protocol_errors",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.tls_use_io_handle_bio",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
+    "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.vhds_heartbeats",
+    "envoy.reloadable_features.wasm_cluster_name_envoy_grpc",
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
+    "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 };
 
 // This is a section for officially sanctioned runtime features which are too
@@ -100,10 +109,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // TODO(#14890) flip once this has been validated in prod.
-    "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     // v2 is fatal-by-default.
-    "envoy.reloadable_features.enable_deprecated_v2_api",
+    "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",

@@ -11,11 +11,18 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "ext_proc",
-    srcs = ["ext_proc.cc"],
-    hdrs = ["ext_proc.h"],
+    srcs = [
+        "ext_proc.cc",
+        "processor_state.cc",
+    ],
+    hdrs = [
+        "ext_proc.h",
+        "processor_state.h",
+    ],
     deps = [
         ":client_interface",
         ":mutation_utils_lib",
+        "//include/envoy/event:timer_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stats:stats_macros",
@@ -56,6 +63,7 @@ envoy_cc_library(
     srcs = ["mutation_utils.cc"],
     hdrs = ["mutation_utils.h"],
     deps = [
+        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:header_map_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",

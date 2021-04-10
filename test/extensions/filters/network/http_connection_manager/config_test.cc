@@ -7,10 +7,10 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/http/request_id_extension_uuid_impl.h"
 #include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
+#include "extensions/request_id/uuid/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
@@ -174,6 +174,40 @@ http_filters:
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, Http3Configured) {
+  const std::string yaml_string = R"EOF(
+codec_type: http3
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+#ifdef ENVOY_ENABLE_QUIC
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException, "HTTP3 configured but not enabled in the build.");
+#endif
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
@@ -1618,11 +1652,13 @@ public:
 
   void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  bool modBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) override { return false; }
-  Http::TraceStatus getTraceStatus(const Http::RequestHeaderMap&) override {
-    return Http::TraceStatus::Sampled;
+  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
   }
-  void setTraceStatus(Http::RequestHeaderMap&, Http::TraceStatus) override {}
+  Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
+    return Tracing::Reason::Sampling;
+  }
+  void setTraceReason(Http::RequestHeaderMap&, Tracing::Reason) override {}
 
   std::string testField() { return config_.test_field(); }
 
@@ -1699,7 +1735,6 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   stat_prefix: ingress_http
   route_config:
     name: local_route
-  request_id_extension: {}
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1708,9 +1743,33 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  auto request_id_extension =
-      dynamic_cast<Http::UUIDRequestIDExtension*>(config.requestIDExtension().get());
+  auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
+      config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
+  EXPECT_TRUE(request_id_extension->packTraceReason());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  request_id_extension:
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
+      pack_trace_reason: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
+      config.requestIDExtension().get());
+  ASSERT_NE(nullptr, request_id_extension);
+  EXPECT_FALSE(request_id_extension->packTraceReason());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {

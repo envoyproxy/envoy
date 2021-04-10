@@ -45,6 +45,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/shared_pool/shared_pool.h"
@@ -561,6 +562,9 @@ public:
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
     return http_protocol_options_->http2_options_;
   }
+  const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const override {
+    return http_protocol_options_->http3_options_;
+  }
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
@@ -596,6 +600,7 @@ public:
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   const std::string& name() const override { return name_; }
+  const std::string& observabilityName() const override { return observability_name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   ClusterStats& stats() const override { return stats_; }
@@ -650,6 +655,13 @@ public:
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
+  Http::Http3::CodecStats& http3CodecStats() const override;
+
+protected:
+  // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
+  // budget message is specified, defaults will be filled in if either params are unspecified.
+  static std::pair<absl::optional<double>, absl::optional<uint32_t>>
+  getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
 private:
   struct ResourceManagers {
@@ -676,6 +688,7 @@ private:
 
   Runtime::Loader& runtime_;
   const std::string name_;
+  const std::string observability_name_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
@@ -721,6 +734,7 @@ private:
   std::vector<Network::FilterFactoryCb> filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
 };
 
 /**

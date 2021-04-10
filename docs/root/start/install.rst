@@ -119,14 +119,26 @@ You can install Envoy on Mac OSX using the official brew repositories, or from
 
       .. code-block:: console
 
-	 $ brew tap tetratelabs/getenvoy
-	 $ brew install envoy
+         $ brew tap tetratelabs/getenvoy
+         $ brew install envoy
 
       .. tip::
 
-	 You can install the ``nightly`` version from
-	 `Get Envoy <https://www.getenvoy.io/>`__ by adding the ``--HEAD`` flag to
-	 the install command.
+         You can install the ``nightly`` version from
+         `Get Envoy <https://www.getenvoy.io/>`__ by adding the ``--HEAD`` flag to
+         the install command.
+
+.. _start_install_windows:
+
+Install Envoy on Windows
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can run Envoy using the official Windows development Docker image.
+
+.. code-block:: console
+
+   $ docker pull envoyproxy/envoy-windows-dev:latest
+   $ docker run --rm envoyproxy/envoy-windows-dev:latest --version
 
 .. _start_install_docker:
 
@@ -144,20 +156,20 @@ The following commands will pull and show the Envoy version of current images.
 
       .. substitution-code-block:: console
 
-	 $ docker pull envoyproxy/|envoy_docker_image|
-	 $ docker run --rm envoyproxy/|envoy_docker_image| --version
+         $ docker pull envoyproxy/|envoy_docker_image|
+         $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
    .. tab:: Get Envoy
 
       .. code-block:: console
 
-	 $ docker pull getenvoy/envoy:stable
-	 $ docker run --rm getenvoy/envoy:stable --version
+         $ docker pull getenvoy/envoy:stable
+         $ docker run --rm getenvoy/envoy:stable --version
 
       .. tip::
 
-	 To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
-	 replace the word ``stable`` with ``nightly`` in the above commands.
+         To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
+         replace the word ``stable`` with ``nightly`` in the above commands.
 
 .. _install_binaries:
 
@@ -166,11 +178,71 @@ Pre-built Envoy Docker images
 
 The following table shows the available Docker images
 
-.. csv-table::
-   :widths: 30 38 8 8 8 8
+.. list-table::
+   :widths: auto
    :header-rows: 2
    :stub-columns: 1
-   :file: _include/dockerhub-images.csv
+
+   * -
+     -
+     - stable
+     - stable
+     - main
+     - main
+   * - Docker image
+     - Description
+     - amd64
+     - arm64
+     - amd64
+     - arm64
+   * - `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+     -
+   * - `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
+   * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     -
+     -
+     - latest
+     -
+   * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
+   * - `envoyproxy/envoy-windows-dev <https://hub.docker.com/r/envoyproxy/envoy-windows-dev/tags/>`_
+     - Release binary with symbols stripped on top of a Windows 1809 base.
+     -
+     -
+     - latest
+     -
+   * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
+     - Build image which includes tools for building multi-arch Envoy and containers.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
 
 .. note::
 

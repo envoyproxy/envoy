@@ -49,6 +49,10 @@ typed_config:
       value: ""
     vm_config:
       vm_id: "my_vm_id"
+      environment_variables:
+        host_env_keys: ["NON_EXIST"]
+        key_values:
+          KEY: VALUE
       runtime: "envoy.wasm.runtime.{}"
       code:
         local:
@@ -69,6 +73,12 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmIntegrationTest,
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmIntegrationTest);
 
 TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   initialize();
   ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, wasm_connection_));
 

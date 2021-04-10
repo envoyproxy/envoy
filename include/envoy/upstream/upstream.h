@@ -541,6 +541,7 @@ public:
   COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
   COUNTER(upstream_cx_http1_total)                                                                 \
   COUNTER(upstream_cx_http2_total)                                                                 \
+  COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \
@@ -764,6 +765,12 @@ public:
   virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
 
   /**
+   * @return const envoy::config::core::v3::Http3ProtocolOptions& for HTTP/3 connections
+   * created on behalf of this cluster. @see envoy::config::core::v3::Http3ProtocolOptions.
+   */
+  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
+
+  /**
    * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
    */
   virtual const envoy::config::core::v3::HttpProtocolOptions&
@@ -860,6 +867,14 @@ public:
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the observability name associated to the cluster. Used in stats, tracing, logging, and
+   * config dumps. The observability name is configured with :ref:`alt_stat_name
+   * <envoy_api_field_config.cluster.v3.Cluster.alt_stat_name>`. If unprovided, the default value is
+   * the cluster name.
+   */
+  virtual const std::string& observabilityName() const PURE;
 
   /**
    * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at
@@ -979,6 +994,11 @@ public:
    * @return the Http2 Codec Stats.
    */
   virtual Http::Http2::CodecStats& http2CodecStats() const PURE;
+
+  /**
+   * @return the Http3 Codec Stats.
+   */
+  virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
 
 protected:
   /**

@@ -86,6 +86,7 @@ envoy_extension_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/transport_sockets/alts:config",
+        "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/integration:http_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",

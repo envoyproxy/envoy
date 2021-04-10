@@ -15,7 +15,6 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-REGISTER_FACTORY(HttpRequestHeadersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
 REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory);
 
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
@@ -182,7 +181,10 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
-    } else if (complete() && !hasTrailers() && !bufferedData()) {
+    } else if (complete() && !hasTrailers() && !bufferedData() &&
+               // If the stream is destroyed, no need to handle the data buffer or trailers.
+               // This can occur if the filter calls sendLocalReply.
+               !parent_.state_.destroyed_) {
       // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
       // byte data frame, we need to create an empty buffer to make sure that when commonContinue
       // is called, the pipeline resumes with an empty data frame with end_stream = true
@@ -240,12 +242,15 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::route(const Router::RouteCal
   return parent_.filter_manager_callbacks_.route(cb);
 }
 
+void ActiveStreamFilterBase::setRoute(Router::RouteConstSharedPtr route) {
+  parent_.filter_manager_callbacks_.setRoute(std::move(route));
+}
+
 void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
 }
 
-void FilterMatchState::evaluateMatchTreeWithNewData(
-    std::function<void(HttpMatchingDataImpl&)> update_func) {
+void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
   if (match_tree_evaluated_ || !matching_data_) {
     return;
   }
@@ -491,10 +496,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->filter_match_state_) {
-      (*entry)->filter_match_state_->evaluateMatchTreeWithNewData(
-          [&](auto& matching_data) { matching_data.onRequestHeaders(headers); });
-    }
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onRequestHeaders(headers); });
 
     if ((*entry)->skipFilter()) {
       continue;
@@ -508,9 +511,6 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "decodeHeaders when end_stream is already false");
-    ENVOY_BUG(
-        !state_.local_complete_ || status == FilterHeadersStatus::StopIteration,
-        "Filters should return FilterHeadersStatus::StopIteration after sending a local reply.");
 
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
@@ -518,8 +518,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     (*entry)->decode_headers_called_ = true;
 
-    const auto continue_iteration =
-        (*entry)->commonHandleAfterHeadersCallback(status, end_stream) && !state_.local_complete_;
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
+    ENVOY_BUG(!continue_iteration || !state_.local_complete_,
+              "Filter did not return StopAll or StopIteration after sending a local reply.");
 
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
@@ -539,7 +540,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
+    if ((!continue_iteration || state_.local_complete_) &&
+        std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
@@ -714,6 +716,9 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onRequestTrailers(trailers); });
+
     if ((*entry)->skipFilter()) {
       continue;
     }
@@ -812,10 +817,23 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   return std::next(filter->entry());
 }
 
+void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+  state_.under_on_local_reply_ = true;
+  filter_manager_callbacks_.onLocalReply(data.code_);
+
+  for (auto entry : filters_) {
+    if (entry->onLocalReply(data) == LocalErrorStatus::ContinueAndResetStream) {
+      data.reset_imminent_ = true;
+    }
+  }
+  state_.under_on_local_reply_ = false;
+}
+
 void FilterManager::sendLocalReply(
     bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   bool is_grpc_request = old_was_grpc_request;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
@@ -824,7 +842,14 @@ void FilterManager::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
 
-  filter_manager_callbacks_.onLocalReply(code);
+  StreamFilterBase::LocalReplyData data{code, details, false};
+  FilterManager::onLocalReply(data);
+  if (data.reset_imminent_) {
+    ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
+                     details);
+    filter_manager_callbacks_.resetStream();
+    return;
+  }
 
   if (!filter_manager_callbacks_.responseHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
@@ -1001,10 +1026,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
   for (; entry != encoder_filters_.end(); entry++) {
-    if ((*entry)->filter_match_state_) {
-      (*entry)->filter_match_state_->evaluateMatchTreeWithNewData(
-          [&headers](auto& matching_data) { matching_data.onResponseHeaders(headers); });
-    }
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&headers](auto& matching_data) { matching_data.onResponseHeaders(headers); });
+
     if ((*entry)->skipFilter()) {
       continue;
     }
@@ -1198,6 +1222,13 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onResponseTrailers(trailers); });
+
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
+
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -1347,7 +1378,8 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
+  if (!complete() ||
+      (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
     return false;
   }
 

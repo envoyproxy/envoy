@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
@@ -641,7 +642,7 @@ public:
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
-        options_(c.options()) {}
+        options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -654,9 +655,29 @@ public:
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
-    // Not used.
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+
+  AccessLog::AccessLogManager& accessLogManager() override {
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return message_validation_visitor_;
+  }
+
+  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  Init::Manager& initManager() override {
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   Api::Api& api() override { return api_; }
 
 private:
@@ -670,11 +691,13 @@ private:
   ThreadLocal::SlotAllocator& tls_;
   Api::Api& api_;
   const Server::Options& options_;
+  ProtobufMessage::ValidationVisitor& message_validation_visitor_;
 };
 
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
-              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options) {
+              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options,
+              ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (options) {
     return std::move(options);
   }
@@ -695,7 +718,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                  config.upstream_http_protocol_options())
            : absl::nullopt),
       config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-      config.has_http2_protocol_options());
+      config.has_http2_protocol_options(), validation_visitor);
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -703,11 +726,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : runtime_(runtime), name_(config.name()), type_(config.type()),
+    : runtime_(runtime), name_(config.name()),
+      observability_name_(PROTOBUF_GET_STRING_OR_DEFAULT(config, alt_stat_name, name_)),
+      type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
-          createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
-                                    "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"))),
+          createOptions(config,
+                        extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
+                            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
+                        factory_context.messageValidationVisitor())),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -944,9 +971,17 @@ ClusterImplBase::ClusterImplBase(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
   }
-  if ((info_->features() & ClusterInfoImpl::Features::HTTP3)) {
-    throw EnvoyException(
-        fmt::format("HTTP3 not yet supported: {}", cluster.name(), cluster.DebugString()));
+
+  if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
+#if defined(ENVOY_ENABLE_QUIC)
+    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+      throw EnvoyException(
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
+                      cluster.DebugString()));
+    }
+#else
+    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+#endif
   }
 
   // Create the default (empty) priority set before registering callbacks to
@@ -1139,9 +1174,9 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
 
 const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
-  try {
-    return Network::Address::resolveProtoAddress(address);
-  } catch (EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
+  END_TRY
+  catch (EnvoyException& e) {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
         info_->type() == envoy::config::cluster::v3::Cluster::EDS) {
       throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
@@ -1221,6 +1256,28 @@ Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
 }
 
+Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
+}
+
+std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(
+    const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
+  constexpr double default_budget_percent = 20.0;
+  constexpr uint32_t default_retry_concurrency = 3;
+
+  absl::optional<double> budget_percent;
+  absl::optional<uint32_t> min_retry_concurrency;
+  if (thresholds.has_retry_budget()) {
+    // The budget_percent and min_retry_concurrency values are only set if there is a retry budget
+    // message set in the cluster config.
+    budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(thresholds.retry_budget(), budget_percent,
+                                                     default_budget_percent);
+    min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        thresholds.retry_budget(), min_retry_concurrency, default_retry_concurrency);
+  }
+  return std::make_pair(budget_percent, min_retry_concurrency);
+}
+
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
@@ -1270,19 +1327,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     track_remaining = it->track_remaining();
     max_connection_pools =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
-    if (it->has_retry_budget()) {
-      // The budget_percent and min_retry_concurrency values do not set defaults like the other
-      // members of the 'threshold' message, because the behavior of the retry circuit breaker
-      // changes depending on whether it has been configured. Therefore, it's necessary to manually
-      // check if the threshold message has a retry budget configured and only set the values if so.
-      budget_percent = it->retry_budget().has_budget_percent()
-                           ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), budget_percent)
-                           : budget_percent;
-      min_retry_concurrency =
-          it->retry_budget().has_min_retry_concurrency()
-              ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), min_retry_concurrency)
-              : min_retry_concurrency;
-    }
+    std::tie(budget_percent, min_retry_concurrency) = ClusterInfoImpl::getRetryBudgetParams(*it);
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,

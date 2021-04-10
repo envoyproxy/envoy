@@ -121,6 +121,7 @@ envoy_cc_library(
         ":config_lib",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_update_info_interface",
+        "//include/envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
@@ -233,6 +234,7 @@ envoy_cc_library(
         "//source/common/config:resource_name_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:version_converter_lib",
+        "//source/common/config:xds_resource_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -413,5 +415,14 @@ envoy_cc_library(
     hdrs = ["string_accessor_impl.h"],
     deps = [
         "//include/envoy/router:string_accessor_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "delegating_route_lib",
+    srcs = ["delegating_route_impl.cc"],
+    hdrs = ["delegating_route_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
     ],
 )

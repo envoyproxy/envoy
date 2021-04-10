@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -9,23 +10,37 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "cds_api_helper_lib",
+    srcs = ["cds_api_helper.cc"],
+    hdrs = ["cds_api_helper.h"],
+    deps = [
+        "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:resource_name_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_api_lib",
     srcs = ["cds_api_impl.cc"],
     hdrs = ["cds_api_impl.h"],
     deps = [
+        ":cds_api_helper_lib",
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//source/common/common:cleanup_lib",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:api_version_lib",
         "//source/common/config:subscription_base_interface",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -56,6 +71,7 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:version_converter_lib",
+        "//source/common/config:xds_resource_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http:mixed_conn_pool",
@@ -74,7 +90,9 @@ envoy_cc_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/http/http3:conn_pool_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -339,6 +357,9 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -535,6 +556,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http/http1:codec_stats_lib",
         "//source/common/http/http2:codec_stats_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/init:manager_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:isolated_store_lib",

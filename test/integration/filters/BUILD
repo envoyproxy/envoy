@@ -40,6 +40,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "local_reply_during_encoding_data_filter_lib",
+    srcs = [
+        "local_reply_during_encoding_data_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "continue_after_local_reply_filter_lib",
     srcs = [
         "continue_after_local_reply_filter.cc",
@@ -158,6 +173,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "on_local_reply_filter_config_lib",
+    srcs = [
+        "on_local_reply_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "passthrough_filter_config_lib",
     srcs = [
         "passthrough_filter.cc",
@@ -181,6 +210,20 @@ envoy_cc_test_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/registry",
         "//source/common/network:connection_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "pause_filter_for_quic_lib",
+    srcs = [
+        "pause_filter_for_quic.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/common/quic:quic_filter_manager_connection_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
@@ -402,5 +445,22 @@ envoy_cc_test_library(
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "set_route_filter_lib",
+    srcs = [
+        "set_route_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/router:delegating_route_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/test_common:delegating_route_utility_lib",
     ],
 )

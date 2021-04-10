@@ -21,6 +21,7 @@ public:
                const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
 
   void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);
@@ -55,6 +56,7 @@ public:
   MOCK_METHOD(void, decode100ContinueHeaders_, (ResponseHeaderMapPtr & headers));
   MOCK_METHOD(void, decodeHeaders_, (ResponseHeaderMapPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (ResponseTrailerMapPtr & trailers));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
 } // namespace Http

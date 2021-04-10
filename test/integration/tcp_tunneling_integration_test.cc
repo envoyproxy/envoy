@@ -91,7 +91,7 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
 
   // Now send a FIN from upstream. This should result in clean shutdown downstream.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -114,7 +114,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
 
   // Now send a FIN from upstream. This should result in clean shutdown downstream.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -135,7 +135,7 @@ TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
 
   // Now send a FIN from upstream. This should result in clean shutdown downstream.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -205,7 +205,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
 
   // Either with early close, or half close, the FIN from upstream should result
   // in clean stream teardown.
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -569,11 +569,10 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
-    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
