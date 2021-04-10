@@ -158,10 +158,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextSucceed) {
   for (int i = 0; i < 3; i++) {
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
@@ -173,10 +173,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextFailsWithoutSocketMatc
   for (int i = 0; i < 3; i++) {
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }

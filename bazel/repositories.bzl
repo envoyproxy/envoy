@@ -145,6 +145,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_nodejs_llhttp()
+    _com_github_alibaba_hessian2_codec()
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
@@ -487,6 +488,17 @@ def _com_github_nodejs_llhttp():
     native.bind(
         name = "llhttp",
         actual = "@com_github_nodejs_llhttp//:llhttp",
+    )
+
+def _com_github_alibaba_hessian2_codec():
+    external_http_archive("com_github_alibaba_hessian2_codec")
+    native.bind(
+        name = "hessian2_codec_object_codec_lib",
+        actual = "@com_github_alibaba_hessian2_codec//hessian2/basic_codec:object_codec_lib",
+    )
+    native.bind(
+        name = "hessian2_codec_codec_impl",
+        actual = "@com_github_alibaba_hessian2_codec//hessian2:codec_impl_lib",
     )
 
 def _com_github_ncopa_suexec():

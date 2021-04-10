@@ -343,8 +343,10 @@ FakeHttpConnection::FakeHttpConnection(
   } else {
     ASSERT(type == Type::HTTP3);
 #ifdef ENVOY_ENABLE_QUIC
+    Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this);
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
+        fake_upstream.http3Options(), max_request_headers_kb, headers_with_underscores_action);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -518,6 +520,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
+      http3_options_(config.http3_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
