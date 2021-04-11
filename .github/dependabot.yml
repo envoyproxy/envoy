@@ -70,3 +70,8 @@ updates:
     directory: "/configs"
     schedule:
       interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/testing"
+    schedule:
+      interval: "daily"

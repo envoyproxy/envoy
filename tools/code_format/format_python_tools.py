@@ -24,7 +24,8 @@ def collect_files():
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_LIST]
         for filename in fnmatch.filter(filenames, '*.py'):
             if not filename.endswith('_pb2.py') and not filename.endswith('_pb2_grpc.py'):
-                matches.append(os.path.join(root, filename))
+                if "test" not in root:
+                    matches.append(os.path.join(root, filename))
     return matches
 
 
