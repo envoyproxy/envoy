@@ -130,14 +130,14 @@ void ValueSetWatcher::fileExtension_(std::string filename) {
 // No rules creates an empty file
 std::shared_ptr<ValueSet>
 ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
-  absl::string_view file_content = contents;
+  const std::string file_content = std::string(contents);
   std::shared_ptr<ValueSet> values = std::make_shared<ValueSet>();
   IpTagFileProto ipf;
 
   if (extension_ == "Yaml") {
-    MessageUtil::loadFromYaml(contents, ipf, protoValidator());
+    MessageUtil::loadFromYaml(file_content, ipf, protoValidator());
   } else if (extension_ == "Json") {
-    MessageUtil::loadFromJson(contents, ipf, protoValidator());
+    MessageUtil::loadFromJson(file_content, ipf, protoValidator());
   } else {
     throw EnvoyException("HTTP IP Tagging Filter supports only json or yaml file types");
   }
