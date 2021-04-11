@@ -14,9 +14,8 @@ level the router takes an incoming HTTP request, matches it to an upstream clust
 request. The router filter supports the following features:
 
 * Virtual hosts that map domains/authorities to a set of routing rules.
-* Prefix and exact path matching rules (both :ref:`case sensitive
-  <envoy_v3_api_field_config.route.v3.RouteMatch.case_sensitive>` and case insensitive). 
-* :ref:`Regex path matching<envoy_v3_api_field_config.route.v3.RouteMatch.safe_regex` rules.
+* Prefix and exact path matching rules (both :ref:`case sensitive <envoy_v3_api_field_config.route.v3.RouteMatch.case_sensitive>` and case insensitive). 
+* :ref:`Regex path matching <envoy_v3_api_field_config.route.v3.RouteMatch.safe_regex` rules.
 * :ref:`TLS redirection <envoy_v3_api_field_config.route.v3.VirtualHost.require_tls>` at the virtual host
   level.
 * :ref:`Path <envoy_v3_api_field_config.route.v3.RedirectAction.path_redirect>`/:ref:`host
