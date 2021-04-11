@@ -6,6 +6,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/str_join.h"
 
@@ -16,7 +17,8 @@ namespace IpTagging {
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    Envoy::Server::Configuration::FactoryContext& factory_context)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
@@ -33,39 +35,38 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         "HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
   }
 
-  // if (!config.ip_tags().empty()) {
-  //   tag_data = IpTaggingFilterSetTagData(config);
-  // else if (!config.path().empty()) {
-  //   tag_from_file = getIPTagsFromFile(file_config)
-  //   tag_data = IpTaggingFilterSetTagData(file_config);
-  // else
-  //   throw EnvoyException("Only one of path or ip_tags can be specified");
-  // }
+  if (!config.path().empty()) {
+    watcher_ = ValueSetWatcher::create(factory_context, std::move(config.path()));
+  } else if (!config.ip_tags().empty()) {
 
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-  tag_data.reserve(config.ip_tags().size());
+    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+    tag_data.reserve(config.ip_tags().size());
 
-  for (const auto& ip_tag : config.ip_tags()) {
-    std::vector<Network::Address::CidrRange> cidr_set;
-    cidr_set.reserve(ip_tag.ip_list().size());
-    for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
+    for (const auto& ip_tag : config.ip_tags()) {
+      std::vector<Network::Address::CidrRange> cidr_set;
+      cidr_set.reserve(ip_tag.ip_list().size());
+      for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
 
-      // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
-      Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
-      if (cidr_entry.isValid()) {
-        cidr_set.emplace_back(std::move(cidr_entry));
-      } else {
-        throw EnvoyException(
-            fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
-                        entry.address_prefix(), entry.prefix_len().value()));
+        // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
+        Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
+        if (cidr_entry.isValid()) {
+          cidr_set.emplace_back(std::move(cidr_entry));
+        } else {
+          throw EnvoyException(
+              fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
+                          entry.address_prefix(), entry.prefix_len().value()));
+        }
       }
+
+      tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
+      stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
     }
 
-    tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
-  }
+    trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 
-  trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+  } else {
+      throw EnvoyException("Only one of path or ip_tags can be specified");
+  }
 }
 
 ValueSet::~ValueSet() = default;
@@ -78,7 +79,7 @@ ValueSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
 }
 
 ValueSetWatcher::ValueSetWatcher(Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
-    : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()) {
+    : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher(), factory_context_(factory_context)) {
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
   watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
                      [this]([[maybe_unused]] std::uint32_t event) { maybeUpdate_(); });
@@ -113,15 +114,35 @@ void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
   content_hash_ = hash;
 }
 
+void ValueSetWatcher::fileExtension_(std::string filename) {
+  if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
+    extension_ = "Yaml";
+  } else if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Json)) {
+    extension_ = "Json";
+  } else {
+    extension_ = "Unknown";
+  }
+}
+
 // Decoder for file.
 // No rules creates an empty file
-std::shared_ptr<ValueSet> ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) {
+std::shared_ptr<ValueSet> ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
   absl::string_view file_content = contents;
   std::shared_ptr<ValueSet> values = std::make_shared<ValueSet>();
-  Json::ObjectSharedPtr json_content = Json::Factory::loadFromString(std::string(file_content));
+  IpTagFileProto ipf;
 
+  if (extension_ == "Yaml") {
+    MessageUtil::loadFromYaml(contents, ipf, protoValidator());
+  }
+  else if (extension_ == "Json") {
+    MessageUtil::loadFromJson(contents, ipf, protoValidator());
+  }
+  else {
+    throw EnvoyException(
+        "HTTP IP Tagging Filter supports only json or yaml file types");
+  }
   // parse the file here and return the values corresponding to valueSet
-  return values;
+  return values_;
 }
 
 std::shared_ptr<ValueSetWatcher>

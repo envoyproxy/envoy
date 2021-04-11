@@ -44,6 +44,8 @@ private:
   // todo
 };
 
+using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
+
 /**
  * Coordinates with the Filesystem::Watcher and when that reports a change, load up
  * the change and updates it's internal settings.
@@ -68,14 +70,18 @@ public:
   const std::string& filename() { return filename_; }
 
 private:
+  Envoy::ProtobufMessage::ValidationVisitor& protoValidator() const {
+    return factory_context_.messageValidationVisitor();
+  }
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
-  static std::shared_ptr<ValueSet> fileContentsAsValueSet_(absl::string_view contents);
-
+  std::shared_ptr<ValueSet> fileContentsAsValueSet_(absl::string_view contents) const;
+  void fileExtension_(std::string filename_);
   std::shared_ptr<const ValueSet> values_;
 
   Api::Api& api_;
   std::string filename_;
+  static std::string extension_;
   std::uint64_t content_hash_ = 0;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   Registry* registry_ = nullptr; // Set by registry.
@@ -86,8 +92,8 @@ private:
  */
 class ValueSetWatcher::Registry {
 private:
-  using map_type = std::unordered_map<absl::string_view, std::weak_ptr<ValueSetWatcher>,
-                                      absl::Hash<absl::string_view>>;
+  using map_type = absl::flat_hash_map<absl::string_view, std::weak_ptr<ValueSetWatcher>,
+                                       absl::Hash<absl::string_view>>;
 
 public:
   std::shared_ptr<ValueSetWatcher>
@@ -113,7 +119,7 @@ class IpTaggingFilterConfig {
 public:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         const std::string& stat_prefix, Stats::Scope& scope,
-                        Runtime::Loader& runtime);
+                        Runtime::Loader& runtime, Envoy::Server::Configuration::FactoryContext& factory_context);
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
@@ -143,7 +149,6 @@ private:
   void incCounter(Stats::StatName name);
 
   std::shared_ptr<const ValueSetWatcher> watcher_;
-
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
