@@ -119,7 +119,8 @@ class IpTaggingFilterConfig {
 public:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         const std::string& stat_prefix, Stats::Scope& scope,
-                        Runtime::Loader& runtime, Envoy::Server::Configuration::FactoryContext& factory_context);
+                        Runtime::Loader& runtime,
+                        Envoy::Server::Configuration::FactoryContext& factory_context);
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }

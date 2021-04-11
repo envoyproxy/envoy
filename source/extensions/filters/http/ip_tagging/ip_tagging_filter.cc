@@ -2,11 +2,11 @@
 
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
-#include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/str_join.h"
 
@@ -65,7 +65,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 
   } else {
-      throw EnvoyException("Only one of path or ip_tags can be specified");
+    throw EnvoyException("Only one of path or ip_tags can be specified");
   }
 }
 
@@ -126,20 +126,18 @@ void ValueSetWatcher::fileExtension_(std::string filename) {
 
 // Decoder for file.
 // No rules creates an empty file
-std::shared_ptr<ValueSet> ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
+std::shared_ptr<ValueSet>
+ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
   absl::string_view file_content = contents;
   std::shared_ptr<ValueSet> values = std::make_shared<ValueSet>();
   IpTagFileProto ipf;
 
   if (extension_ == "Yaml") {
     MessageUtil::loadFromYaml(contents, ipf, protoValidator());
-  }
-  else if (extension_ == "Json") {
+  } else if (extension_ == "Json") {
     MessageUtil::loadFromJson(contents, ipf, protoValidator());
-  }
-  else {
-    throw EnvoyException(
-        "HTTP IP Tagging Filter supports only json or yaml file types");
+  } else {
+    throw EnvoyException("HTTP IP Tagging Filter supports only json or yaml file types");
   }
   // parse the file here and return the values corresponding to valueSet
   return values_;
