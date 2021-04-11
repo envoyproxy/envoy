@@ -31,8 +31,8 @@ public:
 
 private:
   // TODO(5155): This secondary layer with a private class can be removed after http-parser is
-  // removed. This layer avoids colliding symbols (e.g. HPE_PAUSED) between the two libraries by
-  // isolating the libraries in separate compilation units.
+  // removed. This layer avoids colliding symbols between the two libraries by isolating the
+  // libraries in separate compilation units.
   class Impl;
   std::unique_ptr<Impl> impl_;
 };

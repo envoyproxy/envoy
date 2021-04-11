@@ -51,6 +51,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "parser_impl_test",
+    srcs = ["parser_impl_test.cc"],
+    deps = [
+        "//source/common/http/http1:parser_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
     deps = [
