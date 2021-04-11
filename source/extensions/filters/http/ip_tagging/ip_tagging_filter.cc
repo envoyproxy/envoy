@@ -79,7 +79,7 @@ ValueSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
 }
 
 ValueSetWatcher::ValueSetWatcher(Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
-    : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher(), factory_context_(factory_context)) {
+    : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()) {
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
   watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
                      [this]([[maybe_unused]] std::uint32_t event) { maybeUpdate_(); });
