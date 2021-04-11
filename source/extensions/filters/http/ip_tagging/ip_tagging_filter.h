@@ -58,10 +58,12 @@ public:
   static std::shared_ptr<ValueSetWatcher>
   create(Server::Configuration::FactoryContext& factory_context, std::string filename);
 
-  ValueSetWatcher(Event::Dispatcher& dispatcher, Api::Api& api, std::string filename);
+  ValueSetWatcher(Server::Configuration::FactoryContext& factory_context,
+                  Event::Dispatcher& dispatcher, Api::Api& api, std::string filename);
 
   ValueSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
-      : ValueSetWatcher(factory_context.dispatcher(), factory_context.api(), std::move(filename)) {}
+      : ValueSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
+                        std::move(filename)) {}
 
   ~ValueSetWatcher();
 
@@ -84,6 +86,7 @@ private:
   static std::string extension_;
   std::uint64_t content_hash_ = 0;
   std::unique_ptr<Filesystem::Watcher> watcher_;
+  Server::Configuration::FactoryContext& factory_context_;
   Registry* registry_ = nullptr; // Set by registry.
 };
 
