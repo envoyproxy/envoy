@@ -11,7 +11,7 @@ namespace Http1 {
 class HttpParserImpl : public Parser {
 public:
   HttpParserImpl(MessageType type, ParserCallbacks* data);
-  ~HttpParserImpl();
+  ~HttpParserImpl() override;
 
   // Http1::Parser
   RcVal execute(const char* data, int len) override;
@@ -30,6 +30,9 @@ public:
   int statusToInt(const ParserStatus code) const override;
 
 private:
+  // TODO(5155): This secondary layer with a private class can be removed after http-parser is
+  // removed. This layer avoids colliding symbols (e.g. HPE_PAUSED) between the two libraries by
+  // isolating the libraries in separate compilation units.
   class Impl;
   std::unique_ptr<Impl> impl_;
 };

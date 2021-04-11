@@ -16,7 +16,9 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/conn_manager_utility.h"
+#include "common/runtime/runtime_impl.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -61,6 +63,7 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
   h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
   h1_settings.accept_http_10_ = settings.accept_http_10();
   h1_settings.default_host_for_http_10_ = settings.default_host_for_http_10();
+  h1_settings.enable_trailers_ = true;
 
   return h1_settings;
 }
@@ -176,11 +179,35 @@ public:
       request_.closeRemote();
     }));
     ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] {
+          response_.closeRemote();
+          // Reset response as higher level code would do in case response ends before a request is
+          // complete.
+          if (response_.local_closed_) {
+            response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset,
+                                                      "stream reset");
+          }
+        }));
     ON_CALL(response_.response_decoder_, decodeData(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] {
+          response_.closeRemote();
+          // Reset response as higher level code would do in case response ends before a request is
+          // complete.
+          if (response_.local_closed_) {
+            response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset,
+                                                      "stream reset");
+          }
+        }));
     ON_CALL(response_.response_decoder_, decodeTrailers_(_))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] {
+          response_.closeRemote();
+          // Reset response as higher level code would do in case response ends before a request is
+          // complete.
+          if (response_.local_closed_) {
+            response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset,
+                                                      "stream reset");
+          }
+        }));
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
@@ -681,6 +708,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     TestUtility::validate(input);
     codecFuzz(input, HttpVersion::Http1);
     codecFuzz(input, HttpVersion::Http2);
+    // Enable legacy HTTP1 codec.
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.enable_new_http1_parser", "true"}});
+    codecFuzz(input, HttpVersion::Http1);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }

@@ -95,6 +95,7 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -398,22 +399,31 @@ envoy_cc_test(
     ],
 )
 
+MIXED_CONN_POOL_TEST = [
+    ":common_lib",
+    "//source/common/http:mixed_conn_pool",
+    "//test/common/upstream:utility_lib",
+    "//test/mocks:common_lib",
+    "//test/mocks/buffer:buffer_mocks",
+    "//test/mocks/http:http_mocks",
+    "//test/mocks/local_info:local_info_mocks",
+    "//test/mocks/network:connection_mocks",
+    "//test/mocks/router:router_mocks",
+    "//test/mocks/runtime:runtime_mocks",
+    "//test/mocks/stats:stats_mocks",
+]
+
 envoy_cc_test(
     name = "mixed_conn_pool_test",
     srcs = ["mixed_conn_pool_test.cc"],
-    deps = [
-        ":common_lib",
-        "//source/common/http:mixed_conn_pool",
-        "//test/common/upstream:utility_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/network:connection_mocks",
-        "//test/mocks/router:router_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/stats:stats_mocks",
-    ],
+    deps = MIXED_CONN_POOL_TEST,
+)
+
+envoy_cc_test(
+    name = "legacy_mixed_conn_pool_test",
+    srcs = ["mixed_conn_pool_test.cc"],
+    args = ["--runtime-feature-override-for-tests=envoy.reloadable_features.enable_new_http1_parser"],
+    deps = MIXED_CONN_POOL_TEST,
 )
 
 # TODO(alyssawilk): The conn pool grid should work correctly without H3. Circle back and figure

@@ -36,7 +36,6 @@ public:
   Impl(llhttp_type_t type) {
     llhttp_init(&parser_, type, &settings_);
     llhttp_set_lenient_chunked_length(&parser_, 1);
-    llhttp_set_lenient_headers(&parser_, 1);
   }
 
   Impl(llhttp_type_t type, void* data) : Impl(type) {

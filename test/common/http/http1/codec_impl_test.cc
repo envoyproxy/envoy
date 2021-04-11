@@ -1100,12 +1100,9 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// Ensures that requests with invalid HTTP header values are properly rejected
-// when the runtime guard is enabled for the feature.
+// Ensures that requests with invalid HTTP header values are properly rejected.
 TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   TestScopedRuntime scoped_runtime;
-  // When the runtime-guarded feature is enabled, invalid header values
-  // should result in a rejection.
 
   initialize();
 
@@ -1121,8 +1118,14 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
-  EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
+  // Invalid header characters are handled by llhttp directly.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_http1_parser")) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+    EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
+    EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
+  }
 }
 
 // Ensures that request headers with names containing the underscore character are allowed

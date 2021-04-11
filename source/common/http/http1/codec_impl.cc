@@ -664,6 +664,8 @@ Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   absl::string_view header_value{data, length};
+  // TODO(5155): This can be removed when http_parser is removed. llhttp enables strict validation
+  // of HTTP header values.
   if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
     ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
     error_code_ = Http::Code::BadRequest;
