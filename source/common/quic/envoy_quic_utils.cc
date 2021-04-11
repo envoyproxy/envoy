@@ -242,13 +242,14 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
     quic_config.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
   }
 
-  size_t session_flow_control_window_to_send =
+  uint32_t session_flow_control_window_to_send =
       config.has_initial_connection_window_size()
           ? config.initial_connection_window_size().value()
           : Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE;
   // The minimum flow control window supported in QUICHE is 16kB.
   quic_config.SetInitialSessionFlowControlWindowToSend(
-      std::max(quic::kMinimumFlowControlSendWindow, session_flow_control_window_to_send));
+      std::max(quic::kMinimumFlowControlSendWindow,
+               static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
 }
 
 } // namespace Quic
