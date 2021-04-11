@@ -211,7 +211,8 @@ public:
   //     Network::Socket::Type socket_type = Network::Socket::Type::Stream,
   //     std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
   //     bool continue_on_listener_filters_timeout = false,
-  //     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
+  //     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager
+  //     =
   //         nullptr,
   //     uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE) {
   //   listeners_.emplace_back(std::make_unique<TestListener>(
@@ -225,12 +226,13 @@ public:
   //     // If so, dispatcher would not create new network listener.
   //     return listeners_.back().get();
   //   }
-  //   EXPECT_CALL(*socket_factory_, getListenSocket()).WillOnce(Return(listeners_.back()->socket_));
-  //   if (socket_type == Network::Socket::Type::Stream) {
+  //   EXPECT_CALL(*socket_factory_,
+  //   getListenSocket()).WillOnce(Return(listeners_.back()->socket_)); if (socket_type ==
+  //   Network::Socket::Type::Stream) {
   //     EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
   //         .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
-  //                                                         Network::TcpListenerCallbacks& cb, bool,
-  //                                                         uint32_t) -> Network::Listener* {
+  //                                                         Network::TcpListenerCallbacks& cb,
+  //                                                         bool, uint32_t) -> Network::Listener* {
   //           if (listener_callbacks != nullptr) {
   //             *listener_callbacks = &cb;
   //           }
@@ -240,7 +242,8 @@ public:
   //     EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
   //         .WillOnce(Invoke(
   //             [listener](Network::SocketSharedPtr&&, Network::UdpListenerCallbacks&,
-  //                        const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
+  //                        const envoy::config::core::v3::UdpSocketConfig&) ->
+  //                        Network::UdpListener* {
   //               return dynamic_cast<Network::UdpListener*>(listener);
   //             }));
   //     listeners_.back()->udp_listener_config_->listener_worker_router_ =

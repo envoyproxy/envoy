@@ -8,8 +8,8 @@
 #include "common/event/deferred_task.h"
 #include "common/network/utility.h"
 
-#include "server/active_tcp_listener.h"
 #include "server/active_internal_listener.h"
+#include "server/active_tcp_listener.h"
 
 namespace Envoy {
 namespace Server {
@@ -162,7 +162,8 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
                    });
 
   if (listener_it != listeners_.end()) {
-    return Network::InternalListenerCallbacksOptRef(listener_it->second.internalListener().value().get());
+    return Network::InternalListenerCallbacksOptRef(
+        listener_it->second.internalListener().value().get());
   }
   return absl::nullopt;
 }

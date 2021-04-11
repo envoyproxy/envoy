@@ -94,7 +94,8 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
       bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
 
   bool create_socket = false;
-  if (local_address_->type() == Network::Address::Type::Ip) {
+  switch (local_address_->type()) {
+  case Network::Address::Type::Ip:
     if (socket_type_ == Network::Socket::Type::Datagram) {
       ASSERT(reuse_port_ == true);
     }
@@ -107,10 +108,14 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
       // then all worker threads should use same port.
       create_socket = true;
     }
-  } else {
-    ASSERT(local_address_->type() == Network::Address::Type::Pipe);
+    break;
+  case Network::Address::Type::Pipe:
     // Listeners with Unix domain socket always use shared socket.
     create_socket = true;
+    break;
+  case Network::Address::Type::EnvoyInternal:
+    create_socket = false;
+    break;
   }
 
   if (create_socket) {
@@ -347,7 +352,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      // listener_init_target_ is not used during in place update because we expect server started.
+      // listener_init_target_ is not used during in place update because we expect server
+      // started.
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),

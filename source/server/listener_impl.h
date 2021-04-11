@@ -356,11 +356,11 @@ private:
   };
 
   struct InternalListenerConfigImpl : public Network::InternalListenerConfig {
-    InternalListenerConfigImpl(const envoy::config::listener::v3::Listener_InternalListenerConfig config)
+    InternalListenerConfigImpl(
+        const envoy::config::listener::v3::Listener_InternalListenerConfig config)
         : config_(config) {}
     const envoy::config::listener::v3::Listener_InternalListenerConfig config_;
   };
-
 
   /**
    * Create a new listener from an existing listener and the new config message if the in place
