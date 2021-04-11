@@ -1326,7 +1326,7 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
-    // QUICHE Qpack splits concatinated cookies into crumbs to increase
+    // QUICHE Qpack splits concatenated cookies into crumbs to increase
     // compression ratio. On the receiver side, the total size of these crumbs
     // may be larger than coalesced cookie headers. Increase the max request
     // header size to avoid QUIC_HEADERS_TOO_LARGE stream error.
@@ -1595,8 +1595,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   EXCLUDE_DOWNSTREAM_HTTP3 // QUICHE doesn't limit number of headers.
-      // Default header (and trailer) count limit is 100.
-      config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  // The default configured header (and trailer) count limit is 100.
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   Http::TestRequestTrailerMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
