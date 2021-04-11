@@ -4775,56 +4775,57 @@ dynamic_listeners:
         seconds: 1001001001
         nanos: 1000000
 )EOF");
+  // EXPECT_CALL(*listener_foo, onDestroy());
+
+  // Update duplicate should be a NOP.
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo listener. Should share socket.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: test_internal_listener
+address:
+  envoy_internal_address:
+    server_listener_name: test_internal_listener_name
+filter_chains: {}
+internal_listener: {}
+per_connection_buffer_limit_bytes: 10
+    )EOF";
+
+  time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
   EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml),
+                                            "version2", true));
+  checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
+  checkConfigDump(R"EOF(
+  version_info: version2
+  static_listeners:
+  dynamic_listeners:
+    - name: test_internal_listener
+      warming_state:
+        version_info: version2
+        listener:
+          "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+          name: test_internal_listener
+          address:
+            envoy_internal_address:
+              server_listener_name: test_internal_listener_name
+          filter_chains: {}
+          internal_listener: {}
+          per_connection_buffer_limit_bytes: 10
+        last_updated:
+          seconds: 2002002002
+          nanos: 2000000
+  )EOF");
 
-  //   // Update duplicate should be a NOP.
-  //   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "",
-  //   true)); checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
-
-  //   // Update foo listener. Should share socket.
-  //   const std::string listener_foo_update1_yaml = R"EOF(
-  // name: "foo"
-  // address:
-  //   socket_address:
-  //     address: "127.0.0.1"
-  //     port_value: 1234
-  // filter_chains: {}
-  // per_connection_buffer_limit_bytes: 10
-  //   )EOF";
-
-  //   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
-
-  //   ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
-  //   EXPECT_CALL(*listener_foo, onDestroy());
-  //   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml),
-  //                                             "version2", true));
-  //   checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
-  //   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
-  //   checkConfigDump(R"EOF(
-  // version_info: version2
-  // static_listeners:
-  // dynamic_listeners:
-  //   - name: foo
-  //     warming_state:
-  //       version_info: version2
-  //       listener:
-  //         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
-  //         name: foo
-  //         address:
-  //           socket_address:
-  //             address: 127.0.0.1
-  //             port_value: 1234
-  //         filter_chains: {}
-  //         per_connection_buffer_limit_bytes: 10
-  //       last_updated:
-  //         seconds: 2002002002
-  //         nanos: 2000000
-  // )EOF");
-
-  //   // Validate that workers_started stat is zero before calling startWorkers.
-  //   EXPECT_EQ(0, server_.stats_store_
-  //                    .gauge("listener_manager.workers_started",
-  //                    Stats::Gauge::ImportMode::NeverImport) .value());
+  // Validate that workers_started stat is zero before calling startWorkers.
+  EXPECT_EQ(0, server_.stats_store_
+                   .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
 
   //   // Start workers.
   //   EXPECT_CALL(*worker_, addListener(_, _, _));
