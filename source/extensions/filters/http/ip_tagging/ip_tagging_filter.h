@@ -186,6 +186,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
+  std::shared_ptr<const ValueSetWatcher> watcher_;
   IpTaggingFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };

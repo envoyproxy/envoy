@@ -197,8 +197,13 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
-  std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
+  std::vector<std::string> tags;
+
+  if (watcher_ != nullptr) {
+    tags = watcher_->get();
+  } else {
+    tags = config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
+  }
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");
