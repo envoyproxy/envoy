@@ -26,16 +26,6 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
-class IpTaggingFileConfig {
-public:
-  IpTaggingFileConfig(Envoy::Server::Configuration::FactoryContext& factory_context,
-                      std::string path);
-  std::shared_ptr<const ValueSet> values() const { return watcher_->get(); }
-
-private:
-  std::shared_ptr<const ValueSetWatcher> watcher_;
-};
-
 } // namespace IpTagging
 } // namespace HttpFilters
 } // namespace Extensions
