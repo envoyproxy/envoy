@@ -180,16 +180,17 @@ public:
          Stats::Scope& scope)
       : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
         stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
-        symbol_table_(scope.symbolTable()), thrift_(stat_name_set_->add("thrift")),
-        upstream_rq_call_(stat_name_set_->add("upstream_rq_call")),
-        upstream_rq_oneway_(stat_name_set_->add("upstream_rq_oneway")),
-        upstream_rq_invalid_type_(stat_name_set_->add("upstream_rq_invalid_type")),
-        upstream_resp_reply_(stat_name_set_->add("upstream_resp_reply")),
-        upstream_resp_reply_success_(stat_name_set_->add("upstream_resp_success")),
-        upstream_resp_reply_error_(stat_name_set_->add("upstream_resp_error")),
-        upstream_resp_exception_(stat_name_set_->add("upstream_resp_exception")),
-        upstream_resp_invalid_type_(stat_name_set_->add("upstream_resp_invalid_type")),
-        upstream_rq_time_(stat_name_set_->add("upstream_rq_time")), passthrough_supported_(false) {}
+        symbol_table_(scope.symbolTable()),
+        upstream_rq_call_(stat_name_set_->add("thrift.upstream_rq_call")),
+        upstream_rq_oneway_(stat_name_set_->add("thrift.upstream_rq_oneway")),
+        upstream_rq_invalid_type_(stat_name_set_->add("thrift.upstream_rq_invalid_type")),
+        upstream_resp_reply_(stat_name_set_->add("thrift.upstream_resp_reply")),
+        upstream_resp_reply_success_(stat_name_set_->add("thrift.upstream_resp_success")),
+        upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
+        upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
+        upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
+        upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
+        passthrough_supported_(false) {}
 
   ~Router() override = default;
 
@@ -197,26 +198,6 @@ public:
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
   bool passthroughSupported() const override { return passthrough_supported_; }
-
-  // Stats
-  void incClusterScopeCounter(const Stats::StatNameVec& names) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-    cluster_->statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
-  }
-
-  void recordClusterScopeHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
-                                   uint64_t count) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-    cluster_->statsScope()
-        .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
-        .recordValue(count);
-  }
-
-  void chargeResponseTiming(const std::chrono::milliseconds response_time) const {
-    const uint64_t count = response_time.count();
-    recordClusterScopeHistogram({thrift_, upstream_rq_time_}, Stats::Histogram::Unit::Milliseconds,
-                                count);
-  }
 
   // ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -261,6 +242,7 @@ private:
     void onResponseComplete();
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
     void onResetStream(ConnectionPool::PoolFailureReason reason);
+    void chargeResponseTiming();
 
     Router& parent_;
     Tcp::ConnectionPool::Instance& conn_pool_;
@@ -282,6 +264,20 @@ private:
     MonotonicTime downstream_request_complete_time_;
   };
 
+  // Stats
+  void incClusterScopeCounter(const Stats::StatNameVec& names) const {
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+    cluster_->statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+  }
+
+  void recordClusterScopeHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+                                   uint64_t count) const {
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+    cluster_->statsScope()
+        .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
+        .recordValue(count);
+  }
+
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
   RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -294,7 +290,6 @@ private:
   RouterStats stats_;
   Stats::StatNameSetPtr stat_name_set_;
   Stats::SymbolTable& symbol_table_;
-  const Stats::StatName thrift_;
   const Stats::StatName upstream_rq_call_;
   const Stats::StatName upstream_rq_oneway_;
   const Stats::StatName upstream_rq_invalid_type_;

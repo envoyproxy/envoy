@@ -241,15 +241,15 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    metadata->methodName());
   switch (metadata->messageType()) {
   case MessageType::Call:
-    incClusterScopeCounter({thrift_, upstream_rq_call_});
+    incClusterScopeCounter({upstream_rq_call_});
     break;
 
   case MessageType::Oneway:
-    incClusterScopeCounter({thrift_, upstream_rq_oneway_});
+    incClusterScopeCounter({upstream_rq_oneway_});
     break;
 
   default:
-    incClusterScopeCounter({thrift_, upstream_rq_invalid_type_});
+    incClusterScopeCounter({upstream_rq_invalid_type_});
     break;
   }
 
@@ -353,20 +353,20 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
       switch (callbacks_->responseMetadata()->messageType()) {
       case MessageType::Reply:
-        incClusterScopeCounter({thrift_, upstream_resp_reply_});
+        incClusterScopeCounter({upstream_resp_reply_});
         if (callbacks_->responseSuccess()) {
-          incClusterScopeCounter({thrift_, upstream_resp_reply_success_});
+          incClusterScopeCounter({upstream_resp_reply_success_});
         } else {
-          incClusterScopeCounter({thrift_, upstream_resp_reply_error_});
+          incClusterScopeCounter({upstream_resp_reply_error_});
         }
         break;
 
       case MessageType::Exception:
-        incClusterScopeCounter({thrift_, upstream_resp_exception_});
+        incClusterScopeCounter({upstream_resp_exception_});
         break;
 
       default:
-        incClusterScopeCounter({thrift_, upstream_resp_invalid_type_});
+        incClusterScopeCounter({upstream_resp_invalid_type_});
         break;
       }
       upstream_request_->onResponseComplete();
@@ -529,15 +529,7 @@ void Router::UpstreamRequest::onRequestComplete() {
 }
 
 void Router::UpstreamRequest::onResponseComplete() {
-  if (!charged_response_timing_) {
-    Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
-    const std::chrono::milliseconds response_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-    parent_.chargeResponseTiming(response_time);
-    charged_response_timing_ = true;
-  }
-
+  chargeResponseTiming();
   response_complete_ = true;
   conn_state_ = nullptr;
   conn_data_.reset();
@@ -555,14 +547,7 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
     return;
   }
 
-  if (!charged_response_timing_) {
-    Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
-    const std::chrono::milliseconds response_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-    parent_.chargeResponseTiming(response_time);
-    charged_response_timing_ = true;
-  }
+  chargeResponseTiming();
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -596,6 +581,20 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
+
+void Router::UpstreamRequest::chargeResponseTiming() {
+  if (charged_response_timing_) {
+    return;
+  }
+  charged_response_timing_ = true;
+  Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
+  const std::chrono::milliseconds response_time =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+  const uint64_t count = response_time.count();
+  parent_.recordClusterScopeHistogram({parent_.upstream_rq_time_},
+                                      Stats::Histogram::Unit::Milliseconds, count);
 }
 
 } // namespace Router
