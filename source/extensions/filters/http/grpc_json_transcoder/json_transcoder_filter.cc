@@ -373,7 +373,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   if (method_info->request_type_is_http_body_) {
     request_translator = std::make_unique<RequestMessageTranslator>(*type_helper_->Resolver(),
                                                                     false, std::move(request_info));
-    request_translator->Input().StartObject(nullptr)->EndObject();
+    request_translator->Input().StartObject("")->EndObject();
   } else {
     json_request_translator = std::make_unique<JsonRequestTranslator>(
         type_helper_->Resolver(), &request_input, std::move(request_info),
