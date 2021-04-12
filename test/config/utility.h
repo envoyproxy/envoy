@@ -230,7 +230,7 @@ public:
                           HttpConnectionManager::CodecType type);
 
   // Add TLS configuration for either SSL or QUIC transport socket according to listener config.
-  void configDownstreamTransportSocketWitTls(
+  void configDownstreamTransportSocketWithTls(
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
           fill_tls_stuff);

@@ -1062,7 +1062,7 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
   }
 }
 
-void ConfigHelper::configDownstreamTransportSocketWitTls(
+void ConfigHelper::configDownstreamTransportSocketWithTls(
     envoy::config::bootstrap::v3::Bootstrap& bootstrap,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
         fill_tls_stuff) {
@@ -1107,7 +1107,7 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
       listener.set_reuse_port(reuse_port);
     }
   }
-  configDownstreamTransportSocketWitTls(
+  configDownstreamTransportSocketWithTls(
       bootstrap_,
       [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);

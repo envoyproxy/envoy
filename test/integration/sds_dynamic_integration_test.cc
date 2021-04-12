@@ -202,7 +202,7 @@ public:
     ASSERT(test_quic_ ? downstream_protocol_ == Http::CodecClient::Type::HTTP3
                       : downstream_protocol_ == Http::CodecClient::Type::HTTP1);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      config_helper_.configDownstreamTransportSocketWitTls(
+      config_helper_.configDownstreamTransportSocketWithTls(
           bootstrap,
           [this](
               envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
