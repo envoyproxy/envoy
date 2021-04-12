@@ -83,9 +83,9 @@ public:
     response_ = codec_client_->makeRequestWithBody(headers, request_size_);
   }
 
-  void waitForRatelimitRequest() {
+  void waitForRatelimitRequest(int i) {
     AssertionResult result =
-        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_);
+        fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_);
     RELEASE_ASSERT(result, result.message());
     result = fake_ratelimit_connection_->waitForNewStream(*dispatcher_, ratelimit_request_);
     RELEASE_ASSERT(result, result.message());
@@ -184,7 +184,7 @@ public:
 
   void basicFlow() {
     initiateClientConnection();
-    waitForRatelimitRequest();
+    waitForRatelimitRequest(1);
     sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
                           Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
     waitForSuccessfulUpstreamResponse();
@@ -258,7 +258,7 @@ TEST_P(RatelimitIntegrationTest, Ok) {
 TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
   Http::TestResponseHeaderMapImpl ratelimit_response_headers{{"x-ratelimit-limit", "1000"},
                                                              {"x-ratelimit-remaining", "500"}};
   Http::TestRequestHeaderMapImpl request_headers_to_add{{"x-ratelimit-done", "true"}};
@@ -291,7 +291,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
 TEST_P(RatelimitIntegrationTest, OverLimit) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
                         Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
@@ -310,7 +310,7 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
 TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
   Http::TestResponseHeaderMapImpl ratelimit_response_headers{
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}};
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
@@ -338,7 +338,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
 TEST_P(RatelimitIntegrationTest, Error) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
   ratelimit_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, true);
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
@@ -353,7 +353,7 @@ TEST_P(RatelimitIntegrationTest, Error) {
 TEST_P(RatelimitIntegrationTest, Timeout) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
     test_server_->waitForCounterGe("cluster.ratelimit.upstream_rq_timeout", 1);
@@ -402,7 +402,7 @@ TEST_P(RatelimitIntegrationTest, FailedConnect) {
 TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
   ratelimit_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   // Rate limiter fail closed
   waitForFailedUpstreamResponse(500);
@@ -417,7 +417,7 @@ TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
 
   Extensions::Filters::Common::RateLimit::DescriptorStatusList descriptor_statuses{
       Envoy::RateLimit::buildDescriptorStatus(
@@ -453,7 +453,7 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
 
   Extensions::Filters::Common::RateLimit::DescriptorStatusList descriptor_statuses{
       Envoy::RateLimit::buildDescriptorStatus(
@@ -491,7 +491,7 @@ TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
        OverLimitWithoutEnvoyRatelimitedHeader) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
-  waitForRatelimitRequest();
+  waitForRatelimitRequest(1);
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
                         Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
