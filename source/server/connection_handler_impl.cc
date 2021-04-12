@@ -39,10 +39,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    auto internal_listener =
-        std::make_unique<ActiveInternalListener>(*this, dispatcher(),
-                                                 // TODO(lambdai): create internal listener base
-                                                 nullptr, config);
+    auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
     details.typed_listener_ = *internal_listener;
     details.listener_ = std::move(internal_listener);
   } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {

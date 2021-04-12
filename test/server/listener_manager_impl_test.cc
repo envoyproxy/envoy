@@ -4775,7 +4775,6 @@ dynamic_listeners:
         seconds: 1001001001
         nanos: 1000000
 )EOF");
-  // EXPECT_CALL(*listener_foo, onDestroy());
 
   // Update duplicate should be a NOP.
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
@@ -4825,25 +4824,24 @@ per_connection_buffer_limit_bytes: 10
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
                    .value());
-  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  // EXPECT_CALL(*listener_foo_update1, onDestroy());
 
-  //   // Start workers.
-  //   EXPECT_CALL(*worker_, addListener(_, _, _));
-  //   EXPECT_CALL(*worker_, start(_));
-  //   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
-  //   // Validate that workers_started stat is still zero before workers set the status via
-  //   // completion callback.
-  //   EXPECT_EQ(0, server_.stats_store_
-  //                    .gauge("listener_manager.workers_started",
-  //                    Stats::Gauge::ImportMode::NeverImport) .value());
-  //   worker_->callAddCompletion(true);
+  // Start workers.
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  // Validate that workers_started stat is still zero before workers set the status via
+  // completion callback.
+  EXPECT_EQ(0, server_.stats_store_
+                   .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  worker_->callAddCompletion(true);
 
-  //   // Validate that workers_started stat is set to 1 after workers have responded with
-  //   initialization
-  //   // status.
-  //   EXPECT_EQ(1, server_.stats_store_
-  //                    .gauge("listener_manager.workers_started",
-  //                    Stats::Gauge::ImportMode::NeverImport) .value());
+  // Validate that workers_started stat is set to 1 after workers have responded with initialization
+  // status.
+  EXPECT_EQ(1, server_.stats_store_
+                   .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 
   //   // Update duplicate should be a NOP.
   //   EXPECT_FALSE(
@@ -4903,7 +4901,7 @@ per_connection_buffer_limit_bytes: 10
   //   EXPECT_CALL(*worker_, removeListener(_, _));
   //   listener_foo_update1->drain_manager_->drain_sequence_completion_();
   //   checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
-  //   EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
   //   worker_->callRemovalCompletion();
   //   checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
 

@@ -12,9 +12,11 @@ namespace Server {
 
 ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& parent,
                                                Event::Dispatcher& dispatcher,
-                                               Network::ListenerPtr&& listener,
+                                               /*Network::ListenerPtr&& listener,*/
                                                Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
+    : ActiveStreamListenerBase(parent, dispatcher,
+                               std::make_unique<ActiveInternalListener::NetworkInternalListener>(),
+                               config) {}
 
 ActiveInternalListener::~ActiveInternalListener() {
   // TODO(lambdai): delete the active connections.

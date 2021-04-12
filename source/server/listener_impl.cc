@@ -1,5 +1,7 @@
 #include "server/listener_impl.h"
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -325,6 +327,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
     buildTlsInspectorListenerFilter();
+    buildInternalListener();
   }
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
@@ -382,6 +385,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
+  buildInternalListener();
   open_connections_ = origin.open_connections_;
 }
 
@@ -390,6 +394,12 @@ void ListenerImpl::buildAccessLog() {
     AccessLog::InstanceSharedPtr current_access_log =
         AccessLog::AccessLogFactory::fromProto(access_log, *listener_factory_context_);
     access_logs_.push_back(current_access_log);
+  }
+}
+
+void ListenerImpl::buildInternalListener() {
+  if (config_.has_internal_listener()) {
+    internal_listener_config_ = std::make_unique<Network::InternalListenerConfig>();
   }
 }
 

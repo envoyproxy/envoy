@@ -38,9 +38,20 @@ class ActiveInternalListener : public ActiveStreamListenerBase,
                                Logger::Loggable<Logger::Id::conn_handler> {
 public:
   ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
-                         Network::ListenerPtr&& listener, Network::ListenerConfig& config);
+                         Network::ListenerConfig& config);
   ~ActiveInternalListener() override;
 
+  class NetworkInternalListener : public Network::Listener {
+
+    void disable() override {
+      // TODO(lambdai): think about how to elegantly disable internal listener. (Queue socket or
+      // close socket immediately?)
+    }
+
+    void enable() override {}
+
+    void setRejectFraction(UnitFloat) override {}
+  };
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
   Network::BalancedConnectionHandlerOptRef

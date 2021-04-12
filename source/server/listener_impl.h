@@ -372,6 +372,7 @@ private:
                uint32_t concurrency);
   // Helpers for constructor.
   void buildAccessLog();
+  void buildInternalListener();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
   void createListenerFilterFactories(Network::Socket::Type socket_type);
