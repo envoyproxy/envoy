@@ -4901,155 +4901,132 @@ per_connection_buffer_limit_bytes: 10
   worker_->callRemovalCompletion();
   checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
 
-  //   time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
+  time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
 
-  //   // Add bar listener.
-  //   const std::string listener_bar_yaml = R"EOF(
-  // name: "bar"
-  // address:
-  //   socket_address:
-  //     address: "127.0.0.1"
-  //     port_value: 1235
-  // filter_chains: {}
-  //   )EOF";
+  // Add bar listener.
+  const std::string listener_bar_yaml = R"EOF(
+  name: test_internal_listener_bar
+  address:
+    envoy_internal_address:
+      server_listener_name: test_internal_listener_bar
+  filter_chains: {}
+  internal_listener: {}
+    )EOF";
 
-  //   ListenerHandle* listener_bar = expectListenerCreate(false, true);
-  //   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  //   EXPECT_CALL(*worker_, addListener(_, _, _));
-  //   EXPECT_TRUE(
-  //       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml), "version4",
-  //       true));
-  //   EXPECT_EQ(2UL, manager_->listeners().size());
-  //   worker_->callAddCompletion(true);
-  //   checkStats(__LINE__, 2, 2, 0, 0, 2, 0, 0);
+  ListenerHandle* listener_bar = expectListenerCreate(false, true);
+  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml), "version4", true));
+  EXPECT_EQ(2UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+  checkStats(__LINE__, 2, 2, 0, 0, 2, 0, 0);
 
-  //   time_system_.setSystemTime(std::chrono::milliseconds(5005005005005));
+  time_system_.setSystemTime(std::chrono::milliseconds(5005005005005));
 
-  //   // Add baz listener, this time requiring initializing.
-  //   const std::string listener_baz_yaml = R"EOF(
-  // name: "baz"
-  // address:
-  //   socket_address:
-  //     address: "127.0.0.1"
-  //     port_value: 1236
-  // filter_chains: {}
-  //   )EOF";
+  // Add baz listener, this time requiring initializing.
+  const std::string listener_baz_yaml = R"EOF(
+  name: test_internal_listener_baz
+  address:
+    envoy_internal_address:
+      server_listener_name: test_internal_listener_baz
+  filter_chains: {}
+  internal_listener: {}
+    )EOF";
 
-  //   ListenerHandle* listener_baz = expectListenerCreate(true, true);
-  //   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  //   EXPECT_CALL(listener_baz->target_, initialize());
-  //   EXPECT_TRUE(
-  //       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "version5",
-  //       true));
-  //   EXPECT_EQ(2UL, manager_->listeners().size());
-  //   checkStats(__LINE__, 3, 2, 0, 1, 2, 0, 0);
-  //   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
-  //   checkConfigDump(R"EOF(
-  // version_info: version5
-  // dynamic_listeners:
-  //   - name: foo
-  //     active_state:
-  //       version_info: version3
-  //       listener:
-  //         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
-  //         name: foo
-  //         address:
-  //           socket_address:
-  //             address: 127.0.0.1
-  //             port_value: 1234
-  //         filter_chains: {}
-  //       last_updated:
-  //         seconds: 3003003003
-  //         nanos: 3000000
-  //   - name: bar
-  //     active_state:
-  //       version_info: version4
-  //       listener:
-  //         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
-  //         name: bar
-  //         address:
-  //           socket_address:
-  //             address: 127.0.0.1
-  //             port_value: 1235
-  //         filter_chains: {}
-  //       last_updated:
-  //         seconds: 4004004004
-  //         nanos: 4000000
-  //   - name: baz
-  //     warming_state:
-  //       version_info: version5
-  //       listener:
-  //         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
-  //         name: baz
-  //         address:
-  //           socket_address:
-  //             address: 127.0.0.1
-  //             port_value: 1236
-  //         filter_chains: {}
-  //       last_updated:
-  //         seconds: 5005005005
-  //         nanos: 5000000
-  // )EOF");
+  ListenerHandle* listener_baz = expectListenerCreate(true, true);
+  // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_baz->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "version5", true));
+  EXPECT_EQ(2UL, manager_->listeners().size());
+  checkStats(__LINE__, 3, 2, 0, 1, 2, 0, 0);
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
+  checkConfigDump(R"EOF(
+  version_info: version5
+  dynamic_listeners:
+    - name: test_internal_listener
+      active_state:
+        version_info: version3
+        listener:
+          "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+          name: test_internal_listener
+          address:
+            envoy_internal_address:
+              server_listener_name: test_internal_listener_name
+          filter_chains: {}
+          internal_listener: {}
+        last_updated:
+          seconds: 3003003003
+          nanos: 3000000
+    - name: test_internal_listener_bar
+      active_state:
+        version_info: version4
+        listener:
+          "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+          name: test_internal_listener_bar
+          address:
+            envoy_internal_address:
+              server_listener_name: test_internal_listener_bar
+          filter_chains: {}
+          internal_listener: {}
+        last_updated:
+          seconds: 4004004004
+          nanos: 4000000
+    - name: test_internal_listener_baz
+      warming_state:
+        version_info: version5
+        listener:
+          "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+          name: test_internal_listener_baz
+          address:
+            envoy_internal_address:
+              server_listener_name: test_internal_listener_baz
+          filter_chains: {}
+          internal_listener: {}
+        last_updated:
+          seconds: 5005005005
+          nanos: 5000000
+  )EOF");
 
-  //   // Update a duplicate baz that is currently warming.
-  //   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "",
-  //   true)); checkStats(__LINE__, 3, 2, 0, 1, 2, 0, 0);
+  // Update a duplicate baz that is currently warming.
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "", true));
+  checkStats(__LINE__, 3, 2, 0, 1, 2, 0, 0);
 
-  //   // Update baz while it is warming.
-  //   const std::string listener_baz_update1_yaml = R"EOF(
-  // name: baz
-  // address:
-  //   socket_address:
-  //     address: 127.0.0.1
-  //     port_value: 1236
-  // filter_chains:
-  // - filters:
-  //   - name: fake
-  //     typed_config: {}
-  //   )EOF";
+  // Update baz while it is warming.
+  const std::string listener_baz_update1_yaml = R"EOF(
+  name: test_internal_listener_baz
+  address:
+    envoy_internal_address:
+      server_listener_name: test_internal_listener_baz
+  internal_listener: {}    
+  filter_chains:
+  - filters:
+    - name: fake
+      typed_config: {}
+    )EOF";
 
-  //   ListenerHandle* listener_baz_update1 = expectListenerCreate(true, true);
-  //   EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
-  //     // Call the initialize callback during destruction like RDS will.
-  //     listener_baz->target_.ready();
-  //   }));
-  //   EXPECT_CALL(listener_baz_update1->target_, initialize());
-  //   EXPECT_TRUE(
-  //       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_update1_yaml), "",
-  //       true));
-  //   EXPECT_EQ(2UL, manager_->listeners().size());
-  //   checkStats(__LINE__, 3, 3, 0, 1, 2, 0, 0);
+  ListenerHandle* listener_baz_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
+    // Call the initialize callback during destruction like RDS will.
+    listener_baz->target_.ready();
+  }));
+  EXPECT_CALL(listener_baz_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_update1_yaml), "", true));
+  EXPECT_EQ(2UL, manager_->listeners().size());
+  checkStats(__LINE__, 3, 3, 0, 1, 2, 0, 0);
 
-  //   // Finish initialization for baz which should make it active.
-  //   EXPECT_CALL(*worker_, addListener(_, _, _));
-  //   listener_baz_update1->target_.ready();
-  //   EXPECT_EQ(3UL, manager_->listeners().size());
-  //   worker_->callAddCompletion(true);
-  //   checkStats(__LINE__, 3, 3, 0, 0, 3, 0, 0);
+  // Finish initialization for baz which should make it active.
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_baz_update1->target_.ready();
+  EXPECT_EQ(3UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+  checkStats(__LINE__, 3, 3, 0, 0, 3, 0, 0);
 
   EXPECT_CALL(*listener_foo_update2, onDestroy());
-  //   EXPECT_CALL(*listener_bar, onDestroy());
-  //   EXPECT_CALL(*listener_baz_update1, onDestroy());
-  // }
-  //   const std::string yaml = R"EOF(
-  // name: test_internal_listener
-  // address:
-  //   envoy_internal_address:
-  //     server_listener_name: test_internal_listener_name
-  // internal_listener: {}
-  //   )EOF";
-
-  //   server_.server_factory_context_->cluster_manager_.initializeClusters(
-  //       {"dynamic_forward_proxy_cluster"}, {});
-  //   ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
-  //   EXPECT_EQ(1U, manager_->listeners().size());
-  //   EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
-
-  //   ASSERT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
-  //   EXPECT_EQ(1U, manager_->listeners().size());
-  //   // The original ApiListener is there.
-  //   ASSERT_TRUE(manager_->apiListener().has_value());
-  //   EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+  EXPECT_CALL(*listener_bar, onDestroy());
+  EXPECT_CALL(*listener_baz_update1, onDestroy());
 }
 
 TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {
