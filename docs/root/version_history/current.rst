@@ -77,7 +77,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* active http health checks: properly handles HTTP/2 GOAWAY frames from the upstream. Previously a GOAWAY frame due to a graceful listener drain could cause improper failed health checks due to streams being refused by the upstream on a connection that is going away. To revert to old GOAWAY handling behavior, set the runtime feature `envoy.reloadable_features.health_check.graceful_goaway_handling` to false.
+* active http health checks: properly handles HTTP/2 GOAWAY frames from the upstream. Previously a GON/AAWAY frame due to a graceful listener drain could cause improper failed health checks due to streams being refused by the upstream on a connection that is going away. To revert to old GOAWAY handling behavior, set the runtime feature `envoy.reloadable_features.health_check.graceful_goaway_handling` to false.
 * adaptive concurrency: fixed a bug where concurrent requests on different worker threads could update minRTT back-to-back.
 * buffer: tighten network connection read and write buffer high watermarks in preparation to more careful enforcement of read limits. Buffer high-watermark is now set to the exact configured value; previously it was set to value + 1.
 * cdn_loop: check that the entirety of the :ref:`cdn_id <envoy_v3_api_field_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig.cdn_id>` field is a valid CDN identifier.
@@ -102,6 +102,7 @@ Bug Fixes
 * tls: fix issue where OCSP was inadvertently removed from SSL response in multi-context scenarios.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
 * upstream: retry budgets will now set default values for xDS configurations.
+* validation: fix an issue that causes TAP sockets to panic during config validation mode.
 * zipkin: fix 'verbose' mode to emit annotations for stream events. This was the documented behavior, but wasn't behaving as documented.
 
 Removed Config or Runtime
