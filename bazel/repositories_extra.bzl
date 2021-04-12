@@ -6,6 +6,13 @@ load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_
 def _python_deps():
     py_repositories()
 
+    # REMOVE!!!
+    pip_install(
+        name = "sometools_pip3",
+        requirements = "@envoy//tools/sometools:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+
     pip_install(
         name = "config_validation_pip3",
         requirements = "@envoy//tools/config_validation:requirements.txt",
@@ -86,6 +93,11 @@ def _python_deps():
     pip_install(
         name = "pylint_pip3",
         requirements = "@envoy//tools/code_format:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "testing_pip3",
+        requirements = "@envoy//tools/testing:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
