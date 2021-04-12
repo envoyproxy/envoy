@@ -60,6 +60,18 @@ TEST(Utility, ParseRegex) {
     EXPECT_TRUE(compiled_matcher->match(long_string));
   }
 
+  // Regression test for https://github.com/envoyproxy/envoy/issues/15826
+  {
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    matcher.mutable_google_re2();
+    matcher.set_regex("/status/200(/.*)?$");
+    const auto compiled_matcher = Utility::parseRegex(matcher);
+    EXPECT_TRUE(compiled_matcher->match("/status/200"));
+    EXPECT_TRUE(compiled_matcher->match("/status/200/"));
+    EXPECT_TRUE(compiled_matcher->match("/status/200/foo"));
+    EXPECT_FALSE(compiled_matcher->match("/status/200foo"));
+  }
+
   // Positive case to ensure no max program size is enforced.
   {
     TestScopedRuntime scoped_runtime;
