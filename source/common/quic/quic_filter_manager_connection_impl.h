@@ -79,11 +79,10 @@ public:
     return Network::Connection::State::Closed;
   }
   bool connecting() const override {
-    if (!initialized_ ||
-        (quic_connection_ != nullptr && !quic_connection_->IsHandshakeComplete())) {
-      return true;
+    if (initialized_ && (quic_connection_ == nullptr || quic_connection_->IsHandshakeComplete())) {
+      return false;
     }
-    return false;
+    return true;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.

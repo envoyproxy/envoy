@@ -9,6 +9,24 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/codec_impl.h"
+#include "common/quic/envoy_quic_connection_helper.h"
+#include "common/quic/envoy_quic_alarm_factory.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/test_tools/crypto_test_utils.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+#endif
+
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -62,7 +80,11 @@ public:
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
-  ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
+  ~CodecClientTest() override {
+    if (client_ != nullptr) {
+      EXPECT_EQ(0U, client_->numActiveRequests());
+    }
+  }
 
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
@@ -77,20 +99,58 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
-TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
-  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+#ifdef ENVOY_ENABLE_QUIC
+class MockEnvoyQuicClientSession : public Quic::EnvoyQuicClientSession {
+public:
+  MockEnvoyQuicClientSession(quic::ParsedQuicVersionVector& quic_version,
+                             Quic::EnvoyQuicConnectionHelper& connection_helper,
+                             Quic::EnvoyQuicAlarmFactory& alarm_factory,
+                             quic::QuicCryptoClientConfig* crypto_config,
+                             Event::Dispatcher& dispatcher)
+      : EnvoyQuicClientSession(quic::QuicConfig(), quic_version,
+                               std::make_unique<Quic::EnvoyQuicClientConnection>(
+                                   quic::test::TestConnectionId(), connection_helper, alarm_factory,
+                                   new testing::NiceMock<quic::test::MockPacketWriter>(),
+                                   /*owns_writer=*/true, quic_version, dispatcher,
+                                   std::unique_ptr<Network::ConnectionSocket>(
+                                       new testing::NiceMock<Network::MockConnectionSocket>())),
+                               quic::QuicServerId("example.com", 443, false), crypto_config,
+                               /*push_promise_index=*/nullptr, dispatcher,
+                               /*send_buffer_limit=*/16 * 1024 * 2) {}
 
-  EXPECT_CALL(*connection, connecting()).WillOnce(Return(true));
+  ~MockEnvoyQuicClientSession() override {}
+
+  // Network::ClientConnection
+  MOCK_METHOD(void, connect, ());
+  MOCK_METHOD(bool, connecting, (), (const));
+  MOCK_METHOD(void, addConnectionCallbacks, (Network::ConnectionCallbacks & cb));
+  MOCK_METHOD(void, addReadFilter, (Network::ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
+};
+
+TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  quic::ParsedQuicVersionVector quic_version = quic::CurrentSupportedVersions();
+  Quic::EnvoyQuicConnectionHelper connection_helper(dispatcher);
+  Quic::EnvoyQuicAlarmFactory alarm_factory(dispatcher, *connection_helper.GetClock());
+  quic::QuicCryptoClientConfig crypto_config(
+      quic::test::crypto_test_utils::ProofVerifierForTesting());
+  auto connection = std::make_unique<MockEnvoyQuicClientSession>(
+      quic_version, connection_helper, alarm_factory, &crypto_config, dispatcher);
+  testing::NiceMock<Random::MockRandomGenerator> random;
+
   EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
-  EXPECT_CALL(*connection, connect());
   EXPECT_CALL(*connection, addReadFilter(_));
-  auto codec = new Http::MockClientConnection();
+  EXPECT_CALL(*connection, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*connection, connect());
 
-  EXPECT_CALL(dispatcher_, createTimer_(_));
-  client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP3, std::move(connection),
-                                                 codec, nullptr, host_, dispatcher_);
+  auto client = std::make_unique<CodecClientProd>(CodecClient::Type::HTTP3, std::move(connection),
+                                                  host_, dispatcher, random);
+  EXPECT_EQ(0U, client->numActiveRequests());
+  client->close();
 }
+#endif
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   initialize();
