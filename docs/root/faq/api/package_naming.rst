@@ -1,4 +1,4 @@
-What do the v2, v3, vN etc. mean in API package names?
+API 包名中的 v2、v3、vN 是什么意思？
 ======================================================
 
-See the :repo:`API versioning guidelines <api/API_VERSIONING.md>`.
+请参考 :repo:`API 版本指南 <api/API_VERSIONING.md>`。
