@@ -13,7 +13,7 @@ Linux-x86_64|Linux-s390x|Linux-aarch64|Linux-ppc64le)
 Darwin-x86_64|Darwin-arm64)
   ;;
 MSYS_NT-*-x86_64)
-  DEPOT_TOOLS_WIN_TOOLCHAIN=0
+  export DEPOT_TOOLS_WIN_TOOLCHAIN=0
   ;;
 *)
   echo "ERROR: wee8 is currently not supported on $${PLATFORM}." >&2
