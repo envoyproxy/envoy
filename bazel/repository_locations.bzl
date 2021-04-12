@@ -761,7 +761,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.grpc_credentials.aws_iam",
             "envoy.tracers.opencensus",
         ],
-        release_date = "2021-03-31",
+        release_date = "2021-03-30",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
     ),
     com_googlesource_chromium_v8 = dict(
