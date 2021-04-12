@@ -77,9 +77,10 @@ using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHa
  */
 enum class ClusterDiscoveryStatus {
   /**
-   * Cluster was not found during the discovery process.
+   * The discovery process timed out. This means that there is no such cluster or we haven't yet
+   * received any reply from on-demand CDS about it.
    */
-  Missing,
+  Timeout,
   /**
    * Cluster found and currently available through ClusterManager.
    */
@@ -123,14 +124,16 @@ public:
    *
    * @param name is the name of the cluster to be discovered.
    * @param callback will be called when the discovery is finished.
+   * @param timeout describes how long the operation may take before failing.
    * @return ClusterDiscoveryCallbackHandlePtr the discovery process handle.
    */
   virtual ClusterDiscoveryCallbackHandlePtr
   requestOnDemandClusterDiscovery(const std::string& name,
-                                  ClusterDiscoveryCallbackSharedPtr callback) PURE;
+                                  ClusterDiscoveryCallbackSharedPtr callback,
+                                  std::chrono::milliseconds timeout) PURE;
 };
 
-using OdCdsApiHandleSharedPtr = std::shared_ptr<OdCdsApiHandle>;
+using OdCdsApiHandlePtr = std::unique_ptr<OdCdsApiHandle>;
 
 class ClusterManagerFactory;
 
@@ -376,9 +379,9 @@ public:
    * @param odcds_config is a configuration proto. Used when odcds_resources_locator is a nullopt.
    * @param odcds_resources_locator is a locator for ODCDS. Used over odcds_config if not a nullopt.
    * @param validation_visitor
-   * @return OdCdsApiHandleSharedPtr the ODCDS handle.
+   * @return OdCdsApiHandlePtr the ODCDS handle.
    */
-  virtual OdCdsApiHandleSharedPtr
+  virtual OdCdsApiHandlePtr
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;

@@ -29,7 +29,7 @@ public:
 
   NiceMock<MockClusterManager> cm_;
   Stats::IsolatedStoreImpl store_;
-  OdCdsApiPtr odcds_;
+  OdCdsApiSharedPtr odcds_;
   Config::SubscriptionCallbacks* odcds_callbacks_ = nullptr;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };

@@ -12,11 +12,11 @@ namespace Envoy {
 namespace Upstream {
 
 class MockOdCdsApi;
-using MockOdCdsApiPtr = std::unique_ptr<MockOdCdsApi>;
+using MockOdCdsApiSharedPtr = std::shared_ptr<MockOdCdsApi>;
 
 class MockOdCdsApi : public OdCdsApi {
 public:
-  static MockOdCdsApiPtr create() { return std::make_unique<MockOdCdsApi>(); }
+  static MockOdCdsApiSharedPtr create() { return std::make_shared<MockOdCdsApi>(); }
 
   MockOdCdsApi();
   ~MockOdCdsApi() override;

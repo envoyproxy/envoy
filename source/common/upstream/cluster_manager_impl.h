@@ -286,7 +286,7 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
-  OdCdsApiHandleSharedPtr
+  OdCdsApiHandlePtr
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) override;
@@ -344,32 +344,28 @@ protected:
    *
    * It's a protected type, so unit tests can use it.
    */
-  class OdCdsApiHandleImpl : public std::enable_shared_from_this<OdCdsApiHandleImpl>,
-                             public OdCdsApiHandle {
+  class OdCdsApiHandleImpl : public OdCdsApiHandle {
   public:
-    static OdCdsApiHandleSharedPtr create(ClusterManagerImpl& parent, OdCdsApiPtr odcds) {
-      return std::make_shared<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds) {
+      return std::make_unique<OdCdsApiHandleImpl>(parent, std::move(odcds));
     }
 
-    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiPtr odcds)
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds)
         : parent_(parent), odcds_(std::move(odcds)) {
       ASSERT(odcds_ != nullptr);
     }
 
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(const std::string& name,
-                                    ClusterDiscoveryCallbackSharedPtr callback) override {
-      return parent_.requestOnDemandClusterDiscovery(shared_from_this(), name, std::move(callback));
+                                    ClusterDiscoveryCallbackSharedPtr callback,
+                                    std::chrono::milliseconds timeout) override {
+      return parent_.requestOnDemandClusterDiscovery(odcds_, name, std::move(callback), timeout);
     }
-
-    OdCdsApi& getOdCds() const { return *odcds_; }
 
   private:
     ClusterManagerImpl& parent_;
-    const OdCdsApiPtr odcds_;
+    OdCdsApiSharedPtr odcds_;
   };
-
-  using OdCdsApiHandleImplSharedPtr = std::shared_ptr<OdCdsApiHandleImpl>;
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
                                             ThreadLocalClusterUpdateParams&& params);
@@ -682,11 +678,11 @@ private:
   using ClusterUpdatesMap = absl::node_hash_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
   /**
-   * Holds a reference to an on-demand CDS handle to keep it alive for the duration of a cluster
-   * discovery, and an expiration timer notifying worker threads about discovery timing out.
+   * Holds a reference to an on-demand CDS to keep it alive for the duration of a cluster discovery,
+   * and an expiration timer notifying worker threads about discovery timing out.
    */
   struct ClusterCreation {
-    OdCdsApiHandleImplSharedPtr odcds_handle_;
+    OdCdsApiSharedPtr odcds_;
     Event::TimerPtr expiration_timer_;
   };
 
@@ -714,8 +710,9 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr odcds_handle, const std::string& name,
-                                  ClusterDiscoveryCallbackSharedPtr callback);
+  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, const std::string& name,
+                                  ClusterDiscoveryCallbackSharedPtr callback,
+                                  std::chrono::milliseconds timeout);
 
 private:
   ClusterManagerFactory& factory_;

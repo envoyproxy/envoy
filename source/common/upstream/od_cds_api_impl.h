@@ -37,7 +37,7 @@ public:
   virtual void updateOnDemand(const std::string& cluster_name) PURE;
 };
 
-using OdCdsApiPtr = std::unique_ptr<OdCdsApi>;
+using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
 
 /**
  * ODCDS API implementation that fetches via Subscription.
@@ -46,10 +46,10 @@ class OdCdsApiImpl : public OdCdsApi,
                      Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
                      Logger::Loggable<Logger::Id::upstream> {
 public:
-  static OdCdsApiPtr create(const envoy::config::core::v3::ConfigSource& odcds_config,
-                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                            ClusterManager& cm, Stats::Scope& scope,
-                            ProtobufMessage::ValidationVisitor& validation_visitor);
+  static OdCdsApiSharedPtr create(const envoy::config::core::v3::ConfigSource& odcds_config,
+                                  OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+                                  ClusterManager& cm, Stats::Scope& scope,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::OdCdsApi
   void updateOnDemand(const std::string& cluster_name) override;

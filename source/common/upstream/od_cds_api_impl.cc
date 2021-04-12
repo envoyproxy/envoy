@@ -8,11 +8,12 @@
 namespace Envoy {
 namespace Upstream {
 
-OdCdsApiPtr OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
-                                 OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                                 ClusterManager& cm, Stats::Scope& scope,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return OdCdsApiPtr(
+OdCdsApiSharedPtr
+OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
+                     OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+                     ClusterManager& cm, Stats::Scope& scope,
+                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  return OdCdsApiSharedPtr(
       new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, scope, validation_visitor));
 }
 
@@ -69,6 +70,8 @@ void OdCdsApiImpl::sendAwaiting() {
   if (awaiting_names_.empty()) {
     return;
   }
+  ENVOY_LOG(debug, "odcds: sending request for awaiting cluster names {}",
+            fmt::join(awaiting_names_, ", "));
   subscription_->requestOnDemandUpdate(awaiting_names_);
   awaiting_names_.clear();
 }
@@ -76,15 +79,18 @@ void OdCdsApiImpl::sendAwaiting() {
 void OdCdsApiImpl::updateOnDemand(const std::string& cluster_name) {
   switch (status_) {
   case StartStatus::NotStarted:
+    ENVOY_LOG(trace, "odcds: starting a subscription with cluster name {}", cluster_name);
     status_ = StartStatus::Started;
     subscription_->start({cluster_name});
     return;
 
   case StartStatus::Started:
+    ENVOY_LOG(trace, "odcds: putting cluster name {} on awaiting list", cluster_name);
     awaiting_names_.insert(cluster_name);
     return;
 
   case StartStatus::InitialFetchDone:
+    ENVOY_LOG(trace, "odcds: requesting for cluster name {}", cluster_name);
     subscription_->requestOnDemandUpdate({cluster_name});
     return;
   }

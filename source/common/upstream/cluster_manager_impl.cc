@@ -1054,10 +1054,9 @@ void ClusterManagerImpl::ClusterDiscoveryManager::ensureLifecycleCallbacksAreIns
   if (callbacks_handle_) {
     return;
   }
-  auto cb = ClusterAddedCb([this](ThreadLocalCluster& cluster) {
+  callbacks_ = std::make_unique<ClusterCallbacks>([this](ThreadLocalCluster& cluster) {
     processClusterName(cluster.info()->name(), ClusterDiscoveryStatus::Available);
   });
-  callbacks_ = std::make_unique<ClusterCallbacks>(cb);
   callbacks_handle_ = parent_.parent_.addThreadLocalClusterUpdateCallbacks(*callbacks_);
 }
 
@@ -1126,7 +1125,7 @@ void ClusterManagerImpl::ClusterDiscoveryManager::maybePostResetCallbacks() {
   }
 }
 
-OdCdsApiHandleSharedPtr
+OdCdsApiHandlePtr
 ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -1138,35 +1137,47 @@ ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource
   return OdCdsApiHandleImpl::create(*this, std::move(odcds));
 }
 
-ClusterDiscoveryCallbackHandlePtr
-ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr odcds_handle,
-                                                    const std::string& name,
-                                                    ClusterDiscoveryCallbackSharedPtr callback) {
+ClusterDiscoveryCallbackHandlePtr ClusterManagerImpl::requestOnDemandClusterDiscovery(
+    OdCdsApiSharedPtr odcds, const std::string& name, ClusterDiscoveryCallbackSharedPtr callback,
+    std::chrono::milliseconds timeout) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto [handle, discovery_in_progress] = cluster_manager.cdm_.addCallback(name, callback);
   if (discovery_in_progress) {
+    ENVOY_LOG(debug,
+              "cm odcds: on-demand discovery for cluster {} is already in progress, something else "
+              "in this thread has already requested it",
+              name);
     // This worker thread has already requested a discovery of a cluster with this name, so nothing
     // more left to do here.
     return std::move(handle);
   }
+  ENVOY_LOG(
+      debug,
+      "cm odcds: forwarding the on-demand discovery request for cluster {} to the main thread",
+      name);
   // This seems to be the first request for discovery of this cluster in this worker thread. Rest of
   // the process may only happen in the main thread.
-  dispatcher_.post([this, odcds_handle = std::move(odcds_handle),
+  dispatcher_.post([this, odcds = std::move(odcds), timeout,
                     weak_callback = ClusterDiscoveryCallbackWeakPtr(callback), name,
                     &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
     // Check for the cluster here too. It might have been added between the time when this closure
     // was posted and when it is being executed.
     if (getThreadLocalCluster(name) != nullptr) {
+      ENVOY_LOG(debug, "cm odcds: the requested cluster {} is already known", name);
       if (weak_callback.expired()) {
+        ENVOY_LOG(debug, "cm odcds: callback expired");
         // Not only the cluster was added, but it was also already handled, so don't bother with
         // posting the callback back to the worker thread.
         return;
       }
-      thread_local_dispatcher.post([weak_callback] {
+      thread_local_dispatcher.post([name, weak_callback] {
         if (auto callback = weak_callback.lock(); callback != nullptr) {
+          ENVOY_LOG(debug, "cm odcds: invoking callback on the already known cluster {}", name);
           // If this gets called here, it means that we requested a discovery of a cluster without
-          // checking if that cluster is already known by cluster manager.
+          // checking if that cluster is already known by cluster manager. The other situation we
+          // get here can be when another thread was faster in requesting the discovery and handling
+          // the resulting new cluster. It's a rather unlikely race, though.
           (*callback)(ClusterDiscoveryStatus::Available);
         }
       });
@@ -1174,45 +1185,40 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiHandleImplSharedPtr 
     }
 
     if (auto it = pending_cluster_creations_.find(name); it != pending_cluster_creations_.end()) {
+      ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} is already in progress", name);
       // We already began the discovery process for this cluster, nothing to do. If we got here, it
       // means that it was other worker thread that requested the discovery.
       return;
     }
-    auto& odcds = odcds_handle->getOdCds();
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
     // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
-    odcds.updateOnDemand(name);
+    odcds->updateOnDemand(name);
     // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
-    auto timer_cb = Event::TimerCb([this, name] { notifyExpiredDiscovery(name); });
-    auto timer = dispatcher_.createTimer(timer_cb);
-    // TODO(krnowak): This timeout period is arbitrary. Should it be a parameter or do we keep it,
-    // but rather with a name?
-    timer->enableTimer(std::chrono::milliseconds(5000));
+    auto timer = dispatcher_.createTimer([this, name] { notifyExpiredDiscovery(name); });
+    timer->enableTimer(timeout);
     // Keep odcds handle alive for the duration of the discovery process.
     pending_cluster_creations_.insert(
-        {std::move(name), ClusterCreation{std::move(odcds_handle), std::move(timer)}});
+        {std::move(name), ClusterCreation{std::move(odcds), std::move(timer)}});
   });
 
   return std::move(handle);
 }
 
 void ClusterManagerImpl::notifyExpiredDiscovery(const std::string& name) {
+  ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} timed out", name);
   auto map_node_handle = pending_cluster_creations_.extract(name);
   if (map_node_handle.empty()) {
+    // Not sure if this may happen. This looks like timeout callback being invoked despite the
+    // cluster being discovered, so it was removed from pending_cluster_creations_ together with the
+    // timer invoking this callback.
+    //
+    // TODO(krnowak): Consider using ASSERT(!map_node_handle.empty()).
+    ENVOY_LOG(debug, "cm odcds: expired discovery for an already discovered cluster", name);
     return;
   }
-  // Defer destroying the timer, so it's not destroyed during its callback. TimerPtr is a
-  // unique_ptr, which is not copyable, but std::function is copyable, we turn a move-only
-  // unique_ptr into a copyable shared_ptr and pass that to the std::function.
-  dispatcher_.post([timer = std::shared_ptr<Event::Timer>(
-                        std::move(map_node_handle.mapped().expiration_timer_))] {});
-
   // Let all the worker threads know that the discovery timed out.
   tls_.runOnAllThreads([name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    if (!cluster_manager.has_value()) {
-      return;
-    }
-    cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Missing);
+    cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Timeout);
   });
 }
 

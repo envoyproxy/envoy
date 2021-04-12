@@ -69,7 +69,7 @@ public:
   const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const override {
     return cluster_timeout_budget_stat_names_;
   }
-  MOCK_METHOD(OdCdsApiHandleSharedPtr, allocateOdCdsApi,
+  MOCK_METHOD(OdCdsApiHandlePtr, allocateOdCdsApi,
               (const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
@@ -89,7 +89,6 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
-  std::shared_ptr<NiceMock<MockOdCdsApiHandle>> odcds_handle_;
 };
 } // namespace Upstream
 } // namespace Envoy
