@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@deps_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -46,24 +47,10 @@ py_binary(
     ],
 )
 
-py_binary(
-    name = "pip_check",
-    srcs = ["pip_check.py"],
-    visibility = ["//visibility:public"],
+envoy_py_binary(
+    name = "tools.dependency.pip_check",
     deps = [
         "//tools/base:checker",
         requirement("PyYaml"),
-    ],
-)
-
-py_binary(
-    name = "pytest_pip_check",
-    srcs = [
-        "pytest_pip_check.py",
-        "tests/test_pip_check.py",
-    ],
-    deps = [
-        ":pip_check",
-        "//tools/testing:python_pytest",
     ],
 )

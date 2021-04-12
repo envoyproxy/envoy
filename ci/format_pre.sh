@@ -7,8 +7,6 @@
 
 FAILED=()
 CURRENT=""
-DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
-
 
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
 

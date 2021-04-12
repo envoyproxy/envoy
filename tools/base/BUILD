@@ -5,6 +5,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_py_library("tools.base.checker")
+
 envoy_py_library("tools.base.runner")
 
 envoy_py_library("tools.base.utils")

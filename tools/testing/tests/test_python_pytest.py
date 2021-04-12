@@ -9,9 +9,6 @@ from tools.testing import plugin, python_pytest
 
 # this is necessary to fix coverage as these libs are imported before pytest
 # is invoked
-from tools.testing import plugin, python_pytest
-
-
 importlib.reload(python_pytest)
 importlib.reload(plugin)
 
