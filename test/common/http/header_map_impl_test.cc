@@ -37,6 +37,13 @@ TEST(HeaderStringTest, All) {
     EXPECT_TRUE(banana == banana);
   }
 
+  // Static LowerCaseString move assignment operator
+  {
+    LowerCaseString hello_string("HELLO");
+    LowerCaseString goodbye_string("GOODBYE");
+    hello_string = std::move(goodbye_string);
+    EXPECT_EQ("goodbye", hello_string.get());
+  }
   // Static std::string constructor
   {
     std::string static_string("HELLO");
