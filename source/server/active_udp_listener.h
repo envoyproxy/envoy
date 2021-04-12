@@ -7,15 +7,22 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/server/active_udp_listener_config.h"
 
-// TODO(lambdai): remove connection_handler_impl after ActiveListenerImplBase is extracted from it.
-#include "server/connection_handler_impl.h"
+#include "server/active_listener_base.h"
 
 namespace Envoy {
 namespace Server {
 
-class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
+#define ALL_UDP_LISTENER_STATS(COUNTER) COUNTER(downstream_rx_datagram_dropped)
+
+/**
+ * Wrapper struct for UDP listener stats. @see stats_macros.h
+ */
+struct UdpListenerStats {
+  ALL_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class ActiveUdpListenerBase : public ActiveListenerImplBase,
                               public Network::ConnectionHandler::ActiveUdpListener {
 public:
   ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
@@ -27,6 +34,9 @@ public:
   void onData(Network::UdpRecvData&& data) final;
   uint32_t workerIndex() const final { return worker_index_; }
   void post(Network::UdpRecvData&& data) final;
+  void onDatagramsDropped(uint32_t dropped) final {
+    udp_stats_.downstream_rx_datagram_dropped_.add(dropped);
+  }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
@@ -42,6 +52,7 @@ protected:
   Network::UdpConnectionHandler& parent_;
   Network::Socket& listen_socket_;
   Network::UdpListenerPtr udp_listener_;
+  UdpListenerStats udp_stats_;
 };
 
 /**

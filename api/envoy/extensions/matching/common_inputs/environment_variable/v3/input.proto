@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.common_inputs.environment_variable.v3;
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.environment_variable.v3";
+option java_outer_classname = "InputProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Environment Variable Input]
+// [#extension: envoy.matching.common_inputs.environment_variable]
+
+// Reads an environment variable to provide an input for matching.
+message Config {
+  // Name of the environment variable to read from.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+}

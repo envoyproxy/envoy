@@ -6,6 +6,13 @@ load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_
 def _python_deps():
     py_repositories()
 
+    # REMOVE!!!
+    pip_install(
+        name = "sometools_pip3",
+        requirements = "@envoy//tools/sometools:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+
     pip_install(
         name = "config_validation_pip3",
         requirements = "@envoy//tools/config_validation:requirements.txt",
@@ -13,8 +20,8 @@ def _python_deps():
 
         # project_name = "PyYAML",
         # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.3.1",
-        # release_date = "2020-03-18"
+        # version = "5.4.1",
+        # release_date = "2021-01-20"
         # use_category = ["devtools"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
@@ -35,6 +42,11 @@ def _python_deps():
         # version = "1.1.1",
         # release_date = "2019-02-23"
         # use_category = ["test"],
+    )
+    pip_install(
+        name = "deps_pip3",
+        requirements = "@envoy//tools/dependency:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
     )
     pip_install(
         name = "kafka_pip3",
@@ -73,10 +85,20 @@ def _python_deps():
 
         # project_name = "PyYAML",
         # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.3.1",
-        # release_date = "2020-03-18"
+        # version = "5.4.1",
+        # release_date = "2021-01-20"
         # use_category = ["docs"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
+    )
+    pip_install(
+        name = "pylint_pip3",
+        requirements = "@envoy//tools/code_format:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "testing_pip3",
+        requirements = "@envoy//tools/testing:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
     )
     pip_install(
         name = "thrift_pip3",

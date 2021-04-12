@@ -172,23 +172,46 @@ public:
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
   bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
-  static void init() { MainThreadSingleton::initialize(new MainThread()); }
-  static void clear() {
-    delete MainThreadSingleton::getExisting();
-    MainThreadSingleton::clear();
+  bool inTestThread() const {
+    return test_thread_id_.has_value() && (test_thread_id_.value() == std::this_thread::get_id());
   }
-  static bool isMainThread() {
-    // If threading is off, only main thread is running.
-    if (MainThreadSingleton::getExisting() == nullptr) {
-      return true;
-    }
-    // When threading is on, compare thread id with main thread id.
-    return MainThreadSingleton::get().inMainThread();
-  }
+  void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
+  void registerMainThread() { main_thread_id_ = std::this_thread::get_id(); }
+  static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
+  /*
+   * Register the main thread id, should be called in main thread before threading is on. Currently
+   * called in ThreadLocal::InstanceImpl().
+   */
+  static void initMainThread();
+  /*
+   * Register the test thread id, should be called in test thread before threading is on. Allow
+   * some main thread only code to be executed on test thread.
+   */
+  static void initTestThread();
+  /*
+   * Delete the main thread singleton, should be called in main thread after threading
+   * has been shut down. Currently called in ~ThreadLocal::InstanceImpl().
+   */
+  static void clear();
+  static bool isMainThread();
 
 private:
-  std::thread::id main_thread_id_{std::this_thread::get_id()};
+  std::thread::id main_thread_id_;
+  absl::optional<std::thread::id> test_thread_id_;
 };
+
+// To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
+// base. This macros uses main thread assertion to make sure that exceptions aren't thrown from
+// worker thread.
+#define TRY_ASSERT_MAIN_THREAD                                                                     \
+  try {                                                                                            \
+    ASSERT(Thread::MainThread::isMainThread());
+
+#define END_TRY }
+
+// TODO(chaoqinli-1123): Remove this macros after we have removed all the exceptions from data
+// plane.
+#define TRY_NEEDS_AUDIT try
 
 } // namespace Thread
 } // namespace Envoy

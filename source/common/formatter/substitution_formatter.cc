@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/grpc/common.h"
@@ -149,13 +150,20 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
 }
 
 StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                                 bool omit_empty_values,
+                                 const std::vector<CommandParserPtr>& commands)
+    : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+      empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
+      struct_output_format_(FormatBuilder(commands).toFormatMapValue(format_mapping)) {}
+
+StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                                  bool omit_empty_values)
     : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
-      struct_output_format_(toFormatMapValue(format_mapping)) {}
+      struct_output_format_(FormatBuilder().toFormatMapValue(format_mapping)) {}
 
 StructFormatter::StructFormatMapWrapper
-StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
+StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
   auto output = std::make_unique<StructFormatMap>();
   for (const auto& pair : struct_format.fields()) {
     switch (pair.second.kind_case()) {
@@ -177,10 +185,10 @@ StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) cons
     }
   }
   return {std::move(output)};
-};
+}
 
-StructFormatter::StructFormatListWrapper
-StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const {
+StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toFormatListValue(
+    const ProtobufWkt::ListValue& list_value_format) const {
   auto output = std::make_unique<StructFormatList>();
   for (const auto& value : list_value_format.values()) {
     switch (value.kind_case()) {
@@ -204,9 +212,10 @@ StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_form
 }
 
 std::vector<FormatterProviderPtr>
-StructFormatter::toFormatStringValue(const std::string& string_format) const {
-  return SubstitutionFormatParser::parse(string_format);
-};
+StructFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
+  std::vector<CommandParserPtr> commands;
+  return SubstitutionFormatParser::parse(string_format, commands_.value_or(commands));
+}
 
 ProtobufWkt::Value StructFormatter::providersCallback(
     const std::vector<FormatterProviderPtr>& providers,
@@ -1294,9 +1303,11 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
-  try {
-    MessageUtil::jsonConvertValue(*proto, val);
-  } catch (EnvoyException& ex) {
+  // TODO(chaoqin-li1123): make this conversion return an error status instead of throwing.
+  // Access logger conversion from protobufs occurs via json intermediate state, which can throw
+  // when converting that to a structure.
+  TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
+  catch (EnvoyException& ex) {
     return unspecifiedValue();
   }
   return val;

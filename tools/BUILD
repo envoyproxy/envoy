@@ -12,10 +12,8 @@ envoy_package()
 
 exports_files([
     "gen_git_sha.sh",
-    "code_format/check_format.py",
-    "code_format/header_order.py",
-    "code_format/envoy_build_fixer.py",
     "check_repositories.sh",
+    "stack_decode.py",
 ])
 
 envoy_py_test_binary(

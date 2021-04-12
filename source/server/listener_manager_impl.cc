@@ -10,7 +10,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
@@ -25,15 +24,17 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#if defined(ENVOY_ENABLE_QUIC)
+#include "common/quic/quic_transport_socket_factory.h"
+#endif
+
 #include "server/api_listener_impl.h"
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
-#include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -360,9 +361,11 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   }
 
   auto it = error_state_tracker_.find(name);
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     if (it == error_state_tracker_.end()) {
       it = error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
     }
@@ -1009,8 +1012,10 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
   // The only connection oriented UDP transport protocol right now is QUIC.
-  const bool is_quic = listener_.udpListenerFactory() != nullptr &&
-                       !listener_.udpListenerFactory()->isTransportConnectionless();
+  const bool is_quic =
+      listener_.udpListenerConfig().has_value() &&
+      !listener_.udpListenerConfig()->listenerFactory().isTransportConnectionless();
+#if defined(ENVOY_ENABLE_QUIC)
   if (is_quic &&
       dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
     throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
@@ -1018,6 +1023,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                      "{}. \nUse QuicDownstreamTransport instead.",
                                      transport_socket.DebugString()));
   }
+#else
+  // When QUIC is compiled out it should not be possible to configure either the QUIC transport
+  // socket or the QUIC listener and get to this point.
+  ASSERT(!is_quic);
+#endif
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
 
