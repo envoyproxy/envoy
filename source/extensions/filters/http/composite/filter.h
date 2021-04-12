@@ -69,8 +69,8 @@ private:
   // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
   // serve to surface an easier to understand error, as attempting to insert a filter at a later
   // time will result in various FM assertions firing.
-  // TODO(snowp): Instead of validating this via ASSERTs, we should be able to validate that the
-  // match tree is only going to fire when we can actually inject a filter.
+  // We should be protected against this by the match tree validation that only allows request
+  // headers, this just provides some additional sanity checking.
   bool decoded_headers_ : 1;
 
   // Wraps a stream encoder OR a stream decoder filter into a stream filter, making it easier to

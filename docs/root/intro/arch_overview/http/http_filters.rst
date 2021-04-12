@@ -52,7 +52,7 @@ order: ``C``, ``B``, ``A``.
 Conditional Filter Configuration
 --------------------------------
 
-There is some support for having the filter configuration used to change based on the incoming
+There is some support for having the filter configuration used change based on the incoming
 request. See the :ref:`composite filter <config_http_filters_composite>` for details on how to
 configure a match tree that can resolve filter configuration to use for a given request.
 

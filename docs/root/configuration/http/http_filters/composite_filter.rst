@@ -14,10 +14,9 @@ filter it will delegate to before it receives any callbacks that it needs to del
 this, in order to delegate all the data to the specified filter, the decision must be made based
 on just the request headers.
 
-Delegation can fail for a few reasons: the match result was not ready in time for the filter
-to be instantiated at the right time or if the filter factory attempted to use a callback not supported
-by the composite filter. In either case, the `<stat_prefix>.composite.delegation_error` stat will
-be incremented.
+Delegation can fail if the filter factory attempted to use a callback not supported by the
+composite filter. In either case, the `<stat_prefix>.composite.delegation_error` stat will be
+incremented.
 
 Sample Envoy configuration
 --------------------------
