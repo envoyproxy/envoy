@@ -1,9 +1,11 @@
 #pragma once
 
+#include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
 
 #include "common/common/assert.h"
 
+#include "common/network/listen_socket_impl.h"
 #include "server/admin/config_tracker_impl.h"
 
 namespace Envoy {
@@ -30,8 +32,15 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   uint32_t concurrency() const override { return 1; }
 
+  // We want to implement the socket interface without implementing the http listener function.
+  // This is useful for TAP because it wants to emit warnings when the address type is UDS
+  void createHttpListenerSocket(Network::Address::InstanceConstSharedPtr address) {
+    socket_ = std::make_shared<Network::TcpListenSocket>(nullptr, address, nullptr);
+  }
+
 private:
   ConfigTrackerImpl config_tracker_;
+  Network::SocketSharedPtr socket_;
 };
 
 } // namespace Server

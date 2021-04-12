@@ -94,6 +94,11 @@ void ValidationInstance::initialize(const Options& options,
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   Configuration::InitialImpl initial_config(bootstrap, options, *this);
+
+  if (initial_config.admin().address()) {
+    admin_.createHttpListenerSocket(initial_config.admin().address());
+  }
+
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
