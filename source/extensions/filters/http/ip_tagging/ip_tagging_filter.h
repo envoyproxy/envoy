@@ -67,7 +67,6 @@ public:
 
   ~ValueSetWatcher();
 
-  bool contains(absl::string_view s) const;
   std::shared_ptr<const ValueSet> get() const;
   const std::string& filename() { return filename_; }
 
@@ -134,6 +133,10 @@ public:
   }
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
+
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
+  IpTaggingFilterSetTagData(
+      const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config);
 
 private:
   static FilterRequestType requestTypeEnum(

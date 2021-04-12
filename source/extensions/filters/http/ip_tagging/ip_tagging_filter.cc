@@ -36,37 +36,48 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   if (!config.path().empty()) {
+
     watcher_ = ValueSetWatcher::create(factory_context, std::move(config.path()));
+
   } else if (!config.ip_tags().empty()) {
 
-    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-    tag_data.reserve(config.ip_tags().size());
-
-    for (const auto& ip_tag : config.ip_tags()) {
-      std::vector<Network::Address::CidrRange> cidr_set;
-      cidr_set.reserve(ip_tag.ip_list().size());
-      for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
-
-        // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
-        Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
-        if (cidr_entry.isValid()) {
-          cidr_set.emplace_back(std::move(cidr_entry));
-        } else {
-          throw EnvoyException(
-              fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
-                          entry.address_prefix(), entry.prefix_len().value()));
-        }
-      }
-
-      tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-      stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
-    }
-
+    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
+        IpTaggingFilterSetTagData(config);
     trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 
   } else {
+
     throw EnvoyException("Only one of path or ip_tags can be specified");
   }
+}
+
+std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
+IpTaggingFilterConfig::IpTaggingFilterSetTagData(
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config) {
+
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+  tag_data.reserve(config.ip_tags().size());
+
+  for (const auto& ip_tag : config.ip_tags()) {
+    std::vector<Network::Address::CidrRange> cidr_set;
+    cidr_set.reserve(ip_tag.ip_list().size());
+    for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
+
+      // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
+      Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
+      if (cidr_entry.isValid()) {
+        cidr_set.emplace_back(std::move(cidr_entry));
+      } else {
+        throw EnvoyException(
+            fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
+                        entry.address_prefix(), entry.prefix_len().value()));
+      }
+    }
+
+    tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
+    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
+  }
+  return tag_data;
 }
 
 ValueSet::~ValueSet() = default;
@@ -93,8 +104,6 @@ ValueSetWatcher::~ValueSetWatcher() {
   if (registry_ != nullptr)
     registry_->remove(*this);
 }
-
-// bool ValueSetWatcher::contains(absl::string_view s) const { return get()->contains(s); }
 
 std::shared_ptr<const ValueSet> ValueSetWatcher::get() const { return values_; }
 
@@ -141,7 +150,9 @@ ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
   } else {
     throw EnvoyException("HTTP IP Tagging Filter supports only json or yaml file types");
   }
-  // parse the file here and return the values corresponding to valueSet
+
+  // TODO: parse the file here and return the values corresponding to valueSet
+
   return values_;
 }
 
