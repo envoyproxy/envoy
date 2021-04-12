@@ -1027,6 +1027,31 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
+  {
+    // Test virtual host formatter when a route exists
+    StreamInfoFormatter vhost_format("VHOST");
+    const std::string virtual_host_name = "vhost_test_name";
+    Router::MockRouteEntry route_entry_mock;
+    EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry_mock));
+    EXPECT_CALL(route_entry_mock, virtualHost()).Times(2);
+    EXPECT_CALL(route_entry_mock.virtual_host_, name())
+        .WillRepeatedly(ReturnRef(virtual_host_name));
+    EXPECT_EQ("vhost_test_name", vhost_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(vhost_format.formatValue(request_headers, response_headers, response_trailers,
+                                         stream_info, body),
+                ProtoEq(ValueUtil::stringValue("vhost_test_name")));
+  }
+  {
+    // Test virtual host formatter when a route exists
+    StreamInfoFormatter vhost_format("VHOST");
+    EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(nullptr));
+    EXPECT_EQ(absl::nullopt, vhost_format.format(request_headers, response_headers,
+                                                 response_trailers, stream_info, body));
+    EXPECT_THAT(vhost_format.formatValue(request_headers, response_headers, response_trailers,
+                                         stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
 }
 
 TEST(SubstitutionFormatterTest, requestHeaderFormatter) {

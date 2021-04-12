@@ -1178,6 +1178,7 @@ VirtualHostImpl::VirtualHostImpl(
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
     : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
+      name_(virtual_host.name()),
       vcluster_scope_(Stats::Utility::scopeFromStatNames(
           scope, {stat_name_storage_.statName(),
                   factory_context.routerContext().virtualClusterStatNames().vcluster_})),
