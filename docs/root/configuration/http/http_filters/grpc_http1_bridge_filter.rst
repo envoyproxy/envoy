@@ -32,7 +32,7 @@ response trailers to a compliant gRPC server. It works by doing the following:
   work with unary gRPC APIs.
 
 This filter also collects stats for all gRPC requests that transit, even if those requests are
-normal gRPC requests over HTTP/2.
+normal gRPC requests over HTTP/2 or above.
 
 More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
 

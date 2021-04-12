@@ -31,7 +31,7 @@ configure and code each application independently. Envoy supports various types 
   configured, all requests will be multiplexed over the same connection so this circuit breaker
   will only be hit when no connection is already established. If this circuit breaker overflows the
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
-  increment.
+  increment. For HTTP/3 the equivalent to HTTP/2's :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>` is :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>`
 * **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
   in a cluster at any given time. If this circuit breaker overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
   counter for the cluster will increment.
