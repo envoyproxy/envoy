@@ -6,6 +6,7 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
 // Helper function to make sure each protocol in expected_protocols is present
 // in protocols (only used for an ASSERT in debug builds)
 bool contains(const std::vector<Http::Protocol>& protocols,
@@ -21,6 +22,7 @@ bool contains(const std::vector<Http::Protocol>& protocols,
 absl::string_view describePool(const ConnectionPool::Instance& pool) {
   return pool.protocolDescription();
 }
+} // namespace
 
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
@@ -29,7 +31,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
     : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it) {}
+      current_(pool_it), http3_pool_(**pool_it) {}
 
 // TODO(#15649) add trace logging.
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
@@ -54,8 +56,12 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     ConnectionAttemptCallbacks* attempt, ConnectionPool::PoolFailureReason reason,
     absl::string_view transport_failure_reason, Upstream::HostDescriptionConstSharedPtr host) {
+  ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
             describePool(attempt->pool()), grid_.host_->hostname());
+  if (&(attempt->pool()) == &http3_pool_) {
+    http3_attempt_failed_ = true;
+  }
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
 
   // If there is another connection attempt in flight then let that proceed.
@@ -83,6 +89,17 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
 }
 
 bool ConnectivityGrid::WrapperCallbacks::newStream() {
+  if (grid_.is_http3_broken()) {
+    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", describePool(**current_),
+              grid_.host_->hostname());
+    absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
+    if (!next_pool.has_value()) {
+      // If there are no other pools to try, return false.
+      return false;
+    }
+    // Create a new connection attempt for the next pool.
+    current_ = next_pool.value();
+  }
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
             describePool(**current_), grid_.host_->hostname());
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
@@ -98,8 +115,13 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
     Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
     absl::optional<Http::Protocol> protocol) {
+  ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             grid_.host_->hostname());
+  if (http3_attempt_failed_) {
+    // If the HTTP/3 attempt failed but the other attempt succeeded, mark HTTP/3 as broken.
+    grid_.set_is_http3_broken(true);
+  }
   auto delete_on_return = attempt->removeFromList(connection_attempts_);
   // The first successful connection is passed up, and all others will be canceled.
   // TODO: Ensure that if HTTP/2 succeeds, we can allow the HTTP/3 connection to run to completion.
@@ -208,10 +230,10 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       std::make_unique<WrapperCallbacks>(*this, decoder, pools_.begin(), callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
-  // Note that in the case of immediate attempt/failure, newStream will delete this.
   if (wrapped_callbacks_.front()->newStream()) {
     // If newStream succeeds, return nullptr as the caller has received their
-    // callback and does not need a cancellable handle.
+    // callback and does not need a cancellable handle. At this point the
+    // WrappedCallbacks object has also been deleted.
     return nullptr;
   }
   return ret;
