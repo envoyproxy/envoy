@@ -4824,7 +4824,6 @@ per_connection_buffer_limit_bytes: 10
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
                    .value());
-  // EXPECT_CALL(*listener_foo_update1, onDestroy());
 
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _, _));
@@ -4843,67 +4842,64 @@ per_connection_buffer_limit_bytes: 10
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
                    .value());
 
-  //   // Update duplicate should be a NOP.
-  //   EXPECT_FALSE(
-  //       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml), "",
-  //       true));
-  //   checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
+  // Update duplicate should be a NOP.
+  EXPECT_FALSE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml), "", true));
+  checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
 
-  //   time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
+  time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
 
-  //   // Update foo. Should go into warming, have an immediate warming callback, and start
-  //   immediate
-  //   // removal.
-  //   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
-  //   EXPECT_CALL(*worker_, addListener(_, _, _));
-  //   EXPECT_CALL(*worker_, stopListener(_, _));
-  //   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
-  //   EXPECT_TRUE(
-  //       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3",
-  //       true));
-  //   worker_->callAddCompletion(true);
-  //   checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
-  //   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version3"));
-  //   checkConfigDump(R"EOF(
-  // version_info: version3
-  // static_listeners:
-  // dynamic_listeners:
-  //   - name: foo
-  //     active_state:
-  //       version_info: version3
-  //       listener:
-  //         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
-  //         name: foo
-  //         address:
-  //           socket_address:
-  //             address: 127.0.0.1
-  //             port_value: 1234
-  //         filter_chains: {}
-  //       last_updated:
-  //         seconds: 3003003003
-  //         nanos: 3000000
-  //     draining_state:
-  //       version_info: version2
-  //       listener:
-  //         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
-  //         name: foo
-  //         address:
-  //           socket_address:
-  //             address: 127.0.0.1
-  //             port_value: 1234
-  //         filter_chains: {}
-  //         per_connection_buffer_limit_bytes: 10
-  //       last_updated:
-  //         seconds: 2002002002
-  //         nanos: 2000000
-  // )EOF");
+  // Update foo. Should go into warming, have an immediate warming callback, and start immediate
+  // removal.
+  ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
+  worker_->callAddCompletion(true);
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version3"));
+  checkConfigDump(R"EOF(
+  version_info: version3
+  static_listeners:
+  dynamic_listeners:
+    - name: test_internal_listener
+      active_state:
+        version_info: version3
+        listener:
+          "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+          name: test_internal_listener
+          address:
+            envoy_internal_address:
+              server_listener_name: test_internal_listener_name
+          filter_chains: {}
+          internal_listener: {}
+        last_updated:
+          seconds: 3003003003
+          nanos: 3000000
+      draining_state:
+        version_info: version2
+        listener:
+          "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+          name: test_internal_listener
+          address:
+            envoy_internal_address:
+              server_listener_name: test_internal_listener_name
+          filter_chains: {}
+          internal_listener: {}
+          per_connection_buffer_limit_bytes: 10
+        last_updated:
+          seconds: 2002002002
+          nanos: 2000000
+  )EOF");
 
-  //   EXPECT_CALL(*worker_, removeListener(_, _));
-  //   listener_foo_update1->drain_manager_->drain_sequence_completion_();
-  //   checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo_update1->drain_manager_->drain_sequence_completion_();
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  //   worker_->callRemovalCompletion();
-  //   checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+  worker_->callRemovalCompletion();
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
 
   //   time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
 
@@ -5031,7 +5027,7 @@ per_connection_buffer_limit_bytes: 10
   //   worker_->callAddCompletion(true);
   //   checkStats(__LINE__, 3, 3, 0, 0, 3, 0, 0);
 
-  //   EXPECT_CALL(*listener_foo_update2, onDestroy());
+  EXPECT_CALL(*listener_foo_update2, onDestroy());
   //   EXPECT_CALL(*listener_bar, onDestroy());
   //   EXPECT_CALL(*listener_baz_update1, onDestroy());
   // }

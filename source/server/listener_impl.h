@@ -57,7 +57,9 @@ public:
    * @return the socket shared by worker threads; otherwise return null.
    */
   Network::SocketOptRef sharedSocket() const override {
-    if (!reuse_port_) {
+    if (!reuse_port_ &&
+        // internal address has no listener socket.
+        local_address_->envoyInternalAddress() == nullptr) {
       ASSERT(socket_ != nullptr);
       return *socket_;
     }
