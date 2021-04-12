@@ -17,7 +17,7 @@ Example plugin configuration:
       singleton: true
       config:
         name: "my_plugin"
-        configuration: 
+        configuration:
           "@type": type.googleapis.com/google.protobuf.StringValue
           value: |
             {
