@@ -965,6 +965,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ASSERT(!cached_route_);
   refreshCachedRoute();
 
+  // Note: this is the earliest point at which we can record headers size stats, given that
+  // cluster info becomes available after refreshCachedRoute() is called. So any additional
+  // headers that were added before this point will be accounted for, thus this number will
+  // be bigger than expected.
   auto req_resp_stats = clusterRequestResponseSizeStats();
   if (req_resp_stats.has_value()) {
     req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
