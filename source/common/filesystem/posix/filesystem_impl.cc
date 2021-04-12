@@ -167,8 +167,8 @@ bool InstanceImplPosix::protectedPath(const std::string& path) {
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
   // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(path, "/dev/") || path == "/dev" || absl::StartsWith(path, "/sys/") ||
-      path == "/sys" || absl::StartsWith(path, "/proc/") || path == "/proc") {
+  if (absl::StartsWith(path, "/dev/") || absl::StartsWith(path, "/sys/") ||
+      absl::StartsWith(path, "/proc/")) {
     return true;
   }
   return false;

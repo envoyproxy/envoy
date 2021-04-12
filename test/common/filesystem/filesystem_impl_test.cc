@@ -212,13 +212,10 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(file_system_.illegalPath("C:/i/COM0"));
   EXPECT_FALSE(file_system_.illegalPath("C:/i/COM"));
 #else
-  EXPECT_TRUE(file_system_.illegalPath("/dev"));
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));
   // Exception to allow opening from file descriptors. See #7258.
   EXPECT_FALSE(file_system_.illegalPath("/dev/fd/0"));
-  EXPECT_TRUE(file_system_.illegalPath("/proc"));
   EXPECT_TRUE(file_system_.illegalPath("/proc/"));
-  EXPECT_TRUE(file_system_.illegalPath("/sys"));
   EXPECT_TRUE(file_system_.illegalPath("/sys/"));
   EXPECT_TRUE(file_system_.illegalPath("/_some_non_existent_file"));
 #endif
@@ -226,13 +223,10 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 
 #ifndef WIN32
 TEST_F(FileSystemImplTest, ProtectedPath) {
-  EXPECT_TRUE(file_system_.protectedPath("/dev"));
   EXPECT_TRUE(file_system_.protectedPath("/dev/"));
   EXPECT_TRUE(file_system_.protectedPath("/dev/some/path"));
-  EXPECT_TRUE(file_system_.protectedPath("/sys"));
   EXPECT_TRUE(file_system_.protectedPath("/sys/"));
   EXPECT_TRUE(file_system_.protectedPath("/sys/some/path"));
-  EXPECT_TRUE(file_system_.protectedPath("/proc"));
   EXPECT_TRUE(file_system_.protectedPath("/proc/"));
   EXPECT_TRUE(file_system_.protectedPath("/proc/some/path"));
   EXPECT_FALSE(file_system_.protectedPath("/devel"));
