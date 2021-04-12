@@ -291,7 +291,10 @@ envoy_cc_test(
     name = "udp_listener_impl_batch_writer_test",
     srcs = ["udp_listener_impl_batch_writer_test.cc"],
     # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
-    tags = ["skip_on_windows"],
+    tags = [
+        "nofips",
+        "skip_on_windows",
+    ],
     deps = [
         ":udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
