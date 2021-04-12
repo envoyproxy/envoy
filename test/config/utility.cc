@@ -731,21 +731,8 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
     if (http3) {
       envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
       quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
-      if (use_alpn) {
-        // Configure both HTTP/2 and HTTP/3
-        cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-        cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
-        auto* match = cluster->add_transport_socket_matches();
-        ProtobufWkt::Value v;
-        v.set_string_value("true");
-        match->mutable_match()->mutable_fields()->insert({"use_quic", v});
-        match->set_name("use_quic");
-        match->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-        match->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
-      } else {
-        cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-        cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
-      }
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
     } else {
       cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
       cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);

@@ -81,8 +81,8 @@ public:
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
   void metadata(MetadataConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  Network::TransportSocketFactory& transportSocketFactory(bool http3) const override {
-    return logical_host_->transportSocketFactory(http3);
+  Network::TransportSocketFactory& transportSocketFactory() const override {
+    return logical_host_->transportSocketFactory();
   }
   const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
   HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }

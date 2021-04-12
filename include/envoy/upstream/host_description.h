@@ -111,12 +111,8 @@ public:
 
   /**
    * @return the transport socket factory responsible for this host.
-   *
-   * In the case that a host supports both TCP and HTTP/3 for auto-failover,
-   * getTransportSocketFactory will return the TCP socket factory by default,
-   * and return the HTTP/3 socket factory if http3 is explicitly specified.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory(bool http3 = false) const PURE;
+  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return the address used to connect to the host.

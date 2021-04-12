@@ -60,6 +60,18 @@ void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
   }
 }
 
+// Helper function to make sure each protocol in expected_protocols is present
+// in protocols (only used for an ASSERT in debug builds)
+bool contains(const std::vector<Http::Protocol>& protocols,
+              const std::vector<Http::Protocol>& expected_protocols) {
+  for (auto protocol : expected_protocols) {
+    if (std::find(protocols.begin(), protocols.end(), protocol) == protocols.end()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
@@ -1507,10 +1519,12 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
     ClusterConnectivityState& state) {
   if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+    ASSERT(contains(protocols,
+                    {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
-    return std::make_unique<Http::ConnectivityGrid>(dispatcher, api_.randomGenerator(), host,
-                                                    priority, options, transport_socket_options,
-                                                    state, source, coptions);
+    return std::make_unique<Http::ConnectivityGrid>(
+        dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
+        state, source, std::chrono::milliseconds(300), coptions);
   }
   if (protocols.size() >= 2) {
     ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||

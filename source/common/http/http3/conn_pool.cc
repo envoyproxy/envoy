@@ -40,7 +40,7 @@ public:
       auto host_address = host->address();
       source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
     }
-    Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory(true);
+    Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
     quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
         dispatcher, transport_socket_factory, host->cluster().statsScope(), time_source,
         source_address);

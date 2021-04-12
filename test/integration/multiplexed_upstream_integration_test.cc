@@ -631,6 +631,10 @@ protected:
   void createUpstreams() override {
     ASSERT_EQ(upstreamProtocol(), FakeHttpConnection::Type::HTTP3);
     if (use_http2_) {
+      // Generally we always want to set these fields via accessors, which
+      // changes both the upstreams and Envoy's configuration at the same time.
+      // In this particular case, we want to change the upstreams without
+      // touching config, so edit the raw members directly.
       upstream_config_.udp_fake_upstream_ = absl::nullopt;
       upstream_config_.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
     }

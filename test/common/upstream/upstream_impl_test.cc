@@ -62,7 +62,7 @@ protected:
   UpstreamImplTestBase() : api_(Api::createApiForTest(stats_, random_)) {}
 
   NiceMock<Server::MockAdmin> admin_;
-  Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -2218,7 +2218,7 @@ public:
   };
 
   Stats::TestUtil::TestStore stats_;
-  Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -3165,7 +3165,6 @@ TEST_F(ClusterInfoImplTest, Http3) {
               - exact: 127.0.0.1
   )EOF",
                                                        Network::Address::IpVersion::v4);
-
   auto cluster1 = makeCluster(yaml);
   ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
   EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
@@ -3266,42 +3265,22 @@ TEST_F(ClusterInfoImplTest, Http3Alpn) {
                     address: foo.bar.com
                     port_value: 443
     transport_socket:
-      name: envoy.transport_sockets.tls
+      name: envoy.transport_sockets.quic
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-            private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-          validation_context:
-            trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
-    transport_socket_matches:
-      - name: use_quic
-        match:
-          use_quic: true
-        transport_socket:
-          name: envoy.transport_sockets.quic
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
-            upstream_tls_context:
-              common_tls_context:
-                tls_certificates:
-                - certificate_chain:
-                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-                  private_key:
-                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-                validation_context:
-                  trusted_ca:
-                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-                  match_subject_alt_names:
-                  - exact: localhost
-                  - exact: 127.0.0.1
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              private_key:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            validation_context:
+              trusted_ca:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              match_subject_alt_names:
+              - exact: localhost
+              - exact: 127.0.0.1
   )EOF",
                                                        Network::Address::IpVersion::v4);
 

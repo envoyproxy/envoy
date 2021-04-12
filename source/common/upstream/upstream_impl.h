@@ -74,19 +74,6 @@ public:
   void setUnhealthy(UnhealthyType) override {}
 };
 
-static envoy::config::core::v3::Metadata http3Metadata() {
-  // Functionally, in yaml:
-  // filter_metadata:
-  //   envoy.transport_socket_match: { use_quic: "true" }
-  envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Struct match;
-  ProtobufWkt::Value v;
-  v.set_string_value("true");
-  match.mutable_fields()->insert({"use_quic", v});
-  (*metadata.mutable_filter_metadata())["envoy.transport_socket_match"] = match;
-  return metadata;
-}
-
 /**
  * Implementation of Upstream::HostDescription.
  */
@@ -100,12 +87,8 @@ public:
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, TimeSource& time_source);
 
-  Network::TransportSocketFactory& transportSocketFactory(bool http3) const override {
-    if (!http3) {
-      return socket_factory_;
-    }
-    auto metadata = http3Metadata();
-    return resolveTransportSocketFactory(address(), &metadata);
+  Network::TransportSocketFactory& transportSocketFactory() const override {
+    return socket_factory_;
   }
 
   bool canary() const override { return canary_; }

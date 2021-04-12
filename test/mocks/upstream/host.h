@@ -93,7 +93,7 @@ public:
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
-  MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (bool), (const));
+  MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(HostStats&, stats, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
@@ -179,7 +179,7 @@ public:
   MOCK_METHOD(Host::Health, health, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
-  MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (bool), (const));
+  MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(void, setHealthChecker_, (HealthCheckHostMonitorPtr & health_checker));
   MOCK_METHOD(void, setOutlierDetector_, (Outlier::DetectorHostMonitorPtr & outlier_detector));
