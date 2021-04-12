@@ -17,6 +17,8 @@ cmake_external(
         "CMAKE_EXPORT_COMPILE_COMMANDS": "On",
         "WAMR_BUILD_AOT": "0",
         "WAMR_BUILD_SIMD": "0",
+        "WAMR_BUILD_MULTI_MODULE": "1",
+        "WAMR_BUILD_LIBC_WASI": "0",
     },
     lib_source = ":srcs",
     static_libraries = ["libvmlib.a"],

@@ -58,6 +58,9 @@ cc_library(
 
 cc_library(
     name = "wamr_lib",
+    defines = [
+        "ENVOY_WASM_WAMR",
+    ],
     srcs = glob([
         "src/wamr/*.h",
         "src/wamr/*.cc",
