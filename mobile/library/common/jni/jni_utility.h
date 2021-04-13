@@ -39,3 +39,7 @@ envoy_data* buffer_to_native_data_ptr(JNIEnv* env, jobject j_data);
 envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers);
 
 envoy_headers* to_native_headers_ptr(JNIEnv* env, jobjectArray headers);
+
+envoy_stats_tags to_native_tags(JNIEnv* env, jobjectArray tags);
+
+envoy_map to_native_map(JNIEnv* env, jobjectArray entries);

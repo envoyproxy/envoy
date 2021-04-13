@@ -16,6 +16,6 @@ internal class DistributionImpl : Distribution {
   }
 
   override fun recordValue(value: Int) {
-    envoyEngine.get()?.recordHistogramValue(elements, value)
+    envoyEngine.get()?.recordHistogramValue(elements, emptyMap<String, String>(), value)
   }
 }

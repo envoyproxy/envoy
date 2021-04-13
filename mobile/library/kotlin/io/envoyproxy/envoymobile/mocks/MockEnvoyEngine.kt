@@ -19,17 +19,17 @@ internal class MockEnvoyEngine : EnvoyEngine {
 
   override fun terminate() = Unit
 
-  override fun recordCounterInc(elements: String, count: Int): Int = 0
+  override fun recordCounterInc(elements: String, tags: MutableMap<String, String>, count: Int): Int = 0
 
-  override fun recordGaugeSet(elements: String, value: Int): Int = 0
+  override fun recordGaugeSet(elements: String, tags: MutableMap<String, String>, value: Int): Int = 0
 
-  override fun recordGaugeAdd(elements: String, amount: Int): Int = 0
+  override fun recordGaugeAdd(elements: String, tags: MutableMap<String, String>, amount: Int): Int = 0
 
-  override fun recordGaugeSub(elements: String, amount: Int): Int = 0
+  override fun recordGaugeSub(elements: String, tags: MutableMap<String, String>, amount: Int): Int = 0
 
-  override fun recordHistogramDuration(elements: String, durationMs: Int): Int = 0
+  override fun recordHistogramDuration(elements: String, tags: MutableMap<String, String>, durationMs: Int): Int = 0
 
-  override fun recordHistogramValue(elements: String, value: Int): Int = 0
+  override fun recordHistogramValue(elements: String, tags: MutableMap<String, String>, value: Int): Int = 0
 
   override fun registerStringAccessor(accessorName: String, accessor: EnvoyStringAccessor): Int = 0
 }

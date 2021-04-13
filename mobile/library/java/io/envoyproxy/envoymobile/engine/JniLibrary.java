@@ -162,58 +162,70 @@ class JniLibrary {
    *
    * @param engine,  handle to the engine that owns the counter.
    * @param elements Elements of the counter stat.
+   * @param tags Tags of the counter.
    * @param count Amount to add to the counter.
    * @return A status indicating if the action was successful.
    */
-  protected static native int recordCounterInc(long engine, String elements, int count);
+  protected static native int recordCounterInc(long engine, String elements, byte[][] tags,
+                                               int count);
 
   /**
    * Set a gauge of a given string of elements with the given value.
    *
    * @param engine,  handle to the engine that owns the gauge.
    * @param elements Elements of the gauge stat.
+   * @param tags Tags of the gauge.
    * @param value Value to set to the gauge.
    * @return A status indicating if the action was successful.
    */
-  protected static native int recordGaugeSet(long engine, String elements, int value);
+  protected static native int recordGaugeSet(long engine, String elements, byte[][] tags,
+                                             int value);
 
   /**
    * Add the gauge with the given string of elements and by the given amount.
    *
    * @param engine,  handle to the engine that owns the gauge.
    * @param elements Elements of the gauge stat.
+   * @param tags Tags of the gauge.
    * @param amount Amount to add to the gauge.
    * @return A status indicating if the action was successful.
    */
-  protected static native int recordGaugeAdd(long engine, String elements, int amount);
+  protected static native int recordGaugeAdd(long engine, String elements, byte[][] tags,
+                                             int amount);
 
   /**
    * Subtract from the gauge with the given string of elements and by the given amount.
    *
    * @param engine,  handle to the engine that owns the gauge.
    * @param elements Elements of the gauge stat.
+   * @param tags Tags of the gauge.
    * @param amount Amount to subtract from the gauge.
    * @return A status indicating if the action was successful.
    */
-  protected static native int recordGaugeSub(long engine, String elements, int amount);
+  protected static native int recordGaugeSub(long engine, String elements, byte[][] tags,
+                                             int amount);
 
   /**
    * Add another recorded duration in ms to the timer histogram with the given string of elements.
    *
    * @param elements Elements of the histogram stat.
+   * @param tags Tags of the histogram.
    * @param durationMs Duration value to record in the histogram timer distribution.
    * @return A status indicating if the action was successful.
    */
-  protected static native int recordHistogramDuration(long engine, String elements, int durationMs);
+  protected static native int recordHistogramDuration(long engine, String elements, byte[][] tags,
+                                                      int durationMs);
 
   /**
    * Add another recorded value to the generic histogram with the given string of elements.
    *
    * @param elements Elements of the histogram stat.
+   * @param tags Tags of the histogram.
    * @param value Amount to record as a new value for the histogram distribution.
    * @return A status indicating if the action was successful.
    */
-  protected static native int recordHistogramValue(long engine, String elements, int value);
+  protected static native int recordHistogramValue(long engine, String elements, byte[][] tags,
+                                                   int value);
 
   /**
    * Provides a configuration template that may be used for building platform
