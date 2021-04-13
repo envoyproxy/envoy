@@ -1,25 +1,11 @@
 import argparse
-import logging
 import os
-import subprocess
-import sys
 from functools import cached_property
 
-LOG_LEVELS = (("info", logging.INFO), ("debug", logging.DEBUG), ("warn", logging.WARN),
-              ("error", logging.ERROR))
+from tools.base import runner
 
 
-class BazelRunError(Exception):
-    pass
-
-
-class LogFilter(logging.Filter):
-
-    def filter(self, rec):
-        return rec.levelno in (logging.DEBUG, logging.INFO)
-
-
-class Checker(object):
+class Checker(runner.Runner):
     """Runs check methods prefixed with `check_` and named in `self.checks`
 
     check methods should return the count of errors and log warnings and errors
@@ -27,15 +13,10 @@ class Checker(object):
     checks = ()
 
     def __init__(self, *args):
-        self._args = args
+        super().__init__(*args)
         self.success = {}
         self.errors = {}
         self.warnings = {}
-
-    @cached_property
-    def args(self) -> argparse.Namespace:
-        """Parsed args"""
-        return self.parser.parse_args(self._args)
 
     @property
     def diff(self) -> bool:
@@ -62,37 +43,6 @@ class Checker(object):
         """Shows whether there are any failures"""
         # add logic for warn/error
         return self.failed or self.warned
-
-    @cached_property
-    def log(self) -> logging.Logger:
-        """Instantiated logger"""
-        logger = logging.getLogger(self.name)
-        logger.setLevel(self.log_level)
-        stdout_handler = logging.StreamHandler(sys.stdout)
-        stdout_handler.setLevel(logging.DEBUG)
-        stdout_handler.addFilter(LogFilter())
-        stderr_handler = logging.StreamHandler(sys.stderr)
-        stderr_handler.setLevel(logging.WARN)
-        logger.addHandler(stdout_handler)
-        logger.addHandler(stderr_handler)
-        return logger
-
-    @cached_property
-    def log_level(self) -> int:
-        """Log level parsed from args"""
-        return dict(LOG_LEVELS)[self.args.log_level]
-
-    @property
-    def name(self) -> bool:
-        """Name of the checker"""
-        return self.__class__.__name__
-
-    @cached_property
-    def parser(self) -> argparse.ArgumentParser:
-        """Argparse parser"""
-        parser = argparse.ArgumentParser()
-        self.add_arguments(parser)
-        return parser
 
     @cached_property
     def path(self) -> str:
@@ -283,35 +233,9 @@ class Checker(object):
 
 class ForkingChecker(Checker):
 
-    def fork(self, *args, capture_output: bool = True, **kwargs) -> subprocess.CompletedProcess:
-        """Fork a subprocess, using self.path as the cwd by default"""
-        kwargs["cwd"] = kwargs.get("cwd", self.path)
-        return subprocess.run(*args, capture_output=capture_output, **kwargs)
-
-
-class BazelChecker(ForkingChecker):
-
-    def bazel_query(self, query: str) -> list:
-        """Run a bazel query and return stdout as list of lines"""
-        resp = self.fork(["bazel", "query", f"'{query}'"])
-        if resp.returncode:
-            raise BazelRunError(f"Bazel query failed: {resp}")
-        return resp.stdout.decode("utf-8").split("\n")
-
-    def bazel_run(
-            self,
-            target: str,
-            *args,
-            capture_output: bool = False,
-            cwd: str = "",
-            raises: bool = True) -> subprocess.CompletedProcess:
-        """Run a bazel target and return the subprocess response"""
-        args = (("--",) + args) if args else args
-        bazel_args = ("bazel", "run", target) + args
-        resp = self.fork(bazel_args, capture_output=capture_output, cwd=cwd or self.path)
-        if resp.returncode and raises:
-            raise BazelRunError(f"Bazel run failed: {resp}")
-        return resp
+    @cached_property
+    def fork(self):
+        return runner.ForkingAdapter(self)
 
 
 class CheckerSummary(object):

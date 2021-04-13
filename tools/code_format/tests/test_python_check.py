@@ -224,8 +224,8 @@ def test_python_on_checks_complete(patches, results):
     diff_path, failed = results
     patched = patches(
         "open",
-        "PythonChecker.fork",
-        "checker.ForkingChecker.on_checks_complete",
+        "checker.ForkingChecker.fork",
+        "checker.Checker.on_checks_complete",
         ("PythonChecker.diff_file_path", dict(new_callable=PropertyMock)),
         ("PythonChecker.has_failed", dict(new_callable=PropertyMock)),
         prefix="tools.code_format.python_check")

@@ -1,13 +1,8 @@
-import logging
-import sys
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.base import pytest_checker
-from tools.base.checker import (
-    Checker, CheckerSummary, ForkingChecker,
-    LogFilter, LOG_LEVELS)
+from tools.base.checker import Checker, CheckerSummary, ForkingChecker
 
 
 class DummyChecker(Checker):
@@ -30,34 +25,16 @@ class DummyCheckerWithChecks(Checker):
         self.check2()
 
 
-def test_pytest_checker():
-    with patch("tools.base.pytest_checker.python_pytest") as m_pytest:
-        pytest_checker.main("arg1", "arg2", "arg3")
-
-    assert (
-        list(m_pytest.main.call_args)
-        == [('arg1', 'arg2', 'arg3', '--cov', 'tools.base'), {}])
-
-
 def test_checker_constructor():
-    checker = Checker("path1", "path2", "path3")
-    assert checker._args == ("path1", "path2", "path3")
-    assert checker.summary_class == CheckerSummary
+    super_mock = patch("tools.base.checker.runner.Runner.__init__")
 
-
-def test_checker_args():
-    checker = Checker("path1", "path2", "path3")
-    parser_mock = patch(
-        "tools.base.checker.Checker.parser",
-        new_callable=PropertyMock)
-
-    with parser_mock as m_parser:
-        assert checker.args == m_parser.return_value.parse_args.return_value
+    with super_mock as m_super:
+        checker = Checker("path1", "path2", "path3")
 
     assert (
-        list(m_parser.return_value.parse_args.call_args)
-        == [(('path1', 'path2', 'path3'),), {}])
-    assert "args" in checker.__dict__
+        list(m_super.call_args)
+        == [('path1', 'path2', 'path3'), {}])
+    assert checker.summary_class == CheckerSummary
 
 
 def test_checker_diff():
@@ -115,83 +92,6 @@ def test_checker_has_failed(patches, failed, warned):
     else:
         assert result == False
     assert "has_failed" not in checker.__dict__
-
-
-def test_checker_log(patches):
-    checker = Checker("path1", "path2", "path3")
-    patched = patches(
-        "logging.getLogger",
-        "logging.StreamHandler",
-        "LogFilter",
-        ("Checker.log_level", dict(new_callable=PropertyMock)),
-        ("Checker.name", dict(new_callable=PropertyMock)),
-        prefix="tools.base.checker")
-
-    with patched as (m_logger, m_stream, m_filter, m_level, m_name):
-        _loggers = (MagicMock(), MagicMock())
-        m_stream.side_effect = _loggers
-        assert checker.log == m_logger.return_value
-    assert (
-        list(m_logger.return_value.setLevel.call_args)
-        == [(m_level.return_value,), {}])
-    assert (
-        list(list(c) for c in m_stream.call_args_list)
-        == [[(sys.stdout,), {}],
-            [(sys.stderr,), {}]])
-    assert (
-        list(_loggers[0].setLevel.call_args)
-        == [(logging.DEBUG,), {}])
-    assert (
-        list(_loggers[0].addFilter.call_args)
-        == [(m_filter.return_value,), {}])
-    assert (
-        list(_loggers[1].setLevel.call_args)
-        == [(logging.WARN,), {}])
-    assert (
-        list(list(c) for c in m_logger.return_value.addHandler.call_args_list)
-        == [[(_loggers[0],), {}], [(_loggers[1],), {}]])
-    assert "log" in checker.__dict__
-
-
-def test_checker_log_level(patches):
-    checker = Checker("path1", "path2", "path3")
-    patched = patches(
-        "dict",
-        ("Checker.args", dict(new_callable=PropertyMock)),
-        prefix="tools.base.checker")
-    with patched as (m_dict, m_args):
-        assert checker.log_level == m_dict.return_value.__getitem__.return_value
-
-    assert (
-        list(m_dict.call_args)
-        == [(LOG_LEVELS, ), {}])
-    assert (
-        list(m_dict.return_value.__getitem__.call_args)
-        == [(m_args.return_value.log_level,), {}])
-    assert "log_level" in checker.__dict__
-
-
-def test_checker_name():
-    checker = DummyChecker()
-    assert checker.name == checker.__class__.__name__
-    assert "name" not in checker.__dict__
-
-
-def test_checker_parser(patches):
-    checker = Checker("path1", "path2", "path3")
-    patched = patches(
-        "argparse.ArgumentParser",
-        "Checker.add_arguments",
-        prefix="tools.base.checker")
-    with patched as (m_parser, m_add_args):
-        assert checker.parser == m_parser.return_value
-    assert (
-        list(m_parser.call_args)
-        == [(), {}])
-    assert (
-        list(m_add_args.call_args)
-        == [(m_parser.return_value,), {}])
-    assert "parser" in checker.__dict__
 
 
 @pytest.mark.parametrize("path", [None, "PATH"])
@@ -614,32 +514,15 @@ def test_checker_succeed(patches, log, success):
 
 # ForkingChecker tests
 
-@pytest.mark.parametrize("args", [(), ("a", "b")])
-@pytest.mark.parametrize("cwd", [None, "NONE", "PATH"])
-@pytest.mark.parametrize("capture_output", ["NONE", True, False])
-def test_forkingchecker_fork(patches, args, cwd, capture_output):
+def test_forkingchecker_fork():
     checker = ForkingChecker("path1", "path2", "path3")
-    patched = patches(
-        "subprocess.run",
-        ("Checker.path", dict(new_callable=PropertyMock)),
-        prefix="tools.base.checker")
+    forking_mock = patch("tools.base.checker.runner.ForkingAdapter")
 
-    with patched as (m_run, m_path):
-        kwargs = {}
-        if cwd != "NONE":
-            kwargs["cwd"] = cwd
-        if capture_output != "NONE":
-            kwargs["capture_output"] = capture_output
-        assert checker.fork(*args, **kwargs) == m_run.return_value
-
-    expected = {'capture_output': True, 'cwd': cwd}
-    if capture_output is False:
-        expected["capture_output"] = False
-    if cwd == "NONE":
-        expected["cwd"] = m_path.return_value
+    with forking_mock as m_fork:
+        assert checker.fork == m_fork.return_value
     assert (
-        list(m_run.call_args)
-        == [args, expected])
+        list(m_fork.call_args)
+        == [(checker,), {}])
 
 
 # CheckerSummary tests
@@ -770,17 +653,3 @@ def test_checker_summary_print_failed(patches, problem_type, max_display, proble
     assert (
         list(list(c) for c in m_section.call_args_list)
         == expected)
-
-
-# LogFilter tests
-@pytest.mark.parametrize("level", [logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, None, "giraffe"])
-def test_checker_log_filter(level):
-    logfilter = LogFilter()
-
-    class DummyRecord(object):
-        levelno = level
-
-    if level in [logging.DEBUG, logging.INFO]:
-        assert logfilter.filter(DummyRecord())
-    else:
-        assert not logfilter.filter(DummyRecord())
