@@ -34,10 +34,12 @@ if [[ ( $${SYSTEM} == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *clang* ]]; th
   export CC=$${CC:-clang}
   export CXX=$${CXX:-clang++}
   export CXXFLAGS="$${CXXFLAGS} -Wno-implicit-int-float-conversion -Wno-builtin-assume-aligned-alignment -Wno-final-dtor-non-final-class"
-else
+elif [[ $${SYSTEM} == "Linux" ]]; then
   export IS_CLANG=false
   export CC=$${CC:-gcc}
   export CXX=$${CXX:-g++}
+else
+  export IS_CLANG=false
 fi
 
 export AR=$${AR:-ar}
