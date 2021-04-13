@@ -508,7 +508,7 @@ downstream transport socket extensions.
 
 The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
 response is proxied downstream. The response passes through the HTTP and network filters in the
-:ref:`opposite order <arch_overview_http_filters_ordering>`. from the request.
+:ref:`opposite order <arch_overview_http_filters_ordering>` from the request.
 
 Various callbacks for decoder/encoder request lifecycle events will be invoked in HTTP filters, e.g.
 when response trailers are being forwarded or the request body is streamed. Similarly, read/write
