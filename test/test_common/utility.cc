@@ -222,6 +222,28 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   return AssertionSuccess();
 }
 
+AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
+                                                          const std::string& name,
+                                                          Event::TestTimeSystem& time_system,
+                                                          std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (true) {
+    auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
+    if (histo) {
+      if (histo->cumulativeStatistics().sampleCount()) {
+        break;
+      }
+    }
+
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to have samples", name);
+    }
+  }
+  return AssertionSuccess();
+}
+
 std::list<Network::DnsResponse>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
   std::list<Network::DnsResponse> ret;

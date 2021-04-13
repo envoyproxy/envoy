@@ -467,6 +467,13 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  void waitUntilHistogramHasSamples(
+      const std::string& name,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(
+        TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_, timeout));
+  }
+
   Stats::CounterSharedPtr counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.

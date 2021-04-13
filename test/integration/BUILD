@@ -1722,3 +1722,14 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ]),
 )
+
+envoy_cc_test(
+    name = "req_resp_size_stats_integration_test",
+    srcs = [
+        "req_resp_size_stats_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

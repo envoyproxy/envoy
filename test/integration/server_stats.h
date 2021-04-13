@@ -39,6 +39,14 @@ public:
   virtual void waitForCounterExists(const std::string& name) PURE;
 
   /**
+   * Wait until a histogram has samples.
+   * @param name histogram name.
+   */
+  virtual void waitUntilHistogramHasSamples(
+      const std::string& name,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.
