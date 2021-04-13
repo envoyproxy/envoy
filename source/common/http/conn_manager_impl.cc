@@ -670,7 +670,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
 
-  auto req_resp_stats = clusterRequestResponseSizeStats();
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      clusterRequestResponseSizeStats();
   if (req_resp_stats.has_value()) {
     req_resp_stats->get().upstream_rq_body_size_.recordValue(
         filter_manager_.streamInfo().bytesReceived());
@@ -772,7 +773,8 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
-  auto req_resp_stats = clusterRequestResponseSizeStats();
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      clusterRequestResponseSizeStats();
   if (req_resp_stats.has_value()) {
     req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
   }
@@ -969,7 +971,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // cluster info becomes available after refreshCachedRoute() is called. So any additional
   // headers that were added before this point will be accounted for, thus this number will
   // be bigger than expected.
-  auto req_resp_stats = clusterRequestResponseSizeStats();
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      clusterRequestResponseSizeStats();
   if (req_resp_stats.has_value()) {
     req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
   }

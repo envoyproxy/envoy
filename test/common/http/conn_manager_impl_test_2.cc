@@ -2710,8 +2710,7 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamRequestBodySize) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
-      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
 
   auto& req_resp_stats = cluster->cluster_.info_->request_response_size_stats_store_;
@@ -2755,8 +2754,7 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseHeadersSize) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
-      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
 
   auto& req_resp_stats = cluster->cluster_.info_->request_response_size_stats_store_;
@@ -2811,8 +2809,7 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseBodySize) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
-  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
-      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(cluster.get()));
 
   auto& req_resp_stats = cluster->cluster_.info_->request_response_size_stats_store_;
