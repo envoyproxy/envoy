@@ -422,7 +422,6 @@ protected:
 
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
-    Buffer::AccountSharedPtr buffer_memory_account_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
