@@ -120,9 +120,9 @@ bool dirty_channel_{};
 const bool use_tcp_for_dns_lookups_;
 absl::node_hash_map<int, Event::FileEventPtr> events_;
 const absl::optional<std::string> resolvers_csv_;
-}; // namespace DnsFilter
+};
 
+} // namespace DnsFilter
 } // namespace UdpFilters
 } // namespace Extensions
-} // namespace Envoy
 } // namespace Envoy
