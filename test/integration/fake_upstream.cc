@@ -346,7 +346,8 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
-        fake_upstream.http3Options(), max_request_headers_kb, headers_with_underscores_action);
+        fake_upstream.http3Options(), max_request_headers_kb, max_request_headers_count,
+        headers_with_underscores_action);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif

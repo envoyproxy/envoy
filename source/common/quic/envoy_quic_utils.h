@@ -45,16 +45,26 @@ public:
   validateHeader(const std::string& header_name, absl::string_view header_value) = 0;
 };
 
+static constexpr absl::string_view invalid_underscore = "http3.unexpected_underscore";
+static constexpr absl::string_view too_many_http_headers = "http3.too_many_http_headers";
+
 // The returned header map has all keys in lower case.
 template <class T>
-std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list,
-                                             HeaderValidator& validator) {
+std::unique_ptr<T>
+quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidator& validator,
+                          uint32_t max_headers_allowed, absl::string_view& details) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
+    if (max_headers_allowed == 0) {
+      details = too_many_http_headers;
+      return nullptr;
+    }
+    max_headers_allowed--;
     Http::HeaderUtility::HeaderValidationResult result =
         validator.validateHeader(entry.first, entry.second);
     switch (result) {
     case Http::HeaderUtility::HeaderValidationResult::REJECT:
+      details = invalid_underscore;
       return nullptr;
     case Http::HeaderUtility::HeaderValidationResult::DROP:
       continue;
