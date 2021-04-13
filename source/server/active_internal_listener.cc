@@ -10,13 +10,17 @@
 namespace Envoy {
 namespace Server {
 
-ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& parent,
+ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_handler,
                                                Event::Dispatcher& dispatcher,
-                                               /*Network::ListenerPtr&& listener,*/
                                                Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(parent, dispatcher,
-                               std::make_unique<ActiveInternalListener::NetworkInternalListener>(),
-                               config) {}
+    : ActiveInternalListener(conn_handler, dispatcher,
+                             std::make_unique<ActiveInternalListener::NetworkInternalListener>(),
+                             config) {}
+ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_handler,
+                                               Event::Dispatcher& dispatcher,
+                                               Network::ListenerPtr listener,
+                                               Network::ListenerConfig& config)
+    : ActiveStreamListenerBase(conn_handler, dispatcher, std::move(listener), config) {}
 
 ActiveInternalListener::~ActiveInternalListener() {
   // TODO(lambdai): delete the active connections.

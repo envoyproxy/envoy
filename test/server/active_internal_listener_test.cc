@@ -74,7 +74,6 @@ public:
   BasicResourceLimitImpl resource_limit_;
   Network::MockConnectionHandler conn_handler_;
   Network::MockListener* generic_listener_;
-  // MockInternalListenerCallback internal_listener_;
   Network::MockListenerConfig listener_config_;
   NiceMock<Network::MockFilterChainManager> manager_;
 

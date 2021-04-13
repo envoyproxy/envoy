@@ -39,6 +39,8 @@ class ActiveInternalListener : public ActiveStreamListenerBase,
 public:
   ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
                          Network::ListenerConfig& config);
+  ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
+                         Network::ListenerPtr listener, Network::ListenerConfig& config);
   ~ActiveInternalListener() override;
 
   class NetworkInternalListener : public Network::Listener {
