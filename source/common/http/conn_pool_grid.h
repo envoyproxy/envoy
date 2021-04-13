@@ -91,8 +91,6 @@ public:
                                   const StreamInfo::StreamInfo& info,
                                   absl::optional<Http::Protocol> protocol);
 
-    bool http3_attempt_failed() const { return http3_attempt_failed_; }
-
   private:
     // Tracks all the connection attempts which currently in flight.
     std::list<ConnectionAttemptCallbacksPtr> connection_attempts_;
@@ -108,8 +106,6 @@ public:
     Event::TimerPtr next_attempt_timer_;
     // The iterator to the last pool which had a connection attempt.
     PoolIterator current_;
-    // The pool for HTTP/3 connections.
-    ConnectionPool::Instance& http3_pool_;
     // True if the HTTP/3 attempt failed.
     bool http3_attempt_failed_{};
   };
@@ -137,8 +133,11 @@ public:
   // Returns the next pool in the ordered priority list.
   absl::optional<PoolIterator> nextPool(PoolIterator pool_it);
 
-  bool is_http3_broken() const { return is_http3_broken_; }
-  void set_is_http3_broken(bool is_http3_broken) { is_http3_broken_ = is_http3_broken; }
+  // Returns true if |pool| is the Grid's HTTP/3 connection pool.
+  bool isPoolHttp3(const ConnectionPool::Instance& pool);
+
+  bool isHttp3Broken() const { return is_http3_broken_; }
+  void setIsHttp3Broken(bool is_http3_broken) { is_http3_broken_ = is_http3_broken; }
 
 private:
   friend class ConnectivityGridForTest;

@@ -134,7 +134,7 @@ TEST_F(ConnectivityGridTest, Success) {
   ASSERT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
-  EXPECT_FALSE(grid_.is_http3_broken());
+  EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
 // Test the first pool successfully connecting under the stack of newStream.
@@ -144,7 +144,7 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_), nullptr);
   EXPECT_NE(grid_.first(), nullptr);
-  EXPECT_FALSE(grid_.is_http3_broken());
+  EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
 // Test the first pool failing and the second connecting.
@@ -173,7 +173,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   EXPECT_LOG_CONTAINS("trace", "second pool successfully connected to host 'hostname'",
                       grid_.callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt));
-  EXPECT_TRUE(grid_.is_http3_broken());
+  EXPECT_TRUE(grid_.isHttp3Broken());
 }
 
 // Test both connections happening in parallel and the second connecting.
@@ -203,7 +203,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
   EXPECT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
-  EXPECT_TRUE(grid_.is_http3_broken());
+  EXPECT_TRUE(grid_.isHttp3Broken());
 }
 
 // Test both connections happening in parallel and the first connecting.
@@ -231,7 +231,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
   EXPECT_NE(grid_.callbacks(0), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks(0)->onPoolReady(encoder_, host_, info_, absl::nullopt);
-  EXPECT_FALSE(grid_.is_http3_broken());
+  EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
 // Test that after the first pool fails, subsequent connections will
@@ -391,7 +391,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 
 // Test that when HTTP/3 is broken then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
-  grid_.set_is_http3_broken(true);
+  grid_.setIsHttp3Broken(true);
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'first', skipping.",
@@ -403,7 +403,7 @@ TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
   ASSERT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
-  EXPECT_TRUE(grid_.is_http3_broken());
+  EXPECT_TRUE(grid_.isHttp3Broken());
 }
 
 #ifdef ENVOY_ENABLE_QUICHE

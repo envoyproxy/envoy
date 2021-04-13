@@ -31,7 +31,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
     : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it), http3_pool_(**pool_it) {}
+      current_(pool_it) {}
 
 // TODO(#15649) add trace logging.
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
@@ -59,7 +59,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
             describePool(attempt->pool()), grid_.host_->hostname());
-  if (&(attempt->pool()) == &http3_pool_) {
+  if (grid_.isPoolHttp3(attempt->pool())) {
     http3_attempt_failed_ = true;
   }
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
@@ -89,17 +89,6 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
 }
 
 bool ConnectivityGrid::WrapperCallbacks::newStream() {
-  if (grid_.is_http3_broken()) {
-    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", describePool(**current_),
-              grid_.host_->hostname());
-    absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
-    if (!next_pool.has_value()) {
-      // If there are no other pools to try, return false.
-      return false;
-    }
-    // Create a new connection attempt for the next pool.
-    current_ = next_pool.value();
-  }
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
             describePool(**current_), grid_.host_->hostname());
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
@@ -120,7 +109,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
             grid_.host_->hostname());
   if (http3_attempt_failed_) {
     // If the HTTP/3 attempt failed but the other attempt succeeded, mark HTTP/3 as broken.
-    grid_.set_is_http3_broken(true);
+    grid_.setIsHttp3Broken(true);
   }
   auto delete_on_return = attempt->removeFromList(connection_attempts_);
   // The first successful connection is passed up, and all others will be canceled.
@@ -223,11 +212,17 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   if (pools_.empty()) {
     createNextPool();
   }
-
+  PoolIterator pool = pools_.begin();
+  if (is_http3_broken_) {
+    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", describePool(**pool),
+              host_->hostname());
+    createNextPool();
+    pool = ++pool;
+  }
   // TODO(#15649) track pools with successful connections: don't always start at
   // the front of the list.
   auto wrapped_callback =
-      std::make_unique<WrapperCallbacks>(*this, decoder, pools_.begin(), callbacks);
+      std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
   if (wrapped_callbacks_.front()->newStream()) {
@@ -276,6 +271,10 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::nextPool(PoolIt
     return pool_it;
   }
   return createNextPool();
+}
+
+bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
+  return &pool == pools_.begin()->get();
 }
 
 void ConnectivityGrid::onDrainReceived() {
