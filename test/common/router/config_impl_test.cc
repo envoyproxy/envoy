@@ -7905,13 +7905,36 @@ virtual_hosts:
         route: { cluster: baz }
     per_filter_config: { unknown.filter: {} }
 )EOF";
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory", "false"}});
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for name: 'unknown.filter'");
 }
 
-TEST_F(PerFilterConfigsTest, UnknownFilterAny) {
+TEST_F(PerFilterConfigsTest, UnknownFilterAnyPerVirualHostWithCheck) {
+  TestScopedRuntime scoped_runtime;
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      unknown.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory", "false"}});
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Didn't find a registered implementation for name: 'unknown.filter'");
+}
+
+TEST_F(PerFilterConfigsTest, UnknownFilterAnyPerVirualHostIgnoreCheck) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: bar
@@ -7924,9 +7947,48 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.Timestamp
 )EOF";
 
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml);
+}
+
+TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyPreRouteWithCheck) {
+  TestScopedRuntime scoped_runtime;
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          unknown.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory", "false"}});
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException,
       "Didn't find a registered implementation for name: 'unknown.filter'");
+}
+
+TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyPreRouteIgnoreCheck) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          unknown.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml);
 }
 
 // Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without

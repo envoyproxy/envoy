@@ -1525,26 +1525,52 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
   return route_matcher_->route(cb, headers, stream_info, random_value);
 }
 
-namespace {
-
-RouteSpecificFilterConfigConstSharedPtr
-createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                const ProtobufWkt::Struct& config,
-                                const VirtualHostImpl& vhost,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                ProtobufMessage::ValidationVisitor& validator) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_unknown_typed_per_filter_config_factory"))
-  auto factory = Envoy::Config::Utility::getFactoryByName<
-      Server::Configuration::NamedHttpFilterConfigFactory>(name);
-  if (factory == nullptr && vhost.globalRouteConfig().rdsStats() != nullptr) {
-    vhost.globalRouteConfig().rdsStats()->unknown_per_filter_typed_config_factory.inc();
+Server::Configuration::NamedHttpFilterConfigFactory*
+PerFilterConfigs::getRouteSpecificFilterConfigFactory(const std::string& name, const VirtualHostImpl& vhost) {
+  Server::Configuration::NamedHttpFilterConfigFactory* factory = nullptr;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory")) {
+    factory = Envoy::Config::Utility::getFactoryByName<
+        Server::Configuration::NamedHttpFilterConfigFactory>(name);
+    if (factory == nullptr && vhost.globalRouteConfig().rdsStats() != nullptr) {
+      vhost.globalRouteConfig().rdsStats()->unknown_per_filter_typed_config_factory_.inc();
+      ENVOY_LOG(warn,
+                  "Can't find factory for {}. Set runtime "
+                  "config `envoy.reloadable_features.ignore_check_unsupported_typed_per_filter_config` as "
+                  "false to reject any unknown typed per filter config specific configuration.",
+                  name);
+    }
   }
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
-  return factory.createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  else {
+    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::NamedHttpFilterConfigFactory>(name);
+  }
+  return factory;
 }
 
-} // namespace
+RouteSpecificFilterConfigConstSharedPtr
+PerFilterConfigs::createRouteSpecificFilterConfig(Server::Configuration::NamedHttpFilterConfigFactory* factory,
+                                const std::string& name, const ProtobufWkt::Any& typed_config,
+                                const ProtobufWkt::Struct& config,
+                                Server::Configuration::ServerFactoryContext& factory_context,
+                                ProtobufMessage::ValidationVisitor& validator) {
+  ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
+  auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  if (object == nullptr) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+      throw EnvoyException(fmt::format(
+          "The filter {} doesn't support virtual host-specific configurations", name));
+    } else {
+      ENVOY_LOG(warn,
+                "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                "true to reject any invalid virtual-host specific configuration.",
+                name);
+    }
+  }
+  return object;
+}
 
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
@@ -1560,23 +1586,15 @@ PerFilterConfigs::PerFilterConfigs(
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
     const auto& name =
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
+    auto factory = getRouteSpecificFilterConfigFactory(name, vhost);
+    if (factory == nullptr) {
+      continue;
+    }
     auto object = createRouteSpecificFilterConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), vhost, factory_context, validator);
+        factory, name, it.second, ProtobufWkt::Struct::default_instance(),
+        factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
-    } else {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
-        throw EnvoyException(fmt::format(
-            "The filter {} doesn't support virtual host-specific configurations", name));
-      } else {
-        ENVOY_LOG(warn,
-                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
-                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
-                  "true to reject any invalid virtual-host specific configuration.",
-                  name);
-      }
     }
   }
 
@@ -1585,22 +1603,14 @@ PerFilterConfigs::PerFilterConfigs(
     const auto& name =
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object = createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(),
-                                                  it.second, vhost, factory_context, validator);
+    auto factory = getRouteSpecificFilterConfigFactory(name, vhost);
+    if (factory == nullptr) {
+      continue;
+    }
+    auto object = createRouteSpecificFilterConfig(factory, name, ProtobufWkt::Any::default_instance(),
+                                                  it.second, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
-    } else {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
-        throw EnvoyException(fmt::format(
-            "The filter {} doesn't support virtual host-specific configurations", name));
-      } else {
-        ENVOY_LOG(warn,
-                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
-                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
-                  "true to reject any invalid virtual-host specific configuration.",
-                  name);
-      }
     }
   }
 }
