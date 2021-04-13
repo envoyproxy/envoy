@@ -37,13 +37,12 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
                                        protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicTransportSocketFactoryBase(Stats::Scope& store, std::unique_ptr<Ssl::ContextConfig> config,
+  QuicTransportSocketFactoryBase(Stats::Scope& store, Ssl::ContextConfig& context_config,
                                  const std::string& perspective)
-      : stats_(generateStats(store, perspective)), context_config_(std::move(config)) {
-    context_config_->setSecretUpdateCallback([this]() {
-      // The callback also triggers updating |context_config_| with the new secret.
-      // TODO(danzh) Client transport socket factory may also need to update quic crypto.
-      stats_.context_config_update_by_sds_.inc();
+      : stats_(generateStats(store, perspective)) {
+    context_config.setSecretUpdateCallback([this]() {
+      // The callback also triggers updating config_ with the new secret.
+      onSecretUpdated();
     });
   }
 
@@ -56,11 +55,11 @@ public:
   bool usesProxyProtocolOptions() const override { return false; }
 
 protected:
-  const Ssl::ContextConfig& contextConfig() const { return *context_config_; }
+  virtual void onSecretUpdated() { stats_.context_config_update_by_sds_.inc(); };
+
   QuicTransportSocketFactoryStats stats_;
 
 private:
-  std::unique_ptr<Ssl::ContextConfig> context_config_;
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
@@ -68,34 +67,38 @@ private:
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
   QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, std::move(config), "server"),
-        config_(dynamic_cast<const Ssl::ServerContextConfig&>(contextConfig())) {}
+      : QuicTransportSocketFactoryBase(store, *config, "server"), config_(std::move(config)) {}
 
   // Return TLS certificates if the context config is ready.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   getTlsCertificates() const {
-    if (!config_.isReady()) {
+    if (!config_->isReady()) {
       ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
       stats_.downstream_context_secrets_not_ready_.inc();
       return {};
     }
-    return config_.tlsCertificates();
+    return config_->tlsCertificates();
   }
 
 private:
-  const Ssl::ServerContextConfig& config_;
+  Ssl::ServerContextConfigPtr config_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
   QuicClientTransportSocketFactory(Stats::Scope& store, Ssl::ClientContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, std::move(config), "client"),
-        config_(dynamic_cast<const Ssl::ClientContextConfig&>(contextConfig())) {}
+      : QuicTransportSocketFactoryBase(store, *config, "client"), config_(std::move(config)) {}
 
-  const Ssl::ClientContextConfig& clientContextConfig() const { return config_; }
+  const Ssl::ClientContextConfig& clientContextConfig() const { return *config_; }
+
+protected:
+  void onSecretUpdated() override {
+    QuicTransportSocketFactoryBase::onSecretUpdated();
+    // TODO(danzh) Client transport socket factory may also need to update quic crypto.
+  }
 
 private:
-  const Ssl::ClientContextConfig& config_;
+  Ssl::ClientContextConfigPtr config_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client

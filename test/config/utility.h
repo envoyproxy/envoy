@@ -233,7 +233,7 @@ public:
   void configDownstreamTransportSocketWithTls(
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-          fill_tls_stuff);
+          configure_tls_context);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);

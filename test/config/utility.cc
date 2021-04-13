@@ -1065,7 +1065,7 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
 void ConfigHelper::configDownstreamTransportSocketWithTls(
     envoy::config::bootstrap::v3::Bootstrap& bootstrap,
     std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-        fill_tls_stuff) {
+        configure_tls_context) {
   for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
     ASSERT(listener.filter_chains_size() > 0);
     auto* filter_chain = listener.mutable_filter_chains(0);
@@ -1074,13 +1074,13 @@ void ConfigHelper::configDownstreamTransportSocketWithTls(
       transport_socket->set_name("envoy.transport_sockets.quic");
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
           quic_transport_socket_config;
-      fill_tls_stuff(*quic_transport_socket_config.mutable_downstream_tls_context()
-                          ->mutable_common_tls_context());
+      configure_tls_context(*quic_transport_socket_config.mutable_downstream_tls_context()
+                                 ->mutable_common_tls_context());
       transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
     } else if (!listener.has_udp_listener_config()) {
       transport_socket->set_name("envoy.transport_sockets.tls");
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      fill_tls_stuff(*tls_context.mutable_common_tls_context());
+      configure_tls_context(*tls_context.mutable_common_tls_context());
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
     }
   }

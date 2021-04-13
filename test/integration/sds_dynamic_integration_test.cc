@@ -46,24 +46,27 @@ namespace Ssl {
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
 
-std::string sdsTestParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>&
-        p) {
-  return fmt::format(
-      "{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-      std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-      std::get<2>(p.param) ? "UsesQuic" : "UsesTcp");
+struct TestParams {
+  Network::Address::IpVersion ip_version;
+  Grpc::ClientType grpc_type;
+  bool test_quic;
+};
+
+std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
+  return fmt::format("{}_{}_{}",
+                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                     p.param.grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+                     p.param.test_quic ? "UsesQuic" : "UsesTcp");
 }
 
-std::vector<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>
-getSdsTestsParams(bool test_quic) {
-  std::vector<std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> ret;
+std::vector<TestParams> getSdsTestsParams(bool test_quic) {
+  std::vector<TestParams> ret;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
-      ret.push_back({ip_version, grpc_type, false});
+      ret.push_back(TestParams{ip_version, grpc_type, false});
       if (test_quic) {
 #ifdef ENVOY_ENABLE_QUIC
-        ret.push_back({ip_version, grpc_type, true});
+        ret.push_back(TestParams{ip_version, grpc_type, true});
 #else
         ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
 #endif
@@ -76,14 +79,12 @@ getSdsTestsParams(bool test_quic) {
 // Sds integration base class with following support:
 // * functions to create sds upstream, and send sds response
 // * functions to create secret protobuf.
-class SdsDynamicIntegrationBaseTest
-    : public Grpc::BaseGrpcClientIntegrationParamTest,
-      public HttpIntegrationTest,
-      public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
+class SdsDynamicIntegrationBaseTest : public Grpc::BaseGrpcClientIntegrationParamTest,
+                                      public HttpIntegrationTest,
+                                      public testing::TestWithParam<TestParams> {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam().ip_version),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert") {}
 
@@ -91,10 +92,10 @@ public:
                                 Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(downstream_protocol, version, config), server_cert_("server_cert"),
         validation_secret_("validation_secret"), client_cert_("client_cert"),
-        test_quic_(std::get<2>(GetParam())) {}
+        test_quic_(GetParam().test_quic) {}
 
-  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
-  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+  Network::Address::IpVersion ipVersion() const override { return GetParam().ip_version; }
+  Grpc::ClientType clientType() const override { return GetParam().grpc_type; }
 
 protected:
   void createSdsStream(FakeUpstream&) {
@@ -193,10 +194,10 @@ protected:
 class SdsDynamicDownstreamIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   SdsDynamicDownstreamIntegrationTest()
-      : SdsDynamicIntegrationBaseTest((std::get<2>(GetParam()) ? Http::CodecClient::Type::HTTP3
-                                                               : Http::CodecClient::Type::HTTP1),
-                                      std::get<0>(GetParam()),
-                                      ConfigHelper::httpProxyConfig(std::get<2>(GetParam()))) {}
+      : SdsDynamicIntegrationBaseTest((GetParam().test_quic ? Http::CodecClient::Type::HTTP3
+                                                            : Http::CodecClient::Type::HTTP1),
+                                      GetParam().ip_version,
+                                      ConfigHelper::httpProxyConfig(GetParam().test_quic)) {}
 
   void initialize() override {
     ASSERT(test_quic_ ? downstream_protocol_ == Http::CodecClient::Type::HTTP3
@@ -436,25 +437,12 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* transport_socket = bootstrap.mutable_static_resources()
-                                   ->mutable_listeners(0)
-                                   ->mutable_filter_chains(0)
-                                   ->mutable_transport_socket();
-      if (!test_quic_) {
-        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-        auto* common_tls_context = tls_context.mutable_common_tls_context();
-        configInlinedCerts(common_tls_context);
-        transport_socket->set_name("envoy.transport_sockets.tls");
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
-      } else {
-        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
-            transport_socket_config;
-        auto* common_tls_context =
-            transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
-        configInlinedCerts(common_tls_context);
-        transport_socket->set_name("envoy.transport_sockets.quic");
-        transport_socket->mutable_typed_config()->PackFrom(transport_socket_config);
-      }
+      config_helper_.configDownstreamTransportSocketWithTls(
+          bootstrap,
+          [this](
+              envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+            configInlinedCerts(&common_tls_context);
+          });
 
       // Add a static sds cluster
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
