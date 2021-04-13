@@ -6,7 +6,9 @@ Statistics
 Listener
 --------
 
-Every listener has a statistics tree rooted at *listener.<address>.* with the following statistics:
+Every listener has a statistics tree rooted at *listener.<address>.* (or *listener.<stat_prefix>.* if
+:ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>` is non-empty)
+with the following statistics:
 
 .. csv-table::
    :header: Name, Type, Description

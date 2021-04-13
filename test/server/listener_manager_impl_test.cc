@@ -2129,6 +2129,23 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.[__1]_10000.foo").value());
 }
 
+TEST_F(ListenerManagerImplTest, ListenerStatPrefix) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+filter_chains:
+- filters: []
+  )EOF";
+
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
+
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.test_prefix.foo").value());
+}
+
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
