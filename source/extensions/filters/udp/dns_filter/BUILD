@@ -69,7 +69,6 @@ envoy_cc_library(
     srcs = ["dns_impl.cc"],
     hdrs = ["dns_impl.h"],
     external_deps = ["ares"],
-    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
