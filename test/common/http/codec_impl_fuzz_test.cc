@@ -706,13 +706,15 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
   try {
     // Validate input early.
     TestUtility::validate(input);
-    codecFuzz(input, HttpVersion::Http1);
+    // Test new and legacy HTTP/1.1 parsers.
+    for (const auto& value : {"false", "true"}) {
+      TestScopedRuntime scoped_runtime;
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.enable_new_http1_parser", value}});
+      codecFuzz(input, HttpVersion::Http1);
+    }
     codecFuzz(input, HttpVersion::Http2);
-    // Enable legacy HTTP1 codec.
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.enable_new_http1_parser", "true"}});
-    codecFuzz(input, HttpVersion::Http1);
+
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
