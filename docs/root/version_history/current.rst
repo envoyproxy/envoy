@@ -149,6 +149,7 @@ New Features
 * http: hash multiple header values instead of only hash the first header value. It can be disabled by setting the `envoy.reloadable_features.hash_multiple_header_values` runtime key to false. See the :ref:`HashPolicy's Header configuration <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.Header>` for more information.
 * json: introduced new JSON parser (https://github.com/nlohmann/json) to replace RapidJSON. The new parser is disabled by default. To test the new RapidJSON parser, enable the runtime feature `envoy.reloadable_features.remove_legacy_json`.
 * kill_request: :ref:`Kill Request <config_http_filters_kill_request>` Now supports bidirection killing.
+* listener: added an optional :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`.
 * loadbalancer: added the ability to specify the hash_key for a host when using a consistent hashing loadbalancer (ringhash, maglev) using the :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: ``"envoy.lb": {"hash_key": "..."}``.
 * log: added a new custom flag ``%j`` to the log pattern to print the actual message to log as JSON escaped string.
 * oauth filter: added the optional parameter :ref:`resources <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.resources>`. Set this value to add multiple "resource" parameters in the Authorization request sent to the OAuth provider. This acts as an identifier representing the protected resources the client is requesting a token for.
