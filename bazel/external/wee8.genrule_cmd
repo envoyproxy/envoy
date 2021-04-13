@@ -37,6 +37,7 @@ else
   WEE8_BUILD_ARGS+=" use_sysroot=false"
 
   if [[ ( $${SYSTEM} == *MSYS_NT* && $${USE_CLANG_CL-} == "1" ) ]]; then
+    export DEPOT_TOOLS_WIN_TOOLCHAIN=0
     export IS_CLANG=true
     export CC=$${CC:-clang-cl.exe}
     export CXX=$${CXX:-clang-cl.exe}
