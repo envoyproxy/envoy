@@ -639,8 +639,6 @@ TEST_F(DnsFilterTest, LocalTypeAAAAQuerySuccess) {
 TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   InSequence s;
 
-
-
   const std::string expected_address("130.207.244.251");
   const std::string domain("www.foobaz.com");
   setup(forward_query_on_config);
@@ -692,8 +690,6 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
 
 TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   InSequence s;
-
-
 
   const std::string expected_address("2a04:4e42:d::323");
   const std::string domain("www.foobaz.com");
@@ -748,7 +744,6 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
 TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   InSequence s;
 
-
   const std::list<std::string> expected_address{"130.207.244.251", "130.207.244.252",
                                                 "130.207.244.253", "130.207.244.254"};
   const std::string domain("www.foobaz.com");
@@ -802,8 +797,6 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
 
 TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   InSequence s;
-
-
 
   const std::string domain("www.foobaz.com");
   setup(forward_query_on_config);

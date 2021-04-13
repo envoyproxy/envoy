@@ -17,7 +17,6 @@
 #include "absl/strings/str_join.h"
 #include "ares.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -140,7 +139,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
           address_list.emplace_back(
               Network::DnsResponse(std::make_shared<const Network::Address::Ipv4Instance>(&address),
-                          std::chrono::seconds(ai->ai_ttl)));
+                                   std::chrono::seconds(ai->ai_ttl)));
         }
       } else if (addrinfo->nodes->ai_family == AF_INET6) {
         for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
@@ -151,7 +150,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
           address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
           address_list.emplace_back(
               Network::DnsResponse(std::make_shared<const Network::Address::Ipv6Instance>(address),
-                          std::chrono::seconds(ai->ai_ttl)));
+                                   std::chrono::seconds(ai->ai_ttl)));
         }
       }
     }
@@ -176,16 +175,15 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       //  We can't add a main thread assertion here because both this code is reused by dns filter
       //  and executed in both main thread and worker thread. Maybe split the code for filter and
       //  main thread.
-      try { callback_(resolution_status, std::move(address_list)); }
-      catch (const EnvoyException& e) {
+      try {
+        callback_(resolution_status, std::move(address_list));
+      } catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      }
-      catch (const std::exception& e) {
+      } catch (const std::exception& e) {
         ENVOY_LOG(critical, "std::exception in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      }
-      catch (...) {
+      } catch (...) {
         ENVOY_LOG(critical, "Unknown exception in c-ares callback");
         dispatcher_.post([] { throw EnvoyException("unknown"); });
       }
@@ -248,7 +246,8 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
 }
 
 Network::ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
-                                         Network::DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+                                                  Network::DnsLookupFamily dns_lookup_family,
+                                                  ResolveCb callback) {
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.

@@ -3,8 +3,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
-#include "extensions/filters/udp/dns_filter/dns_parser.h"
 #include "extensions/filters/udp/dns_filter/dns_impl.h"
+#include "extensions/filters/udp/dns_filter/dns_parser.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +23,8 @@ public:
                     std::chrono::milliseconds timeout, Event::Dispatcher& dispatcher,
                     uint64_t max_pending_lookups)
       : timeout_(timeout), dispatcher_(dispatcher),
-        resolver_(DnsResolverImpl::createDnsResolver(dispatcher, resolvers, false /* use_tcp_for_dns_lookups */)),
+        resolver_(DnsResolverImpl::createDnsResolver(dispatcher, resolvers,
+                                                     false /* use_tcp_for_dns_lookups */)),
         callback_(callback), max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord
@@ -35,9 +36,7 @@ public:
    * @param domain_query the query record object containing the name for which we are resolving
    */
   void resolveExternalQuery(DnsQueryContextPtr context, const DnsQueryRecord* domain_query);
-  void setResolver(const Network::DnsResolverSharedPtr & resolver) {
-    resolver_ = resolver;
-  }
+  void setResolver(const Network::DnsResolverSharedPtr& resolver) { resolver_ = resolver; }
 
 private:
   struct LookupContext {

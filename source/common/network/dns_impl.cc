@@ -173,7 +173,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       //  We can't add a main thread assertion here because both this code is reused by dns filter
       //  and executed in both main thread and worker thread. Maybe split the code for filter and
       //  main thread.
-      TRY_ASSERT_MAIN_THREAD { callback_(resolution_status, std::move(address_list)); } END_TRY
+      TRY_ASSERT_MAIN_THREAD { callback_(resolution_status, std::move(address_list)); }
+      END_TRY
       catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
