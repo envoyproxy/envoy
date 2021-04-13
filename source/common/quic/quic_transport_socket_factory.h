@@ -54,7 +54,7 @@ public:
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
   // code does not create transport sockets.
   // QuicClientTransportSocketFactory::createTransportSocket is called by the
-  // connection grid when uptream HTTP/3 fails over to TCP, and a raw SSL socket
+  // connection grid when upstream HTTP/3 fails over to TCP, and a raw SSL socket
   // is needed. In this case the QuicClientTransportSocketFactory falls over to
   // using the fallback factory.
   Network::TransportSocketPtr
