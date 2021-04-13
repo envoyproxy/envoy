@@ -60,10 +60,13 @@ public:
   virtual bool supportsPathlessHeaders() const { return false; }
 };
 
+class VirtualHostImpl;
+
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
                    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
+                   const VirtualHostImpl& vhost,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
 
@@ -729,7 +732,8 @@ private:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
                          Server::Configuration::ServerFactoryContext& factory_context,
                          ProtobufMessage::ValidationVisitor& validator,
-                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
+                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
+                         const VirtualHostImpl& vhost);
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);

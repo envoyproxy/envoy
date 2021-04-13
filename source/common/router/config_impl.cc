@@ -371,7 +371,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           route, factory_context.api(),
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(),
-                          route.hidden_envoy_deprecated_per_filter_config(), factory_context,
+                          route.hidden_envoy_deprecated_per_filter_config(), vhost, factory_context,
                           validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
@@ -414,7 +414,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       auto cluster_entry = std::make_unique<WeightedClusterEntry>(
-          this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster);
+          this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster, vhost);
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -1003,7 +1003,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string& runtime_key,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator,
-    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster)
+    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
+    const VirtualHostImpl& vhost)
     : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
       loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
@@ -1012,8 +1013,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.typed_per_filter_config(),
-                          cluster.hidden_envoy_deprecated_per_filter_config(), factory_context,
-                          validator) {
+                          cluster.hidden_envoy_deprecated_per_filter_config(), vhost,
+                          factory_context, validator) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1188,8 +1189,8 @@ VirtualHostImpl::VirtualHostImpl(
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.typed_per_filter_config(),
-                          virtual_host.hidden_envoy_deprecated_per_filter_config(), factory_context,
-                          validator),
+                          virtual_host.hidden_envoy_deprecated_per_filter_config(), *this,
+                          factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
@@ -1529,10 +1530,15 @@ namespace {
 RouteSpecificFilterConfigConstSharedPtr
 createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                                 const ProtobufWkt::Struct& config,
+                                const VirtualHostImpl& vhost,
                                 Server::Configuration::ServerFactoryContext& factory_context,
                                 ProtobufMessage::ValidationVisitor& validator) {
-  auto& factory = Envoy::Config::Utility::getAndCheckFactoryByName<
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_unknown_typed_per_filter_config_factory"))
+  auto factory = Envoy::Config::Utility::getFactoryByName<
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
+  if (factory == nullptr && vhost.globalRouteConfig().rdsStats() != nullptr) {
+    vhost.globalRouteConfig().rdsStats()->unknown_per_filter_typed_config_factory.inc();
+  }
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
@@ -1543,6 +1549,7 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
     const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
+    const VirtualHostImpl& vhost,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   if (!typed_configs.empty() && !configs.empty()) {
@@ -1555,7 +1562,7 @@ PerFilterConfigs::PerFilterConfigs(
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createRouteSpecificFilterConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
+        name, it.second, ProtobufWkt::Struct::default_instance(), vhost, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
     } else {
@@ -1579,7 +1586,7 @@ PerFilterConfigs::PerFilterConfigs(
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(),
-                                                  it.second, factory_context, validator);
+                                                  it.second, vhost, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
     } else {
