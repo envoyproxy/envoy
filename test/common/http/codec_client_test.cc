@@ -118,7 +118,7 @@ public:
                                /*push_promise_index=*/nullptr, dispatcher,
                                /*send_buffer_limit=*/16 * 1024 * 2) {}
 
-  ~MockEnvoyQuicClientSession() override {}
+  ~MockEnvoyQuicClientSession() override = default;
 
   // Network::ClientConnection
   MOCK_METHOD(void, connect, ());
