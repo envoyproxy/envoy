@@ -14,7 +14,8 @@ namespace Router {
  */
 #define ALL_RDS_STATS(COUNTER)                                                                     \
   COUNTER(config_reload)                                                                           \
-  COUNTER(update_empty)
+  COUNTER(update_empty)                                                                            \
+  COUNTER(unknown_per_filter_typed_config_factory)
 
 /**
  * Struct definition for all RDS stats. @see stats_macros.h
