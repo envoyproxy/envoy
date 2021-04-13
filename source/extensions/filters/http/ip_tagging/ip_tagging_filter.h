@@ -76,9 +76,9 @@ private:
   }
 
   void fileExtension_(std::string filename_) {
-    if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
+    if (absl::EndsWith(filename_, MessageUtil::FileExtensions::get().Yaml)) {
       extension_ = "Yaml";
-    } else if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Json)) {
+    } else if (absl::EndsWith(filename_, MessageUtil::FileExtensions::get().Json)) {
       extension_ = "Json";
     } else {
       extension_ = "Unknown";
