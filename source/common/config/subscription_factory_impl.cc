@@ -86,12 +86,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
-    Config::GrpcMuxSharedPtr gmuxsp = cm_.adsMux();
-    if ( gmuxsp == nullptr ) {
-      throw EnvoyException("A configuration for dynamic resources is required for ads with a non primary cluster");
-    } 
+    if ( cm_.adsMux() == nullptr ) {
+      throw EnvoyException("Sub-components (like SDS) of a primary cluster cannot be configured via ADS");
+    }
     return std::make_unique<GrpcSubscriptionImpl>(
-        gmuxsp, callbacks, resource_decoder, stats, type_url, dispatcher_,
+        cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
         Utility::configSourceInitialFetchTimeout(config), true);
   }
   default:

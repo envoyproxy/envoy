@@ -1,0 +1,81 @@
+node:
+  id: TEST
+  cluster: test
+  locality:
+    region: tor
+    zone: dev
+static_resources:
+  clusters:
+  - name: ads_cluster
+    connect_timeout: 1s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: ads_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 18000
+  - name: test
+    connect_timeout: 1s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: test
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost
+                    port_value: 8583
+    transport_socket:
+      name: "envoy.transport_sockets.tls"
+      typed_config:
+        "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext"
+        common_tls_context:
+          validation_context_sds_secret_config:
+            name: val_cert
+            sds_config:
+              ads: {}
+              resource_api_version: V3
+dynamic_resources:
+  ads_config:
+    api_type: GRPC
+    grpc_services:
+      envoy_grpc:
+        cluster_name: "ads_cluster"
+    transport_api_version: V3
+#node:
+#  id: TEST
+#  cluster: test
+#  locality:
+#    region: tor
+#    zone: dev
+#static_resources:
+#  clusters:
+#    - name: test
+#      connect_timeout: 1s
+#      type: strict_dns
+#      lb_policy: round_robin
+#      load_assignment:
+#        cluster_name: test
+#        endpoints:
+#          - lb_endpoints:
+#              - endpoint:
+#                  address:
+#                    socket_address:
+#                      address: localhost
+#                      port_value: 12345
+#      transport_socket:
+#        name: envoy.transport_sockets.tls
+#        typed_config:
+#          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+#          common_tls_context:
+#            validation_context_sds_secret_config:
+#              name: val_cert
+#              sds_config:
+#                ads: {}

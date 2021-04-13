@@ -1073,6 +1073,12 @@ TEST_P(ServerInstanceImplTest, BadSdsConfigSource) {
       "'sds-grpc' does not exist, was added via api, or is an EDS cluster");
 }
 
+TEST_P(ServerInstanceImplTest, BadSdsAdsConfigSource) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/bad_sds_ads_config_source.yaml"), EnvoyException,
+      "Sub-components (like SDS) of a primary cluster cannot be configured via ADS");
+}
+
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
