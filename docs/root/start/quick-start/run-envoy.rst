@@ -236,12 +236,14 @@ Next, start the Envoy server using the override configuration:
 
    .. tab:: System
 
+      On Linux/Mac: run:
+
       .. code-block:: console
 
          $ envoy -c envoy-demo.yaml --config-yaml "$(cat envoy-override.yaml)"
          ...
 
-   .. tab:: Windows
+      On Windows run:
 
       .. code-block:: PowerShell
 
@@ -400,6 +402,12 @@ This can be overridden using :option:`--log-path`.
                      -c 'C:\ProgramData\envoy.yaml'
                      --log-path 'C:\logs\custom.log'
 
+      .. note::
+
+         Envoy on a Windows system Envoy will output to ``CON`` by default.
+
+         This can also be used as a logging path when configuring logging.
+
 :ref:`Access log <arch_overview_access_logs>` paths can be set for the
 :ref:`admin interface <start_quick_start_admin>`, and for configured
 :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
@@ -425,12 +433,6 @@ Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additiona
 
 Envoy can be configured to log to :ref:`different formats <config_access_log>`, and to
 :ref:`different outputs <api-v3_config_accesslog>` in addition to files and ``stdout/err``.
-
-.. note::
-
-   If you are running Envoy on a Windows system Envoy will output to ``CON`` by default.
-
-   This can also be used as a logging path when configuring logging.
 
 Debugging Envoy
 ---------------
