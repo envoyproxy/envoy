@@ -1494,13 +1494,15 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator,
-                       bool validate_clusters_default)
+                       bool validate_clusters_default,
+                       RdsStats* rds_stats)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
       uses_vhds_(config.has_vhds()),
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
-                                          DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
+                                          DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
+      rds_stats_(rds_stats) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context, validator,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));

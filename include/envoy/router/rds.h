@@ -10,6 +10,20 @@ namespace Envoy {
 namespace Router {
 
 /**
+ * All RDS stats. @see stats_macros.h
+ */
+#define ALL_RDS_STATS(COUNTER)                                                                     \
+  COUNTER(config_reload)                                                                           \
+  COUNTER(update_empty)
+
+/**
+ * Struct definition for all RDS stats. @see stats_macros.h
+ */
+struct RdsStats {
+  ALL_RDS_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * A provider for constant route configurations.
  */
 class RouteConfigProvider {

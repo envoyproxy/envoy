@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/router/rds.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -1029,7 +1030,8 @@ class ConfigImpl : public Config {
 public:
   ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
              Server::Configuration::ServerFactoryContext& factory_context,
-             ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default);
+             ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default,
+             RdsStats* rds_stats = nullptr);
 
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
   const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
@@ -1065,6 +1067,10 @@ public:
     return max_direct_response_body_size_bytes_;
   }
 
+  RdsStats* rdsStats() const {
+    return rds_stats_;
+  }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1075,6 +1081,7 @@ private:
   const bool uses_vhds_;
   const bool most_specific_header_mutations_wins_;
   const uint32_t max_direct_response_body_size_bytes_;
+  RdsStats* rds_stats_;
 };
 
 /**
