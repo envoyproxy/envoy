@@ -306,3 +306,4 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
 
 } // namespace Network
 } // namespace Envoy
+
