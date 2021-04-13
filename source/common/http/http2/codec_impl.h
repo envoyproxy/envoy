@@ -387,11 +387,7 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()),
-          buffer_memory_account_(std::make_shared<Buffer::BufferMemoryAccount>()) {
-      pending_recv_data_.bindAccount(buffer_memory_account_);
-      pending_send_data_.bindAccount(buffer_memory_account_);
-    }
+        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
