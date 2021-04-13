@@ -2,6 +2,7 @@
 # 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix MSAN linking.
 # 4. Provide more details on Windows build failures.
+# 5. Remove requirement for Windows 10 19041 SDK.
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -66,3 +67,54 @@
    return available_versions[0]
 
 
+--- wee8/build/toolchain/win/setup_toolchain.py
++++ wee8/build/toolchain/win/setup_toolchain.py
+@@ -165,14 +165,10 @@ def _LoadToolchainEnv(cpu, toolchain_root, sdk_dir, target_store):
+     if (cpu != 'x64'):
+       # x64 is default target CPU thus any other CPU requires a target set
+       cpu_arg += '_' + cpu
+-    args = [script_path, cpu_arg, ]
++    args = [script_path, cpu_arg]
+     # Store target must come before any SDK version declaration
+     if (target_store):
+-      args.append('store')
+-    # Explicitly specifying the SDK version to build with to avoid accidentally
+-    # building with a new and untested SDK. This should stay in sync with the
+-    # packaged toolchain in build/vs_toolchain.py.
+-    args.append('10.0.19041.0')
++      args.append(['store'])
+     variables = _LoadEnvFromBat(args)
+   return _ExtractImportantEnvironment(variables)
+
+--- wee8/build/vs_toolchain.py
++++ wee8/build/vs_toolchain.py
+@@ -420,10 +420,6 @@ def _CopyDebugger(target_dir, target_cpu):
+   # List of debug files that should be copied, the first element of the tuple is
+   # the name of the file and the second indicates if it's optional.
+   debug_files = [('dbghelp.dll', False), ('dbgcore.dll', True)]
+-  # The UCRT is not a redistributable component on arm64.
+-  if target_cpu != 'arm64':
+-    debug_files.extend([('api-ms-win-downlevel-kernel32-l2-1-0.dll', False),
+-                        ('api-ms-win-eventing-provider-l1-1-0.dll', False)])
+   for debug_file, is_optional in debug_files:
+     full_path = os.path.join(win_sdk_dir, 'Debuggers', target_cpu, debug_file)
+     if not os.path.exists(full_path):
+--- wee8/build/win/BUILD.gn
++++ wee8/build/win/BUILD.gn
+@@ -79,7 +79,6 @@ if (is_win) {
+         "$root_out_dir/cdb/api-ms-win-crt-string-l1-1-0.dll",
+         "$root_out_dir/cdb/api-ms-win-crt-time-l1-1-0.dll",
+         "$root_out_dir/cdb/api-ms-win-crt-utility-l1-1-0.dll",
+-        "$root_out_dir/cdb/api-ms-win-downlevel-kernel32-l2-1-0.dll",
+         "$root_out_dir/cdb/api-ms-win-eventing-provider-l1-1-0.dll",
+         "$root_out_dir/cdb/ucrtbase.dll",
+       ]
+@@ -163,8 +162,6 @@ if (is_win) {
+           "$root_out_dir/api-ms-win-crt-string-l1-1-0.dll",
+           "$root_out_dir/api-ms-win-crt-time-l1-1-0.dll",
+           "$root_out_dir/api-ms-win-crt-utility-l1-1-0.dll",
+-          "$root_out_dir/api-ms-win-downlevel-kernel32-l2-1-0.dll",
+-          "$root_out_dir/api-ms-win-eventing-provider-l1-1-0.dll",
+         ]
+         if (!is_debug) {
+           data += [ "$root_out_dir/ucrtbase.dll" ]
