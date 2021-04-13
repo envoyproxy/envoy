@@ -28,7 +28,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
                                                      PoolIterator pool_it,
                                                      ConnectionPool::Callbacks& callbacks)
-    : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks),
+    : grid_(grid), decoder_(decoder), inner_callbacks_(&callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
       current_(pool_it) {}
@@ -58,10 +58,12 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     absl::string_view transport_failure_reason, Upstream::HostDescriptionConstSharedPtr host) {
   ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
-            describePool(attempt->pool()), grid_.host_->hostname());
+            describePool(attempt->pool()), host->hostname());
   if (grid_.isPoolHttp3(attempt->pool())) {
     http3_attempt_failed_ = true;
   }
+  maybeMarkHttp3Broken();
+
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
 
   // If there is another connection attempt in flight then let that proceed.
@@ -76,11 +78,14 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller.
-  ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(attempt->pool()),
-            grid_.host_->hostname());
+  ConnectionPool::Callbacks* callbacks = inner_callbacks_;
+  inner_callbacks_ = nullptr;
   deleteThis();
-  callbacks.onPoolFailure(reason, transport_failure_reason, host);
+  if (callbacks != nullptr) {
+    ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(attempt->pool()),
+              host->hostname());
+    callbacks->onPoolFailure(reason, transport_failure_reason, host);
+  }
 }
 
 void ConnectivityGrid::WrapperCallbacks::deleteThis() {
@@ -106,20 +111,28 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     absl::optional<Http::Protocol> protocol) {
   ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
-            grid_.host_->hostname());
-  if (http3_attempt_failed_) {
-    // If the HTTP/3 attempt failed but the other attempt succeeded, mark HTTP/3 as broken.
+            host->hostname());
+  if (!grid_.isPoolHttp3(attempt->pool())) {
+    alpn_attempt_succeeded_ = true;
+  }
+  maybeMarkHttp3Broken();
+
+  auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
+  ConnectionPool::Callbacks* callbacks = inner_callbacks_;
+  inner_callbacks_ = nullptr;
+  // If there are other connection attempts in progress, let them complete.
+  if (connection_attempts_.empty()) {
+    deleteThis();
+  }
+  if (callbacks != nullptr) {
+    callbacks->onPoolReady(encoder, host, info, protocol);
+  }
+}
+
+void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
+  if (http3_attempt_failed_ && alpn_attempt_succeeded_) {
     grid_.setIsHttp3Broken(true);
   }
-  auto delete_on_return = attempt->removeFromList(connection_attempts_);
-  // The first successful connection is passed up, and all others will be canceled.
-  // TODO: Ensure that if HTTP/2 succeeds, we can allow the HTTP/3 connection to run to completion.
-  for (auto& attempt : connection_attempts_) {
-    attempt->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
-  }
-  ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  deleteThis();
-  callbacks.onPoolReady(encoder, host, info, protocol);
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(

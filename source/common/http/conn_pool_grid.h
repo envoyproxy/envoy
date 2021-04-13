@@ -92,6 +92,9 @@ public:
     // Removes this from the owning list, deleting it.
     void deleteThis();
 
+    // Marks HTTP/3 broken If the HTTP/3 attempt failed but the other attempt succeeded.
+    void maybeMarkHttp3Broken();
+
     // Tracks all the connection attempts which currently in flight.
     std::list<ConnectionAttemptCallbacksPtr> connection_attempts_;
 
@@ -100,14 +103,17 @@ public:
     // The decoder for the original newStream, needed to create streams on subsequent pools.
     Http::ResponseDecoder& decoder_;
     // The callbacks from the original caller, which must get onPoolFailure or
-    // onPoolReady unless there is call to cancel().
-    ConnectionPool::Callbacks& inner_callbacks_;
+    // onPoolReady unless there is call to cancel(). Will be nullptr if the calller
+    // has been notified while attempts are still pending.
+    ConnectionPool::Callbacks* inner_callbacks_;
     // The timer which tracks when new connections should be attempted.
     Event::TimerPtr next_attempt_timer_;
     // The iterator to the last pool which had a connection attempt.
     PoolIterator current_;
     // True if the HTTP/3 attempt failed.
     bool http3_attempt_failed_{};
+    // True if the ALPN attempt succeeded.
+    bool alpn_attempt_succeeded_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 

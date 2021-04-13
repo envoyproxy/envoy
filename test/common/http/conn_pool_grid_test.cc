@@ -234,6 +234,37 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
   EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
+// Test both connections happening in parallel and the second connecting before
+// the first eventually fails..
+TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) {
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+
+  grid_.newStream(decoder_, callbacks_);
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_TRUE(failover_timer->enabled_);
+
+  // Kick off the second connection.
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  EXPECT_NE(grid_.callbacks(1), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  EXPECT_FALSE(grid_.isHttp3Broken());
+
+  // onPoolFailure should not be passed up the first time. Instead the grid
+  // should wait on the other pool
+  EXPECT_NE(grid_.callbacks(0), nullptr);
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  grid_.callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host_);
+  EXPECT_TRUE(grid_.isHttp3Broken());
+}
+
 // Test that after the first pool fails, subsequent connections will
 // successfully fail over to the second pool (the iterators work as intended)
 TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
@@ -265,6 +296,7 @@ TEST_F(ConnectivityGridTest, ImmediateDoubleFailure) {
   grid_.immediate_failure_ = true;
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   EXPECT_EQ(grid_.newStream(decoder_, callbacks_), nullptr);
+  EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
 // Test both connections happening in parallel and both failing.
@@ -292,6 +324,7 @@ TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   grid_.callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                     "reason", host_);
+  EXPECT_FALSE(grid_.isHttp3Broken());
 }
 
 // Test cancellation
