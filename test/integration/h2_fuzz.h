@@ -23,5 +23,7 @@ public:
 private:
   void sendFrame(const test::integration::H2TestFrame&,
                  std::function<void(const Envoy::Http::Http2::Http2Frame&)>);
+
+  Filesystem::ScopedUseMemfiles use_memfiles_{true};
 };
 } // namespace Envoy
