@@ -9,7 +9,6 @@ import subprocess
 import sys
 from functools import cached_property
 
-
 LOG_LEVELS = (("info", logging.INFO), ("debug", logging.DEBUG), ("warn", logging.WARN),
               ("error", logging.ERROR))
 
