@@ -24,6 +24,7 @@ EXCLUDED_PREFIXES = (
     "./.cache",
     "./source/extensions/extensions_build_config.bzl",
     "./bazel/toolchains/configs/",
+    "./bazel/distfiles.bzl",
     "./tools/testdata/check_format/",
     "./tools/pyformat/",
     "./third_party/",
