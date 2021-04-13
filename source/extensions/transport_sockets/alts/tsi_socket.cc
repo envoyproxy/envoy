@@ -259,6 +259,57 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
   return repeatReadAndUnprotect(buffer, result);
 }
 
+Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, bool end_stream) {
+  uint64_t total_bytes_written = 0;
+  Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false};
+
+  while (true) {
+    uint64_t bytes_to_drain_this_iteration =
+        prev_bytes_to_drain_ > 0 ? prev_bytes_to_drain_
+                                 : std::min(buffer.length(), actual_frame_size_to_use_);
+    // Consumed all data. Exit.
+    if (bytes_to_drain_this_iteration == 0) {
+      break;
+    }
+    // Short write did not occur previously.
+    if (raw_write_buffer_.length() == 0) {
+      ASSERT(frame_protector_);
+      ASSERT(prev_bytes_to_drain_ == 0);
+
+      // Store data to be protected this iteration in a separate buffer.
+      Buffer::OwnedImpl bytes_to_protect_this_iteration;
+      bytes_to_protect_this_iteration.add(buffer.linearize(bytes_to_drain_this_iteration),
+                                          bytes_to_drain_this_iteration);
+
+      // Do protect.
+      ENVOY_CONN_LOG(debug, "TSI: protecting buffer size: {}", callbacks_->connection(),
+                     bytes_to_protect_this_iteration.length());
+      tsi_result status =
+          frame_protector_->protect(bytes_to_protect_this_iteration, raw_write_buffer_);
+      ENVOY_CONN_LOG(debug, "TSI: protected buffer left: {} result: {}", callbacks_->connection(),
+                     bytes_to_protect_this_iteration.length(), tsi_result_to_string(status));
+    }
+
+    // Write raw_write_buffer_ to nework.
+    ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
+                   raw_write_buffer_.length(), end_stream);
+    result = raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
+    total_bytes_written += result.bytes_processed_;
+
+    // Short write. Exit.
+    if (raw_write_buffer_.length() > 0) {
+      prev_bytes_to_drain_ =
+          prev_bytes_to_drain_ > 0 ? prev_bytes_to_drain_ : bytes_to_drain_this_iteration;
+      break;
+    } else {
+      buffer.drain(bytes_to_drain_this_iteration);
+      prev_bytes_to_drain_ = 0;
+    }
+  }
+
+  return {result.action_, total_bytes_written, false};
+}
+
 Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (!handshake_complete_) {
     Network::PostIoAction action = doHandshake();
@@ -268,11 +319,7 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
 
   if (handshake_complete_) {
     ASSERT(frame_protector_);
-    ENVOY_CONN_LOG(debug, "TSI: protecting buffer size: {}", callbacks_->connection(),
-                   buffer.length());
-    tsi_result status = frame_protector_->protect(buffer, raw_write_buffer_);
-    ENVOY_CONN_LOG(debug, "TSI: protected buffer left: {} result: {}", callbacks_->connection(),
-                   buffer.length(), tsi_result_to_string(status));
+    return repeatProtectAndWrite(buffer, end_stream);
   }
 
   if (raw_write_buffer_.length() > 0) {

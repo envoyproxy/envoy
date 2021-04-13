@@ -74,6 +74,8 @@ public:
 
   // This API should be called only after ALTS handshake finishes successfully.
   size_t actualFrameSizeToUse() { return actual_frame_size_to_use_; }
+  // Set actual_frame_size_to_use_. Exposed for testing purpose.
+  void setActualFrameSizeToUse(size_t frame_size) { actual_frame_size_to_use_ = frame_size; }
 
 private:
   Network::PostIoAction doHandshake();
@@ -82,6 +84,8 @@ private:
 
   // Helper function to perform repeated read and unprotect operations.
   Network::IoResult repeatReadAndUnprotect(Buffer::Instance& buffer, Network::IoResult prev_result);
+  // Helper function to perform repeated protect and write operations.
+  Network::IoResult repeatProtectAndWrite(Buffer::Instance& buffer, bool end_stream);
   // Helper function to read from a raw socket and update status.
   Network::IoResult readFromRawSocket();
 
@@ -107,6 +111,7 @@ private:
   bool handshake_complete_{};
   bool end_stream_read_{};
   bool read_error_{};
+  uint64_t prev_bytes_to_drain_{};
 };
 
 /**
