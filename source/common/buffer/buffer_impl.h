@@ -8,7 +8,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/account.h"
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
@@ -60,13 +59,13 @@ public:
    * @param account the account to charge.
    * @param freelist to search for the backing storage, if any.
    */
-  Slice(uint64_t min_capacity, std::shared_ptr<Account> account,
+  Slice(uint64_t min_capacity, AccountSharedPtr account,
         absl::optional<FreeListReference> free_list = absl::nullopt)
       : capacity_(sliceSize(min_capacity)), storage_(newStorage(capacity_, free_list)),
         base_(storage_.get()), data_(0), reservable_(0) {
     if (account) {
       account->charge(capacity_);
-      charges_.emplace_back(account);
+      account_ = account;
     }
   }
 
@@ -84,7 +83,7 @@ public:
   Slice(Slice&& rhs) noexcept {
     storage_ = std::move(rhs.storage_);
     drain_trackers_ = std::move(rhs.drain_trackers_);
-    charges_ = std::move(rhs.charges_);
+    account_ = std::move(rhs.account_);
     base_ = rhs.base_;
     data_ = rhs.data_;
     reservable_ = rhs.reservable_;
@@ -103,7 +102,7 @@ public:
       freeStorage(std::move(storage_), capacity_);
       storage_ = std::move(rhs.storage_);
       drain_trackers_ = std::move(rhs.drain_trackers_);
-      charges_ = std::move(rhs.charges_);
+      account_ = std::move(rhs.account_);
       base_ = rhs.base_;
       data_ = rhs.data_;
       reservable_ = rhs.reservable_;
@@ -317,12 +316,9 @@ public:
     }
     drain_trackers_.clear();
 
-    for (auto& account : charges_) {
-      if (account) {
-        account->credit(capacity_);
-      }
+    if (account_) {
+      account_->credit(capacity_);
     }
-    charges_.clear();
   }
 
   /**
@@ -330,18 +326,18 @@ public:
    * charging for this slice, the account still exists, and the slice owns
    * backing memory.
    */
-  void chargeAccountIfValid(std::shared_ptr<Account> account) {
-    if (hasCharge() || storage_ == nullptr || !account) {
+  void chargeAccountIfValid(const AccountSharedPtr& account) {
+    if (hasAccount() || storage_ == nullptr || !account) {
       return;
     }
     account->charge(capacity_);
-    charges_.emplace_back(account);
+    account_ = account;
   }
 
   /**
-   * Whether there's at least one associated charge for this slice.
+   * Whether there's an associated account for this slice.
    */
-  bool hasCharge() { return !charges_.empty(); }
+  bool hasAccount() { return account_ != nullptr; }
 
   static constexpr uint32_t default_slice_size_ = 16384;
 
@@ -423,9 +419,9 @@ protected:
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
 
-  /** Charges associated with this slice. This should be 0 or 1 elements. When
-   * coalescing with another slice, we do not transfer over their charges. */
-  absl::InlinedVector<std::shared_ptr<Account>, 1> charges_;
+  /** Account associated with this slice. This may be null. When
+   * coalescing with another slice, we do not transfer over their account. */
+  AccountSharedPtr account_;
 };
 
 class OwnedImpl;
@@ -679,7 +675,7 @@ public:
 
   // Buffer::Instance
   void addDrainTracker(std::function<void()> drain_tracker) override;
-  void bindAccount(std::shared_ptr<Account> account) override;
+  void bindAccount(AccountSharedPtr account) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
@@ -774,7 +770,7 @@ private:
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
 
-  std::shared_ptr<Account> account_;
+  AccountSharedPtr account_;
 
   struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
     virtual absl::Span<Slice> ownedSlices() PURE;

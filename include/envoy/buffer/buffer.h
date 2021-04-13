@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
-#include "envoy/common/account.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
@@ -87,6 +86,41 @@ public:
 using ReservationSlicesOwnerPtr = std::unique_ptr<ReservationSlicesOwner>;
 
 /**
+ * An interface for accounting the usage of a resource.
+ * The "resource" tracked here is implicit, if in the future we want to track multiple
+ * resources, we should expand the interface to make it explicit.
+ *
+ * Currently this is only used by L7 streams to track the amount of memory
+ * allocated in buffers by the stream.
+ */
+class Account {
+public:
+  virtual ~Account() = default;
+
+  /**
+   * Returns the outstanding balance.
+   */
+  virtual uint64_t balance() const PURE;
+
+  /**
+   * Charges the account the specified amount.
+   *
+   * @param amount the amount to debit.
+   */
+  virtual void charge(uint64_t amount) PURE;
+
+  /**
+   * Called on to credit the account as
+   * a charged resource is no longer used.
+   *
+   * @param amount the amount to credit.
+   */
+  virtual void credit(uint64_t amount) PURE;
+};
+
+using AccountSharedPtr = std::shared_ptr<Account>;
+
+/**
  * A basic buffer abstraction.
  */
 class Instance {
@@ -108,7 +142,7 @@ public:
    *
    * @param account a shared_ptr to the account to charge.
    */
-  virtual void bindAccount(std::shared_ptr<Account> account) PURE;
+  virtual void bindAccount(AccountSharedPtr account) PURE;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant

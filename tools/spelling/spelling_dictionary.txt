@@ -1194,7 +1194,6 @@ unary
 unconfigurable
 undef
 underflowing
-underflows
 unfreed
 unicast
 unicode

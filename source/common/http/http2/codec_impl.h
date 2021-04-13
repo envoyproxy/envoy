@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/account.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
@@ -427,7 +426,7 @@ protected:
 
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
-    std::shared_ptr<Account> buffer_memory_account_;
+    Buffer::AccountSharedPtr buffer_memory_account_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;

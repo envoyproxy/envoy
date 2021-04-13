@@ -41,11 +41,11 @@ void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
   slices_.back().addDrainTracker(std::move(drain_tracker));
 }
 
-void OwnedImpl::bindAccount(std::shared_ptr<Account> account) {
+void OwnedImpl::bindAccount(AccountSharedPtr account) {
   ASSERT(slices_.empty());
   // We don't yet have an account bound.
   ASSERT(!account_);
-  account_ = account;
+  account_ = std::move(account);
 }
 
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }

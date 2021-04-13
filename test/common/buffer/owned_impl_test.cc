@@ -1324,8 +1324,35 @@ TEST(BufferMemoryAccountTest, BufferAccountsForUnownedSliceMovedInto) {
   accounted_buffer.move(unowned_buffer);
   EXPECT_EQ(account->balance(), 4096);
 
-  accounted_buffer.drain(std::string("Unaccounted Slice").length());
+  accounted_buffer.drain(accounted_buffer.length());
   EXPECT_EQ(account->balance(), 0);
+}
+
+TEST(BufferMemoryAccountTest, BufferFragmentsShouldNotHaveAnAssociatedAccount) {
+  std::shared_ptr<BufferMemoryAccount> buffer_one_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_one;
+  buffer_one.bindAccount(buffer_one_account);
+  ASSERT_EQ(buffer_one_account->balance(), 0);
+
+  std::shared_ptr<BufferMemoryAccount> buffer_two_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_two;
+  buffer_two.bindAccount(buffer_two_account);
+  ASSERT_EQ(buffer_two_account->balance(), 0);
+
+  const char data[] = "hello world";
+  BufferFragmentImpl frag(data, 11, nullptr);
+  buffer_one.addBufferFragment(frag);
+  EXPECT_EQ(buffer_one_account->balance(), 0);
+  EXPECT_EQ(buffer_one.length(), 11);
+
+  // Transfer over buffer
+  buffer_two.move(buffer_one);
+  EXPECT_EQ(buffer_two_account->balance(), 0);
+  EXPECT_EQ(buffer_two.length(), 11);
+
+  buffer_two.drain(buffer_two.length());
+  EXPECT_EQ(buffer_two_account->balance(), 0);
+  EXPECT_EQ(buffer_two.length(), 0);
 }
 
 TEST(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMoved) {
@@ -1348,12 +1375,13 @@ TEST(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMoved) {
   EXPECT_EQ(buffer_one_account->balance(), 4096);
   EXPECT_EQ(buffer_two_account->balance(), 0);
 
-  buffer_two.drain(std::string("Charged to Account One").length());
+  buffer_two.drain(buffer_two.length());
   EXPECT_EQ(buffer_one_account->balance(), 0);
   EXPECT_EQ(buffer_two_account->balance(), 0);
 }
 
-TEST(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMovedUnlessCoalesced) {
+TEST(BufferMemoryAccountTest,
+     SliceRemainsAttachToOriginalAccountWhenMovedUnlessCoalescedIntoExistingSlice) {
   std::shared_ptr<BufferMemoryAccount> buffer_one_account = std::make_shared<BufferMemoryAccount>();
   Buffer::OwnedImpl buffer_one;
   buffer_one.bindAccount(buffer_one_account);
@@ -1377,6 +1405,76 @@ TEST(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMovedUnless
   buffer_two.drain(std::string("To be Coalesce into:Will Coalesce").length());
   EXPECT_EQ(buffer_one_account->balance(), 0);
   EXPECT_EQ(buffer_two_account->balance(), 0);
+}
+
+TEST(BufferMemoryAccountTest, SliceCanRemainAttachedToOriginalAccountWhenMovedAndCoalescedInto) {
+  std::shared_ptr<BufferMemoryAccount> buffer_one_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_one;
+  buffer_one.bindAccount(buffer_one_account);
+  ASSERT_EQ(buffer_one_account->balance(), 0);
+
+  std::shared_ptr<BufferMemoryAccount> buffer_two_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_two;
+  buffer_two.bindAccount(buffer_two_account);
+  ASSERT_EQ(buffer_two_account->balance(), 0);
+
+  std::shared_ptr<BufferMemoryAccount> buffer_three_account =
+      std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_three;
+  buffer_three.bindAccount(buffer_three_account);
+  ASSERT_EQ(buffer_three_account->balance(), 0);
+
+  buffer_one.add("Will Coalesce");
+  buffer_two.add("To be Coalesce into:");
+  EXPECT_EQ(buffer_one_account->balance(), 4096);
+  EXPECT_EQ(buffer_two_account->balance(), 4096);
+
+  // Transfer buffers, leading to slice coalescing in third buffer.
+  buffer_three.move(buffer_two);
+  buffer_three.move(buffer_one);
+  EXPECT_EQ(buffer_one_account->balance(), 0);
+  EXPECT_EQ(buffer_two_account->balance(), 4096);
+  EXPECT_EQ(buffer_three_account->balance(), 0);
+
+  buffer_three.drain(std::string("To be Coalesce into:Will Coalesce").length());
+  EXPECT_EQ(buffer_two_account->balance(), 0);
+}
+
+TEST(BufferMemoryAccountTest, LinearizedBufferShouldChargeItsAssociatedAccount) {
+  std::shared_ptr<BufferMemoryAccount> buffer_one_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_one;
+  buffer_one.bindAccount(buffer_one_account);
+  ASSERT_EQ(buffer_one_account->balance(), 0);
+
+  std::shared_ptr<BufferMemoryAccount> buffer_two_account = std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_two;
+  buffer_two.bindAccount(buffer_two_account);
+  ASSERT_EQ(buffer_two_account->balance(), 0);
+
+  std::shared_ptr<BufferMemoryAccount> buffer_three_account =
+      std::make_shared<BufferMemoryAccount>();
+  Buffer::OwnedImpl buffer_three;
+  buffer_three.bindAccount(buffer_three_account);
+  ASSERT_EQ(buffer_three_account->balance(), 0);
+
+  const std::string long_string(4096, 'a');
+  buffer_one.add(long_string);
+  buffer_two.add(long_string);
+  EXPECT_EQ(buffer_one_account->balance(), 4096);
+  EXPECT_EQ(buffer_two_account->balance(), 4096);
+
+  // Move into the third buffer.
+  buffer_three.move(buffer_one);
+  buffer_three.move(buffer_two);
+  EXPECT_EQ(buffer_one_account->balance(), 4096);
+  EXPECT_EQ(buffer_two_account->balance(), 4096);
+  EXPECT_EQ(buffer_three_account->balance(), 0);
+
+  // Linearize, which does a copy out of the slices.
+  buffer_three.linearize(8192);
+  EXPECT_EQ(buffer_one_account->balance(), 0);
+  EXPECT_EQ(buffer_two_account->balance(), 0);
+  EXPECT_EQ(buffer_three_account->balance(), 8192);
 }
 
 } // namespace

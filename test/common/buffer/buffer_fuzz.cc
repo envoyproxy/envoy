@@ -74,7 +74,7 @@ public:
     drain_tracker();
   }
 
-  void bindAccount(std::shared_ptr<Account>) override {
+  void bindAccount(Buffer::AccountSharedPtr) override {
     // Not implemented.
     ASSERT(false);
   }
