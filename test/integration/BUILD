@@ -335,14 +335,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http2_integration_test",
+    name = "multiplexed_integration_test",
     srcs = [
-        "http2_integration_test.cc",
-        "http2_integration_test.h",
+        "multiplexed_integration_test.cc",
+        "multiplexed_integration_test.h",
     ],
     shard_count = 4,
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",

@@ -11,7 +11,16 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto downstream_protocol : downstream_protocols) {
       for (auto upstream_protocol : upstream_protocols) {
+#ifdef ENVOY_ENABLE_QUIC
         ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol});
+#else
+        if (downstream_protocol == Http::CodecClient::Type::HTTP3 ||
+            upstream_protocol == FakeHttpConnection::Type::HTTP3) {
+          ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
+        } else {
+          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol});
+        }
+#endif
       }
     }
   }

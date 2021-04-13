@@ -247,7 +247,6 @@ void EnvoyQuicServerStream::OnHeadersTooLarge() {
 
 void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
-    ASSERT(!received_trailers().empty());
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
     request_decoder_->decodeTrailers(
