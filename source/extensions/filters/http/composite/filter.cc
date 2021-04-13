@@ -105,6 +105,9 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
     delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
     delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
   }
+
+  // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,
+  // either directly or via some return status.
 }
 
 Http::FilterHeadersStatus
