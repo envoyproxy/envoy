@@ -523,6 +523,7 @@ def test_forkingchecker_fork():
     assert (
         list(m_fork.call_args)
         == [(checker,), {}])
+    assert "fork" in checker.__dict__
 
 
 # CheckerSummary tests
