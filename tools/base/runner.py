@@ -83,6 +83,6 @@ class ForkingAdapter(object):
         return self.fork(*args, **kwargs)
 
     def fork(self, *args, capture_output: bool = True, **kwargs) -> subprocess.CompletedProcess:
-        """Fork a subprocess, using self.path as the cwd by default"""
+        """Fork a subprocess, using self.context.path as the cwd by default"""
         kwargs["cwd"] = kwargs.get("cwd", self.context.path)
         return subprocess.run(*args, capture_output=capture_output, **kwargs)
