@@ -1,7 +1,6 @@
 #include "common/quic/envoy_quic_proof_source.h"
 
 #include <openssl/bio.h>
-#include <unistd.h>
 
 #include "envoy/ssl/tls_certificate_config.h"
 
