@@ -10,7 +10,7 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr double DefaultRate = 0.5;
+constexpr double DefaultRate = 0.05;
 constexpr int DefaultFixedTarget = 1;
 constexpr int SamplingFileVersion = 2;
 constexpr auto VersionJsonKey = "version";

@@ -102,6 +102,7 @@ Bug Fixes
 * tls: fix issue where OCSP was inadvertently removed from SSL response in multi-context scenarios.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
 * upstream: retry budgets will now set default values for xDS configurations.
+* xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5%.
 * zipkin: fix 'verbose' mode to emit annotations for stream events. This was the documented behavior, but wasn't behaving as documented.
 
 Removed Config or Runtime
