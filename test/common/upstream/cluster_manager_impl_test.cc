@@ -4,12 +4,14 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/config/xds_resource.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/router/context_impl.h"
 
 #include "extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
@@ -211,6 +213,38 @@ public:
   ClusterDiscoveryCallbackHandlePtr tmp_handle_;
   std::chrono::milliseconds timeout_ = std::chrono::milliseconds(5000);
 };
+
+TEST_F(ODCDTest, TestAllocate) {
+  envoy::config::core::v3::ConfigSource config;
+  OptRef<xds::core::v3::ResourceLocator> locator;
+  ProtobufMessage::MockValidationVisitor mock_visitor;
+
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+
+  auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
+  EXPECT_NE(handle, nullptr);
+}
+
+TEST_F(ODCDTest, TestAllocateWithLocator) {
+  envoy::config::core::v3::ConfigSource config;
+  ProtobufMessage::MockValidationVisitor mock_visitor;
+
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+
+  auto locator = Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.api.v2.Cluster/bar");
+  auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
+  EXPECT_NE(handle, nullptr);
+}
 
 TEST_F(ODCDTest, TestRequest) {
   auto cb = createCallback();

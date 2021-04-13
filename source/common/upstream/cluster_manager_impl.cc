@@ -1207,15 +1207,7 @@ ClusterDiscoveryCallbackHandlePtr ClusterManagerImpl::requestOnDemandClusterDisc
 void ClusterManagerImpl::notifyExpiredDiscovery(const std::string& name) {
   ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} timed out", name);
   auto map_node_handle = pending_cluster_creations_.extract(name);
-  if (map_node_handle.empty()) {
-    // Not sure if this may happen. This looks like timeout callback being invoked despite the
-    // cluster being discovered, so it was removed from pending_cluster_creations_ together with the
-    // timer invoking this callback.
-    //
-    // TODO(krnowak): Consider using ASSERT(!map_node_handle.empty()).
-    ENVOY_LOG(debug, "cm odcds: expired discovery for an already discovered cluster", name);
-    return;
-  }
+  ASSERT(!map_node_handle.empty());
   // Let all the worker threads know that the discovery timed out.
   tls_.runOnAllThreads([name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Timeout);
