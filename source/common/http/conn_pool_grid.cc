@@ -212,7 +212,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       std::make_unique<WrapperCallbacks>(*this, decoder, pools_.begin(), callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
-  // Note that in the case of immediate attempt/failure, newStream deletes the wrapped callback.
+  // Note that in the case of immediate attempt/failure, newStream will delete this.
   if (wrapped_callbacks_.front()->newStream() == StreamCreationResult::ImmediateResult) {
     // If newStream succeeds, return nullptr as the caller has received their
     // callback and does not need a cancellable handle.
