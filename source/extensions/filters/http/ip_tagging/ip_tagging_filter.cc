@@ -125,16 +125,6 @@ void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
   content_hash_ = hash;
 }
 
-void ValueSetWatcher::fileExtension_(std::string filename) {
-  if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
-    extension_ = "Yaml";
-  } else if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Json)) {
-    extension_ = "Json";
-  } else {
-    extension_ = "Unknown";
-  }
-}
-
 // Decoder for file.
 // No rules creates an empty file
 std::shared_ptr<ValueSet>

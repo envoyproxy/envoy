@@ -74,10 +74,20 @@ private:
   Envoy::ProtobufMessage::ValidationVisitor& protoValidator() const {
     return factory_context_.messageValidationVisitor();
   }
+
+  void fileExtension_(std::string filename_) {
+    if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
+      extension_ = "Yaml";
+    } else if (absl::EndsWith(filename, MessageUtil::FileExtensions::get().Json)) {
+      extension_ = "Json";
+    } else {
+      extension_ = "Unknown";
+    }
+  }
+
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
   std::shared_ptr<ValueSet> fileContentsAsValueSet_(absl::string_view contents) const;
-  void fileExtension_(std::string filename_);
   std::shared_ptr<const ValueSet> values_;
 
   Api::Api& api_;
@@ -100,7 +110,7 @@ private:
 public:
   std::shared_ptr<ValueSetWatcher>
   getOrCreate(Server::Configuration::FactoryContext& factory_context, std::string filename);
-  void remove(ValueSetWatcher& watcher) noexcept; // Called in destructor of ValueSet.
+  void remove(ValueSetWatcher& watcher) noexcept;
 
   static Registry& singleton();
 
