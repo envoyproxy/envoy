@@ -115,32 +115,7 @@ envoy_data* buffer_to_native_data_ptr(JNIEnv* env, jobject j_data) {
 }
 
 envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
-  // Note that headers is a flattened array of key/value pairs.
-  // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
-  envoy_map_size_t length = env->GetArrayLength(headers);
-  if (length == 0) {
-    return envoy_noheaders;
-  }
-
-  envoy_map_entry* header_array =
-      static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * length / 2));
-
-  for (envoy_map_size_t i = 0; i < length; i += 2) {
-    // Copy native byte array for header key
-    jbyteArray j_key = static_cast<jbyteArray>(env->GetObjectArrayElement(headers, i));
-    envoy_data header_key = array_to_native_data(env, j_key);
-
-    // Copy native byte array for header value
-    jbyteArray j_value = static_cast<jbyteArray>(env->GetObjectArrayElement(headers, i + 1));
-    envoy_data header_value = array_to_native_data(env, j_value);
-
-    header_array[i / 2] = {header_key, header_value};
-    env->DeleteLocalRef(j_key);
-    env->DeleteLocalRef(j_value);
-  }
-
-  envoy_headers native_headers = {length / 2, header_array};
-  return native_headers;
+  return to_native_map(env, headers);
 }
 
 envoy_headers* to_native_headers_ptr(JNIEnv* env, jobjectArray headers) {
@@ -156,4 +131,35 @@ envoy_headers* to_native_headers_ptr(JNIEnv* env, jobjectArray headers) {
   envoy_headers* native_headers = static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_map_entry)));
   *native_headers = to_native_headers(env, headers);
   return native_headers;
+}
+
+envoy_stats_tags to_native_tags(JNIEnv* env, jobjectArray tags) { return to_native_map(env, tags); }
+
+envoy_map to_native_map(JNIEnv* env, jobjectArray entries) {
+  // Note that headers is a flattened array of key/value pairs.
+  // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
+  envoy_map_size_t length = env->GetArrayLength(entries);
+  if (length == 0) {
+    return {0, NULL};
+  }
+
+  envoy_map_entry* entry_array =
+      static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * length / 2));
+
+  for (envoy_map_size_t i = 0; i < length; i += 2) {
+    // Copy native byte array for header key
+    jbyteArray j_key = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i));
+    envoy_data entry_key = array_to_native_data(env, j_key);
+
+    // Copy native byte array for header value
+    jbyteArray j_value = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i + 1));
+    envoy_data entry_value = array_to_native_data(env, j_value);
+
+    entry_array[i / 2] = {entry_key, entry_value};
+    env->DeleteLocalRef(j_key);
+    env->DeleteLocalRef(j_value);
+  }
+
+  envoy_map native_map = {length / 2, entry_array};
+  return native_map;
 }

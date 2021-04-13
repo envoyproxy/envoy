@@ -16,14 +16,14 @@ internal class GaugeImpl : Gauge {
   }
 
   override fun set(value: Int) {
-    envoyEngine.get()?.recordGaugeSet(series, value)
+    envoyEngine.get()?.recordGaugeSet(series, emptyMap<String, String>(), value)
   }
 
   override fun add(amount: Int) {
-    envoyEngine.get()?.recordGaugeAdd(series, amount)
+    envoyEngine.get()?.recordGaugeAdd(series, emptyMap<String, String>(), amount)
   }
 
   override fun sub(amount: Int) {
-    envoyEngine.get()?.recordGaugeSub(series, amount)
+    envoyEngine.get()?.recordGaugeSub(series, emptyMap<String, String>(), amount)
   }
 }

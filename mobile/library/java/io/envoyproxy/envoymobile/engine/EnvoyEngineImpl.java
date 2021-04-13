@@ -1,11 +1,11 @@
 package io.envoyproxy.envoymobile.engine;
 
-import java.util.Map;
-
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+
+import java.util.Map;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
 public class EnvoyEngineImpl implements EnvoyEngine {
@@ -94,70 +94,82 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * Increment a counter with the given count.
    *
    * @param elements Elements of the counter stat.
+   * @param tags Tags of the counter stat.
    * @param count Amount to add to the counter.
    * @return A status indicating if the action was successful.
    */
   @Override
-  public int recordCounterInc(String elements, int count) {
-    return JniLibrary.recordCounterInc(engineHandle, elements, count);
+  public int recordCounterInc(String elements, Map<String, String> tags, int count) {
+    return JniLibrary.recordCounterInc(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
+                                       count);
   }
 
   /**
    * Set a gauge of a given string of elements with the given value.
    *
    * @param elements Elements of the gauge stat.
+   * @param tags Tags of the gauge stat.
    * @param value Value to set to the gauge.
    * @return A status indicating if the action was successful.
    */
   @Override
-  public int recordGaugeSet(String elements, int value) {
-    return JniLibrary.recordGaugeSet(engineHandle, elements, value);
+  public int recordGaugeSet(String elements, Map<String, String> tags, int value) {
+    return JniLibrary.recordGaugeSet(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
+                                     value);
   }
 
   /**
    * Add the gauge with the given string of elements and by the given amount.
    *
    * @param elements Elements of the gauge stat.
+   * @param tags Tags of the gauge stat.
    * @param amount Amount to add to the gauge.
    * @return A status indicating if the action was successful.
    */
   @Override
-  public int recordGaugeAdd(String elements, int amount) {
-    return JniLibrary.recordGaugeAdd(engineHandle, elements, amount);
+  public int recordGaugeAdd(String elements, Map<String, String> tags, int amount) {
+    return JniLibrary.recordGaugeAdd(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
+                                     amount);
   }
 
   /**
    * Subtract from the gauge with the given string of elements and by the given amount.
    *
    * @param elements Elements of the gauge stat.
+   * @param tags Tags of the gauge stat.
    * @param amount Amount to subtract from the gauge.
    * @return A status indicating if the action was successful.
    */
   @Override
-  public int recordGaugeSub(String elements, int amount) {
-    return JniLibrary.recordGaugeSub(engineHandle, elements, amount);
+  public int recordGaugeSub(String elements, Map<String, String> tags, int amount) {
+    return JniLibrary.recordGaugeSub(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
+                                     amount);
   }
 
   /**
    * Add another recorded duration in ms to the timer histogram with the given string of elements.
    *
    * @param elements Elements of the histogram stat.
+   * @param tags Tags of the histogram stat.
    * @param durationMs Duration value to record in the histogram timer distribution.
    * @return A status indicating if the action was successful.
    */
-  public int recordHistogramDuration(String elements, int durationMs) {
-    return JniLibrary.recordHistogramDuration(engineHandle, elements, durationMs);
+  public int recordHistogramDuration(String elements, Map<String, String> tags, int durationMs) {
+    return JniLibrary.recordHistogramDuration(engineHandle, elements,
+                                              JniBridgeUtility.toJniTags(tags), durationMs);
   }
 
   /**
    * Add another recorded value to the generic histogram with the given string of elements.
    *
    * @param elements Elements of the histogram stat.
+   * @param tags Tags of the histogram stat.
    * @param value Amount to record as a new value for the histogram distribution.
    * @return A status indicating if the action was successful.
    */
-  public int recordHistogramValue(String elements, int value) {
-    return JniLibrary.recordHistogramValue(engineHandle, elements, value);
+  public int recordHistogramValue(String elements, Map<String, String> tags, int value) {
+    return JniLibrary.recordHistogramValue(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
+                                           value);
   }
 
   @Override
