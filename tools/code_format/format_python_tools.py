@@ -24,7 +24,8 @@ def collect_files():
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_LIST]
         for filename in fnmatch.filter(filenames, '*.py'):
             if not filename.endswith('_pb2.py') and not filename.endswith('_pb2_grpc.py'):
-                matches.append(os.path.join(root, filename))
+                if "test" not in root:
+                    matches.append(os.path.join(root, filename))
     return matches
 
 
@@ -39,10 +40,7 @@ def validate_format(fix=False):
     successful_update_files = set()
     for python_file in collect_files():
         reformatted_source, encoding, changed = FormatFile(
-            python_file,
-            style_config='tools/code_format/.style.yapf',
-            in_place=fix,
-            print_diff=not fix)
+            python_file, style_config='.style.yapf', in_place=fix, print_diff=not fix)
         if not fix:
             fixes_required = True if changed else fixes_required
             if reformatted_source:

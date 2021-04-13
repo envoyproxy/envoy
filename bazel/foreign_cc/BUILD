@@ -293,6 +293,7 @@ envoy_cmake_external(
             "libLLVMTextAPI.a",
         ],
     }),
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -341,6 +342,7 @@ envoy_cmake_external(
             "libWAVMUnwind.a",
         ],
     }),
+    tags = ["skip_on_windows"],
     deps = [":llvm"],
 )
 

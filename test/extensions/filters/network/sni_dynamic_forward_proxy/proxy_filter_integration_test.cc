@@ -130,7 +130,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, UpstreamTls) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 

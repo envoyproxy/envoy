@@ -407,7 +407,6 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
 
   echo "fix_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
@@ -418,7 +417,6 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
@@ -467,6 +465,14 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
+  exit 0
+elif [[ "$CI_TARGET" == "tooling" ]]; then
+  echo "Run pytest tooling tests..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_pytest -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_coverage -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_runner -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_utils -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:python_coverage -- --fail-under=95 /tmp/.coverage-envoy /source/generated/tooling
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" wasm-cc

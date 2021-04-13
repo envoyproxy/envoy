@@ -5,8 +5,6 @@
 
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -43,7 +41,13 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) cons
                                           false);
 }
 
-bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
+bool RouteEntryImplBase::headersMatch(const RpcInvocationImpl& invocation) const {
+  if (config_headers_.empty()) {
+    ENVOY_LOG(debug, "dubbo route matcher: no headers match");
+    return true;
+  }
+
+  const auto& headers = invocation.attachment().headers();
   ENVOY_LOG(debug, "dubbo route matcher: headers size {}, metadata headers size {}",
             config_headers_.size(), headers.size());
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
@@ -84,24 +88,34 @@ RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& meta
   ASSERT(metadata.hasInvocationInfo());
   const auto invocation = dynamic_cast<const RpcInvocationImpl*>(&metadata.invocationInfo());
   ASSERT(invocation);
-  if (!invocation->hasParameters()) {
+
+  const auto& parameters = invocation->parameters();
+  if (parameters.empty()) {
     return nullptr;
   }
 
   ENVOY_LOG(debug, "dubbo route matcher: parameter name match");
   for (auto& config_data : parameter_data_list_) {
-    const std::string& data = invocation->getParameterValue(config_data.index_);
-    if (data.empty()) {
+    if (config_data.index_ >= parameters.size()) {
       ENVOY_LOG(debug,
-                "dubbo route matcher: parameter matching failed, there are no parameters in the "
+                "dubbo route matcher: parameter matching failed, there is no parameter in the "
                 "user request, index '{}'",
                 config_data.index_);
       return nullptr;
     }
 
-    if (!matchParameter(data, config_data)) {
+    const auto data = parameters.at(config_data.index_)->toString();
+    if (!data.has_value()) {
+      ENVOY_LOG(debug,
+                "dubbo route matcher: parameter matching failed, the parameter cannot be converted "
+                "to string, index '{}'",
+                config_data.index_);
+      return nullptr;
+    }
+
+    if (!matchParameter(absl::string_view(*data.value()), config_data)) {
       ENVOY_LOG(debug, "dubbo route matcher: parameter matching failed, index '{}', value '{}'",
-                config_data.index_, data);
+                config_data.index_, *data.value());
       return nullptr;
     }
   }
@@ -144,7 +158,7 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
   const auto invocation = dynamic_cast<const RpcInvocationImpl*>(&metadata.invocationInfo());
   ASSERT(invocation);
 
-  if (invocation->hasHeaders() && !RouteEntryImplBase::headersMatch(invocation->headers())) {
+  if (!RouteEntryImplBase::headersMatch(*invocation)) {
     ENVOY_LOG(error, "dubbo route matcher: headers not match");
     return nullptr;
   }
@@ -179,16 +193,57 @@ SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
   ENVOY_LOG(debug, "dubbo route matcher: routes list size {}", routes_.size());
 }
 
+bool SingleRouteMatcherImpl::matchServiceGroup(const RpcInvocationImpl& invocation) const {
+  if (!group_.has_value() || group_.value().empty()) {
+    return true;
+  }
+
+  return invocation.serviceGroup().has_value() && invocation.serviceGroup().value() == group_;
+}
+
+bool SingleRouteMatcherImpl::matchServiceVersion(const RpcInvocationImpl& invocation) const {
+  if (!version_.has_value() || version_.value().empty()) {
+    return true;
+  }
+  return invocation.serviceVersion().has_value() && invocation.serviceVersion().value() == version_;
+}
+
+bool SingleRouteMatcherImpl::matchServiceName(const RpcInvocationImpl& invocation) const {
+  return interface_matcher_.match(invocation.serviceName());
+}
+
+SingleRouteMatcherImpl::InterfaceMatcher::InterfaceMatcher(const std::string& interface_name) {
+  if (interface_name == "*") {
+    impl_ = [](const absl::string_view interface) { return !interface.empty(); };
+    return;
+  }
+  if (absl::StartsWith(interface_name, "*")) {
+    const std::string suffix = interface_name.substr(1);
+    impl_ = [suffix](const absl::string_view interface) {
+      return interface.size() > suffix.size() && absl::EndsWith(interface, suffix);
+    };
+    return;
+  }
+  if (absl::EndsWith(interface_name, "*")) {
+    const std::string prefix = interface_name.substr(0, interface_name.size() - 1);
+    impl_ = [prefix](const absl::string_view interface) {
+      return interface.size() > prefix.size() && absl::StartsWith(interface, prefix);
+    };
+    return;
+  }
+  impl_ = [interface_name](const absl::string_view interface) {
+    return interface == interface_name;
+  };
+}
+
 RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadata,
                                                   uint64_t random_value) const {
   ASSERT(metadata.hasInvocationInfo());
-  const auto& invocation = metadata.invocationInfo();
+  const auto invocation = dynamic_cast<const RpcInvocationImpl*>(&metadata.invocationInfo());
+  ASSERT(invocation);
 
-  if (interface_matcher_.match(invocation.serviceName()) &&
-      (group_.value().empty() ||
-       (invocation.serviceGroup().has_value() && invocation.serviceGroup().value() == group_)) &&
-      (version_.value().empty() || (invocation.serviceVersion().has_value() &&
-                                    invocation.serviceVersion().value() == version_))) {
+  if (matchServiceName(*invocation) && matchServiceVersion(*invocation) &&
+      matchServiceGroup(*invocation)) {
     for (const auto& route : routes_) {
       RouteConstSharedPtr route_entry = route->matches(metadata, random_value);
       if (nullptr != route_entry) {
