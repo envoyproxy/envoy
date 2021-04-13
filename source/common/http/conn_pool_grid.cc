@@ -119,7 +119,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   }
   ConnectionPool::Callbacks& callbacks = inner_callbacks_;
   deleteThis();
-  return callbacks.onPoolReady(encoder, host, info, protocol);
+  callbacks.onPoolReady(encoder, host, info, protocol);
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
@@ -221,8 +221,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   }
   // TODO(#15649) track pools with successful connections: don't always start at
   // the front of the list.
-  auto wrapped_callback =
-      std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks);
+  auto wrapped_callback = std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
   if (wrapped_callbacks_.front()->newStream()) {

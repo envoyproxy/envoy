@@ -71,9 +71,6 @@ public:
     // been created.
     bool newStream();
 
-    // Removes this from the owning list, deleting it.
-    void deleteThis();
-
     // Called on pool failure or timeout to kick off another connection attempt.
     // Returns true if there is a failover pool and a connection has been
     // attempted, false if all pools have been tried.
@@ -92,6 +89,9 @@ public:
                                   absl::optional<Http::Protocol> protocol);
 
   private:
+    // Removes this from the owning list, deleting it.
+    void deleteThis();
+
     // Tracks all the connection attempts which currently in flight.
     std::list<ConnectionAttemptCallbacksPtr> connection_attempts_;
 
