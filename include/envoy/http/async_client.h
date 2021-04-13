@@ -205,6 +205,9 @@ public:
       parent_context = v;
       return *this;
     }
+    // Set dynamic metadata of async stream. If a metadata record with filter name 'envoy.lb' is
+    // provided, metadata match criteria of async stream route will be overrided by the metadata
+    // and then used by the subset load balancer.
     StreamOptions& setMetadata(const envoy::config::core::v3::Metadata& m) {
       metadata = m;
       return *this;
