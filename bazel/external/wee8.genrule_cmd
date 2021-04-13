@@ -41,6 +41,7 @@ else
     export IS_CLANG=true
     export CC=$${CC:-clang-cl.exe}
     export CXX=$${CXX:-clang-cl.exe}
+    export CXXFLAGS="$${CXXFLAGS} -Wno-unknown-argument"
   elif [[ ( $${SYSTEM} == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *clang* ]]; then
     export IS_CLANG=true
     export CC=$${CC:-clang}
