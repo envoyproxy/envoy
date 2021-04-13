@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -46,6 +48,14 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
+  Buffer::BufferMemoryAccountSharedPtr getAccount() const override {
+    // TODO(kbaichoo): implement account tracking for QUIC.
+    return nullptr;
+  }
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // TODO(kbaichoo): implement account tracking for QUIC.
+  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;

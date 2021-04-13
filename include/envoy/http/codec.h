@@ -380,6 +380,19 @@ public:
    * small window updates as satisfying the idle timeout as this is a potential DoS vector.
    */
   virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
+   * @return the account associated with this stream.
+   */
+  virtual Buffer::BufferMemoryAccountSharedPtr getAccount() const PURE;
+
+  /**
+   * Sets the account for this stream, propagating it to all of its buffers.
+   * This should only be called on client streams since server streams create
+   * their own account.
+   * @param the account to assign this stream.
+   */
+  virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 };
 
 /**

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
@@ -543,6 +544,11 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t decoderBufferLimit() PURE;
+
+  /**
+   * @return the account, if any, used by this stream.
+   */
+  virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
 
   /**
    * Takes a stream, and acts as if the headers are newly arrived.

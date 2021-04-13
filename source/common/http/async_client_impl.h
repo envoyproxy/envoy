@@ -365,6 +365,8 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
+  // TODO(kbaichoo): Implement this?
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

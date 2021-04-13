@@ -82,6 +82,10 @@ public:
     request_encoder_->getStream().resetStream(Envoy::Http::StreamResetReason::LocalReset);
   }
 
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
+    request_encoder_->getStream().setAccount(std::move(account));
+  }
+
   // Http::StreamCallbacks
   void onResetStream(Envoy::Http::StreamResetReason reason,
                      absl::string_view transport_failure_reason) override {

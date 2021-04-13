@@ -28,8 +28,8 @@ class FilterManagerTest : public testing::Test {
 public:
   void initialize() {
     filter_manager_ = std::make_unique<FilterManager>(
-        filter_manager_callbacks_, dispatcher_, connection_, 0, true, 10000, filter_factory_,
-        local_reply_, protocol_, time_source_, filter_state_,
+        filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000,
+        filter_factory_, local_reply_, protocol_, time_source_, filter_state_,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 

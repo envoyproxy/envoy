@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
@@ -17,6 +18,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/common/statusor.h"
@@ -229,7 +231,7 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.addressProvider().localAddress();
     }
@@ -255,11 +257,6 @@ protected:
       if (details_.empty()) {
         details_ = details;
       }
-    }
-
-    void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
-      pending_recv_data_.setWatermarks(low_watermark, high_watermark);
-      pending_send_data_.setWatermarks(low_watermark, high_watermark);
     }
 
     // If the receive buffer encounters watermark callbacks, enable/disable reads on this stream.
@@ -298,14 +295,8 @@ protected:
     // watermark can never overflow because the peer can never send more bytes than the stream
     // window without triggering protocol error and this buffer is drained after each DATA frame was
     // dispatched through the filter chain. See source/docs/flow_control.md for more information.
-    Buffer::WatermarkBuffer pending_recv_data_{
-        [this]() -> void { this->pendingRecvBufferLowWatermark(); },
-        [this]() -> void { this->pendingRecvBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
-    Buffer::WatermarkBuffer pending_send_data_{
-        [this]() -> void { this->pendingSendBufferLowWatermark(); },
-        [this]() -> void { this->pendingSendBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
+    Buffer::InstancePtr pending_recv_data_;
+    Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;
@@ -375,6 +366,13 @@ protected:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
+    // Http::Stream
+    Buffer::BufferMemoryAccountSharedPtr getAccount() const override {
+      return buffer_memory_account_;
+    }
+    void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
+
+    Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     ResponseDecoder& response_decoder_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
@@ -387,7 +385,11 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
+        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()),
+          buffer_memory_account_(std::make_shared<Buffer::BufferMemoryAccountImpl>()) {
+      pending_recv_data_->bindAccount(buffer_memory_account_);
+      pending_send_data_->bindAccount(buffer_memory_account_);
+    }
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -420,8 +422,19 @@ protected:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
+    // Http::Stream
+    Buffer::BufferMemoryAccountSharedPtr getAccount() const override {
+      return buffer_memory_account_;
+    }
+    void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+      RELEASE_ASSERT(
+          false,
+          "Server Stream creates an account during construction. This should not be called.");
+    }
+
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;

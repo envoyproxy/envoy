@@ -39,8 +39,7 @@ public:
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
 
-  void setWatermarks(uint32_t watermark) override { setWatermarks(watermark / 2, watermark); }
-  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
+  void setWatermarks(uint32_t watermark) override;
   uint32_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently
   // than the low watermark callbacks.
@@ -48,7 +47,7 @@ public:
 
 protected:
   virtual void checkHighAndOverflowWatermarks();
-  void checkLowWatermark();
+  virtual void checkLowWatermark();
 
 private:
   void commit(uint64_t length, absl::Span<RawSlice> slices,

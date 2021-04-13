@@ -48,6 +48,8 @@ void OwnedImpl::bindAccount(BufferMemoryAccountSharedPtr account) {
   account_ = std::move(account);
 }
 
+BufferMemoryAccountSharedPtr OwnedImpl::getAccountForTest() { return account_; }
+
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {

@@ -268,6 +268,7 @@ public:
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
+  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};

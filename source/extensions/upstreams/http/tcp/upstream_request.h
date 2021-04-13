@@ -74,6 +74,7 @@ public:
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
   void readDisable(bool disable) override;
   void resetStream() override;
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;

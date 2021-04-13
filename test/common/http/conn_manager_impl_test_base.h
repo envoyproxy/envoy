@@ -186,7 +186,7 @@ public:
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
-  MockStream stream_;
+  NiceMock<MockStream> stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::MockOverloadManager> overload_manager_;

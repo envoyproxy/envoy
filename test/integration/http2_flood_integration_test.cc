@@ -11,8 +11,8 @@
 #include "common/network/socket_option_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
-#include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -30,70 +30,6 @@ namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
-
-class SocketInterfaceSwap {
-public:
-  // Object of this class hold the state determining the IoHandle which
-  // should return EAGAIN from the `writev` call.
-  struct IoHandleMatcher {
-    bool shouldReturnEgain(uint32_t src_port, uint32_t dst_port) const {
-      absl::ReaderMutexLock lock(&mutex_);
-      return writev_returns_egain_ && (src_port == src_port_ || dst_port == dst_port_);
-    }
-
-    // Source port to match. The port specified should be associated with a listener.
-    void setSourcePort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
-      src_port_ = port;
-    }
-
-    // Destination port to match. The port specified should be associated with a listener.
-    void setDestinationPort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
-      dst_port_ = port;
-    }
-
-    void setWritevReturnsEgain() {
-      absl::WriterMutexLock lock(&mutex_);
-      ASSERT(src_port_ != 0 || dst_port_ != 0);
-      writev_returns_egain_ = true;
-    }
-
-  private:
-    mutable absl::Mutex mutex_;
-    uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
-  };
-
-  SocketInterfaceSwap() {
-    Envoy::Network::SocketInterfaceSingleton::clear();
-    test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
-        std::make_unique<Envoy::Network::TestSocketInterface>(
-            [writev_matcher = writev_matcher_](
-                Envoy::Network::TestIoSocketHandle* io_handle, const Buffer::RawSlice*,
-                uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-              if (writev_matcher->shouldReturnEgain(io_handle->localAddress()->ip()->port(),
-                                                    io_handle->peerAddress()->ip()->port())) {
-                return Api::IoCallUint64Result(
-                    0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                       Network::IoSocketError::deleteIoError));
-              }
-              return absl::nullopt;
-            }));
-  }
-
-  ~SocketInterfaceSwap() {
-    test_socket_interface_loader_.reset();
-    Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
-  }
-
-protected:
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
-  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
-};
 
 // It is important that the new socket interface is installed before any I/O activity starts and
 // the previous one is restored after all I/O activity stops. Since the HttpIntegrationTest
@@ -396,7 +332,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
 
   // The factory will be used to create 4 buffers: the input and output buffers for request and
   // response pipelines.
-  EXPECT_EQ(4, buffer_factory->numBuffersCreated());
+  EXPECT_EQ(8, buffer_factory->numBuffersCreated());
 
   // Expect at least 1000 1 byte data frames in the output buffer. Each data frame comes with a
   // 9-byte frame header; 10 bytes per data frame, 10000 bytes total. The output buffer should also
@@ -411,7 +347,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   EXPECT_GE(22000, buffer_factory->sumMaxBufferSizes());
   // Verify that all buffers have watermarks set.
   EXPECT_THAT(buffer_factory->highWatermarkRange(),
-              testing::Pair(1024 * 1024 * 1024, 1024 * 1024 * 1024));
+              testing::Pair(256 * 1024 * 1024, 1024 * 1024 * 1024));
 }
 
 // Verify that the server can detect flood triggered by a DATA frame from a decoder filter call
