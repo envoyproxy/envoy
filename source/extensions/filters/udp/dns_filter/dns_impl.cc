@@ -1,4 +1,4 @@
-#include "common/network/dns_impl.h"
+#include "extensions/filters/udp/dns_filter/dns_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -17,8 +17,11 @@
 #include "absl/strings/str_join.h"
 #include "ares.h"
 
+
 namespace Envoy {
-namespace Network {
+namespace Extensions {
+namespace UdpFilters {
+namespace DnsFilter {
 
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
@@ -122,7 +125,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     }
   }
 
-  std::list<DnsResponse> address_list;
+  std::list<Network::DnsResponse> address_list;
   ResolutionStatus resolution_status;
   if (status == ARES_SUCCESS) {
     resolution_status = ResolutionStatus::Success;
@@ -136,7 +139,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
           address.sin_addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr)->sin_addr;
 
           address_list.emplace_back(
-              DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
+              Network::DnsResponse(std::make_shared<const Network::Address::Ipv4Instance>(&address),
                           std::chrono::seconds(ai->ai_ttl)));
         }
       } else if (addrinfo->nodes->ai_family == AF_INET6) {
@@ -147,7 +150,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
           address.sin6_port = 0;
           address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
           address_list.emplace_back(
-              DnsResponse(std::make_shared<const Address::Ipv6Instance>(address),
+              Network::DnsResponse(std::make_shared<const Network::Address::Ipv6Instance>(address),
                           std::chrono::seconds(ai->ai_ttl)));
         }
       }
@@ -173,7 +176,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       //  We can't add a main thread assertion here because both this code is reused by dns filter
       //  and executed in both main thread and worker thread. Maybe split the code for filter and
       //  main thread.
-      TRY_ASSERT_MAIN_THREAD { callback_(resolution_status, std::move(address_list)); } END_TRY
+      try { callback_(resolution_status, std::move(address_list)); }
       catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
@@ -244,8 +247,8 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
                           (write ? Event::FileReadyType::Write : 0));
 }
 
-ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
-                                         DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+Network::ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
+                                         Network::DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.
@@ -259,11 +262,11 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
-  if (dns_lookup_family == DnsLookupFamily::Auto) {
+  if (dns_lookup_family == Network::DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }
 
-  if (dns_lookup_family == DnsLookupFamily::V4Only) {
+  if (dns_lookup_family == Network::DnsLookupFamily::V4Only) {
     pending_resolution->getAddrInfo(AF_INET);
   } else {
     pending_resolution->getAddrInfo(AF_INET6);
@@ -303,5 +306,7 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
       this);
 }
 
-} // namespace Network
+} // namespace DnsFilter
+} // namespace UdpFilters
+} // namespace Extensions
 } // namespace Envoy

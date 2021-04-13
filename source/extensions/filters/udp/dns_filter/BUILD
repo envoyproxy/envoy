@@ -26,6 +26,7 @@ envoy_cc_library(
     ],
     external_deps = ["ares"],
     deps = [
+        ":dns_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
@@ -61,4 +62,22 @@ envoy_cc_extension(
         "//include/envoy/server:filter_config_interface",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",
     ],
+)
+
+
+envoy_cc_library(
+    name = "dns_lib",
+    srcs = ["dns_impl.cc"],
+    hdrs = ["dns_impl.h"],
+    external_deps = ["ares"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:dns_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:linked_object",
+    ],
+    visibility = ["//visibility:public"],
 )

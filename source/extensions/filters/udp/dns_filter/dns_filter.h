@@ -145,6 +145,11 @@ public:
    */
   bool isKnownDomain(const absl::string_view domain_name);
 
+
+  void setResolver(const Network::DnsResolverSharedPtr & resolver) {
+    resolver_->setResolver(resolver);
+  }
+
 private:
   /**
    * Prepare the response buffer and send it to the client
@@ -338,6 +343,8 @@ private:
       break;
     }
   }
+
+
 
   /**
    * @brief Helper function to retrieve the Endpoint configuration for a requested domain
