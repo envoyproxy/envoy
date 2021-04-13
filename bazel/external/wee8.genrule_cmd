@@ -30,7 +30,7 @@ rm -rf out/wee8
 if [[ $${SYSTEM} == *MSYS_NT* ]]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
 
-  if [[ $${USE_CLANG_CL} == "1" ]]; then
+  if [[ $${USE_CLANG_CL-} == "1" ]]; then
     export IS_CLANG=true
   else
     export IS_CLANG=false
