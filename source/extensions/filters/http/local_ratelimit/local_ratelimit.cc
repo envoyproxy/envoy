@@ -89,7 +89,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     populateDescriptors(descriptors, headers);
   }
 
-  bool isRequestAllowed = config->proto_config().per_connection()
+  bool isRequestAllowed = config->protoConfig().per_connection()
                               ? requestAllowed(descriptors)
                               : config->requestAllowed(descriptors);
 
@@ -129,10 +129,10 @@ LocalRateLimiterImplSharedPtr Filter::getRateLimiter() {
           PerConnectionRateLimiter::key())) {
     auto rate_limiter = std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
         std::chrono::milliseconds(
-            PROTOBUF_GET_MS_OR_DEFAULT(config->proto_config().token_bucket(), fill_interval, 0)),
-        config->proto_config().token_bucket().max_tokens(),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->proto_config().token_bucket(), tokens_per_fill, 1),
-        config->dispatcher(), config->proto_config().descriptors());
+            PROTOBUF_GET_MS_OR_DEFAULT(config->protoConfig().token_bucket(), fill_interval, 0)),
+        config->protoConfig().token_bucket().max_tokens(),
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config->protoConfig().token_bucket(), tokens_per_fill, 1),
+        config->dispatcher(), config->protoConfig().descriptors());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(), std::make_unique<PerConnectionRateLimiter>(rate_limiter),
