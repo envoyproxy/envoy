@@ -459,8 +459,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false),
-      accept_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.accept_strict_1xx_and_204_response_headers")),
+      require_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.require_strict_1xx_and_204_response_headers")),
       send_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.send_strict_1xx_and_204_response_headers")),
       dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
@@ -856,7 +856,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
-     << DUMP_MEMBER(accept_strict_1xx_and_204_headers_)
+     << DUMP_MEMBER(require_strict_1xx_and_204_headers_)
      << DUMP_MEMBER(send_strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
      << DUMP_MEMBER(buffered_body_.length());
 
@@ -1283,7 +1283,7 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
       handling_upgrade_ = true;
     }
 
-    if (accept_strict_1xx_and_204_headers_ &&
+    if (require_strict_1xx_and_204_headers_ &&
         (parser_->statusCode() < 200 || parser_->statusCode() == 204)) {
       if (headers->TransferEncoding()) {
         RETURN_IF_ERROR(
