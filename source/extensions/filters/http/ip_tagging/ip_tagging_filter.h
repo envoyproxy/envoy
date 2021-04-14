@@ -38,12 +38,10 @@ class ValueSet {
 public :
   ValueSet() = default;
 
-  ValueSet(ValueSet&& o) noexcept : tag_set_(std::move(o.tag_set_)) {}
-
   ~ValueSet();
 
 private:
-   Network::LcTrie::LcTrie<std::string> tag_set_;
+  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> tag_set_;
 };
 
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
@@ -90,8 +88,8 @@ private:
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
   std::shared_ptr<ValueSet> fileContentsAsValueSet_(absl::string_view contents) const;
-  std::shared_ptr<ValueSet> jsonFileContentsAsValueSet_(absl::string_view contents) const;
-  std::shared_ptr<ValueSet> yamlFileContentsAsValueSet_(absl::string_view contents) const;
+  std::shared_ptr<ValueSet> jsonFileContentsAsValueSet_(std::string contents) const;
+  std::shared_ptr<ValueSet> yamlFileContentsAsValueSet_(std::string contents) const;
   std::shared_ptr<const ValueSet> values_;
 
   Api::Api& api_;

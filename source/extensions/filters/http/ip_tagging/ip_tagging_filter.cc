@@ -126,7 +126,7 @@ void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
   content_hash_ = hash;
 }
 
-// Yaml and Json file content validation.
+// Validate and parse both yaml and json file content.
 std::shared_ptr<ValueSet>
 ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
   const std::string file_content = std::string(contents);
@@ -135,10 +135,12 @@ ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
 
   if (extension_ == "Yaml") {
     MessageUtil::loadFromYaml(file_content, ipf, protoValidator());
-    values = yamlFileContentsAsValueSet_(file_content);
+    values = yamlFileContentsAsValueSet_(std::move(file_content));
+
   } else if (extension_ == "Json") {
     MessageUtil::loadFromJson(file_content, ipf, protoValidator());
-    values = jsonFileContentsAsValueSet_(file_content);
+    values = jsonFileContentsAsValueSet_(std::move(file_content));
+
   } else {
     throw EnvoyException("HTTP IP Tagging Filter supports only json or yaml file types");
   }
@@ -148,7 +150,7 @@ ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
 
 // Json parser
 std::shared_ptr<ValueSet>
-ValueSetWatcher::jsonFileContentsAsValueSet_(absl::string_view contents) const {
+ValueSetWatcher::jsonFileContentsAsValueSet_(std::string contents) const {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(contents);
   int pos = 0;
@@ -165,7 +167,7 @@ ValueSetWatcher::jsonFileContentsAsValueSet_(absl::string_view contents) const {
 
 // Yaml parser
 std::shared_ptr<ValueSet>
-ValueSetWatcher::yamlFileContentsAsValueSet_(absl::string_view contents) const {
+ValueSetWatcher::yamlFileContentsAsValueSet_(std::string contents) const {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   YAML::Node data = YAML::Load(contents);
 
