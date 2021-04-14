@@ -246,6 +246,7 @@ public:
   // ThriftProxy::ThriftFilters::DecoderFilterCallbacks
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(const Network::Connection*, connection, (), (const));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(TransportType, downstreamTransportType, (), (const));

@@ -25,15 +25,19 @@ The filter outputs generic routing error statistics in the *thrift.<stat_prefix>
   no_healthy_upstream, Counter, Total requests with no healthy upstream endpoints available.
 
 
-The filter also outputs MessageType statistics in the upstream cluster's stat scope.
+The filter is also responsible for cluster-level statistics derived from routed upstream clusters.
+Since these stats utilize the underlying cluster scope, we prefix with the `thrift` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  request_call, Counter, Total requests with the "Call" message type.
-  request_oneway, Counter, Total requests with the "Oneway" message type.
-  request_invalid_type, Counter, Total requests with an unsupported message type.
-  response_reply, Counter, Total responses with the "Reply" message type. Includes both successes and errors.
-  response_exception, Counter, Total responses with the "Exception" message type.
-  response_invalid_type, Counter, Total responses with an unsupported message type.
+  thrift.upstream_rq_call, Counter, Total requests with the "Call" message type.
+  thrift.upstream_rq_oneway, Counter, Total requests with the "Oneway" message type.
+  thrift.upstream_rq_invalid_type, Counter, Total requests with an unsupported message type.
+  thrift.upstream_resp_reply, Counter, Total responses with the "Reply" message type. Sums both Successses and Errors.
+  thrift.upstream_resp_success, Counter, Total Replies that are considered "Successes".
+  thrift.upstream_resp_error, Counter, Total Replies that are considered "Errors".
+  thrift.upstream_resp_exception, Counter, Total responses with the "Exception" message type.
+  thrift.upstream_resp_invalid_type, Counter, Total responses with an unsupported message type.
+  thrift.upstream_rq_time, Histogram, total rq time from rq complete to resp complete; includes oneway messages.

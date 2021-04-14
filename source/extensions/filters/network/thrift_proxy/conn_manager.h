@@ -127,6 +127,7 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return parent_.stream_id_; }
     const Network::Connection* connection() const override { return parent_.connection(); }
+    Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
     void continueDecoding() override;
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     TransportType downstreamTransportType() const override {
@@ -206,6 +207,9 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     const Network::Connection* connection() const override;
+    Event::Dispatcher& dispatcher() override {
+      return parent_.read_callbacks_->connection().dispatcher();
+    }
     void continueDecoding() override { parent_.continueDecoding(); }
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
