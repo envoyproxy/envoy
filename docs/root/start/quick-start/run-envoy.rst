@@ -9,7 +9,7 @@ the Envoy Docker image.
 
 .. note::
 
-   For Linux container follow the instructions in Docker (Linux) tab and for Windows container
+   For Linux containers follow the instructions in Docker (Linux) tab and for Windows containers
    follow the Docker (Windows) instructions.
 
 
