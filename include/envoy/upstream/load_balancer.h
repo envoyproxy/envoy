@@ -139,6 +139,19 @@ public:
   std::string category() const override { return "envoy.load_balancers"; }
 };
 
+using TypedLoadBalancerFactorySharedPtr = std::shared_ptr<TypedLoadBalancerFactory>;
+
+class TypedLoadBalancer {
+public:
+  virtual ~TypedLoadBalancer() = default;
+
+  virtual TypedLoadBalancerFactory* factory() PURE;
+
+  virtual void initialize() PURE;
+};
+
+using TypedLoadBalancerPtr = std::unique_ptr<TypedLoadBalancer>;
+
 /**
  * Factory for load balancers.
  */

@@ -814,6 +814,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
+  } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
+      cluster_entry_it->second->typed_lb_ = std::make_unique<TypedLoadBalancerImpl>(
+        cluster_reference.info()->loadBalancingPolicy(), cluster_reference.info()->lbConfig());
   }
 
   updateClusterCounts();
@@ -945,8 +948,10 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   }
 
   LoadBalancerFactorySharedPtr load_balancer_factory;
+  TypedLoadBalancerFactory* typed_load_balancer_factory;
   if (add_or_update_cluster) {
     load_balancer_factory = cm_cluster.loadBalancerFactory();
+    typed_load_balancer_factory = cm_cluster.typedLoadBalancerFactory();
   }
 
   for (auto& per_priority : params.per_priority_update_params_) {
@@ -959,7 +964,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 
   tls_.runOnAllThreads(
       [info = cm_cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
-       load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+       load_balancer_factory, typed_load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
         if (add_or_update_cluster) {
           if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
@@ -969,7 +974,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
           }
 
           new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
-                                                                        load_balancer_factory);
+                                                                        load_balancer_factory,
+                                                                        typed_load_balancer_factory);
           cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
         }
 
@@ -1067,7 +1073,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     const auto& local_cluster_name = local_cluster_params->info_->name();
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name);
     thread_local_clusters_[local_cluster_name] = std::make_unique<ClusterEntry>(
-        *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_);
+        *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_,
+        local_cluster_params->typed_load_balancer_factory_);
     local_priority_set_ = &thread_local_clusters_[local_cluster_name]->priority_set_;
   }
 }
@@ -1308,8 +1315,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-    const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+    const LoadBalancerFactorySharedPtr& lb_factory,
+    TypedLoadBalancerFactory* typed_lb_factory)
+    : parent_(parent), lb_factory_(lb_factory), typed_lb_factory_(typed_lb_factory), cluster_info_(cluster),
       http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
@@ -1349,20 +1357,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       break;
     }
     case LoadBalancerType::LoadBalancingPolicyConfig: {
-      ASSERT(lb_factory_ == nullptr);
+      ASSERT(typed_lb_factory != nullptr);
       for (const auto& policy : cluster->loadBalancingPolicy().policies()) {
         LoadBalancerFactoryContextImpl context(
             parent_.parent_.validation_context_.staticValidationVisitor());
-        TypedLoadBalancerFactory* factory =
-            Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(policy.name());
 
-        if (factory == nullptr) {
-          ENVOY_LOG(warn, fmt::format("Didn't find a registered implementation for name: '{}'",
-                                      policy.name()));
-          continue;
-        }
-
-        lb_ = factory->create(policy, cluster->lbType(), context, priority_set_,
+        lb_ = typed_lb_factory_->create(policy, cluster->lbType(), context, priority_set_,
                               parent_.local_priority_set_, cluster->stats(),
                               parent.parent_.runtime_, parent.parent_.random_, cluster->lbConfig());
         break;

@@ -70,6 +70,33 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
+class TypedLoadBalancerImpl : public TypedLoadBalancer {
+public:
+  TypedLoadBalancerImpl(
+    const envoy::config::cluster::v3::LoadBalancingPolicy& lb_policy,
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+  : lb_policy_(lb_policy), common_config_(common_config) {
+      for (const auto& policy : lb_policy_.policies()) {
+        factory_ = Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(policy.name());
+        if (factory_ == nullptr) {
+          continue;
+        }
+        break;
+      }
+    }
+
+  TypedLoadBalancerFactory* factory() {
+    return factory_;
+  }
+
+  void initialize() { }
+
+
+  const envoy::config::cluster::v3::LoadBalancingPolicy& lb_policy_;
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config_;
+  TypedLoadBalancerFactory* factory_;
+};
+
 /**
  * Base class for all LB implementations.
  */

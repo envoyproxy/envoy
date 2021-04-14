@@ -120,6 +120,8 @@ public:
   // Return a new load balancer factory if the cluster has one.
   virtual LoadBalancerFactorySharedPtr loadBalancerFactory() PURE;
 
+  virtual TypedLoadBalancerFactory* typedLoadBalancerFactory() PURE;
+
   // Return true if a cluster has already been added or updated.
   virtual bool addedOrUpdated() PURE;
 
@@ -390,7 +392,8 @@ private:
 
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-                   const LoadBalancerFactorySharedPtr& lb_factory);
+                   const LoadBalancerFactorySharedPtr& lb_factory,
+                   TypedLoadBalancerFactory* typed_lb_factory);
       ~ClusterEntry() override;
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
@@ -418,6 +421,7 @@ private:
       // a factory will create a new LB on every membership update. LB types that don't have a
       // factory will create an LB on construction and use it forever.
       LoadBalancerFactorySharedPtr lb_factory_;
+      TypedLoadBalancerFactory* typed_lb_factory_;
       // Current active LB.
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
@@ -428,6 +432,7 @@ private:
 
     struct LocalClusterParams {
       LoadBalancerFactorySharedPtr load_balancer_factory_;
+      TypedLoadBalancerFactory* typed_load_balancer_factory_;
       ClusterInfoConstSharedPtr info_;
     };
 
@@ -486,6 +491,15 @@ private:
         return nullptr;
       }
     }
+
+    TypedLoadBalancerFactory* typedLoadBalancerFactory() override {
+      if (typed_lb_ != nullptr) {
+        return typed_lb_->factory();
+      } else {
+        return nullptr;
+      }
+    }
+
     bool addedOrUpdated() override { return added_or_updated_; }
     void setAddedOrUpdated() override {
       ASSERT(!added_or_updated_);
@@ -499,6 +513,7 @@ private:
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
+    TypedLoadBalancerPtr typed_lb_;
     SystemTime last_updated_;
     bool added_or_updated_{};
     Common::CallbackHandlePtr member_update_cb_;
