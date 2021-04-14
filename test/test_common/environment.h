@@ -194,12 +194,8 @@ public:
    * Dumps the contents of the file into the string.
    *
    * @param filename: the fully qualified name of the file to use
-   * @param require_existence if true, RELEASE_ASSERT if the file does not exist.
-   *   If false, an empty string will be returned if the file is not present.
-   * @return string the contents of the file.
    */
-  static std::string readFileToStringForTest(const std::string& filename,
-                                             bool require_existence = true);
+  static std::string readFileToStringForTest(const std::string& filename);
 
   /**
    * Create a path on the filesystem (mkdir -p ... equivalent).

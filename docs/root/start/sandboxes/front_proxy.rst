@@ -8,7 +8,7 @@ Front proxy
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
 `docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front Envoy and a
@@ -251,7 +251,7 @@ We can ``curl`` it to gain useful information:
 - :ref:`/server_info <operations_admin_interface_server_info>` provides information about the Envoy version you are running.
 - :ref:`/stats <operations_admin_interface_stats>` provides statistics about the  Envoy server.
 
-In the example we can we can enter the ``front-envoy`` container to query admin:
+In the example we can enter the ``front-envoy`` container to query admin:
 
 .. code-block:: console
 

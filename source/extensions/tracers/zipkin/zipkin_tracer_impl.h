@@ -8,6 +8,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
@@ -80,6 +81,9 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override;
   std::string getBaggage(absl::string_view) override;
 
+  // TODO: This method is unimplemented for Zipkin.
+  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+
   /**
    * @return a reference to the Zipkin::Span object.
    */
@@ -124,6 +128,7 @@ public:
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
+  const std::string& hostname() { return hostname_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -140,6 +145,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   std::string cluster_;
+  std::string hostname_;
   ZipkinTracerStats tracer_stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;

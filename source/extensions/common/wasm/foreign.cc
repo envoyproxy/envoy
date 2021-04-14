@@ -19,6 +19,8 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
+using CelStateType = Filters::Common::Expr::CelStateType;
+
 template <typename T> WasmForeignFunction createFromClass() {
   auto c = std::make_shared<T>();
   return c->create(c);
@@ -35,7 +37,7 @@ RegisterForeignFunction registerCompressForeignFunction(
         return WasmResult::SerializationFailure;
       }
       auto result = alloc_result(dest_len);
-      memcpy(result, b.get(), dest_len);
+      memcpy(result, b.get(), dest_len); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
     });
 
@@ -51,7 +53,7 @@ RegisterForeignFunction registerUncompressForeignFunction(
                        arguments.size());
         if (r == Z_OK) {
           auto result = alloc_result(dest_len);
-          memcpy(result, b.get(), dest_len);
+          memcpy(result, b.get(), dest_len); // NOLINT(safe-memcpy)
           return WasmResult::Ok;
         }
         if (r != Z_BUF_ERROR) {
@@ -184,7 +186,7 @@ public:
         return serialize_status;
       }
       auto output = alloc_result(result.size());
-      memcpy(output, result.data(), result.size());
+      memcpy(output, result.data(), result.size()); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
     };
     return f;
@@ -224,19 +226,19 @@ public:
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::DeclarePropertyArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
-        WasmType type = WasmType::Bytes;
+        CelStateType type = CelStateType::Bytes;
         switch (args.type()) {
         case envoy::source::extensions::common::wasm::WasmType::Bytes:
-          type = WasmType::Bytes;
+          type = CelStateType::Bytes;
           break;
         case envoy::source::extensions::common::wasm::WasmType::Protobuf:
-          type = WasmType::Protobuf;
+          type = CelStateType::Protobuf;
           break;
         case envoy::source::extensions::common::wasm::WasmType::String:
-          type = WasmType::String;
+          type = CelStateType::String;
           break;
         case envoy::source::extensions::common::wasm::WasmType::FlatBuffers:
-          type = WasmType::FlatBuffers;
+          type = CelStateType::FlatBuffers;
           break;
         default:
           // do nothing
@@ -259,8 +261,8 @@ public:
         }
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->declareProperty(
-            args.name(),
-            std::make_unique<const WasmStatePrototype>(args.readonly(), type, args.schema(), span));
+            args.name(), std::make_unique<const Filters::Common::Expr::CelStatePrototype>(
+                             args.readonly(), type, args.schema(), span));
       }
       return WasmResult::BadArgument;
     };

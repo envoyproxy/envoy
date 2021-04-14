@@ -24,6 +24,8 @@ public:
   const std::string Compressor = "envoy.filters.http.compressor";
   // CORS filter
   const std::string Cors = "envoy.filters.http.cors";
+  // Composite filter
+  const std::string Composite = "envoy.filters.http.composite";
   // CSRF filter
   const std::string Csrf = "envoy.filters.http.csrf";
   // Decompressor filter
@@ -84,6 +86,10 @@ public:
   const std::string AwsLambda = "envoy.filters.http.aws_lambda";
   // OAuth filter
   const std::string OAuth = "envoy.filters.http.oauth2";
+  // KillRequest filter
+  const std::string KillRequest = "envoy.filters.http.kill_request";
+  // External Processing filter
+  const std::string ExternalProcessing = "envoy.filters.http.ext_proc";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

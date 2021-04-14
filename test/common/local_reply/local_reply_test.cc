@@ -23,7 +23,7 @@ const absl::string_view TestInitContentType = "content-type";
 
 class LocalReplyTest : public testing::Test {
 public:
-  LocalReplyTest() : stream_info_(time_system_.timeSystem()) { resetData(TestInitCode); }
+  LocalReplyTest() : stream_info_(time_system_.timeSystem(), nullptr) { resetData(TestInitCode); }
 
   void resetData(Http::Code code) {
     code_ = code;
@@ -106,7 +106,8 @@ TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
   // Default text formatter without any mappers
   const std::string yaml = R"(
   body_format:
-     text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
+     text_format_source:
+       inline_string: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
@@ -168,6 +169,15 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
           comparison:
             op: EQ
             value:
+              default_value: 403
+              runtime_key: key_b
+      body:
+        inline_string: ""
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
               default_value: 410
               runtime_key: key_b
       body:
@@ -200,7 +210,17 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   EXPECT_EQ(body_, "400 body text");
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=410 matches the second filter; rewrite body only
+  // code=403 matches the second filter; does not rewrite code, sets an empty body and content_type.
+  resetData(403);
+  body_ = "original body text";
+  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, static_cast<Http::Code>(403));
+  EXPECT_EQ(stream_info_.response_code_, 403U);
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "403");
+  EXPECT_EQ(body_, "");
+  EXPECT_EQ(content_type_, "text/plain");
+
+  // code=410 matches the third filter; rewrite body only
   resetData(410);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(410));
@@ -209,7 +229,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   EXPECT_EQ(body_, "410 body text");
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=420 matches the third filter; rewrite code only
+  // code=420 matches the fourth filter; rewrite code only
   resetData(420);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
@@ -218,13 +238,44 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   EXPECT_EQ(body_, TestInitBody);
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=430 matches the fourth filter; rewrite nothing
+  // code=430 matches the fifth filter; rewrite nothing
   resetData(430);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(430));
   EXPECT_EQ(stream_info_.response_code_, 430U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "430");
   EXPECT_EQ(body_, TestInitBody);
+  EXPECT_EQ(content_type_, "text/plain");
+}
+
+// Test that we can use the deprecated `text_format` field with an empty value,
+// which is currently the only use case that it serves until we relax the
+// size validation on `DataSource.inline_string`.
+TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewriteDeprecatedTextFormatEmpty)) {
+  // Match with response_code, and rewrite the code and body.
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
+              default_value: 404
+              runtime_key: key_b
+      body_format_override:
+        text_format: ""
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+  auto local = Factory::create(config_, context_);
+
+  // code=404 matches the only filter; does not rewrite code, sets an empty body and content_type.
+  resetData(404);
+  body_ = "original body text";
+  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, static_cast<Http::Code>(404));
+  EXPECT_EQ(stream_info_.response_code_, 404U);
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "404");
+  EXPECT_EQ(body_, "");
   EXPECT_EQ(content_type_, "text/plain");
 }
 
@@ -259,7 +310,8 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
       body:
         inline_string: "411 body text"
     body_format:
-      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE% default formatter"
+      text_format_source:
+        inline_string: "%LOCAL_REPLY_BODY% %RESPONSE_CODE% default formatter"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
@@ -350,7 +402,8 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
       body:
         inline_string: "401 body text"
       body_format_override:
-        text_format: "<h1>%LOCAL_REPLY_BODY%</h1>"
+        text_format_source:
+          inline_string: "<h1>%LOCAL_REPLY_BODY%</h1>"
         content_type: "text/html; charset=UTF-8"
     - filter:
         status_code_filter:
@@ -373,9 +426,11 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
       body:
         inline_string: "421 body text"
       body_format_override:
-        text_format: "%LOCAL_REPLY_BODY%"
+        text_format_source:
+          inline_string: "%LOCAL_REPLY_BODY%"
     body_format:
-      text_format: "<h1>%LOCAL_REPLY_BODY%</h1> %RESPONSE_CODE% default formatter"
+      text_format_source:
+        inline_string: "<h1>%LOCAL_REPLY_BODY%</h1> %RESPONSE_CODE% default formatter"
       content_type: "text/html; charset=UTF-8"
 )";
   TestUtility::loadFromYaml(yaml, config_);

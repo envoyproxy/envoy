@@ -1,10 +1,13 @@
 #include <iostream>
+#include <ostream>
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
+
+#include "common/network/socket_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
 
@@ -38,7 +41,9 @@ class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 
 class MockConnectionSocket : public Network::ConnectionSocket {
 public:
-  MockConnectionSocket() = default;
+  MockConnectionSocket()
+      : address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)) {}
+
   static std::unique_ptr<MockConnectionSocket>
   createMockConnectionSocket(uint16_t destination_port, const std::string& destination_address,
                              const std::string& server_name, const std::string& transport_protocol,
@@ -47,15 +52,18 @@ public:
     auto res = std::make_unique<MockConnectionSocket>();
 
     if (absl::StartsWith(destination_address, "/")) {
-      res->local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
+      res->address_provider_->setLocalAddress(
+          std::make_shared<Network::Address::PipeInstance>(destination_address));
     } else {
-      res->local_address_ =
-          Network::Utility::parseInternetAddress(destination_address, destination_port);
+      res->address_provider_->setLocalAddress(
+          Network::Utility::parseInternetAddress(destination_address, destination_port));
     }
     if (absl::StartsWith(source_address, "/")) {
-      res->remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
+      res->address_provider_->setRemoteAddress(
+          std::make_shared<Network::Address::PipeInstance>(source_address));
     } else {
-      res->remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
+      res->address_provider_->setRemoteAddress(
+          Network::Utility::parseInternetAddress(source_address, source_port));
     }
     res->server_name_ = server_name;
     res->transport_protocol_ = transport_protocol;
@@ -63,23 +71,17 @@ public:
     return res;
   }
 
-  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
-    return remote_address_;
-  }
-
-  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
-    return remote_address_;
-  }
-
-  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-    return local_address_;
-  }
-
   absl::string_view detectedTransportProtocol() const override { return transport_protocol_; }
-
   absl::string_view requestedServerName() const override { return server_name_; }
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
+  }
+  Network::SocketAddressSetter& addressProvider() override { return *address_provider_; }
+  const Network::SocketAddressSetter& addressProvider() const override {
+    return *address_provider_;
+  }
+  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+    return address_provider_;
   }
 
   // Wont call
@@ -90,15 +92,13 @@ public:
   void close() override {}
   bool isOpen() const override { return false; }
   Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }
-  Network::Address::Type addressType() const override { return local_address_->type(); }
+  Network::Address::Type addressType() const override {
+    return address_provider_->localAddress()->type();
+  }
   absl::optional<Network::Address::IpVersion> ipVersion() const override {
     return Network::Address::IpVersion::v4;
   }
   Network::SocketPtr duplicate() override { return nullptr; }
-  void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
-  void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
-  void setRemoteAddress(const Network::Address::InstanceConstSharedPtr&) override {}
-  bool localAddressRestored() const override { return true; }
   void setDetectedTransportProtocol(absl::string_view) override {}
   void setRequestedApplicationProtocols(const std::vector<absl::string_view>&) override {}
   void addOption(const OptionConstSharedPtr&) override {}
@@ -113,17 +113,21 @@ public:
   Api::SysCallIntResult setSocketOption(int, int, const void*, socklen_t) override {
     return {0, 0};
   }
+  Api::SysCallIntResult ioctl(unsigned long, void*, unsigned long, void*, unsigned long,
+                              unsigned long*) override {
+    return {0, 0};
+  }
   Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {
     return {0, 0};
   }
   Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
+  void dumpState(std::ostream&, int) const override {}
 
 private:
   Network::IoHandlePtr io_handle_;
   OptionsSharedPtr options_;
-  Network::Address::InstanceConstSharedPtr local_address_;
-  Network::Address::InstanceConstSharedPtr remote_address_;
+  Network::SocketAddressSetterSharedPtr address_provider_;
   std::string server_name_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;

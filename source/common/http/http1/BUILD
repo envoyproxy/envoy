@@ -12,6 +12,9 @@ envoy_cc_library(
     name = "header_formatter_lib",
     srcs = ["header_formatter.cc"],
     hdrs = ["header_formatter.h"],
+    deps = [
+        "//include/envoy/http:header_formatter_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -24,45 +27,39 @@ envoy_cc_library(
     ],
 )
 
-CODEC_LIB_DEPS = [
-    ":codec_stats_lib",
-    ":header_formatter_lib",
-    "//include/envoy/buffer:buffer_interface",
-    "//include/envoy/http:codec_interface",
-    "//include/envoy/http:header_map_interface",
-    "//include/envoy/network:connection_interface",
-    "//source/common/buffer:buffer_lib",
-    "//source/common/buffer:watermark_buffer_lib",
-    "//source/common/common:assert_lib",
-    "//source/common/common:statusor_lib",
-    "//source/common/common:utility_lib",
-    "//source/common/grpc:common_lib",
-    "//source/common/http:codec_helper_lib",
-    "//source/common/http:codes_lib",
-    "//source/common/http:exception_lib",
-    "//source/common/http:header_map_lib",
-    "//source/common/http:header_utility_lib",
-    "//source/common/http:headers_lib",
-    "//source/common/http:status_lib",
-    "//source/common/http:utility_lib",
-    "//source/common/runtime:runtime_features_lib",
-    "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-]
-
 envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = ["http_parser"],
-    deps = CODEC_LIB_DEPS + ["//source/common/common:cleanup_lib"],
-)
-
-envoy_cc_library(
-    name = "codec_legacy_lib",
-    srcs = ["codec_impl_legacy.cc"],
-    hdrs = ["codec_impl_legacy.h"],
-    external_deps = ["http_parser"],
-    deps = CODEC_LIB_DEPS,
+    deps = [
+        ":codec_stats_lib",
+        ":header_formatter_lib",
+        ":legacy_parser_lib",
+        ":parser_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/common:scope_tracker_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/network:connection_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:dump_state_utils",
+        "//source/common/common:statusor_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:codec_helper_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:exception_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:status_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -84,5 +81,38 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "settings_lib",
+    srcs = ["settings.cc"],
+    hdrs = ["settings.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//source/common/config:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "parser_interface",
+    hdrs = ["parser.h"],
+    deps = [
+        "//source/common/common:statusor_lib",
+        "//source/common/http:status_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "legacy_parser_lib",
+    srcs = ["legacy_parser_impl.cc"],
+    hdrs = ["legacy_parser_impl.h"],
+    external_deps = ["http_parser"],
+    deps = [
+        ":parser_interface",
+        "//source/common/common:assert_lib",
     ],
 )

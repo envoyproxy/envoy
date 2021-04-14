@@ -120,8 +120,12 @@ void WebsocketIntegrationTest::initialize() {
   if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          cluster->mutable_http2_protocol_options()->set_allow_connect(true);
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http2_protocol_options()
+              ->set_allow_connect(true);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   }
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
@@ -365,7 +369,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders("websocket"));
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();
@@ -382,7 +386,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();

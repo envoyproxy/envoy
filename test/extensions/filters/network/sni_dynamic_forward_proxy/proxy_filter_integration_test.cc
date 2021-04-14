@@ -31,6 +31,8 @@ public:
     config_helper_.addConfigModifier([this, max_hosts, max_pending_requests](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
 
@@ -115,9 +117,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, UpstreamTls) {
 
   codec_client_ = makeHttpConnection(
       makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, fake_upstream_connection_, TestUtility::DefaultTimeout, max_request_headers_kb_,
-      max_request_headers_count_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
 
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -130,7 +130,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, UpstreamTls) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 

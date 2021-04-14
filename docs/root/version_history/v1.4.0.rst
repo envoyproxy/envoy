@@ -56,7 +56,7 @@ Deprecated
 * The following log macros have been deprecated: `log_trace`, `log_debug`, `conn_log`,
   `conn_log_info`, `conn_log_debug`, `conn_log_trace`, `stream_log`, `stream_log_info`,
   `stream_log_debug`, `stream_log_trace`. For replacements, please see
-  `logger.h <https://github.com/envoyproxy/envoy/blob/master/source/common/common/logger.h>`_.
+  `logger.h <https://github.com/envoyproxy/envoy/blob/main/source/common/common/logger.h>`_.
 * The connectionId() and ssl() callbacks of StreamFilterCallbacks have been deprecated and
   replaced with a more general connection() callback, which, when not returning a nullptr, can be
   used to get the connection id and SSL connection from the returned Connection object pointer.

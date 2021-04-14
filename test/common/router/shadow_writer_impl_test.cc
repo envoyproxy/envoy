@@ -25,10 +25,12 @@ public:
   void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
     Http::RequestMessagePtr message(new Http::RequestMessageImpl());
     message->headers().setHost(host);
-    EXPECT_CALL(cm_, get(Eq("foo")));
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm_.async_client_));
+    cm_.initializeThreadLocalClusters({"foo"});
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("foo")));
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
     auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5));
-    EXPECT_CALL(cm_.async_client_, send_(_, _, options))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, options))
         .WillOnce(Invoke(
             [&](Http::RequestMessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -42,7 +44,7 @@ public:
 
   Upstream::MockClusterManager cm_;
   ShadowWriterImpl writer_{cm_};
-  Http::MockAsyncClientRequest request_{&cm_.async_client_};
+  Http::MockAsyncClientRequest request_{&cm_.thread_local_cluster_.async_client_};
   Http::AsyncClient::Callbacks* callback_{};
 };
 
@@ -65,8 +67,8 @@ TEST_F(ShadowWriterImplTest, NoCluster) {
   InSequence s;
 
   Http::RequestMessagePtr message(new Http::RequestMessageImpl());
-  EXPECT_CALL(cm_, get(Eq("foo"))).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).Times(0);
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("foo"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
   auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5));
   writer_.shadow("foo", std::move(message), options);
 }

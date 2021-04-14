@@ -30,7 +30,7 @@ Http::Code ServerInfoHandler::handlerCerts(absl::string_view,
       *cert_chain = *cert_details;
     }
   });
-  response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
+  response.add(MessageUtil::getJsonStringFromMessageOrError(certificates, true, true));
   return Http::Code::OK;
 }
 
@@ -52,7 +52,7 @@ Http::Code ServerInfoHandler::handlerMemory(absl::string_view,
   memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
   memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
   memory.set_total_physical_bytes(Memory::Stats::totalPhysicalBytes());
-  response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessageOrError(memory, true, true)); // pretty-print
   return Http::Code::OK;
 }
 
@@ -89,7 +89,7 @@ Http::Code ServerInfoHandler::handlerServerInfo(absl::string_view, Http::Respons
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();
   server_info.mutable_node()->MergeFrom(server_.localInfo().node());
-  response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
+  response.add(MessageUtil::getJsonStringFromMessageOrError(server_info, true, true));
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;
 }

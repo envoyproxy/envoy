@@ -56,6 +56,13 @@ private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
   bool isGrpcWebRequest(const Http::RequestHeaderMap& headers);
+  bool isProtoEncodedGrpcWebResponseHeaders(const Http::ResponseHeaderMap& headers) const;
+  bool hasProtoEncodedGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const;
+  bool needsTransformationForNonProtoEncodedResponse(Http::ResponseHeaderMap& headers,
+                                                     bool end_stream) const;
+  void mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& output,
+                                                Buffer::Instance* last_data);
+  void setTransformedNonProtoEncodedResponseHeaders(Buffer::Instance* data);
 
   static const uint8_t GRPC_WEB_TRAILER;
   const absl::flat_hash_set<std::string>& gRpcWebContentTypes() const;
@@ -65,11 +72,13 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   bool is_text_request_{};
   bool is_text_response_{};
+  bool needs_transformation_for_non_proto_encoded_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Grpc::Decoder decoder_;
   absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   bool is_grpc_web_request_{};
   Grpc::Context& context_;
+  Http::ResponseHeaderMap* response_headers_{nullptr};
 };
 
 } // namespace GrpcWeb

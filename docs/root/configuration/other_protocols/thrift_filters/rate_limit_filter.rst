@@ -39,3 +39,12 @@ The filter outputs statistics in the *cluster.<route target cluster>.ratelimit.*
   of :ref:`failure_mode_deny
   <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit.failure_mode_deny>` set to
   false."
+
+Dynamic Metadata
+----------------
+.. _config_thrift_filters_rate_limit_dynamic_metadata:
+
+The ratelimit filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
+*only* when the gRPC ratelimit service returns a :ref:`CheckResponse
+<envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse>` with a filled :ref:`dynamic_metadata
+<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field.

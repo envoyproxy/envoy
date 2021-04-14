@@ -6,8 +6,10 @@
 # https://github.com/actions/virtual-environments/blob/master/images/macos/macos-10.15-Readme.md for
 # a list of pre-installed tools in the macOS image.
 
-# https://github.com/actions/virtual-environments/issues/1811
-brew uninstall openssl@1.0.2t
+# https://github.com/actions/virtual-environments/issues/2322
+if command -v 2to3 > /dev/null; then
+    rm -f "$(command -v 2to3)"
+fi
 
 export HOMEBREW_NO_AUTO_UPDATE=1
 HOMEBREW_RETRY_ATTEMPTS=10
@@ -29,13 +31,13 @@ function install {
 function retry () {
     local returns=1 i=1
     while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
-	if "$@"; then
-	    returns=0
-	    break
-	else
-	    sleep "$HOMEBREW_RETRY_INTERVAL";
-	    ((i++))
-	fi
+        if "$@"; then
+            returns=0
+            break
+        else
+            sleep "$HOMEBREW_RETRY_INTERVAL";
+            ((i++))
+        fi
     done
     return "$returns"
 }
@@ -45,7 +47,7 @@ if ! retry brew update; then
   echo "Failed to update homebrew"
 fi
 
-DEPS="automake cmake coreutils go libtool wget ninja"
+DEPS="automake cmake coreutils libtool wget ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"

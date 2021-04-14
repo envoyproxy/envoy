@@ -24,17 +24,17 @@ public:
   const Network::IoHandle& ioHandle() const override { return *io_handle_; }
   Network::Connection& connection() override { return connection_; }
   bool shouldDrainReadBuffer() override { return false; }
-  void setReadBufferReady() override { set_read_buffer_ready_ = true; }
+  void setTransportSocketIsReadable() override { transport_socket_is_readable_ = true; }
   void raiseEvent(Network::ConnectionEvent) override { event_raised_ = true; }
   void flushWriteBuffer() override { write_buffer_flushed_ = true; }
 
-  bool event_raised() const { return event_raised_; }
-  bool set_read_buffer_ready() const { return set_read_buffer_ready_; }
-  bool write_buffer_flushed() const { return write_buffer_flushed_; }
+  bool eventRaised() const { return event_raised_; }
+  bool transportSocketIsReadable() const { return transport_socket_is_readable_; }
+  bool writeBufferFlushed() const { return write_buffer_flushed_; }
 
 private:
   bool event_raised_{false};
-  bool set_read_buffer_ready_{false};
+  bool transport_socket_is_readable_{false};
   bool write_buffer_flushed_{false};
   Network::IoHandlePtr io_handle_;
   Network::Connection& connection_;
@@ -55,12 +55,12 @@ TEST_F(NoOpTransportSocketCallbacksTest, TestAllCallbacks) {
   EXPECT_EQ(&connection_, &wrapped_callbacks_.connection());
   EXPECT_FALSE(wrapped_callbacks_.shouldDrainReadBuffer());
 
-  wrapped_callbacks_.setReadBufferReady();
-  EXPECT_FALSE(wrapper_callbacks_.set_read_buffer_ready());
+  wrapped_callbacks_.setTransportSocketIsReadable();
+  EXPECT_FALSE(wrapper_callbacks_.transportSocketIsReadable());
   wrapped_callbacks_.raiseEvent(Network::ConnectionEvent::Connected);
-  EXPECT_FALSE(wrapper_callbacks_.event_raised());
+  EXPECT_FALSE(wrapper_callbacks_.eventRaised());
   wrapped_callbacks_.flushWriteBuffer();
-  EXPECT_FALSE(wrapper_callbacks_.write_buffer_flushed());
+  EXPECT_FALSE(wrapper_callbacks_.writeBufferFlushed());
 }
 
 } // namespace

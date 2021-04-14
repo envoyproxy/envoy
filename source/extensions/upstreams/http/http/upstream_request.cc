@@ -47,10 +47,6 @@ bool HttpConnPool::cancelAnyPendingStream() {
   return false;
 }
 
-absl::optional<Envoy::Http::Protocol> HttpConnPool::protocol() const {
-  return conn_pool_->protocol();
-}
-
 void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
@@ -60,12 +56,13 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 
 void HttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info) {
+                               const StreamInfo::StreamInfo& info,
+                               absl::optional<Envoy::Http::Protocol> protocol) {
   conn_pool_stream_handle_ = nullptr;
   auto upstream =
       std::make_unique<HttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder);
   callbacks_->onPoolReady(std::move(upstream), host,
-                          request_encoder.getStream().connectionLocalAddress(), info);
+                          request_encoder.getStream().connectionLocalAddress(), info, protocol);
 }
 
 } // namespace Http

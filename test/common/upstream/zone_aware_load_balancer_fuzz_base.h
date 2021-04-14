@@ -1,3 +1,5 @@
+#pragma once
+
 #include "test/mocks/upstream/priority_set.h"
 
 #include "load_balancer_fuzz_base.h"

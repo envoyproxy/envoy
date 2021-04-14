@@ -21,8 +21,10 @@ filter configuration snippet is permitted:
     rds:
       route_config_name: local_route
       config_source:
+        resource_api_version: V3
         api_config_source:
           api_type: GRPC
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: xds_cluster
@@ -49,9 +51,11 @@ follows:
       codec_type: AUTO
       rds:
         route_config_name: local_route
+        resource_api_version: V3
         config_source:
           api_config_source:
             api_type: GRPC
+            transport_api_version: V3
             grpc_services:
               envoy_grpc:
                 cluster_name: xds_cluster
@@ -85,3 +89,4 @@ to the common subscription statistics, it also provides the following:
 
   config_reload, Counter, Total number of successful configuration updates
   config_fail, Counter, Total number of failed configuration updates
+  config_conflict, Counter, Total number of conflicting applications of configuration updates; this may happen when a new listener cannot reuse a subscribed extension configuration due to an invalid type URL.

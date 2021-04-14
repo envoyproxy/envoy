@@ -45,8 +45,6 @@ envoy_extension_cc_test(
     name = "metrics_service_integration_test",
     srcs = ["metrics_service_integration_test.cc"],
     extension_name = "envoy.stat_sinks.metrics_service",
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

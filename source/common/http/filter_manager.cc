@@ -1,6 +1,7 @@
 #include "common/http/filter_manager.h"
 
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
@@ -14,6 +15,7 @@ namespace Envoy {
 namespace Http {
 
 namespace {
+REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory);
 
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
 
@@ -179,7 +181,10 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
-    } else if (complete() && !hasTrailers() && !bufferedData()) {
+    } else if (complete() && !hasTrailers() && !bufferedData() &&
+               // If the stream is destroyed, no need to handle the data buffer or trailers.
+               // This can occur if the filter calls sendLocalReply.
+               !parent_.state_.destroyed_) {
       // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
       // byte data frame, we need to create an empty buffer to make sure that when commonContinue
       // is called, the pipeline resumes with an empty data frame with end_stream = true
@@ -237,8 +242,32 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::route(const Router::RouteCal
   return parent_.filter_manager_callbacks_.route(cb);
 }
 
+void ActiveStreamFilterBase::setRoute(Router::RouteConstSharedPtr route) {
+  parent_.filter_manager_callbacks_.setRoute(std::move(route));
+}
+
 void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
+}
+
+void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
+  if (match_tree_evaluated_ || !matching_data_) {
+    return;
+  }
+
+  update_func(*matching_data_);
+
+  const auto match_result = Matcher::evaluateMatch<HttpMatchingData>(*match_tree_, *matching_data_);
+
+  match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
+
+  if (match_tree_evaluated_ && match_result.result_) {
+    if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
+      skip_filter_ = true;
+    } else {
+      filter_->onMatchCallback(*match_result.result_);
+    }
+  }
 }
 
 bool ActiveStreamDecoderFilter::canContinue() {
@@ -250,8 +279,8 @@ bool ActiveStreamDecoderFilter::canContinue() {
   return !parent_.state_.local_complete_;
 }
 
-Buffer::WatermarkBufferPtr ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
+Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
+  auto buffer = dispatcher().getWatermarkFactory().create(
       [this]() -> void { this->requestDataDrained(); },
       [this]() -> void { this->requestDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
@@ -259,7 +288,7 @@ Buffer::WatermarkBufferPtr ActiveStreamDecoderFilter::createBuffer() {
   return buffer;
 }
 
-Buffer::WatermarkBufferPtr& ActiveStreamDecoderFilter::bufferedData() {
+Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
@@ -348,11 +377,19 @@ void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& 
   }
 }
 
+ResponseHeaderMapOptRef ActiveStreamDecoderFilter::continueHeaders() const {
+  return parent_.filter_manager_callbacks_.continueHeaders();
+}
+
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
   parent_.stream_info_.setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
+}
+
+ResponseHeaderMapOptRef ActiveStreamDecoderFilter::responseHeaders() const {
+  return parent_.filter_manager_callbacks_.responseHeaders();
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -363,6 +400,10 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
+}
+
+ResponseTrailerMapOptRef ActiveStreamDecoderFilter::responseTrailers() const {
+  return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
 void ActiveStreamDecoderFilter::encodeMetadata(MetadataMapPtr&& metadata_map_ptr) {
@@ -385,8 +426,17 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
 }
 
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
+                                                 FilterMatchStateSharedPtr match_state,
                                                  bool dual_filter) {
-  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
+  ActiveStreamDecoderFilterPtr wrapper(
+      new ActiveStreamDecoderFilter(*this, filter, match_state, dual_filter));
+
+  // If we're a dual handling filter, have the encoding wrapper be the only thing registering itself
+  // as the handling filter.
+  if (match_state) {
+    match_state->filter_ = filter.get();
+  }
+
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
@@ -400,8 +450,15 @@ void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr fi
 }
 
 void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
+                                                 FilterMatchStateSharedPtr match_state,
                                                  bool dual_filter) {
-  ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
+  ActiveStreamEncoderFilterPtr wrapper(
+      new ActiveStreamEncoderFilter(*this, filter, match_state, dual_filter));
+
+  if (match_state) {
+    match_state->filter_ = filter.get();
+  }
+
   filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
@@ -439,6 +496,13 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onRequestHeaders(headers); });
+
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
+
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
@@ -455,6 +519,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     (*entry)->decode_headers_called_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
+    ENVOY_BUG(!continue_iteration || !state_.local_complete_,
+              "Filter did not return StopAll or StopIteration after sending a local reply.");
 
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
@@ -474,7 +540,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
+    if ((!continue_iteration || state_.local_complete_) &&
+        std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
@@ -515,6 +582,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
     // If the filter pointed by entry has stopped for all frame types, return now.
     if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
       return;
@@ -646,6 +716,13 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onRequestTrailers(trailers); });
+
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
+
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -674,6 +751,9 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
     // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
     // metadata in case decodeHeaders returns StopAllIteration. The latter can happen when headers
@@ -737,10 +817,23 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   return std::next(filter->entry());
 }
 
+void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+  state_.under_on_local_reply_ = true;
+  filter_manager_callbacks_.onLocalReply(data.code_);
+
+  for (auto entry : filters_) {
+    if (entry->onLocalReply(data) == LocalErrorStatus::ContinueAndResetStream) {
+      data.reset_imminent_ = true;
+    }
+  }
+  state_.under_on_local_reply_ = false;
+}
+
 void FilterManager::sendLocalReply(
     bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   bool is_grpc_request = old_was_grpc_request;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
@@ -749,7 +842,14 @@ void FilterManager::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
 
-  filter_manager_callbacks_.onLocalReply(code);
+  StreamFilterBase::LocalReplyData data{code, details, false};
+  FilterManager::onLocalReply(data);
+  if (data.reset_imminent_) {
+    ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
+                     details);
+    filter_manager_callbacks_.resetStream();
+    return;
+  }
 
   if (!filter_manager_callbacks_.responseHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
@@ -804,16 +904,14 @@ void FilterManager::sendLocalReplyViaFilterChain(
                  absl::string_view& content_type) -> void {
             // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
             // opt refs.
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
-                                     ? &filter_manager_callbacks_.requestHeaders()->get()
-                                     : nullptr,
-                                 response_headers, stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 stream_info_, code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
-            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders()->get(), end_stream);
+            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             // TODO: Start encoding from the last decoder filter that saw the
@@ -845,10 +943,8 @@ void FilterManager::sendDirectLocalReply(
           },
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
-                                     ? &filter_manager_callbacks_.requestHeaders()->get()
-                                     : nullptr,
-                                 response_headers, stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 stream_info_, code, body, content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
             // Move the response headers into the FilterManager to make sure they're visible to
@@ -885,6 +981,10 @@ void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, false, FilterIterationStartState::AlwaysStartFromNext);
   for (; entry != encoder_filters_.end(); entry++) {
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
+
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode100ContinueHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode100ContinueHeaders;
     FilterHeadersStatus status = (*entry)->handle_->encode100ContinueHeaders(headers);
@@ -926,6 +1026,12 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
   for (; entry != encoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&headers](auto& matching_data) { matching_data.onResponseHeaders(headers); });
+
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
@@ -980,6 +1086,9 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
       commonEncodePrefix(filter, false, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != encoder_filters_.end(); entry++) {
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
     // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
     // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
@@ -1048,6 +1157,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
     // If the filter pointed by entry has stopped for all frame type, return now.
     if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
       return;
@@ -1110,6 +1222,13 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onResponseTrailers(trailers); });
+
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
+
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -1193,11 +1312,11 @@ bool FilterManager::createFilterChain() {
   bool upgrade_rejected = false;
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
-    upgrade = filter_manager_callbacks_.requestHeaders()->get().Upgrade();
+    upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
 
     // Treat CONNECT requests as a special upgrade case.
     if (!upgrade && HeaderUtility::isConnect(*filter_manager_callbacks_.requestHeaders())) {
-      upgrade = filter_manager_callbacks_.requestHeaders()->get().Method();
+      upgrade = filter_manager_callbacks_.requestHeaders()->Method();
     }
   }
 
@@ -1259,7 +1378,8 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
+  if (!complete() ||
+      (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
     return false;
   }
 
@@ -1302,15 +1422,15 @@ absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeCon
   return parent_.filter_manager_callbacks_.routeConfig();
 }
 
-Buffer::WatermarkBufferPtr ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer(
+Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
+  auto buffer = dispatcher().getWatermarkFactory().create(
       [this]() -> void { this->responseDataDrained(); },
       [this]() -> void { this->responseDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
-  return Buffer::WatermarkBufferPtr{buffer};
+  return buffer;
 }
-Buffer::WatermarkBufferPtr& ActiveStreamEncoderFilter::bufferedData() {
+Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }

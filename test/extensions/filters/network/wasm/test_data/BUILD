@@ -13,8 +13,8 @@ wasm_rust_binary(
     name = "logging_rust.wasm",
     srcs = ["logging_rust.rs"],
     deps = [
-        "//bazel/external/cargo:log",
-        "//bazel/external/cargo:proxy_wasm",
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
     ],
 )
 
@@ -23,6 +23,7 @@ envoy_cc_library(
     srcs = [
         "test_cpp.cc",
         "test_cpp_null_plugin.cc",
+        "test_resume_call_cpp.cc",
     ],
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
@@ -37,8 +38,11 @@ envoy_cc_library(
 
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
-    srcs = ["test_cpp.cc"],
+    srcs = [
+        "test_cpp.cc",
+        "test_resume_call_cpp.cc",
+    ],
     deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
+        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics_lite",
     ],
 )

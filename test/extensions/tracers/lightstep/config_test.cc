@@ -22,10 +22,8 @@ namespace {
 
 TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(
-          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
-  ON_CALL(*context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*context.server_factory_context_.cluster_manager_.active_clusters_["fake_cluster"]->info_,
           features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 

@@ -59,6 +59,20 @@ TEST(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
                EnvoyException);
 }
 
+TEST(HttpJwtAuthnFilterFactoryTest, ProviderWithoutIssuer) {
+  JwtAuthentication proto_config;
+  auto& provider = (*proto_config.mutable_providers())["provider"];
+  // This provider did not specify "issuer".
+  provider.mutable_local_jwks()->set_inline_string(PublicKey);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  FilterFactory factory;
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
 TEST(HttpJwtAuthnFilterFactoryTest, EmptyPerRouteConfig) {
   PerRouteConfig per_route;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;

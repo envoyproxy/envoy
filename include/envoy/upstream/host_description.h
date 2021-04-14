@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
@@ -148,6 +149,11 @@ public:
    * Set the current priority.
    */
   virtual void priority(uint32_t) PURE;
+
+  /**
+   * @return timestamp in milliseconds of when host was created.
+   */
+  virtual MonotonicTime creationTime() const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

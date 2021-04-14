@@ -206,6 +206,24 @@ thrift_filters:
   EXPECT_EQ("thrift.ingress.", factory.config_stat_prefix_);
 }
 
+// Test config with payload passthrough enabled.
+TEST_F(ThriftFilterConfigTest, ThriftProxyPayloadPassthrough) {
+  const std::string yaml = R"EOF(
+stat_prefix: ingress
+payload_passthrough: true
+route_config:
+  name: local_route
+thrift_filters:
+  - name: envoy.filters.thrift.router
+)EOF";
+
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+  testConfig(config);
+
+  EXPECT_EQ(true, config.payload_passthrough());
+}
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions

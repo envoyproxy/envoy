@@ -235,9 +235,9 @@ public:
   virtual bool mutexTracingEnabled() const PURE;
 
   /**
-   * @return whether to use the fake symbol table implementation.
+   * @return bool indicating whether core dumps have been enabled.
    */
-  virtual bool fakeSymbolTableEnabled() const PURE;
+  virtual bool coreDumpEnabled() const PURE;
 
   /**
    * @return bool indicating whether cpuset size should determine the number of worker threads.

@@ -65,6 +65,7 @@ typedef uint32_t mode_t;
 
 typedef SOCKET os_fd_t;
 typedef HANDLE filesystem_os_id_t; // NOLINT(modernize-use-using)
+typedef DWORD signal_t;            // NOLINT(modernize-use-using)
 
 typedef unsigned int sa_family_t;
 
@@ -147,13 +148,27 @@ struct msghdr {
 #define SOCKET_ERROR_ADDR_NOT_AVAIL WSAEADDRNOTAVAIL
 #define SOCKET_ERROR_INVAL WSAEINVAL
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
+#define SOCKET_ERROR_BADF WSAEBADF
 
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
 
+#define ENVOY_WIN32_SIGNAL_COUNT 1
+#define ENVOY_SIGTERM 0
+
 namespace Platform {
 constexpr absl::string_view null_device_path{"NUL"};
+
+constexpr bool win32SupportsOriginalDestination() {
+#if defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
+  return true;
+#else
+  return false;
+#endif
 }
+
+} // namespace Platform
+
 #else // POSIX
 
 #include <arpa/inet.h>
@@ -215,6 +230,7 @@ constexpr absl::string_view null_device_path{"NUL"};
 
 typedef int os_fd_t;
 typedef int filesystem_os_id_t; // NOLINT(modernize-use-using)
+typedef int signal_t;           // NOLINT(modernize-use-using)
 
 #define INVALID_HANDLE -1
 #define INVALID_SOCKET -1
@@ -240,10 +256,13 @@ typedef int filesystem_os_id_t; // NOLINT(modernize-use-using)
 #define SOCKET_ERROR_ADDR_NOT_AVAIL EADDRNOTAVAIL
 #define SOCKET_ERROR_INVAL EINVAL
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
+#define SOCKET_ERROR_BADF EBADF
 
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES
 #define HANDLE_ERROR_INVALID EBADF
+
+#define ENVOY_SIGTERM SIGTERM
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"/dev/null"};

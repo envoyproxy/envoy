@@ -32,8 +32,9 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
       type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
       dispatcher_(dispatcher) {}
 
-void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                                        const std::set<std::string>& cur_removed) {
+void DeltaSubscriptionState::updateSubscriptionInterest(
+    const absl::flat_hash_set<std::string>& cur_added,
+    const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
     setResourceWaitingForServer(a);
     // If interest in a resource is removed-then-added (all before a discovery request
@@ -58,7 +59,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::stri
 // the entirety of your interest at the start of a stream, even if nothing has changed.
 bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   return !names_added_.empty() || !names_removed_.empty() ||
-         !any_request_sent_yet_in_current_stream_;
+         !any_request_sent_yet_in_current_stream_ || must_send_discovery_request_;
 }
 
 UpdateAck DeltaSubscriptionState::handleResponse(
@@ -66,9 +67,9 @@ UpdateAck DeltaSubscriptionState::handleResponse(
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(message.nonce(), type_url_);
-  try {
-    handleGoodResponse(message);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { handleGoodResponse(message); }
+  END_TRY
+  catch (const EnvoyException& e) {
     handleBadResponse(e, ack);
   }
   return ack;
@@ -163,6 +164,7 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 envoy::service::discovery::v3::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestAckless() {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+  must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".

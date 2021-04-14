@@ -7,7 +7,6 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/type/matcher/node.proto";
 
 import "google/api/annotations.proto";
-import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
 

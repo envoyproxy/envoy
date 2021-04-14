@@ -186,7 +186,8 @@ public:
             {"dynamicMetadata", static_luaDynamicMetadata},
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
-            {"downstreamSslConnection", static_luaDownstreamSslConnection}};
+            {"downstreamSslConnection", static_luaDownstreamSslConnection},
+            {"requestedServerName", static_luaRequestedServerName}};
   }
 
 private:
@@ -221,8 +222,17 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamDirectRemoteAddress);
 
+  /**
+   * Get requested server name
+   * @return requested server name (e.g. SNI in TLS), if any.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
+
   // Envoy::Lua::BaseLuaObject
-  void onMarkDead() override { dynamic_metadata_wrapper_.reset(); }
+  void onMarkDead() override {
+    dynamic_metadata_wrapper_.reset();
+    downstream_ssl_connection_.reset();
+  }
 
   StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
@@ -248,6 +258,11 @@ private:
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
   const std::string public_key_;
+};
+
+class Timestamp {
+public:
+  enum Resolution { Millisecond };
 };
 
 } // namespace Lua

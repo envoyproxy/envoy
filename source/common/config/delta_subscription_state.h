@@ -29,9 +29,10 @@ public:
                          const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
 
   // Update which resources we're interested in subscribing to.
-  void updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                  const std::set<std::string>& cur_removed);
-  void addAliasesToResolve(const std::set<std::string>& aliases);
+  void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
+                                  const absl::flat_hash_set<std::string>& cur_removed);
+  void addAliasesToResolve(const absl::flat_hash_set<std::string>& aliases);
+  void setMustSendDiscoveryRequest() { must_send_discovery_request_ = true; }
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const;
@@ -98,8 +99,8 @@ private:
   const bool supports_heartbeats_;
   TtlManager ttl_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
-  // iterator into just its keys, e.g. for use in std::set_difference.
-  std::set<std::string> resource_names_;
+  // iterator into just its keys.
+  absl::flat_hash_set<std::string> resource_names_;
 
   const std::string type_url_;
   UntypedConfigUpdateCallbacks& watch_map_;
@@ -108,6 +109,7 @@ private:
   std::chrono::milliseconds init_fetch_timeout_;
 
   bool any_request_sent_yet_in_current_stream_{};
+  bool must_send_discovery_request_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
   // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.

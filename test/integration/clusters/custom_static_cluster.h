@@ -1,3 +1,5 @@
+#pragma once
+
 #include <chrono>
 #include <list>
 #include <string>
@@ -27,7 +29,8 @@ public:
                       Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                       Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
                       std::string address, uint32_t port)
-      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
+                        factory_context.dispatcher().timeSource()),
         priority_(priority), address_(std::move(address)), port_(port), host_(makeHost()) {}
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

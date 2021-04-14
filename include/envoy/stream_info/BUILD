@@ -18,6 +18,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:protocol_interface",
         "//include/envoy/http:request_id_extension_interface",
+        "//include/envoy/network:socket_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/common:assert_lib",

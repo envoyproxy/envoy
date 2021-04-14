@@ -71,17 +71,18 @@ public:
               auto result = ClusterFactoryImplBase::create(
                   cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
                   dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-                  outlier_event_logger, added_via_api, validation_visitor_, *api_);
+                  outlier_event_logger, added_via_api, validation_visitor_, *api_, options_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
             }));
   }
 
   Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
+  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
+                   std::vector<Http::Protocol>&,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   ClusterConnectivityState& state) override {
+                   TimeSource&, ClusterConnectivityState& state) override {
     return Http::ConnectionPool::InstancePtr{
         allocateConnPool_(host, options, transport_socket_options, state)};
   }
@@ -102,7 +103,8 @@ public:
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&,
+                      const xds::core::v3::ResourceLocator*, ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
@@ -140,6 +142,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
@@ -167,10 +170,11 @@ public:
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                          ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context, Grpc::Context& grpc_context)
+                         Http::Context& http_context, Grpc::Context& grpc_context,
+                         Router::Context& router_context)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                            main_thread_dispatcher, admin, validation_context, api, http_context,
-                           grpc_context) {}
+                           grpc_context, router_context) {}
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
@@ -185,19 +189,17 @@ public:
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
-  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  ClusterManagerFactory& factory, Stats::Store& stats,
-                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                  const LocalInfo::LocalInfo& local_info,
-                                  AccessLog::AccessLogManager& log_manager,
-                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                  ProtobufMessage::ValidationContext& validation_context,
-                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-                                  MockLocalHostsRemoved& local_hosts_removed,
-                                  Http::Context& http_context, Grpc::Context& grpc_context)
+  MockedUpdatedClusterManagerImpl(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+      const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
+      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                                main_thread_dispatcher, admin, validation_context, api, http_context,
-                               grpc_context),
+                               grpc_context, router_context),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:

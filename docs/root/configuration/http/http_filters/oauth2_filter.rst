@@ -32,7 +32,7 @@ The OAuth filter's flow involves:
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
 no matter what format that token is, if
 :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.forward_bearer_token>`
-is set to true the filter will send over a 
+is set to true the filter will send over a
 cookie named `BearerToken` to the upstream. Additionally, the `Authorization` header will be populated
 with the same value.
 
@@ -71,6 +71,15 @@ The following is an example configuring the filter.
         name: hmac
         sds_config:
           path: "/etc/envoy/hmac.yaml"
+    # (Optional): defaults to 'user' scope if not provided
+    auth_scopes:
+    - user
+    - openid
+    - email
+    # (Optional): set resource parameter for Authorization request
+    resources:
+    - oauth2-resource
+    - http://example.com
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
@@ -114,6 +123,15 @@ Below is a complete code example of how we employ the filter as one of
                     name: hmac
                     sds_config:
                       path: "/etc/envoy/hmac.yaml"
+                # (Optional): defaults to 'user' scope if not provided
+                auth_scopes:
+                - user
+                - openid
+                - email
+                # (Optional): set resource parameter for Authorization request
+                resources:
+                - oauth2-resource
+                - http://example.com
           - name: envoy.router
           tracing: {}
           codec_type: "AUTO"
@@ -143,12 +161,12 @@ Below is a complete code example of how we employ the filter as one of
               socket_address:
                 address: 127.0.0.1
                 port_value: 8080
-  - name: auth
+  - name: oauth
     connect_timeout: 5s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: auth
+      cluster_name: oauth
       endpoints:
       - lb_endpoints:
         - endpoint:

@@ -92,7 +92,7 @@ void Span::finishSpan() {
     s.mutable_annotations()->insert({item.first, item.second});
   }
 
-  const std::string json = MessageUtil::getJsonStringFromMessage(
+  const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
 
   broker_.send(json);

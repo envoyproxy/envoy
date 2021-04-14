@@ -2,6 +2,7 @@
 
 #include "common/grpc/async_client_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -34,7 +35,8 @@ public:
     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
 
     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
-    ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
+    cm_.initializeThreadLocalClusters({"test_cluster"});
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
@@ -76,8 +78,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   config.mutable_envoy_grpc()->set_authority("demo.com");
 
   grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("test_cluster"))
-      .WillRepeatedly(ReturnRef(http_client_));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
@@ -128,9 +129,9 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
 
   // Prepare the parent context of this call.
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
-  stream_info.setDownstreamLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address));
+  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;
@@ -247,7 +248,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
 // status UNAVAILABLE and error message "Cluster not available"
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available"));
   auto grpc_stream =

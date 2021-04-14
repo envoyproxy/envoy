@@ -1,7 +1,7 @@
-# Clang 10.0 library pre-built Bazel.
+# Clang 11.0 library pre-built Bazel.
 #
 # This file was mostly manually assembled (with some hacky Python scripts) from
-# clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz and corresponding
+# clang+llvm-11.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz and corresponding
 # https://github.com/llvm/llvm-project.git source. It needs Clang 10.0 to work.
 #
 # The BUILD file has sufficient dependency relationships

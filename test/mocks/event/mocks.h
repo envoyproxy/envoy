@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
@@ -71,9 +72,10 @@ public:
     return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port, backlog_size)};
   }
 
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb) override {
-    return Network::UdpListenerPtr{createUdpListener_(socket, cb)};
+  Network::UdpListenerPtr
+  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+                    const envoy::config::core::v3::UdpSocketConfig& config) override {
+    return Network::UdpListenerPtr{createUdpListener_(socket, cb, config)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -83,10 +85,26 @@ public:
     return timer;
   }
 
+  Event::TimerPtr createScaledTimer(ScaledTimerMinimum minimum, Event::TimerCb cb) override {
+    auto timer = Event::TimerPtr{createScaledTimer_(minimum, cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
+  Event::TimerPtr createScaledTimer(ScaledTimerType timer_type, Event::TimerCb cb) override {
+    auto timer = Event::TimerPtr{createScaledTypedTimer_(timer_type, cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
     auto schedulable_cb = Event::SchedulableCallbackPtr{createSchedulableCallback_(cb)};
-    // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
-    ASSERT(schedulable_cb != nullptr);
+    if (!allow_null_callback_) {
+      // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
+      ASSERT(schedulable_cb != nullptr);
+    }
     return schedulable_cb;
   }
 
@@ -97,7 +115,7 @@ public:
     }
   }
 
-  SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override {
+  SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
     return SignalEventPtr{listenForSignal_(signal_num, cb)};
   }
 
@@ -122,24 +140,31 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                bool bind_to_port, uint32_t backlog_size));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
+              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+               const envoy::config::core::v3::UdpSocketConfig& config));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
+  MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
+  MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
-  MOCK_METHOD(SignalEvent*, listenForSignal_, (int signal_num, SignalCb cb));
+  MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
   MOCK_METHOD(void, post, (std::function<void()> callback));
+  MOCK_METHOD(void, deleteInDispatcherThread, (DispatcherThreadDeletableConstPtr deletable));
   MOCK_METHOD(void, run, (RunType type));
-  MOCK_METHOD(const ScopeTrackedObject*, setTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
   MOCK_METHOD(bool, isThreadSafe, (), (const));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
   MOCK_METHOD(Thread::ThreadId, getCurrentThreadId, ());
   MOCK_METHOD(MonotonicTime, approximateMonotonicTime, (), (const));
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
+  MOCK_METHOD(void, shutdown, ());
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
-  MockBufferFactory buffer_factory_;
+  testing::NiceMock<MockBufferFactory> buffer_factory_;
+  bool allow_null_callback_{};
 
 private:
   const std::string name_;
@@ -184,8 +209,12 @@ public:
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
     return TimerPtr{createTimer_(minimum, std::move(callback))};
   }
+  TimerPtr createTimer(ScaledTimerType timer_type, TimerCb callback) override {
+    return TimerPtr{createTypedTimer_(timer_type, std::move(callback))};
+  }
   MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
-  MOCK_METHOD(void, setScaleFactor, (double), (override));
+  MOCK_METHOD(Timer*, createTypedTimer_, (ScaledTimerType, TimerCb));
+  MOCK_METHOD(void, setScaleFactor, (UnitFloat), (override));
 };
 
 class MockSchedulableCallback : public SchedulableCallback {
@@ -227,6 +256,8 @@ public:
 
   MOCK_METHOD(void, activate, (uint32_t events));
   MOCK_METHOD(void, setEnabled, (uint32_t events));
+  MOCK_METHOD(void, registerEventIfEmulatedEdge, (uint32_t event));
+  MOCK_METHOD(void, unregisterEventIfEmulatedEdge, (uint32_t event));
 };
 
 } // namespace Event

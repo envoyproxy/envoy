@@ -17,7 +17,9 @@ namespace Envoy {
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version);
+  AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
+                     envoy::config::core::v3::ApiVersion transport_api_version =
+                         envoy::config::core::v3::ApiVersion::AUTO);
   AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
 
   void TearDown() override;

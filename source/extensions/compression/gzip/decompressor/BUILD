@@ -29,6 +29,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.compression.decompressor",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":zlib_decompressor_impl_lib",

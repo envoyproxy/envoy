@@ -21,7 +21,7 @@ TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Http::StreamDecoderFilterSharedPtr filter;
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter).WillOnce(::testing::SaveArg<0>(&filter));
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
 
   envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
   config.set_cdn_id("cdn");
@@ -59,6 +59,17 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
 
   envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
   config.set_cdn_id("\r\n");
+  CdnLoopFilterFactory factory;
+
+  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                             EnvoyException, HasSubstr("is not a valid CDN identifier"));
+}
+
+TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  config.set_cdn_id("cdn,cdn");
   CdnLoopFilterFactory factory;
 
   EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),

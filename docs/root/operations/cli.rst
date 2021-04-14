@@ -124,6 +124,7 @@ following are the command line options that Envoy supports.
 
    :%v:	The actual message to log ("some user text")
    :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
+   :%j:	The actual message to log as JSON escaped string (https://tools.ietf.org/html/rfc7159#page-8).
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")
@@ -332,7 +333,7 @@ following are the command line options that Envoy supports.
   extensions cannot be used by static or dynamic configuration, though they are still linked into
   Envoy and may run start-up code or have other runtime effects. Extension names are created by
   joining the extension category and name with a forward slash,
-  e.g. ``grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
+  e.g. ``envoy.grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
 
 .. option:: --version
 
@@ -350,3 +351,10 @@ following are the command line options that Envoy supports.
   * build mode - either ``RELEASE`` or ``DEBUG``,
 
   * TLS library - either ``BoringSSL`` or ``BoringSSL-FIPS``.
+
+.. option:: --enable-core-dump
+
+  *(optional)* This flag is intended for Linux-based systems and it's a no-op for all other platforms.
+  It enables core dumps by invoking `prctl <https://man7.org/linux/man-pages/man2/prctl.2.html>`_ using the
+  PR_SET_DUMPABLE option. This is useful for container environments when using capabilities, given that when
+  Envoy has more capabilities than its base environment core dumping will be disabled by the kernel.

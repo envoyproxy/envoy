@@ -96,6 +96,11 @@ service Bookstore {
       get: "/indexStream"
     };
   }
+  rpc GetRoot(google.protobuf.Empty) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/"
+    };
+  }
   rpc PostBody(EchoBodyRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       post: "/postBody"
@@ -112,6 +117,20 @@ service Bookstore {
     option (google.api.http) = {
       post: "/echoBody"
       body: "nested.content"
+    };
+  }
+
+  rpc EchoRawBody(google.api.HttpBody) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/echoRawBody"
+      additional_bindings: {post: "/echoRawBody"}
+    };
+  }
+
+  rpc EchoNestedBody(EchoNestedRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/echoNestedBody"
+      body: "nested1.body"
     };
   }
   rpc EchoResponseBodyPath(google.protobuf.Empty) returns (EchoBodyRequest) {
@@ -277,6 +296,14 @@ message EchoBodyRequest {
   string arg = 1;
   string unused = 2;
   Nested nested = 3;
+}
+
+message EchoNestedRequest {
+  message Nested {
+    google.api.HttpBody body = 1;
+  }
+  Nested nested1 = 1;
+  Nested nested2 = 2;
 }
 
 // Request and Response message for EchoStructReqResp method.

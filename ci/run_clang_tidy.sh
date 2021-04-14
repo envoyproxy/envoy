@@ -26,12 +26,13 @@ echo "Generating compilation database..."
 
 # bazel build need to be run to setup virtual includes, generating files which are consumed
 # by clang-tidy
-"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --include_headers
+read -ra COMP_DB_TARGETS <<< "$COMP_DB_TARGETS"
+"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --include_headers "${COMP_DB_TARGETS[@]}"
 
 # Do not run clang-tidy against win32 impl
 # TODO(scw00): We should run clang-tidy against win32 impl once we have clang-cl support for Windows
 function exclude_win32_impl() {
-  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32
+  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32 | grep -v source/common/event/win32
 }
 
 # Do not run clang-tidy against macOS impl

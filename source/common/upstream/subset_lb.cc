@@ -102,8 +102,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
 }
 
 SubsetLoadBalancer::~SubsetLoadBalancer() {
-  original_priority_set_callback_handle_->remove();
-
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
     if (entry->active()) {
@@ -128,6 +126,9 @@ void SubsetLoadBalancer::rebuildSingle() {
   for (const auto& host_set : original_priority_set_.hostSetsPerPriority()) {
     for (const auto& host : host_set->hosts()) {
       MetadataConstSharedPtr metadata = host->metadata();
+      if (metadata == nullptr) {
+        continue;
+      }
       const auto& filter_metadata = metadata->filter_metadata();
       auto filter_it = filter_metadata.find(Config::MetadataFilters::get().ENVOY_LB);
       if (filter_it != filter_metadata.end()) {
@@ -136,6 +137,7 @@ void SubsetLoadBalancer::rebuildSingle() {
         if (fields_it != fields.end()) {
           auto [iterator, did_insert] =
               single_host_per_subset_map_.try_emplace(fields_it->second, host);
+          UNREFERENCED_PARAMETER(iterator);
           if (!did_insert) {
             // Two hosts with the same metadata value were found. Ignore all but one of them, and
             // set a metric for how many times this happened.
@@ -623,7 +625,8 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
       first = false;
     }
 
-    buf << it.first << "=" << MessageUtil::getJsonStringFromMessage(it.second);
+    const ProtobufWkt::Value& value = it.second;
+    buf << it.first << "=" << MessageUtil::getJsonStringFromMessageOrDie(value);
   }
 
   return buf.str();

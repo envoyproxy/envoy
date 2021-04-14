@@ -134,6 +134,10 @@ envoy_cc_test(
         # Used in createDnsResolver to force creation of DnsResolverImpl when running test on macOS.
         "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
     ],
+    # TODO(envoyproxy/windows-dev): Under winsock2 this is behaving unusually for windows, even as
+    # 127.0.0.1 and ::1 are explicitly added to `c:\windows\system32\drivers\etc\hosts` ... see:
+    # https://gist.github.com/wrowe/24fe5b93b58bb444bce7ecc134905395
+    tags = ["fails_on_clang_cl"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
@@ -286,10 +290,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "udp_listener_impl_batch_writer_test",
     srcs = ["udp_listener_impl_batch_writer_test.cc"],
-    tags = [
-        # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
-        "skip_on_windows",
-    ],
+    # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
+    tags = ["skip_on_windows"],
     deps = [
         ":udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
@@ -298,8 +300,8 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
+        "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_lib",
         "//test/common/network:listener_impl_test_base_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
@@ -383,8 +385,10 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -445,6 +449,16 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:filter_state_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "win32_redirect_records_option_test",
+    srcs = ["win32_redirect_records_option_test.cc"],
+    deps = [
+        ":socket_option_test",
+        "//source/common/network:address_lib",
+        "//source/common/network:win32_redirect_records_option_lib",
     ],
 )
 

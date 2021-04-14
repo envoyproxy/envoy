@@ -8,11 +8,12 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
+#include "common/config/utility.h"
 #include "common/formatter/substitution_format_string.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
@@ -20,10 +21,9 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 
-AccessLog::InstanceSharedPtr
-FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                              AccessLog::FilterPtr&& filter,
-                                              Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::CommonFactoryContext& context) {
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());
@@ -35,8 +35,9 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
     } else {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
-      sff_config.set_text_format(fal_config.format());
-      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+      sff_config.mutable_text_format_source()->set_inline_string(fal_config.format());
+      formatter =
+          Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context.api());
     }
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
@@ -47,11 +48,13 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       kTypedJsonFormat: {
     envoy::config::core::v3::SubstitutionFormatString sff_config;
     *sff_config.mutable_json_format() = fal_config.typed_json_format();
-    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+    formatter =
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context.api());
     break;
   }
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kLogFormat:
-    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(),
+                                                                          context.api());
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       ACCESS_LOG_FORMAT_NOT_SET:
@@ -59,7 +62,8 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     break;
   }
 
-  return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
+  return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
                                          context.accessLogManager());
 }
 

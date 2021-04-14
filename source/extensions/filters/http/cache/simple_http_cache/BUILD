@@ -15,6 +15,7 @@ envoy_cc_extension(
     name = "simple_http_cache_lib",
     srcs = ["simple_http_cache.cc"],
     hdrs = ["simple_http_cache.h"],
+    category = "envoy.filters.http",
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     status = "wip",
     deps = [

@@ -5,7 +5,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "udpa/core/v1/collection_entry.pb.h"
+#include "xds/core/v3/collection_entry.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -52,7 +52,7 @@ public:
                                       DurationUtil::durationToMilliseconds(resource.ttl())))
                                 : absl::nullopt) {}
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
-                      const udpa::core::v1::CollectionEntry::InlineEntry& inline_entry)
+                      const xds::core::v3::CollectionEntry::InlineEntry& inline_entry)
       : DecodedResourceImpl(resource_decoder, inline_entry.name(),
                             Protobuf::RepeatedPtrField<std::string>(), inline_entry.resource(),
                             true, inline_entry.version(), absl::nullopt) {}

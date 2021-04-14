@@ -98,6 +98,8 @@ public:
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
@@ -112,6 +114,8 @@ public:
     cluster_.set_name("cluster_0");
     cluster_.set_type(envoy::config::cluster::v3::Cluster::EDS);
     auto* eds_cluster_config = cluster_.mutable_eds_cluster_config();
+    eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
     eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
     if (http_active_hc) {
       auto* health_check = cluster_.add_health_checks();
@@ -178,8 +182,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
 
   // We need to do a bunch of work to get a hold of second hc connection.
   FakeHttpConnectionPtr fake_upstream_connection;
-  auto result = fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, fake_upstream_connection, TestUtility::DefaultTimeout, max_request_headers_kb_);
+  auto result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection);
   RELEASE_ASSERT(result, result.message());
 
   FakeStreamPtr upstream_request;
@@ -345,7 +348,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
                            .prioritySet();
 
   // Keep track of how many times we're seeing a member update callback.
-  priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
     // We should see both hosts present in the member update callback.
     EXPECT_EQ(2, hosts_added.size());
     member_update_count++;

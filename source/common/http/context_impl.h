@@ -27,10 +27,14 @@ public:
   }
 
   const UserAgentContext& userAgentContext() const override { return user_agent_context_; }
+  const Stats::StatName& asyncClientStatPrefix() const override {
+    return async_client_stat_prefix_;
+  }
 
 private:
   CodeStatsImpl code_stats_;
   UserAgentContext user_agent_context_;
+  const Stats::StatName async_client_stat_prefix_;
   envoy::config::trace::v3::Tracing default_tracing_config_;
 };
 

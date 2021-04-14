@@ -47,6 +47,14 @@ config:
   signout_path:
     path:
       exact: /signout
+  auth_scopes:
+  - user
+  - openid
+  - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
     )EOF";
 
   OAuth2Config factory;
@@ -87,12 +95,21 @@ config:
   signout_path:
     path:
       exact: /signout
+  auth_scopes:
+  - user
+  - openid
+  - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
     )EOF";
 
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   Server::Configuration::MockFactoryContext context;
+  context.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
   auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();

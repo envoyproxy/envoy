@@ -24,3 +24,6 @@ Extensions
   upstream/upstream
   wasm/wasm
   watchdog/watchdog
+  descriptors/descriptors
+  request_id/request_id
+  http/header_formatters

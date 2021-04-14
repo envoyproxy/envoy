@@ -31,9 +31,9 @@ envoy_cc_library(
     name = "wasm_hdr",
     hdrs = [
         "context.h",
+        "plugin.h",
         "wasm.h",
         "wasm_extension.h",
-        "wasm_state.h",
         "wasm_vm.h",
     ],
     visibility = ["//visibility:public"],
@@ -45,9 +45,11 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_object",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
         "//source/common/version:version_includes",
+        "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/http:well_known_names",
         "@com_google_cel_cpp//eval/public:activation",
@@ -58,30 +60,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "wasm_interoperation_lib",
-    srcs = [
-        "wasm_state.cc",
-    ],
-    hdrs = [
-        "wasm_state.h",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//include/envoy/stream_info:filter_state_interface",
-        "//source/common/protobuf",
-        "//source/common/singleton:const_singleton",
-        "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_cel_cpp//eval/public:cel_value",
-        "@com_google_cel_cpp//eval/public/structs:cel_proto_wrapper",
-        "@com_google_cel_cpp//tools:flatbuffers_backed_impl",
-    ],
-)
-
-envoy_cc_library(
     name = "wasm_lib",
     srcs = [
         "context.cc",
         "foreign.cc",
+        "plugin.cc",
         "wasm.cc",
         "wasm_extension.cc",
         "wasm_vm.cc",
@@ -95,13 +78,13 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":wasm_hdr",
-        ":wasm_interoperation_lib",
         ":wasm_runtime_factory_interface",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",
         "//include/envoy/server:lifecycle_notifier_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:safe_memcpy_lib",
         "//source/common/config:remote_data_fetcher_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",

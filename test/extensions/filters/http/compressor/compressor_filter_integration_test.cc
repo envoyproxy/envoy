@@ -25,6 +25,38 @@ public:
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
 
+  void doCompressedRequest(Http::TestRequestHeaderMapImpl&& request_headers,
+                           Http::TestResponseHeaderMapImpl&& response_headers) {
+    uint64_t response_content_length;
+    uint64_t request_content_length;
+    ASSERT_TRUE(absl::SimpleAtoi(request_headers.get_("content-length"), &request_content_length));
+    ASSERT_TRUE(
+        absl::SimpleAtoi(response_headers.get_("content-length"), &response_content_length));
+    const Buffer::OwnedImpl expected_request{std::string(request_content_length, 'a')};
+    auto response = sendRequestAndWaitForResponse(request_headers, request_content_length,
+                                                  response_headers, response_content_length);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+              upstream_request_->headers()
+                  .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                  ->value()
+                  .getStringView());
+    EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
+              upstream_request_->headers().getTransferEncodingValue());
+    EXPECT_GT(upstream_request_->bodyLength(), 0U);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+    ASSERT_EQ(response_content_length, response->body().size());
+    EXPECT_EQ(response->body(), std::string(response_content_length, 'a'));
+
+    Buffer::OwnedImpl decompressed_request{};
+    const Buffer::OwnedImpl compressed_request{upstream_request_->body()};
+    decompressor_.decompress(compressed_request, decompressed_request);
+    ASSERT_EQ(request_content_length, decompressed_request.length());
+    EXPECT_TRUE(TestUtility::buffersEqual(expected_request, decompressed_request));
+  }
+
   void doRequestAndCompression(Http::TestRequestHeaderMapImpl&& request_headers,
                                Http::TestResponseHeaderMapImpl&& response_headers) {
     uint64_t content_length;
@@ -70,11 +102,26 @@ public:
       name: compressor
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-        disable_on_etag_header: true
-        content_length: 100
-        content_type:
-          - text/html
-          - application/json
+        response_direction_config:
+          disable_on_etag_header: true
+          remove_accept_encoding_header: false
+          common_config:
+            enabled:
+              default_value: true
+              runtime_key: foo_key
+            min_content_length: 100
+            content_type:
+              - text/html
+              - application/json
+        request_direction_config:
+          common_config:
+            enabled:
+              default_value: true
+              runtime_key: enable_requests
+            min_content_length: 100
+            content_type:
+              - text/html
+              - application/json
         compressor_library:
           name: testlib
           typed_config:
@@ -327,4 +374,20 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigVaryHeader) {
   ASSERT_EQ("Cookie, Accept-Encoding",
             response->headers().get(Http::CustomHeaders::get().Vary)[0]->value().getStringView());
 }
+
+/**
+ * Exercises gzip request compression with full configuration.
+ */
+TEST_P(CompressorIntegrationTest, CompressedRequestAcceptanceFullConfigTest) {
+  initializeFilter(full_config);
+  doCompressedRequest(Http::TestRequestHeaderMapImpl{{":method", "PUT"},
+                                                     {":path", "/test/long/url"},
+                                                     {":scheme", "http"},
+                                                     {":authority", "host"},
+                                                     {"content-length", "256"}},
+                      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                      {"content-length", "10"},
+                                                      {"content-type", "application/json"}});
+}
+
 } // namespace Envoy

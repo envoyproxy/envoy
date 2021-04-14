@@ -24,24 +24,18 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
   }
 
   const auto& verify_san_list = options.verifySubjectAltNameListOverride();
-  if (!verify_san_list.empty()) {
-    for (const auto& san : verify_san_list) {
-      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(san), key);
-    }
+  for (const auto& san : verify_san_list) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(san), key);
   }
 
   const auto& alpn_list = options.applicationProtocolListOverride();
-  if (!alpn_list.empty()) {
-    for (const auto& protocol : alpn_list) {
-      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
-    }
+  for (const auto& protocol : alpn_list) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
   }
 
   const auto& alpn_fallback = options.applicationProtocolFallback();
-  if (!alpn_fallback.empty()) {
-    for (const auto& protocol : alpn_fallback) {
-      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
-    }
+  for (const auto& protocol : alpn_fallback) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
   }
 
   // Proxy protocol options should only be included in the hash if the upstream

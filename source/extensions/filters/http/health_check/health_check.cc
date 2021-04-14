@@ -104,7 +104,11 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::ResponseHeaderM
     }
 
     headers.setEnvoyUpstreamHealthCheckedCluster(context_.localInfo().clusterName());
-  } else if (context_.healthCheckFailed()) {
+  }
+
+  if (context_.healthCheckFailed() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster")) {
     headers.setReferenceEnvoyImmediateHealthCheckFail(
         Http::Headers::get().EnvoyImmediateHealthCheckFailValues.True);
   }
@@ -135,7 +139,7 @@ void HealthCheckFilter::onComplete() {
         details = &RcDetails::get().HealthCheckClusterHealthy;
         const std::string& cluster_name = item.first;
         const uint64_t min_healthy_percentage = static_cast<uint64_t>(item.second);
-        auto* cluster = clusterManager.get(cluster_name);
+        auto* cluster = clusterManager.getThreadLocalCluster(cluster_name);
         if (cluster == nullptr) {
           // If the cluster does not exist at all, consider the service unhealthy.
           final_status = Http::Code::ServiceUnavailable;

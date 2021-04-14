@@ -13,25 +13,9 @@
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
-
-// These are defined in envoy/router/router.h, however during certain cases the compiler is
-// refusing to use the header version so allocate space here.
-const uint32_t RetryPolicy::RETRY_ON_5XX;
-const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
-const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
-const uint32_t RetryPolicy::RETRY_ON_ENVOY_RATE_LIMITED;
-const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
-const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
-const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
-const uint32_t RetryPolicy::RETRY_ON_RESET;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::RequestHeaderMap& request_headers,
@@ -52,12 +36,10 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   request_headers.removeEnvoyRetryOn();
   request_headers.removeEnvoyRetryGrpcOn();
   request_headers.removeEnvoyMaxRetries();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consume_all_retry_headers")) {
-    request_headers.removeEnvoyHedgeOnPerTryTimeout();
-    request_headers.removeEnvoyRetriableHeaderNames();
-    request_headers.removeEnvoyRetriableStatusCodes();
-    request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
-  }
+  request_headers.removeEnvoyHedgeOnPerTryTimeout();
+  request_headers.removeEnvoyRetriableHeaderNames();
+  request_headers.removeEnvoyRetriableStatusCodes();
+  request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
 
   return ret;
 }

@@ -98,7 +98,7 @@ Set a key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py set foo bar
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py set foo bar
   setf foo to bar
 
 
@@ -106,21 +106,21 @@ Get a key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py get foo
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py get foo
   bar
 
 Modify an existing key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py set foo baz
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py set foo baz
   setf foo to baz
 
 Get the modified key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py get foo
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py get foo
   baz
 
 In the running docker-compose container, you should see the gRPC service printing a record of its activity:

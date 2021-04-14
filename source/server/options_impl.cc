@@ -147,10 +147,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg cpuset_threads(
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
-  TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
-                                              "Use fake symbol table implementation", false, false,
-                                              "bool", cmd);
-
   TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
                                                   "Comma-separated list of extensions to disable",
                                                   false, "", "string", cmd);
@@ -160,20 +156,24 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   TCLAP::ValueArg<std::string> socket_mode("", "socket-mode", "Socket file permission", false,
                                            "600", "string", cmd);
+  TCLAP::SwitchArg enable_core_dump("", "enable-core-dump", "Enable core dumps", cmd, false);
 
   cmd.setExceptionHandling(false);
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
-  } catch (TCLAP::ArgException& e) {
-    try {
-      cmd.getOutput()->failure(cmd, e);
-    } catch (const TCLAP::ExitException&) {
+  }
+  END_TRY
+  catch (TCLAP::ArgException& e) {
+    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
+    END_TRY
+    catch (const TCLAP::ExitException&) {
       // failure() has already written an informative message to stderr, so all that's left to do
       // is throw our own exception with the original message.
       throw MalformedArgvException(e.what());
     }
-  } catch (const TCLAP::ExitException& e) {
+  }
+  catch (const TCLAP::ExitException& e) {
     // parse() throws an ExitException with status 0 after printing the output for --help and
     // --version.
     throw NoServingException();
@@ -181,11 +181,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
-  fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
-  if (fake_symbol_table_enabled_) {
-    ENVOY_LOG(warn, "Fake symbol tables have been removed. Please remove references to "
-                    "--use-fake-symbol-table");
-  }
+  core_dump_enabled_ = enable_core_dump.getValue();
 
   cpuset_threads_ = cpuset_threads.getValue();
 
@@ -423,8 +419,8 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
       parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
       mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
-      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false),
-      socket_path_("@envoy_domain_socket"), socket_mode_(0) {}
+      mutex_tracing_enabled_(false), cpuset_threads_(false), socket_path_("@envoy_domain_socket"),
+      socket_mode_(0) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

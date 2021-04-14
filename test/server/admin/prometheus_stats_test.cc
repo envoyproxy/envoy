@@ -91,7 +91,7 @@ protected:
     EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::AllocatorImpl alloc_;
   Stats::StatNamePool pool_;
   std::vector<Stats::CounterSharedPtr> counters_;

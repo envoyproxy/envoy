@@ -29,7 +29,7 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEvent();
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   internal_ = std::make_unique<Internal>(&server);
 }
 

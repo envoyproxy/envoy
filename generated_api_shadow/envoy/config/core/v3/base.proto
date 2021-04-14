@@ -9,10 +9,12 @@ import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/semantic_version.proto";
 
 import "google/protobuf/any.proto";
-import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/core/v3/context_params.proto";
+
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -132,7 +134,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
 
@@ -161,6 +163,13 @@ message Node {
   // Opaque metadata extending the node identifier. Envoy will pass this
   // directly to the management server.
   google.protobuf.Struct metadata = 3;
+
+  // Map from xDS resource type URL to dynamic context parameters. These may vary at runtime (unlike
+  // other fields in this message). For example, the xDS client may have a shard identifier that
+  // changes during the lifetime of the xDS client. In Envoy, this would be achieved by updating the
+  // dynamic context on the Server::Instance's LocalInfo context provider. The shard ID dynamic
+  // parameter then appears in this field during future discovery requests.
+  map<string, xds.core.v3.ContextParams> dynamic_parameters = 12;
 
   // Locality specifying where the Envoy instance is running.
   Locality locality = 4;
@@ -192,9 +201,11 @@ message Node {
   // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
   // if there is a listener bound to port 80, the list can optionally contain the
   // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
-  repeated Address listening_addresses = 11 [deprecated = true];
+  repeated Address listening_addresses = 11
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  string hidden_envoy_deprecated_build_version = 5 [deprecated = true];
+  string hidden_envoy_deprecated_build_version = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
@@ -329,10 +340,10 @@ message DataSource {
     string filename = 1 [(validate.rules).string = {min_len: 1}];
 
     // Bytes inlined in the configuration.
-    bytes inline_bytes = 2 [(validate.rules).bytes = {min_len: 1}];
+    bytes inline_bytes = 2;
 
     // String inlined in the configuration.
-    string inline_string = 3 [(validate.rules).string = {min_len: 1}];
+    string inline_string = 3;
   }
 }
 
@@ -396,7 +407,8 @@ message TransportSocket {
   oneof config_type {
     google.protobuf.Any typed_config = 3;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 }
 

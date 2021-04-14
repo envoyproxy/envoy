@@ -18,10 +18,12 @@
 #include "envoy/tracing/http_tracer_manager.h"
 
 #include "common/common/logger.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/json/json_loader.h"
 #include "common/local_reply/local_reply.h"
 #include "common/router/rds_impl.h"
@@ -105,7 +107,9 @@ public:
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
-  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
+    return request_id_extension_;
+  }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -169,7 +173,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
-  bool shouldStripMatchingPort() const override { return strip_matching_port_; }
+  Http::StripPortType stripPortType() const override { return strip_port_type_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;
@@ -209,6 +213,7 @@ private:
   Http::ConnectionManagerStats stats_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
   const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
@@ -221,6 +226,7 @@ private:
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   Filter::Http::FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
@@ -250,7 +256,7 @@ private:
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
-  const bool strip_matching_port_;
+  Http::StripPortType strip_port_type_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;

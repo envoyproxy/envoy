@@ -1,0 +1,17 @@
+version: "3.7"
+services:
+
+  vrp:
+    build:
+      context: .
+      dockerfile: Dockerfile-vrp
+    environment:
+      ENVOY_EDGE_EXTRA_ARGS: ""
+      ENVOY_ORIGIN_EXTRA_ARGS: ""
+    networks:
+      - envoymesh
+    ports:
+      - "10000:10000"
+
+networks:
+  envoymesh: {}

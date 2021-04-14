@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
@@ -28,11 +29,13 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 
   return [proto_config, &context, timeout,
+          transport_version =
+              Config::Utility::getAndCheckTransportVersion(proto_config.rate_limit_service()),
           filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(
         filter_config, Filters::Common::RateLimit::rateLimitClient(
                            context, proto_config.rate_limit_service().grpc_service(), timeout,
-                           proto_config.rate_limit_service().transport_api_version())));
+                           transport_version)));
   };
 }
 

@@ -21,6 +21,7 @@ use(
       "path": "api/envoy/",
       "label": "api",
       "github_status_label": "any API change",
+      "auto_assign": True,
     },
     {
       "owner": "envoyproxy/api-watchers",

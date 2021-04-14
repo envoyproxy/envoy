@@ -10,8 +10,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/tracing/trace_reason.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/assert.h"
@@ -80,8 +82,12 @@ enum ResponseFlag {
   NoFilterConfigFound = 0x200000,
   // Request or connection exceeded the downstream connection duration.
   DurationTimeout = 0x400000,
+  // Upstream response had an HTTP protocol error
+  UpstreamProtocolError = 0x800000,
+  // No cluster found for a given request.
+  NoClusterFound = 0x1000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DurationTimeout
+  LastFlag = NoClusterFound,
 };
 
 /**
@@ -106,9 +112,6 @@ struct ResponseCodeDetailValues {
   // to attempt a retry.
   const std::string RequestPayloadExceededRetryBufferLimit =
       "request_payload_exceeded_retry_buffer_limit";
-  // Envoy is doing non-streaming proxying, and the response payload exceeded
-  // configured limits.
-  const std::string ResponsePayloadTooLArge = "response_payload_too_large";
   // The per-stream keepalive timeout was exceeded.
   const std::string StreamIdleTimeout = "stream_idle_timeout";
   // The per-stream max duration timeout was exceeded.
@@ -235,6 +238,11 @@ public:
    * flags are accumulated.
    */
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
+
+  /**
+   * @param code the HTTP response code to set for this request.
+   */
+  virtual void setResponseCode(uint32_t code) PURE;
 
   /**
    * @param rc_details the response code details string to set for this request.
@@ -446,43 +454,9 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @param downstream_local_address sets the local address of the downstream connection. Note that
-   * it can be different than the local address of the upstream connection.
+   * @return the downstream address provider.
    */
-  virtual void setDownstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_local_address) PURE;
-
-  /**
-   * @return the downstream local address. Note that this will never be nullptr.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
-
-  /**
-   * @param downstream_direct_remote_address sets the direct physical address of downstream
-   * connection.
-   */
-  virtual void setDownstreamDirectRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) PURE;
-
-  /**
-   * @return the downstream directly connected address. This will never be nullptr. This is
-   * equivalent to the address of the physical connection.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr&
-  downstreamDirectRemoteAddress() const PURE;
-
-  /**
-   * @param downstream_remote_address sets the remote address of downstream connection.
-   */
-  virtual void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) PURE;
-
-  /**
-   * @return the downstream remote address. Note that this will never be nullptr. This may be
-   * equivalent to downstreamDirectRemoteAddress, unless the remote address is inferred from a
-   * proxy proto, x-forwarded-for, etc.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
+  virtual const Network::SocketAddressProvider& downstreamAddressProvider() const PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.
@@ -591,14 +565,25 @@ public:
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 
   /**
-   * @param utils The requestID utils implementation this stream uses
+   * @param provider The requestID provider implementation this stream uses.
    */
-  virtual void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) PURE;
+  virtual void
+  setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) PURE;
 
   /**
-   * @return A shared pointer to the request ID utils for this stream
+   * @return the request ID provider for this stream if available.
    */
-  virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
+  virtual const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const PURE;
+
+  /**
+   * Set the trace reason for the stream.
+   */
+  virtual void setTraceReason(Tracing::Reason reason) PURE;
+
+  /**
+   * @return the trace reason for the stream.
+   */
+  virtual Tracing::Reason traceReason() const PURE;
 
   /**
    * @return Connection ID of the downstream connection, or unset if not available.
@@ -609,6 +594,16 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
+
+  /**
+   * @param filter_chain_name Network filter chain name of the downstream connection.
+   */
+  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
+
+  /**
+   * @return Network filter chain name of the downstream connection.
+   */
+  virtual const std::string& filterChainName() const PURE;
 };
 
 } // namespace StreamInfo

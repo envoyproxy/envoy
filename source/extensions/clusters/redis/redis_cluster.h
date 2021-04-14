@@ -14,14 +14,14 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/http/codec.h"
@@ -95,7 +95,7 @@ namespace Redis {
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
-               const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
+               const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
@@ -114,10 +114,13 @@ public:
       values[1].asString() = "SLOTS";
       asArray().swap(values);
     }
+
     static ClusterSlotsRequest instance_;
   };
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  TimeSource& timeSource() const { return time_source_; }
 
 private:
   friend class RedisClusterTest;
@@ -145,7 +148,8 @@ private:
   class RedisHost : public Upstream::HostImpl {
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary)
+              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
+              TimeSource& time_source)
         : Upstream::HostImpl(
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -153,7 +157,8 @@ private:
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),
-              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status(),
+              time_source),
           primary_(primary) {}
 
     bool isPrimary() const { return primary_; }
@@ -285,7 +290,7 @@ private:
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                                envoy::config::cluster::redis::RedisClusterConfig> {
+                                envoy::extensions::clusters::redis::v3::RedisClusterConfig> {
 public:
   RedisClusterFactory()
       : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Redis) {}
@@ -296,7 +301,7 @@ private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
-      const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
+      const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;

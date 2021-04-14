@@ -11,14 +11,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_basic_cc_library(
-    name = "printers_includes",
-    hdrs = ["printers.h"],
-    deps = [
-        "//include/envoy/network:address_interface",
-    ],
-)
-
 envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
@@ -87,8 +79,9 @@ envoy_cc_test_library(
 envoy_cc_library(
     name = "printers_lib",
     srcs = ["printers.cc"],
+    hdrs = ["printers.h"],
     deps = [
-        ":printers_includes",
+        "//include/envoy/network:address_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
     ],
@@ -117,6 +110,8 @@ envoy_cc_test_library(
     ],
     deps = [
         ":file_system_for_test_lib",
+        ":logging_lib",
+        ":printers_lib",
         ":resources_lib",
         ":test_time_lib",
         ":thread_factory_for_test_lib",
@@ -133,6 +128,7 @@ envoy_cc_test_library(
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -306,7 +302,6 @@ envoy_cc_test_library(
     hdrs = ["wasm_base.h"],
     deps = [
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/common/wasm:wasm_interoperation_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
@@ -326,4 +321,12 @@ envoy_basic_cc_library(
     name = "test_version_linkstamp",
     srcs = ["test_version_linkstamp.cc"],
     alwayslink = 1,
+)
+
+envoy_cc_test_library(
+    name = "delegating_route_utility_lib",
+    srcs = ["delegating_route_utility.h"],
+    deps = [
+        "//source/common/router:delegating_route_lib",
+    ],
 )

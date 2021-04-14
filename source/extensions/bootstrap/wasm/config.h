@@ -34,37 +34,37 @@ private:
 };
 
 using WasmServicePtr = std::unique_ptr<WasmService>;
-using CreateWasmServiceCallback = std::function<void(WasmServicePtr)>;
 
-class WasmFactory : public Server::Configuration::BootstrapExtensionFactory,
-                    Logger::Loggable<Logger::Id::wasm> {
+class WasmFactory : public Server::Configuration::BootstrapExtensionFactory {
 public:
   ~WasmFactory() override = default;
   std::string name() const override { return "envoy.bootstrap.wasm"; }
-  void createWasm(const envoy::extensions::wasm::v3::WasmService& config,
-                  Server::Configuration::ServerFactoryContext& context,
-                  CreateWasmServiceCallback&& cb);
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::wasm::v3::WasmService>();
   }
-
-private:
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
-class WasmServiceExtension : public Server::BootstrapExtension {
+class WasmServiceExtension : public Server::BootstrapExtension, Logger::Loggable<Logger::Id::wasm> {
 public:
+  WasmServiceExtension(const envoy::extensions::wasm::v3::WasmService& config,
+                       Server::Configuration::ServerFactoryContext& context)
+      : config_(config), context_(context) {}
   WasmService& wasmService() {
     ASSERT(wasm_service_ != nullptr);
     return *wasm_service_;
   }
+  void onServerInitialized() override;
 
 private:
+  void createWasm(Server::Configuration::ServerFactoryContext& context);
+
+  envoy::extensions::wasm::v3::WasmService config_;
+  Server::Configuration::ServerFactoryContext& context_;
   WasmServicePtr wasm_service_;
-  friend class WasmFactory;
+  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 } // namespace Wasm

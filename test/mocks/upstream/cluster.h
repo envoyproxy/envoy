@@ -24,6 +24,8 @@ public:
   MOCK_METHOD(void, initialize, (std::function<void()> callback));
   MOCK_METHOD(InitializePhase, initializePhase, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
+  MOCK_METHOD(PrioritySet&, prioritySet, ());
+  MOCK_METHOD(const PrioritySet&, prioritySet, (), (const));
 
   std::shared_ptr<MockClusterInfo> info_{new ::testing::NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;

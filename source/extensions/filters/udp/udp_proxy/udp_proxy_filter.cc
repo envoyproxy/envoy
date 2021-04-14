@@ -14,7 +14,8 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
-  Upstream::ThreadLocalCluster* cluster = config->clusterManager().get(config->cluster());
+  Upstream::ThreadLocalCluster* cluster =
+      config->clusterManager().getThreadLocalCluster(config->cluster());
   if (cluster != nullptr) {
     onClusterAddOrUpdate(*cluster);
   }
@@ -74,7 +75,6 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
           })) {}
 
 UdpProxyFilter::ClusterInfo::~ClusterInfo() {
-  member_update_cb_handle_->remove();
   // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
   // not a performance critical path.
   while (!sessions_.empty()) {
@@ -221,7 +221,7 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
-      packets_dropped);
+      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     cluster_.cluster_stats_.sess_rx_errors_.inc();

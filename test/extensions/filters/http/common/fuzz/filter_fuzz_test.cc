@@ -48,6 +48,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
   try {
     // Catch invalid header characters.
     TestUtility::validate(input);
+    ENVOY_LOG_MISC(debug, "Filter configuration: {}", input.config().DebugString());
     // Fuzz filter.
     static UberFilterFuzzer fuzzer;
     fuzzer.fuzz(input.config(), input.data(), input.upstream_data());

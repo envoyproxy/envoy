@@ -6,6 +6,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/interval_value.h"
+
 namespace Envoy {
 namespace Random {
 
@@ -50,13 +52,13 @@ public:
   /**
    * @return a random boolean value, with probability `p` equaling true.
    */
-  bool bernoulli(float p) {
-    if (p <= 0) {
+  bool bernoulli(UnitFloat p) {
+    if (p == UnitFloat::min()) {
       return false;
-    } else if (p >= 1) {
+    } else if (p == UnitFloat::max()) {
       return true;
     }
-    return random() < static_cast<result_type>(p * static_cast<float>(max()));
+    return random() < static_cast<result_type>(p.value() * static_cast<float>(max()));
   }
 };
 

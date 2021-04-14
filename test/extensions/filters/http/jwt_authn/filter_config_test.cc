@@ -168,7 +168,7 @@ rules:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   // Make sure that the thread callbacks are not invoked inline.
-  server_context.thread_local_.defer_data = true;
+  server_context.thread_local_.defer_data_ = true;
   {
     // Scope in all the things that the filter depends on, so they are destroyed as we leave the
     // scope.

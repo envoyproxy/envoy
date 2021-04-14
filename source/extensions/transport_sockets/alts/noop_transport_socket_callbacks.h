@@ -25,7 +25,7 @@ public:
   /*
    * No-op for these two methods to hold back the callbacks.
    */
-  void setReadBufferReady() override {}
+  void setTransportSocketIsReadable() override {}
   void raiseEvent(Network::ConnectionEvent) override {}
   void flushWriteBuffer() override {}
 

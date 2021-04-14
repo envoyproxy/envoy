@@ -7,11 +7,11 @@ actions {
   }
 }
 actions {
-  prefetch {
+  preconnect {
   }
 }
 actions {
-  prefetch {
+  preconnect {
   }
 }
 actions {

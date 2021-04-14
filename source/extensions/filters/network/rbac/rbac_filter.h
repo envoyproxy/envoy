@@ -31,6 +31,14 @@ public:
       const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
+  std::string shadowEffectivePolicyIdField() const {
+    return shadow_rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField;
+  }
+  std::string shadowEngineResultField() const {
+    return shadow_rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
+  }
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
@@ -44,9 +52,10 @@ public:
 
 private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
+  const std::string shadow_rules_stat_prefix_;
 
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
   const envoy::extensions::filters::network::rbac::v3::RBAC::EnforcementType enforcement_type_;
 };
 

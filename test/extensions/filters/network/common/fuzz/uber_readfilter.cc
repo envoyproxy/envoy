@@ -73,6 +73,13 @@ void UberFilterFuzzer::fuzzerSetup() {
   ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.test_key.thrift_filter_enabled", 100))
       .WillByDefault(Return(true));
+
+  // Bring back old behavior where any thread local cluster lookup returns a default cluster.
+  // TODO(mattklein123): This should not be required and we should be able to test different
+  // variations here, however the fuzz test fails without this change and the overall change is
+  // large enough as it is so this will be revisited.
+  ON_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
 }
 
 UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTimeSystem()) {

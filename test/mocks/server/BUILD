@@ -182,6 +182,7 @@ envoy_cc_mock(
         "//include/envoy/server:instance_interface",
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
+        "//source/common/router:context_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
@@ -224,6 +225,7 @@ envoy_cc_mock(
     srcs = ["factory_context.cc"],
     hdrs = ["factory_context.h"],
     deps = [
+        "//source/common/router:context_lib",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:overload_manager_mocks",
@@ -278,6 +280,7 @@ envoy_cc_mock(
     hdrs = ["filter_chain_factory_context.h"],
     deps = [
         "//include/envoy/server:filter_config_interface",
+        "//source/common/router:context_lib",
         "//test/mocks/server:factory_context_mocks",
     ],
 )

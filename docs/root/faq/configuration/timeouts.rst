@@ -28,8 +28,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
   field in the HTTP connection manager configuration. To modify the idle timeout for upstream
   connections use the
-  :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field
-  in the cluster configuration.
+  :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>` field in the Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, keyed by `envoy.extensions.upstreams.http.v3.HttpProtocolOptions`
 
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
 
@@ -63,10 +62,10 @@ context request/stream is interchangeable.
   recommended for all requests (not just streaming requests/responses) as it additionally defends
   against an HTTP/2 peer that does not open stream window once an entire response has been buffered
   to be sent to a downstream client.
-* The HTTP protocol :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` 
-  is defined in a generic message used by the HTTP connection manager. The max stream duration is the 
-  maximum time that a stream's lifetime will span. You can use this functionality when you want to reset 
-  HTTP request/response streams periodically. You can't use :ref:`request_timeout 
+* The HTTP protocol :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`
+  is defined in a generic message used by the HTTP connection manager. The max stream duration is the
+  maximum time that a stream's lifetime will span. You can use this functionality when you want to reset
+  HTTP request/response streams periodically. You can't use :ref:`request_timeout
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_timeout>`
   in this situation because this timer will be disarmed if a response header is received on the request/response streams.
   This timeout is available on both upstream and downstream connections.

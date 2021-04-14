@@ -1,5 +1,7 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
+#include "extensions/request_id/uuid/config.h"
+
 using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
@@ -12,15 +14,16 @@ namespace Http {
 HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
     : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
-          access_log_path_, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-          log_manager_)}},
+          Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
+          Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                       POOL_HISTOGRAM(fake_stats_))},
              "", fake_stats_),
 
       listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
-      request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
+      request_id_extension_(
+          Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_)),
       local_reply_(LocalReply::Factory::createDefault()) {
 
   ON_CALL(route_config_provider_, lastUpdated())
@@ -53,14 +56,16 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
   server_name_ = server_name;
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
-  ON_CALL(overload_manager_.overload_state_, createScaledTimer_)
+  ON_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_)
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
-  filter_callbacks_.connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443);
-  filter_callbacks_.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_
+      ->setDirectRemoteAddressForTest(std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());
@@ -88,11 +93,11 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
   // NOTE: The length/repetition in this routine allows InSequence to work correctly in an outer
   // scope.
   for (int i = 0; i < num_decoder_filters * num_requests; i++) {
-    decoder_filters_.push_back(new MockStreamDecoderFilter());
+    decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
   }
 
   for (int i = 0; i < num_encoder_filters * num_requests; i++) {
-    encoder_filters_.push_back(new MockStreamEncoderFilter());
+    encoder_filters_.push_back(new NiceMock<MockStreamEncoderFilter>());
   }
 
   InSequence s;

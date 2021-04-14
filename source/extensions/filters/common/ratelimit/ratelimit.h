@@ -35,6 +35,7 @@ enum class LimitStatus {
 using DescriptorStatusList =
     std::vector<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>;
 using DescriptorStatusListPtr = std::unique_ptr<DescriptorStatusList>;
+using DynamicMetadataPtr = std::unique_ptr<ProtobufWkt::Struct>;
 
 /**
  * Async callbacks used during limit() calls.
@@ -44,12 +45,21 @@ public:
   virtual ~RequestCallbacks() = default;
 
   /**
-   * Called when a limit request is complete. The resulting status,
-   * response headers and request headers to be forwarded to the upstream are supplied.
+   * Called when a limit request is complete. The resulting status, response headers
+   * and request headers to be forwarded to the upstream are supplied.
+   *
+   * @status The ratelimit status
+   * @descriptor_statuses The descriptor statuses
+   * @response_headers_to_add The headers to add to the downstream response, for non-OK statuses
+   * @request_headers_to_add The headers to add to the upstream request, if not ratelimited
+   * @response_body The response body to use for the downstream response, for non-OK statuses. May
+   * contain non UTF-8 values (e.g. binary data).
    */
   virtual void complete(LimitStatus status, DescriptorStatusListPtr&& descriptor_statuses,
                         Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                        Http::RequestHeaderMapPtr&& request_headers_to_add) PURE;
+                        Http::RequestHeaderMapPtr&& request_headers_to_add,
+                        const std::string& response_body,
+                        DynamicMetadataPtr&& dynamic_metadata) PURE;
 };
 
 /**

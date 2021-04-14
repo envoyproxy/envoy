@@ -30,11 +30,14 @@ public:
   }
 
   void initialize() override {
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
-      accesslog_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*accesslog_cluster);
     });
 
     config_helper_.addConfigModifier(
@@ -104,8 +107,7 @@ public:
     }
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
-    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
-                                        /*ignore_repeated_field_ordering=*/false));
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
 
@@ -123,10 +125,12 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
@@ -146,9 +150,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -169,9 +174,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -217,9 +223,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:

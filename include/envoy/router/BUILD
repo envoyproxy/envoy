@@ -9,6 +9,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "context_interface",
+    hdrs = ["context.h"],
+)
+
+envoy_cc_library(
     name = "rds_interface",
     hdrs = ["rds.h"],
     deps = [
@@ -92,7 +97,6 @@ envoy_cc_library(
     hdrs = ["router_ratelimit.h"],
     deps = [
         "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

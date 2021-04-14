@@ -44,7 +44,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::TestUtil::TestStore global_store_;
   Stats::TestUtil::TestStore cluster_scope_;
   Http::CodeStatsImpl code_stats_;

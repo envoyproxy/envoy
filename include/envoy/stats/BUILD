@@ -66,7 +66,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_macros",
     hdrs = ["stats_macros.h"],
-    deps = [":stats_interface"],
+    deps = [
+        ":stats_interface",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
+    ],
 )
 
 envoy_cc_library(

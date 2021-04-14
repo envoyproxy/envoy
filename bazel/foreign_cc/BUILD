@@ -79,6 +79,7 @@ configure_make(
 envoy_cmake_external(
     name = "ares",
     cache_entries = {
+        "CARES_BUILD_TOOLS": "no",
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
         "CMAKE_CXX_COMPILER_FORCED": "on",
@@ -91,8 +92,8 @@ envoy_cmake_external(
         "//conditions:default": [],
     }),
     postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/nameser.h $INSTALLDIR/include/nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_dns.h $INSTALLDIR/include/ares_dns.h",
-        "//conditions:default": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/nameser.h $INSTALLDIR/include/nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//conditions:default": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
     }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
@@ -126,6 +127,8 @@ envoy_cmake_external(
         "CURL_CA_PATH": "none",
         "CMAKE_USE_OPENSSL": "off",
         "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
+        # Avoid libidn2
+        "USE_LIBIDN2": "off",
         # NGHTTP2.
         "USE_NGHTTP2": "on",
         "NGHTTP2_LIBRARY": "$EXT_BUILD_DEPS/nghttp2",
@@ -290,6 +293,7 @@ envoy_cmake_external(
             "libLLVMTextAPI.a",
         ],
     }),
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -338,6 +342,7 @@ envoy_cmake_external(
             "libWAVMUnwind.a",
         ],
     }),
+    tags = ["skip_on_windows"],
     deps = [":llvm"],
 )
 

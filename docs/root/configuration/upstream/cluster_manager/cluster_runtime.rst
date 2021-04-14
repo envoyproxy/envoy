@@ -48,12 +48,12 @@ outlier_detection.consecutive_local_origin_failure
   setting in outlier detection
 
 outlier_detection.interval_ms
-  :ref:`interval_ms
+  :ref:`interval
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`
   setting in outlier detection
 
 outlier_detection.base_ejection_time_ms
-  :ref:`base_ejection_time_ms
+  :ref:`base_ejection_time
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>`
   setting in outlier detection
 
@@ -127,6 +127,11 @@ outlier_detection.failure_percentage_threshold
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.failure_percentage_threshold>`
   setting in outlier detection
 
+outlier_detection.max_ejection_time_ms
+  :ref:`max_ejection_time
+  <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>`
+  setting in outlier detection
+
 Core
 ----
 
@@ -135,8 +140,8 @@ upstream.healthy_panic_threshold
   Defaults to 50%.
 
 upstream.use_http2
-  Whether the cluster utilizes the *http2* :ref:`protocol options <envoy_v3_api_field_config.cluster.v3.Cluster.http2_protocol_options>`
-  if configured. Set to 0 to disable HTTP/2 even if the feature is configured. Defaults to enabled.
+  Whether the cluster utilizes the *http2* if configured in `HttpProtocolOptions <envoy_v3_msg_config.upstreams.http.v3.HttpProtocolOptions>`.
+  Set to 0 to disable HTTP/2 even if the feature is configured. Defaults to enabled.
 
 .. _config_cluster_manager_cluster_runtime_zone_routing:
 

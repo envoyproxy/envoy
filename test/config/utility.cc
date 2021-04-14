@@ -9,6 +9,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/codec.h"
@@ -33,13 +34,18 @@ namespace Envoy {
 std::string ConfigHelper::baseConfig() {
   return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 dynamic_resources:
   lds_config:
+    resource_api_version: V3
     path: {}
 static_resources:
   secrets:
@@ -75,7 +81,11 @@ static_resources:
 std::string ConfigHelper::baseUdpListenerConfig() {
   return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -115,6 +125,27 @@ std::string ConfigHelper::tcpProxyConfig() {
 )EOF");
 }
 
+std::string ConfigHelper::startTlsConfig() {
+  return absl::StrCat(
+      tcpProxyConfig(),
+      fmt::format(R"EOF(
+      transport_socket:
+        name: "starttls"
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          cleartext_socket_config:
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+                certificate_chain:
+                  filename: {}
+                private_key:
+                  filename: {}
+)EOF",
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
+}
+
 std::string ConfigHelper::tlsInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
@@ -122,7 +153,10 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::httpProxyConfig() {
+std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
+  if (downstream_use_quic) {
+    return quicHttpProxyConfig();
+  }
   return absl::StrCat(baseConfig(), fmt::format(R"EOF(
     filter_chains:
       filters:
@@ -190,7 +224,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
               domains: "*"
             name: route_config_0
     udp_listener_config:
-      udp_listener_name: "quiche_quic_listener"
+      quic_options: {{}}
 )EOF",
                                                            Platform::null_device_path));
 }
@@ -245,14 +279,16 @@ typed_config:
 )EOF";
 }
 
-// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
-//               work restores it here.
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
   return fmt::format(
       R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -262,14 +298,19 @@ dynamic_resources:
     resource_api_version: V3
     api_config_source:
       api_type: {}
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      set_node_on_first_message_only: false
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_cds_cluster
       endpoints:
@@ -315,7 +356,13 @@ static_resources:
 
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::adsBootstrap(const std::string& api_type,
-                                       envoy::config::core::v3::ApiVersion api_version) {
+                                       envoy::config::core::v3::ApiVersion resource_api_version,
+                                       envoy::config::core::v3::ApiVersion transport_api_version) {
+  // We use this to allow tests to default to having a single API version but override and make
+  // the transport/resource API version distinction when needed.
+  if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO) {
+    transport_api_version = resource_api_version;
+  }
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
@@ -325,8 +372,9 @@ dynamic_resources:
     resource_api_version: {1}
     ads: {{}}
   ads_config:
-    transport_api_version: {1}
+    transport_api_version: {2}
     api_type: {0}
+    set_node_on_first_message_only: true
 static_resources:
   clusters:
     name: dummy_cluster
@@ -343,15 +391,25 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 0
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
 admin:
-  access_log_path: {2}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{3}"
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type, api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     api_type,
+                     resource_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     transport_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
                      Platform::null_device_path);
 }
 
@@ -372,7 +430,11 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                   address: {}
                   port_value: {}
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {{}}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {{}}
     )EOF",
                                                                                  name, name,
                                                                                  address, port));
@@ -391,7 +453,11 @@ ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy
           resource_api_version: {}
           ads: {{}}
       lb_policy: {}
-      http2_protocol_options: {{}}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {{}}
     )EOF",
                                         name, apiVersionStr(api_version), lb_policy),
                             cluster, shouldBoost(api_version));
@@ -420,7 +486,11 @@ ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_pol
               trusted_ca:
                 filename: {}
       lb_policy: {}
-      http2_protocol_options: {{}}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {{}}
     )EOF",
                   name, apiVersionStr(api_version),
                   TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"),
@@ -497,13 +567,13 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
                                envoy::config::core::v3::ApiVersion api_version) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
-      name: {}
+      name: "{}"
       virtual_hosts:
       - name: integration
         domains: ["*"]
         routes:
         - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
+          route: {{ cluster: "{}" }}
     )EOF",
                                         name, cluster),
                             route, shouldBoost(api_version));
@@ -579,18 +649,30 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
 
 void ConfigHelper::setConnectConfig(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
-    bool terminate_connect) {
+    bool terminate_connect, bool allow_post) {
   auto* route_config = hcm.mutable_route_config();
   ASSERT_EQ(1, route_config->virtual_hosts_size());
   auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
   auto* match = route->mutable_match();
   match->Clear();
-  match->mutable_connect_matcher();
+
+  if (allow_post) {
+    match->set_prefix("/");
+
+    auto* header = match->add_headers();
+    header->set_name(":method");
+    header->set_exact_match("POST");
+  } else {
+    match->mutable_connect_matcher();
+  }
 
   if (terminate_connect) {
     auto* upgrade = route->mutable_route()->add_upgrade_configs();
     upgrade->set_upgrade_type("CONNECT");
-    upgrade->mutable_connect_config();
+    auto* config = upgrade->mutable_connect_config();
+    if (allow_post) {
+      config->set_allow_post(true);
+    }
   }
 
   hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
@@ -602,6 +684,56 @@ void ConfigHelper::applyConfigModifiers() {
     config_modifier(bootstrap_);
   }
   config_modifiers_.clear();
+}
+
+void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
+  addConfigModifier([use_alpn, http3](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+
+    if (use_alpn) {
+      ConfigHelper::HttpProtocolOptions new_protocol_options;
+
+      HttpProtocolOptions old_protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      protocol_options.MergeFrom(old_protocol_options);
+
+      new_protocol_options = old_protocol_options;
+      new_protocol_options.clear_explicit_http_config();
+      new_protocol_options.mutable_auto_config();
+      if (old_protocol_options.explicit_http_config().has_http_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http_protocol_options());
+      } else if (old_protocol_options.explicit_http_config().has_http2_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http2_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http2_protocol_options());
+      }
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(new_protocol_options);
+    }
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    auto* validation_context =
+        tls_context.mutable_common_tls_context()->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    // The test certs are for *.lyft.com, so make sure SNI matches.
+    tls_context.set_sni("foo.lyft.com");
+    if (http3) {
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+      envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
+      quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
+      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+    } else {
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+    }
+  });
 }
 
 void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
@@ -619,12 +751,28 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
 }
 
 void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.reloadable_features.enable_deprecated_v2_api", "true");
+  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
   addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
-void ConfigHelper::setNewCodecs() {
-  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "true");
+void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
+                                      HttpProtocolOptions& protocol_options) {
+  if (cluster.typed_extension_protocol_options().contains(
+          "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+    HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+        (*cluster.mutable_typed_extension_protocol_options())
+            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    protocol_options.MergeFrom(old_options);
+  }
+  (*cluster.mutable_typed_extension_protocol_options())
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+          .PackFrom(protocol_options);
+}
+
+void ConfigHelper::setHttp2(envoy::config::cluster::v3::Cluster& cluster) {
+  HttpProtocolOptions protocol_options;
+  protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+  setProtocolOptions(cluster, protocol_options);
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
@@ -812,6 +960,17 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   }
 }
 
+void ConfigHelper::setListenerSendBufLimits(uint32_t limit) {
+  RELEASE_ASSERT(!finalized_, "");
+  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* options = listener->add_socket_options();
+  options->set_description("SO_SNDBUF");
+  options->set_level(SOL_SOCKET);
+  options->set_int_value(limit);
+  options->set_name(SO_SNDBUF);
+}
+
 void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeout) {
   addConfigModifier(
       [timeout](
@@ -918,7 +1077,26 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view format) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+      quic_transport_socket_config;
+  auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
+  ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
+                              *tls_context->mutable_common_tls_context());
+  for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
+    if (listener.udp_listener_config().has_quic_options()) {
+      ASSERT(listener.filter_chains_size() > 0);
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* transport_socket = filter_chain->mutable_transport_socket();
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+      listener.set_reuse_port(reuse_port);
+    }
+  }
+}
+
+bool ConfigHelper::setAccessLog(
+    const std::string& filename, absl::string_view format,
+    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters) {
   if (getFilterFromListener("http") == nullptr) {
     return false;
   }
@@ -928,7 +1106,15 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->set_text_format(absl::StrCat(format, "\n"));
+    auto* log_format = access_log_config.mutable_log_format();
+    log_format->mutable_text_format_source()->set_inline_string(absl::StrCat(format, "\n"));
+    if (!formatters.empty()) {
+      for (const auto& formatter : formatters) {
+        auto* added_formatter = log_format->add_formatters();
+        added_formatter->set_name(formatter.name());
+        added_formatter->mutable_typed_config()->PackFrom(formatter.typed_config());
+      }
+    }
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -943,7 +1129,8 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   }
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->set_text_format(std::string(format));
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        std::string(format));
   }
   access_log_config.set_path(filename);
   bootstrap_.mutable_static_resources()
@@ -961,10 +1148,15 @@ void ConfigHelper::initializeTls(
   common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
   auto* validation_context = common_tls_context.mutable_validation_context();
-  validation_context->mutable_trusted_ca()->set_filename(
-      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  validation_context->add_verify_certificate_hash(
-      options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+  if (options.custom_validator_config_) {
+    validation_context->set_allocated_custom_validator_config(options.custom_validator_config_);
+  } else {
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    validation_context->add_verify_certificate_hash(
+        options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
+  }
+  validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
@@ -992,6 +1184,10 @@ void ConfigHelper::initializeTls(
       tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
+  }
+  if (!options.san_matchers_.empty()) {
+    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
+                                                              options.san_matchers_.end()};
   }
 }
 
@@ -1045,27 +1241,25 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
   }
 }
 
+void ConfigHelper::addBootstrapExtension(const std::string& config) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* extension = bootstrap_.add_bootstrap_extensions();
+  TestUtility::loadFromYaml(config, *extension);
+}
+
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_filter = getFilterFromListener("http");
-  if (hcm_filter) {
-    auto* config = hcm_filter->mutable_typed_config();
-    hcm = MessageUtil::anyConvert<
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
-        *config);
-    return true;
-  }
-  return false;
+  return loadFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::storeHttpConnectionManager(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_config_any = getFilterFromListener("http")->mutable_typed_config();
-
-  hcm_config_any->PackFrom(hcm);
+  return storeFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
@@ -1095,7 +1289,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
 
   const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
-      "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
+      "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
   TestEnvironment::renameFile(file, lds_filename);
 }
 
@@ -1120,11 +1314,13 @@ void ConfigHelper::setUpstreamOutboundFramesLimits(uint32_t max_all_frames,
                                                    uint32_t max_control_frames) {
   addConfigModifier(
       [max_all_frames, max_control_frames](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        auto* static_resources = bootstrap.mutable_static_resources();
-        auto* cluster = static_resources->mutable_clusters(0);
-        auto* http_protocol_options = cluster->mutable_http2_protocol_options();
+        ConfigHelper::HttpProtocolOptions protocol_options;
+        auto* http_protocol_options =
+            protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
         http_protocol_options->mutable_max_outbound_frames()->set_value(max_all_frames);
         http_protocol_options->mutable_max_outbound_control_frames()->set_value(max_control_frames);
+        ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                         protocol_options);
       });
 }
 

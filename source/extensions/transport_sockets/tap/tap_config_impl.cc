@@ -29,12 +29,12 @@ PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
 }
 
 void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v3::Connection& connection) {
-  if (connection_.localAddress() != nullptr) {
+  if (connection_.addressProvider().localAddress() != nullptr) {
     // Local address might not be populated before a client connection is connected.
-    Network::Utility::addressToProtobufAddress(*connection_.localAddress(),
+    Network::Utility::addressToProtobufAddress(*connection_.addressProvider().localAddress(),
                                                *connection.mutable_local_address());
   }
-  Network::Utility::addressToProtobufAddress(*connection_.remoteAddress(),
+  Network::Utility::addressToProtobufAddress(*connection_.addressProvider().remoteAddress(),
                                              *connection.mutable_remote_address());
 }
 
