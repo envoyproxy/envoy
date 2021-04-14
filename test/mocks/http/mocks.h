@@ -394,6 +394,7 @@ public:
   MOCK_METHOD(FilterTrailersStatus, decodeTrailers, (RequestTrailerMap & trailers));
   MOCK_METHOD(FilterMetadataStatus, decodeMetadata, (Http::MetadataMap & metadata_map));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
+  MOCK_METHOD(void, decodeComplete, ());
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
@@ -405,6 +406,7 @@ public:
   MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, (), (const));
   MOCK_METHOD(FilterMetadataStatus, encodeMetadata, (MetadataMap & metadata_map));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (StreamEncoderFilterCallbacks & callbacks));
+  MOCK_METHOD(void, encodeComplete, ());
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
