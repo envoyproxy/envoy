@@ -49,7 +49,7 @@ public:
   // Too many trailers were sent
   static constexpr absl::string_view too_many_trailers = "http3.too_many_trailers";
   // Too many headers were sent.
-  static constexpr absl::string_view too_many_http_headers = "http3.too_many_http_headers";
+  static constexpr absl::string_view too_many_headers = "http3.too_many_headers";
 };
 
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
@@ -74,7 +74,7 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
   auto headers = T::create();
   for (const auto& entry : header_list) {
     if (max_headers_allowed == 0) {
-      details = Http3ResponseCodeDetailValues::too_many_http_headers;
+      details = Http3ResponseCodeDetailValues::too_many_headers;
       return nullptr;
     }
     max_headers_allowed--;
