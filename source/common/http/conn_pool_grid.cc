@@ -240,11 +240,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   if (is_http3_broken_) {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", describePool(**pool),
               host_->hostname());
+    // Since HTTP/3 is broken, presumably both pools have already been created so this
+    // is just to be safe.
     createNextPool();
     pool = ++pool;
   }
-  // TODO(#15649) track pools with successful connections: don't always start at
-  // the front of the list.
   auto wrapped_callback = std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
