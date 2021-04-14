@@ -1,7 +1,7 @@
 def _genrule_repository(ctx):
     ctx.download_and_extract(
         ctx.attr.urls,
-        "",  # output
+        ctx.attr.output,  # output
         ctx.attr.sha256,
         "",  # type
         ctx.attr.strip_prefix,
@@ -55,6 +55,7 @@ genrule_repository = repository_rule(
             mandatory = True,
             allow_single_file = [".BUILD"],
         ),
+        "output": attr.string(),
     },
     implementation = _genrule_repository,
 )

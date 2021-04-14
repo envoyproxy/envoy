@@ -17,4 +17,8 @@ def load_repository_locations_spec(repository_locations_spec):
             if "strip_prefix" in location:
                 mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
             mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
+
+        # output is a combination of key and the last part of the first url.
+        # This is to avoid conflicts.
+        mutable_location["output"] = "-".join([key, mutable_location["urls"][0].split("/")[-1]])
     return locations
