@@ -709,7 +709,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
 
 // Validate that a listener update should fail if the subscribed extension configuration make filter
 // terminal but the filter position is not at the last position at filter chain.
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotFit) {
+TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilterChain) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", false, false);
   initialize();

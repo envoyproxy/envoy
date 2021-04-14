@@ -486,6 +486,29 @@ filter_chains:
       "filter in a network filter chain.");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, NotTerminalLast) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: envoy.filters.network.tcp_proxy
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+      stat_prefix: tcp
+      cluster: cluster
+  - name: unknown_but_will_not_be_processed
+    typed_config: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "Error: terminal filter named envoy.filters.network.tcp_proxy of type "
+      "envoy.filters.network.tcp_proxy must be the last filter in a network filter chain.");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
   const std::string yaml = R"EOF(
 address:
@@ -531,29 +554,6 @@ private:
     return [](Network::FilterManager&) -> void {};
   }
 };
-
-TEST_F(ListenerManagerImplWithRealFiltersTest, NotTerminalLast) {
-  TestStatsConfigFactory filter;
-  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
-
-  const std::string yaml = R"EOF(
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-filter_chains:
-- filters:
-  - name: stats_test
-    typed_config: {}
-  - name: unknown_but_will_not_be_processed
-    typed_config: {}
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                          EnvoyException,
-                          "Error: terminal filter named stats_test of type "
-                          "stats_test must be the last filter in a network filter chain.");
-}
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
   TestStatsConfigFactory filter;
