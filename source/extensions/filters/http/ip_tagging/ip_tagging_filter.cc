@@ -171,10 +171,10 @@ ValueSetWatcher::yamlFileContentsAsValueSet_(std::string contents) const {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   YAML::Node data = YAML::Load(contents);
 
-  for (YAML::const_iterator it = data.begin(); it != data.end(); ++it) {
-    std::string ip_tag_name = it["ip_tag_name"].as<std::string>();
+  for (std::size_t i=0;i<data.size();i++) {
+    std::string ip_tag_name = data[i]["ip_tag_name"].as<std::string>();
     std::vector<Network::Address::CidrRange> tag_list =
-        it["ip_tags"].as<std::vector<Network::Address::CidrRange>>();
+        data[i]["ip_tags"].as<std::vector<Network::Address::CidrRange>>();
     tag_data.emplace_back(ip_tag_name, tag_list);
   }
   return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
