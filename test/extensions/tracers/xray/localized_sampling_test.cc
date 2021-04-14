@@ -37,7 +37,7 @@ TEST_F(LocalizedSamplingStrategyTest, EmptyRulesDefaultRate) {
   NiceMock<Random::MockRandomGenerator> random_generator;
   LocalizedSamplingStrategy strategy{"{{}", random_generator, time_system_};
   ASSERT_TRUE(strategy.usingDefaultManifest());
-  ASSERT_EQ(strategy.defaultManifest().defaultRule().rate(), 0.05);
+  ASSERT_EQ(strategy.defaultManifest().defaultRuleRate(), 0.05);
 }
 
 TEST_F(LocalizedSamplingStrategyTest, ValidCustomRules) {

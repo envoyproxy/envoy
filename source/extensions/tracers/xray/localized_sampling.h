@@ -121,6 +121,11 @@ public:
   LocalizedSamplingRule& defaultRule() { return default_rule_; }
 
   /**
+   * @return default sampling rule's sampling rate. Mainly for unit testing purposes.
+   */
+  double defaultRuleRate() const { return default_rule_.rate(); }
+
+  /**
    * @return the user-defined sampling rules
    */
   std::vector<LocalizedSamplingRule>& customRules() { return custom_rules_; }
@@ -158,7 +163,7 @@ public:
   /**
    * @return the default manifest. Mainly for unit testing purposes.
    */
-  LocalizedSamplingManifest& defaultManifest() { return default_manifest_; }
+  const LocalizedSamplingManifest& defaultManifest() const { return default_manifest_; }
 
 private:
   bool shouldTrace(LocalizedSamplingRule& rule);

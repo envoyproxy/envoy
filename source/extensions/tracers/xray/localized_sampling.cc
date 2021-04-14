@@ -10,6 +10,7 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
+// DefaultRate=0.05 corresponds to 5% sampling rate when no custom rules are applied
 constexpr double DefaultRate = 0.05;
 constexpr int DefaultFixedTarget = 1;
 constexpr int SamplingFileVersion = 2;
