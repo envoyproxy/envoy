@@ -466,6 +466,9 @@ end of all checks.
 Just like with `Runner` a help menu is automatically created, and you can add custom arguments if
 required.
 
+Also like `Runner`, any added `Checker` classes are expected to have unit tests, and a `pytest_mychecker` bazel target
+is automatically added. With the above example, the test file should be located at `tools/sometools/tests/test_mychecker.py`.
+
 One key difference with the `Checker` tools and its derivatives is that it expects a `path` either specified
 with `--path` or as an argument. This is used as a context (for example the Envoy src directory) for
 running the checks.
