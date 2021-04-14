@@ -191,6 +191,43 @@ TEST_P(WasmHttpFilterTest, AllHeadersAndTrailers) {
   filter().onDestroy();
 }
 
+TEST_P(WasmHttpFilterTest, AddTrailers) {
+  setupTest("", "headers");
+  setupFilter();
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody data")))).Times(2);
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+  EXPECT_THAT(request_headers.get_("newheader"), Eq("newheadervalue"));
+  EXPECT_THAT(request_headers.get_("server"), Eq("envoy-wasm"));
+
+  Buffer::OwnedImpl data("data");
+  Http::TestRequestTrailerMapImpl request_trailers{};
+  EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, false));
+  EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(request_trailers));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+  EXPECT_THAT(request_trailers.get_("newtrailer"), Eq("request"));
+
+  Http::TestResponseHeaderMapImpl response_headers{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().encodeHeaders(response_headers, false));
+  EXPECT_THAT(response_headers.get_("test-status"), Eq("OK"));
+
+  Http::TestResponseTrailerMapImpl response_trailers{};
+  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, false));
+  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(response_trailers));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, true));
+  EXPECT_THAT(response_trailers.get_("newtrailer"), Eq("response"));
+
+  filter().onDestroy();
+}
+
 TEST_P(WasmHttpFilterTest, AllHeadersAndTrailersNotStarted) {
   setupTest("", "headers");
   setupFilter();
@@ -224,7 +261,10 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersAndBody) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
   EXPECT_FALSE(filter().endOfStream(proxy_wasm::WasmStreamType::Request));
   Buffer::OwnedImpl data("hello");
+  Http::TestRequestTrailerMapImpl request_trailers{};
+  EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(request_trailers));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+  EXPECT_THAT(request_trailers.get_("newtrailer"), Eq("request"));
   filter().onDestroy();
 }
 

@@ -1,4 +1,4 @@
-use log::{trace, debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use proxy_wasm::traits::{Context, HttpContext};
 use proxy_wasm::types::*;
 
@@ -49,15 +49,25 @@ impl HttpContext for TestStream {
         action
     }
 
-    fn on_http_request_body(&mut self, body_size: usize, _: bool) -> Action {
+    fn on_http_request_body(&mut self, body_size: usize, end_of_stream: bool) -> Action {
         if let Some(body) = self.get_http_request_body(0, body_size) {
             error!("onBody {}", String::from_utf8(body).unwrap());
+        }
+        if end_of_stream {
+            self.add_http_request_trailer("newtrailer", "request");
         }
         Action::Continue
     }
 
     fn on_http_response_headers(&mut self, _: usize) -> Action {
         self.set_http_response_header("test-status", Some("OK"));
+        Action::Continue
+    }
+
+    fn on_http_response_body(&mut self, _: usize, end_of_stream: bool) -> Action {
+        if end_of_stream {
+            self.add_http_response_trailer("newtrailer", "response");
+        }
         Action::Continue
     }
 
