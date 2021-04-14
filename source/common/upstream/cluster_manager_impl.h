@@ -382,17 +382,15 @@ private:
 
   /** A thread-local on-demand cluster discovery manager. It takes care of invoking the discovery
    *  callbacks in the event of a finished discovery. It does it by installing a cluster lifecycle
-   *  callback that invokes the discovery callbacks when a matching cluster just got added. If there
-   *  is no pending cluster discovery in the thread, it removes the cluster lifecycle callback.
+   *  callback that invokes the discovery callbacks when a matching cluster just got added.
    */
-  class ClusterDiscoveryManager {
+  class ClusterDiscoveryManager : Logger::Loggable<Logger::Id::upstream> {
   public:
     ClusterDiscoveryManager(ThreadLocalClusterManagerImpl& parent);
 
     /**
      * Invoke the callbacks for the given cluster name. The discovery status is passed to the
-     * callbacks. After invoking the callbacks, they are dropped from the manager. This may also
-     * result in a deferred removal of the life-cycle callback.
+     * callbacks. After invoking the callbacks, they are dropped from the manager.
      */
     void processClusterName(const std::string& name, ClusterDiscoveryStatus cluster_status);
 
@@ -434,10 +432,6 @@ private:
     };
 
     /**
-     * Install a cluster lifecycle callback if it wasn't yet installed.
-     */
-    void ensureLifecycleCallbacksAreInstalled();
-    /**
      * Drops a callback from under the iterator from the manager without invoking the callback.
      */
     void erase(const std::string& name, CallbackListIterator it);
@@ -446,17 +440,11 @@ private:
      * whether the dropped callback was a last one for the given cluster.
      */
     bool eraseFromList(const std::string& name, CallbackListIterator it);
-    /**
-     * Posts a callback to worker's dispatcher to drop the cluster lifecycle callbacks. Posting this
-     * action is to avoid dropping the callbacks from the callback list while iterating it.
-     */
-    void maybePostResetCallbacks();
 
     ThreadLocalClusterManagerImpl& parent_;
     absl::flat_hash_map<std::string, CallbackList> pending_clusters_;
     ClusterUpdateCallbacksHandlePtr callbacks_handle_;
     std::unique_ptr<ClusterUpdateCallbacks> callbacks_;
-    bool callbacks_handle_cleanup_posted_ = false;
   };
 
   /**
@@ -572,6 +560,7 @@ private:
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
                                                   bool allocate = false);
+    ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;

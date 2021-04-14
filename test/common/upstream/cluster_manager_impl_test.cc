@@ -173,17 +173,9 @@ public:
     create(defaultConfig());
     odcds_ = MockOdCdsApi::create();
     odcds_handle_ = cluster_manager_->createOdCdsApiHandle(odcds_);
-    // These tmp things are kept to keep the cluster lifecycle callback,
-    // because mock would cause the callback to be removed while
-    // iterating the list of those callbacks.
-    tmp_cb_ = std::make_shared<ClusterDiscoveryCallback>([](ClusterDiscoveryStatus) {});
-    EXPECT_CALL(*odcds_, updateOnDemand("cluster_tmp"));
-    tmp_handle_ = odcds_handle_->requestOnDemandClusterDiscovery("cluster_tmp", tmp_cb_, timeout_);
   }
 
   void TearDown() override {
-    tmp_cb_.reset();
-    tmp_handle_.reset();
     odcds_.reset();
     odcds_handle_.reset();
     factory_.tls_.shutdownThread();
@@ -209,8 +201,6 @@ public:
 
   MockOdCdsApiSharedPtr odcds_;
   OdCdsApiHandlePtr odcds_handle_;
-  ClusterDiscoveryCallbackSharedPtr tmp_cb_;
-  ClusterDiscoveryCallbackHandlePtr tmp_handle_;
   std::chrono::milliseconds timeout_ = std::chrono::milliseconds(5000);
 };
 

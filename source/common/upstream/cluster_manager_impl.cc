@@ -1025,7 +1025,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
-  return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
+  return cluster_manager.addClusterUpdateCallbacks(cb);
 }
 
 namespace {
@@ -1048,16 +1048,16 @@ private:
 
 ClusterManagerImpl::ClusterDiscoveryManager::ClusterDiscoveryManager(
     ThreadLocalClusterManagerImpl& parent)
-    : parent_(parent) {}
-
-void ClusterManagerImpl::ClusterDiscoveryManager::ensureLifecycleCallbacksAreInstalled() {
-  if (callbacks_handle_) {
-    return;
-  }
+    : parent_(parent) {
   callbacks_ = std::make_unique<ClusterCallbacks>([this](ThreadLocalCluster& cluster) {
+    ENVOY_LOG(trace,
+              "cm cdm: starting processing cluster name {} (status {}) from cluster lifecycle "
+              "callback in {}",
+              cluster.info()->name(), enumToInt(ClusterDiscoveryStatus::Available),
+              parent_.thread_local_dispatcher_.name());
     processClusterName(cluster.info()->name(), ClusterDiscoveryStatus::Available);
   });
-  callbacks_handle_ = parent_.parent_.addThreadLocalClusterUpdateCallbacks(*callbacks_);
+  callbacks_handle_ = parent.addClusterUpdateCallbacks(*callbacks_);
 }
 
 void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(
@@ -1068,22 +1068,25 @@ void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(
   // of removing an item from the list while iterating the list.
   auto map_node_handle = pending_clusters_.extract(name);
   if (map_node_handle.empty()) {
+    ENVOY_LOG(trace, "cm cdm: no callbacks for the cluster name {} in {}", name,
+              parent_.thread_local_dispatcher_.name());
     return;
   }
+  ENVOY_LOG(trace, "cm cdm: invoking {} callbacks for the cluster name {} in {}",
+            map_node_handle.mapped().size(), name, parent_.thread_local_dispatcher_.name());
   for (const auto& weak_callback : map_node_handle.mapped()) {
     auto callback = weak_callback.lock();
     if (callback != nullptr) {
       (*callback)(cluster_status);
     }
   }
-  maybePostResetCallbacks();
 }
 
 ClusterManagerImpl::ClusterDiscoveryManager::Pair
 ClusterManagerImpl::ClusterDiscoveryManager::addCallback(
     const std::string& name, const ClusterDiscoveryCallbackSharedPtr& callback) {
-  ensureLifecycleCallbacksAreInstalled();
-
+  ENVOY_LOG(trace, "cm cdm: adding callback for the cluster name {} in {}", name,
+            parent_.thread_local_dispatcher_.name());
   auto& callbacks_list = pending_clusters_[name];
   auto it = callbacks_list.emplace(callbacks_list.end(), callback);
   auto handle = std::make_unique<ClusterDiscoveryCallbackHandleImpl>(*this, name, it);
@@ -1093,36 +1096,28 @@ ClusterManagerImpl::ClusterDiscoveryManager::addCallback(
 
 void ClusterManagerImpl::ClusterDiscoveryManager::erase(const std::string& name,
                                                         CallbackListIterator it) {
+  ENVOY_LOG(trace, "cm cdm: dropping callback for the cluster name {} in ", name,
+            parent_.thread_local_dispatcher_.name());
   const bool drop_list = eraseFromList(name, it);
   if (drop_list) {
+    ENVOY_LOG(trace, "cm cdm: dropped last callback for the cluster name {} in {}", name,
+              parent_.thread_local_dispatcher_.name());
     pending_clusters_.erase(name);
   }
-  maybePostResetCallbacks();
 }
 
 bool ClusterManagerImpl::ClusterDiscoveryManager::eraseFromList(const std::string& name,
                                                                 CallbackListIterator it) {
   auto map_it = pending_clusters_.find(name);
   if (map_it == pending_clusters_.end()) {
+    ENVOY_LOG(trace,
+              "cm cdm: no callbacks for the cluster name {} found, no callbacks to remove in {}",
+              name, parent_.thread_local_dispatcher_.name());
     return false;
   }
   auto& list = map_it->second;
   list.erase(it);
   return list.empty();
-}
-
-void ClusterManagerImpl::ClusterDiscoveryManager::maybePostResetCallbacks() {
-  if (!callbacks_handle_cleanup_posted_ && pending_clusters_.empty()) {
-    parent_.thread_local_dispatcher_.post([this] {
-      // Something might got added in the meantime, so check the map again.
-      if (pending_clusters_.empty()) {
-        callbacks_handle_.reset();
-        callbacks_.reset();
-      }
-      callbacks_handle_cleanup_posted_ = false;
-    });
-    callbacks_handle_cleanup_posted_ = true;
-  }
 }
 
 OdCdsApiHandlePtr
@@ -1146,8 +1141,8 @@ ClusterDiscoveryCallbackHandlePtr ClusterManagerImpl::requestOnDemandClusterDisc
   if (discovery_in_progress) {
     ENVOY_LOG(debug,
               "cm odcds: on-demand discovery for cluster {} is already in progress, something else "
-              "in this thread has already requested it",
-              name);
+              "in thread {} has already requested it",
+              name, cluster_manager.thread_local_dispatcher_.name());
     // This worker thread has already requested a discovery of a cluster with this name, so nothing
     // more left to do here.
     return std::move(handle);
@@ -1164,16 +1159,14 @@ ClusterDiscoveryCallbackHandlePtr ClusterManagerImpl::requestOnDemandClusterDisc
     // Check for the cluster here too. It might have been added between the time when this closure
     // was posted and when it is being executed.
     if (getThreadLocalCluster(name) != nullptr) {
-      ENVOY_LOG(debug, "cm odcds: the requested cluster {} is already known", name);
-      if (weak_callback.expired()) {
-        ENVOY_LOG(debug, "cm odcds: callback expired");
-        // Not only the cluster was added, but it was also already handled, so don't bother with
-        // posting the callback back to the worker thread.
-        return;
-      }
-      thread_local_dispatcher.post([name, weak_callback] {
+      ENVOY_LOG(
+          debug,
+          "cm odcds: the requested cluster {} is already known, posting the callback back to {}",
+          name, thread_local_dispatcher.name());
+      thread_local_dispatcher.post([name, weak_callback, &thread_local_dispatcher] {
         if (auto callback = weak_callback.lock(); callback != nullptr) {
-          ENVOY_LOG(debug, "cm odcds: invoking callback on the already known cluster {}", name);
+          ENVOY_LOG(debug, "cm odcds: invoking callback on the already known cluster {} in {}",
+                    name, thread_local_dispatcher.name());
           // If this gets called here, it means that we requested a discovery of a cluster without
           // checking if that cluster is already known by cluster manager. The other situation we
           // get here can be when another thread was faster in requesting the discovery and handling
@@ -1210,6 +1203,11 @@ void ClusterManagerImpl::notifyExpiredDiscovery(const std::string& name) {
   ASSERT(!map_node_handle.empty());
   // Let all the worker threads know that the discovery timed out.
   tls_.runOnAllThreads([name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    ENVOY_LOG(
+        trace,
+        "cm cdm: starting processing cluster name {} (status {}) from the expired timer in {}",
+        name, enumToInt(ClusterDiscoveryStatus::Timeout),
+        cluster_manager->thread_local_dispatcher_.name());
     cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Timeout);
   });
 }
@@ -1491,6 +1489,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
   }
 
   return &container_iter->second;
+}
+
+ClusterUpdateCallbacksHandlePtr
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
+    ClusterUpdateCallbacks& cb) {
+  return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, update_callbacks_);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
