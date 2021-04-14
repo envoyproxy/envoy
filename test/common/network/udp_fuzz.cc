@@ -74,12 +74,9 @@ public:
     total_packets = provider.ConsumeIntegralInRange<uint16_t>(1, 15);
     sent_packets = 0;
     Network::Test::UdpSyncPeer client_(ip_version_);
-    // printf("Sending a total of %d\n", total_packets);
     for (uint16_t i = 0; i < total_packets; i++) {
-      // printf("Sending \n");
       std::string packet_ =
           provider.ConsumeBytesAsString(provider.ConsumeIntegralInRange<uint32_t>(1, 3000));
-      // printf("packet size: %lu\n", packet_.size());
       if (packet_.size() == 0) {
         packet_ = "EMPTY_PACKET";
       }
