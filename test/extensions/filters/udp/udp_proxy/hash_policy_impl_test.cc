@@ -1,3 +1,5 @@
+#include <string>
+
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 
 #include "common/common/hash.h"
@@ -50,6 +52,16 @@ public:
   const Network::Address::InstanceConstSharedPtr pipe_address_;
 };
 
+class HashPolicyImplKeyTest : public HashPolicyImplBaseTest {
+public:
+  HashPolicyImplKeyTest() : Key("key"), EmptyKey("") {}
+
+  void additionalSetup() override { hash_policy_config_->set_key(Key); }
+
+  const std::string Key;
+  const std::string EmptyKey;
+};
+
 // Check invalid policy type
 TEST_F(HashPolicyImplBaseTest, NotSupportedPolicy) {
   EXPECT_DEATH(setup(), ".*panic: not reached.*");
@@ -70,6 +82,26 @@ TEST_F(HashPolicyImplSourceIpTest, SourceIpWithUnixDomainSocketType) {
   setup();
 
   auto hash = hash_policy_->generateHash(*pipe_address_);
+
+  EXPECT_FALSE(hash.has_value());
+}
+
+// Check if generate correct hash
+TEST_F(HashPolicyImplKeyTest, KeyHash) {
+  setup();
+
+  auto generated_hash = HashUtil::xxHash64(Key);
+  auto hash = hash_policy_->generateHash(*peer_address_);
+
+  EXPECT_EQ(generated_hash, hash.value());
+}
+
+// Check that returns null hash in case of hash key has been changed to an empty string
+TEST_F(HashPolicyImplKeyTest, KeyWithEmptyString) {
+  setup();
+
+  hash_policy_config_->set_key(EmptyKey);
+  auto hash = hash_policy_->generateHash(*peer_address_);
 
   EXPECT_FALSE(hash.has_value());
 }
