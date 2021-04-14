@@ -115,7 +115,10 @@ public:
                             quic::QuicServerId("example.com", 443, false), &crypto_config_, nullptr,
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024),
-        http_connection_(envoy_quic_session_, http_connection_callbacks_) {
+        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
+                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
+        http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
+                         64 * 1024) {
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
     EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
@@ -178,6 +181,9 @@ protected:
   testing::StrictMock<Stats::MockGauge> read_current_;
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
+  Stats::IsolatedStoreImpl scope_;
+  Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   QuicHttpClientConnectionImpl http_connection_;
 };
 

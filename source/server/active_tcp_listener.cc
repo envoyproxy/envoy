@@ -12,8 +12,6 @@
 #include "common/network/utility.h"
 #include "common/stats/timespan_impl.h"
 
-#include "server/connection_handler_impl.h"
-
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -27,25 +25,6 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
   }
 }
 } // namespace
-
-void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
-  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-  ActiveConnections& active_connections = connection.active_connections_;
-  ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
-  parent_.dispatcher().deferredDelete(std::move(removed));
-  // Delete map entry only iff connections becomes empty.
-  if (active_connections.connections_.empty()) {
-    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
-    ASSERT(iter != connections_by_context_.end());
-    // To cover the lifetime of every single connection, Connections need to be deferred deleted
-    // because the previously contained connection is deferred deleted.
-    parent_.dispatcher().deferredDelete(std::move(iter->second));
-    // The erase will break the iteration over the connections_by_context_ during the deletion.
-    if (!is_deleting_) {
-      connections_by_context_.erase(iter);
-    }
-  }
-}
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config)
@@ -62,12 +41,6 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {
   config.connectionBalancer().registerHandler(*this);
-}
-
-void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
-  ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
-  ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
-  config_ = &config;
 }
 
 ActiveTcpListener::~ActiveTcpListener() {
@@ -97,6 +70,31 @@ ActiveTcpListener::~ActiveTcpListener() {
   // can revisit. This case, if it happens, should be benign on production builds. This case is
   // covered in ConnectionHandlerTest::RemoveListenerDuringRebalance.
   ASSERT(num_listener_connections_ == 0);
+}
+
+void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
+  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
+  ActiveConnections& active_connections = connection.active_connections_;
+  ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
+  parent_.dispatcher().deferredDelete(std::move(removed));
+  // Delete map entry only iff connections becomes empty.
+  if (active_connections.connections_.empty()) {
+    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+    ASSERT(iter != connections_by_context_.end());
+    // To cover the lifetime of every single connection, Connections need to be deferred deleted
+    // because the previously contained connection is deferred deleted.
+    parent_.dispatcher().deferredDelete(std::move(iter->second));
+    // The erase will break the iteration over the connections_by_context_ during the deletion.
+    if (!is_deleting_) {
+      connections_by_context_.erase(iter);
+    }
+  }
+}
+
+void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
+  ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
+  ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
+  config_ = &config;
 }
 
 void ActiveTcpSocket::onTimeout() {

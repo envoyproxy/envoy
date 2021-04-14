@@ -144,7 +144,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   upstream_request_->encodeData(response_data2, true);
 
   // Wait for frames to arrive downstream.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   // Assert that the total bytes received downstream equal the sum of the uncompressed byte buffers
   // sent.
@@ -264,7 +264,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   upstream_request_->encodeData(response_data2, true);
 
   // Wait for frames to arrive downstream.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());

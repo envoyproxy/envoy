@@ -6,6 +6,7 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/string_accessor_impl.h"
+#include "common/stream_info/uint32_accessor_impl.h"
 
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
@@ -55,6 +56,7 @@ public:
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
@@ -157,6 +159,10 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
                                        StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("uint32_accessor",
+                                       std::make_unique<StreamInfo::UInt32AccessorImpl>(42),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
                                        StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -184,6 +190,9 @@ common_properties:
     string_accessor:
       "@type": type.googleapis.com/google.protobuf.StringValue
       value: test_value
+    uint32_accessor:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+      value: 42
     serialized:
       "@type": type.googleapis.com/google.protobuf.Duration
       value: 10s

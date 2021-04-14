@@ -16,6 +16,7 @@
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/ext_proc/client.h"
+#include "extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -75,21 +76,6 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::PassThroughFilter,
                public ExternalProcessorCallbacks {
-  // The state of filter execution -- this is used to determine
-  // how to handle gRPC callbacks.
-  enum class FilterState {
-    // The filter is not waiting for anything, so any response on the
-    // gRPC stream is spurious and will result in the filter closing
-    // the stream.
-    Idle,
-    // The filter is waiting for a "request_headers" or a "response_headers" message.
-    // Any other response on the gRPC stream will be treated as spurious.
-    Headers,
-    // The filter is waiting for a "request_body" or "response_body" message.
-    // The body to modify is the filter's buffered body.
-    BufferedBody,
-  };
-
   // The result of an attempt to open the stream
   enum class StreamOpenState {
     // The stream was opened successfully
@@ -108,6 +94,8 @@ public:
         processing_mode_(config->processingMode()) {}
 
   void onDestroy() override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -128,32 +116,27 @@ public:
 
 private:
   StreamOpenState openStream();
-  void startMessageTimer(Event::TimerPtr& timer);
   void onMessageTimeout();
   void cleanUpTimers();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
-  bool
-  handleRequestHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
-  bool
-  handleResponseHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
-  bool handleRequestBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& response);
-  bool handleResponseBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& response);
+  Http::FilterHeadersStatus onHeaders(ProcessorState& state, Http::HeaderMap& headers,
+                                      bool end_stream);
+  Http::FilterDataStatus onData(
+      ProcessorState& state,
+      envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode::BodySendMode body_mode,
+      Buffer::Instance& data, bool end_stream);
 
-  void sendBodyChunk(bool request_path, const Buffer::Instance& data, bool end_stream);
+  void sendBodyChunk(const ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
 
-  // The state of the request-processing, or "decoding" side of the filter.
-  // We maintain separate states for encoding and decoding since they may
-  // be interleaved.
-  FilterState request_state_ = FilterState::Idle;
-
-  // The state of the response-processing side
-  FilterState response_state_ = FilterState::Idle;
+  // The state of the filter on both the encoding and decoding side.
+  DecodingProcessorState decoding_state_;
+  EncodingProcessorState encoding_state_;
 
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
@@ -168,20 +151,9 @@ private:
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
 
-  // The headers that we'll be expected to modify. They are set when
-  // received and reset to nullptr when they are no longer valid.
-  Http::RequestHeaderMap* request_headers_ = nullptr;
-  Http::ResponseHeaderMap* response_headers_ = nullptr;
-
   // The processing mode. May be locally overridden by any response,
   // So every instance of the filter has a copy.
   envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
-
-  // The timers that are used to manage per-message timeouts. Since the
-  // request and response paths run in parallel and can theoretically overlap,
-  // we need two timers.
-  Event::TimerPtr request_message_timer_;
-  Event::TimerPtr response_message_timer_;
 };
 
 } // namespace ExternalProcessing
