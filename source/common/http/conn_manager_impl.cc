@@ -971,8 +971,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     return;
   }
 
-  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
-                                               localPort());
+  auto optional_port = ConnectionManagerUtility::maybeNormalizeHost(
+      *request_headers_, connection_manager_.config_, localPort());
+  if (optional_port.has_value()) {
+    filter_manager_.streamInfo().setRemovedHostPort(optional_port.value());
+  }
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.

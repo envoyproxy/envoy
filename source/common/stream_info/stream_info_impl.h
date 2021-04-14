@@ -134,9 +134,13 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
 
+  absl::optional<uint32_t> removedHostPort() const override { return host_port_; }
+
   const absl::optional<std::string>& responseCodeDetails() const override {
     return response_code_details_;
   }
+
+  void setRemovedHostPort(uint32_t port) override { host_port_ = port; }
 
   void setResponseCode(uint32_t code) override { response_code_ = code; }
 
@@ -301,6 +305,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
+  absl::optional<uint32_t> host_port_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};

@@ -567,6 +567,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     request_headers_parser_->evaluateHeaders(headers, stream_info);
   }
 
+  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
+      stream_info.removedHostPort().has_value() &&
+      headers.getHostValue().find(":") == absl::string_view::npos) {
+    headers.setHost(
+        absl::StrCat(headers.getHostValue(), ":", stream_info.removedHostPort().value()));
+  }
+
   if (!host_rewrite_.empty()) {
     headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
