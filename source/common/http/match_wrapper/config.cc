@@ -99,7 +99,7 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
   MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
   auto match_tree =
-      Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(context, validation_visitor)
+      Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(prefix, context, validation_visitor)
           .create(proto_config.matcher());
 
   if (!validation_visitor.errors().empty()) {

@@ -383,6 +383,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("404", headers.getStatusValue());
@@ -424,6 +425,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
@@ -453,6 +455,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
         EXPECT_EQ(normalized_path, header_map.getPathValue());
@@ -1026,6 +1029,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
         EXPECT_EQ(normalized_host, header_map.getHostValue());
@@ -2039,6 +2043,7 @@ public:
     // codec stream error
     EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
         .WillOnce(Return(stream_error_on_invalid_http_message));
+    EXPECT_CALL(*filter, encodeComplete());
     EXPECT_CALL(*filter, encodeHeaders(_, true));
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {

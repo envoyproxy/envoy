@@ -179,6 +179,7 @@ proto_library(
         "//envoy/extensions/filters/http/buffer/v3:pkg",
         "//envoy/extensions/filters/http/cache/v3alpha:pkg",
         "//envoy/extensions/filters/http/cdn_loop/v3alpha:pkg",
+        "//envoy/extensions/filters/http/composite/v3:pkg",
         "//envoy/extensions/filters/http/compressor/v3:pkg",
         "//envoy/extensions/filters/http/cors/v3:pkg",
         "//envoy/extensions/filters/http/csrf/v3:pkg",
