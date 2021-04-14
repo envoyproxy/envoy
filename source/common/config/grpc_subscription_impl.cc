@@ -36,6 +36,7 @@ void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resourc
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
+  RELEASE_ASSERT(grpc_mux_ != nullptr, "grpc_mux_ initialized with null value");
   watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, options_);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and

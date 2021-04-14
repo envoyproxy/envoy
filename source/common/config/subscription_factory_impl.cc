@@ -86,6 +86,10 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
+    if (cm_.adsMux() == nullptr) {
+      throw EnvoyException(
+          "Sub-components (like SDS) of a primary cluster cannot be configured via ADS");
+    }
     return std::make_unique<GrpcSubscriptionImpl>(
         cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
         Utility::configSourceInitialFetchTimeout(config), true, options);

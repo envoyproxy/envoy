@@ -313,7 +313,6 @@ ClusterManagerImpl::ClusterManagerImpl(
       loadCluster(cluster, MessageUtil::hash(cluster), "", false, active_clusters_);
     }
   }
-
   // Now setup ADS if needed, this might rely on a primary cluster.
   // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
   // After here, we just have a GrpcMux interface held in ads_mux_, which hides
@@ -357,6 +356,11 @@ ClusterManagerImpl::ClusterManagerImpl(
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
   } else {
+    // Without a dynamic resource configuration (bootstrap.dynamic_resources() == null)
+    // an ads_mux == nullptr will cause an error in the
+    // SubscriptionFactoryImpl::subscriptionFromConfigSource() for the
+    // envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds case.
+    // TODO can this condition be caught here?
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
 
