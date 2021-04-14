@@ -232,7 +232,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->protobufConfiguration(),
-                                                  factory_context_, validator_, false, subscription->stats());
+                                                  factory_context_, validator_, false, &subscription->stats());
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }

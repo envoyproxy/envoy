@@ -111,8 +111,8 @@ public:
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);
-  RdsStats* stats() {
-    return &stats_;
+  RdsStats& stats() {
+    return stats_;
   }
 
 private:
