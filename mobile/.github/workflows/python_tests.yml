@@ -1,0 +1,24 @@
+name: python_tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  pythontests:
+    name: python_tests
+    runs-on: ubuntu-18.04
+    timeout-minutes: 90
+    container:
+      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: 'Run tests'
+        run: bazel test --action_env=LD_LIBRARY_PATH --test_output=all //test/python/...
