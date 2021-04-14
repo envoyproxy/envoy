@@ -230,6 +230,9 @@ public:
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
 
+  void setRemovedHostPort(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  absl::optional<uint32_t> removedHostPort() const override { return absl::nullopt; }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
