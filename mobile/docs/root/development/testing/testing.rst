@@ -46,7 +46,7 @@ Swift tests
 
 To run the entire Swift unit test suite locally, use the following Bazel command:
 
-``bazelisk test --test_output=all --build_tests_only //test/swift/...``
+``bazelisk test --config=ios --test_output=all --build_tests_only //test/swift/...``
 
 --------
 Coverage
