@@ -433,7 +433,7 @@ class MyChecker(Checker):
         except ATerribleError:
             self.error("check1", ["Oh noes, something went badly wrong! 8("])
         else:
-            self.success("check1", ["All good 8)"])
+            self.succeed("check1", ["All good 8)"])
 
     def check_check2(self) -> None:
         # checking code for check2
@@ -444,7 +444,7 @@ class MyChecker(Checker):
         except ATerribleError:
             self.error("check2", ["Oh noes, something else went badly wrong! 8("])
         else:
-            self.success("check2", ["All good 8)"])
+            self.succeed("check2", ["All good 8)"])
 
 
 def main(*args) -> int:
@@ -460,5 +460,12 @@ user both with and without `bazel`. To use without, you will need make it execut
 user will need to have any dependencies locally installed.
 
 Notice in the check methods the results of the check are logged to one of `self.error`, `self.warn`,
-or `self.success`. Each takes a `list` of outcomes. The results will be summarized to the user at the
+or `self.succeed`. Each takes a `list` of outcomes. The results will be summarized to the user at the
 end of all checks.
+
+Just like with `Runner` a help menu is automatically created, and you can add custom arguments if
+required.
+
+One key difference with the `Checker` tools and its derivatives is that it expects a `path` either specified
+with `--path` or as an argument. This is used as a context (for example the Envoy src directory) for
+running the checks.
