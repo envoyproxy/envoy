@@ -18,6 +18,11 @@ namespace Server {
  */
 class ValidationAdmin : public Admin {
 public:
+  // We want to implement the socket interface without implementing the http listener function.
+  // This is useful for TAP because it wants to emit warnings when the address type is UDS
+  ValidationAdmin(Network::Address::InstanceConstSharedPtr address)
+      : socket_(address ? std::make_shared<Network::TcpListenSocket>(nullptr, address, nullptr)
+                        : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
@@ -31,12 +36,6 @@ public:
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   uint32_t concurrency() const override { return 1; }
-
-  // We want to implement the socket interface without implementing the http listener function.
-  // This is useful for TAP because it wants to emit warnings when the address type is UDS
-  void createHttpListenerSocket(Network::Address::InstanceConstSharedPtr address) {
-    socket_ = std::make_shared<Network::TcpListenSocket>(nullptr, address, nullptr);
-  }
 
 private:
   ConfigTrackerImpl config_tracker_;
