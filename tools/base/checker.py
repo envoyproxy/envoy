@@ -8,7 +8,8 @@ from tools.base import runner
 class Checker(runner.Runner):
     """Runs check methods prefixed with `check_` and named in `self.checks`
 
-    check methods should return the count of errors and log warnings and errors
+    Check methods should call the `self.warn`, `self.error` or `self.succeed`
+    depending upon the outcome of the checks.
     """
     checks = ()
 
