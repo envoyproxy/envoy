@@ -103,7 +103,7 @@ public:
     // The decoder for the original newStream, needed to create streams on subsequent pools.
     Http::ResponseDecoder& decoder_;
     // The callbacks from the original caller, which must get onPoolFailure or
-    // onPoolReady unless there is call to cancel(). Will be nullptr if the calller
+    // onPoolReady unless there is call to cancel(). Will be nullptr if the caller
     // has been notified while attempts are still pending.
     ConnectionPool::Callbacks* inner_callbacks_;
     // The timer which tracks when new connections should be attempted.
