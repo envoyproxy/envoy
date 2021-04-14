@@ -7,12 +7,6 @@ Run Envoy
 The following instructions walk through starting Envoy as a system daemon or using
 the Envoy Docker image.
 
-.. note::
-
-   For Linux containers follow the instructions in Docker (Linux) tab and for Windows containers
-   follow the Docker (Windows) instructions.
-
-
 .. _start_quick_start_version:
 
 Check your Envoy version
@@ -29,7 +23,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
          $ envoy --version
          ...
 
-   .. tab:: Docker (Linux)
+   .. tab:: Docker (Linux Container)
 
       .. substitution-code-block:: console
 
@@ -37,9 +31,9 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
                envoyproxy/|envoy_docker_image| \
                    --version
          ...
-   .. tab:: Docker (Windows)
+   .. tab:: Docker (Windows Container)
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
          PS> docker run --rm
                'envoyproxy/|envoy_windows_docker_image|'
@@ -63,7 +57,7 @@ flag:
          $ envoy --help
          ...
 
-   .. tab:: Docker (Linux)
+   .. tab:: Docker (Linux Container)
 
       .. substitution-code-block:: console
 
@@ -72,9 +66,9 @@ flag:
                    --help
          ...
 
-   .. tab:: Docker (Windows)
+   .. tab:: Docker (Windows Container)
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
          PS> docker run --rm
                'envoyproxy/|envoy_windows_docker_image|'
@@ -100,7 +94,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
          $ envoy -c envoy-demo.yaml
          ...
 
-   .. tab:: Docker (Linux)
+   .. tab:: Docker (Linux Container)
 
       You can start the Envoy Docker image without specifying a configuration file, and
       it will use the demo config by default.
@@ -127,12 +121,12 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
                    -c /envoy-custom.yaml
          ...
 
-   .. tab:: Docker (Windows)
+   .. tab:: Docker (Windows Container)
 
       You can start the Envoy Docker image without specifying a configuration file, and
       it will use the demo config by default.
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
          PS> docker run --rm -it
                -p '9901:9901'
@@ -144,7 +138,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``, from PowerShell run:
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
          PS> docker run --rm -it
                -v "$PWD\:`"C:\envoy-configs`""
@@ -252,12 +246,12 @@ Next, start the Envoy server using the override configuration:
 
       On Windows run:
 
-      .. code-block:: PowerShell
+      .. code-block:: powershell
 
          $ envoy -c envoy-demo.yaml --config-yaml "$(Get-Content -Raw envoy-override.yaml)"
          ...
 
-   .. tab:: Docker (Linux)
+   .. tab:: Docker (Linux Container)
 
       .. substitution-code-block:: console
 
@@ -269,9 +263,9 @@ Next, start the Envoy server using the override configuration:
                    --config-yaml "$(cat envoy-override.yaml)"
          ...
 
-   .. tab:: Docker (Windows)
+   .. tab:: Docker (Windows Container)
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
          PS> docker run --rm -it
                -p '9902:9902'
@@ -331,7 +325,7 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
 
-   .. tab:: Docker (Linux)
+   .. tab:: Docker (Linux Container)
 
       .. substitution-code-block:: console
 
@@ -354,17 +348,17 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
 
-   .. tab:: Docker (Windows)
+   .. tab:: Docker (Windows Container)
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
          PS> docker run --rm -it
-         -v "$PWD\:`"C:\envoy-configs`""
-         -p '9901:9901'
-         -p '10000:10000'
-         'envoyproxy/|envoy_windows_docker_image|'
-            --mode validate
-            -c 'C:\envoy-configs\my-envoy-config.yaml'
+               -v "$PWD\:`"C:\envoy-configs`""
+               -p '9901:9901'
+               -p '10000:10000'
+               'envoyproxy/|envoy_windows_docker_image|'
+                  --mode validate
+                  -c 'C:\envoy-configs\my-envoy-config.yaml'
 
          configuration 'my-envoy-config.yaml' OK
 
@@ -384,7 +378,7 @@ This can be overridden using :option:`--log-path`.
          $ mkdir logs
          $ envoy -c envoy-demo.yaml --log-path logs/custom.log
 
-   .. tab:: Docker (Linux)
+   .. tab:: Docker (Linux Container)
 
       .. substitution-code-block:: console
 
@@ -397,9 +391,9 @@ This can be overridden using :option:`--log-path`.
                    -c /etc/envoy/envoy.yaml \
                    --log-path logs/custom.log
 
-   .. tab:: Docker (Windows)
+   .. tab:: Docker (Windows Container)
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
             PS> mkdir logs
             PS> docker run --rm -it
@@ -472,7 +466,7 @@ which are set to ``debug`` and ``trace`` respectively.
          $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
          ...
 
-   .. tab:: Docker (Linux)
+   .. tab:: Docker (Linux Container)
 
       .. substitution-code-block:: console
 
@@ -485,9 +479,9 @@ which are set to ``debug`` and ``trace`` respectively.
                    --component-log-level upstream:debug,connection:trace
          ...
 
-   .. tab:: Docker (Windows)
+   .. tab:: Docker (Windows Container)
 
-      .. substitution-code-block:: PowerShell
+      .. substitution-code-block:: powershell
 
             PS> mkdir logs
             PS> docker run --rm -it
