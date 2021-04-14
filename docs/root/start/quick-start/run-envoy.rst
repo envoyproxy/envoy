@@ -23,7 +23,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
          $ envoy --version
          ...
 
-   .. tab:: Docker (Linux Container)
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -31,7 +31,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
                envoyproxy/|envoy_docker_image| \
                    --version
          ...
-   .. tab:: Docker (Windows Container)
+   .. tab:: Docker (Windows Image)
 
       .. substitution-code-block:: powershell
 
@@ -57,7 +57,7 @@ flag:
          $ envoy --help
          ...
 
-   .. tab:: Docker (Linux Container)
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -66,7 +66,7 @@ flag:
                    --help
          ...
 
-   .. tab:: Docker (Windows Container)
+   .. tab:: Docker (Windows Image)
 
       .. substitution-code-block:: powershell
 
@@ -94,7 +94,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
          $ envoy -c envoy-demo.yaml
          ...
 
-   .. tab:: Docker (Linux Container)
+   .. tab:: Docker (Linux Image)
 
       You can start the Envoy Docker image without specifying a configuration file, and
       it will use the demo config by default.
@@ -121,7 +121,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
                    -c /envoy-custom.yaml
          ...
 
-   .. tab:: Docker (Windows Container)
+   .. tab:: Docker (Windows Image)
 
       You can start the Envoy Docker image without specifying a configuration file, and
       it will use the demo config by default.
@@ -251,7 +251,7 @@ Next, start the Envoy server using the override configuration:
          $ envoy -c envoy-demo.yaml --config-yaml "$(Get-Content -Raw envoy-override.yaml)"
          ...
 
-   .. tab:: Docker (Linux Container)
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -263,7 +263,7 @@ Next, start the Envoy server using the override configuration:
                    --config-yaml "$(cat envoy-override.yaml)"
          ...
 
-   .. tab:: Docker (Windows Container)
+   .. tab:: Docker (Windows Image)
 
       .. substitution-code-block:: powershell
 
@@ -325,7 +325,7 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
 
-   .. tab:: Docker (Linux Container)
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -348,7 +348,7 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
 
-   .. tab:: Docker (Windows Container)
+   .. tab:: Docker (Windows Image)
 
       .. substitution-code-block:: powershell
 
@@ -378,7 +378,7 @@ This can be overridden using :option:`--log-path`.
          $ mkdir logs
          $ envoy -c envoy-demo.yaml --log-path logs/custom.log
 
-   .. tab:: Docker (Linux Container)
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -391,7 +391,7 @@ This can be overridden using :option:`--log-path`.
                    -c /etc/envoy/envoy.yaml \
                    --log-path logs/custom.log
 
-   .. tab:: Docker (Windows Container)
+   .. tab:: Docker (Windows Image)
 
       .. substitution-code-block:: powershell
 
@@ -466,7 +466,7 @@ which are set to ``debug`` and ``trace`` respectively.
          $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
          ...
 
-   .. tab:: Docker (Linux Container)
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -479,7 +479,7 @@ which are set to ``debug`` and ``trace`` respectively.
                    --component-log-level upstream:debug,connection:trace
          ...
 
-   .. tab:: Docker (Windows Container)
+   .. tab:: Docker (Windows Image)
 
       .. substitution-code-block:: powershell
 
