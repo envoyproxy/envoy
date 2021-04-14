@@ -9,6 +9,7 @@
 #include "common/json/json_loader.h"
 
 #include "absl/strings/str_join.h"
+#include "yaml-cpp/yaml.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -125,7 +126,7 @@ void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
   content_hash_ = hash;
 }
 
-// Decoder for file.
+// Yaml and Json file content validation.
 // No rules creates an empty file
 std::shared_ptr<ValueSet>
 ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
@@ -141,9 +142,39 @@ ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
     throw EnvoyException("HTTP IP Tagging Filter supports only json or yaml file types");
   }
 
-  // TODO: parse the file here and return the values corresponding to valueSet
+  return values;
+}
 
-  return values_;
+// Json parser
+std::shared_ptr<ValueSet>
+ValueSetWatcher::jsonFileContentsAsValueSet_(absl::string_view contents) const {
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+  Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(std::string(contents));
+  int pos = 0;
+
+  json_data->iterate([&pos](const std::string& key, const Json::Object& value) {
+    std::string ip_tag_name = value.getString("ip_tag_name");
+    std::vector<Envoy::Json::ObjectSharedPtr> tag_list = value.getObjectArray("ip_tags");
+    tag_data.emplace_back(ip_tag_name, tag_list);
+    pos++;
+  });
+
+  return tag_data;
+}
+
+// Yaml parser
+std::shared_ptr<ValueSet>
+ValueSetWatcher::yamlFileContentsAsValueSet_(absl::string_view contents) const {
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+  YAML::Node data = YAML::Load(std::string(contents));
+
+  for (YAML::const_iterator it = data.begin(); it != data.end(); ++it) {
+    std::string ip_tag_name = it["ip_tag_name"].as<std::string>();
+    std::vector<Network::Address::CidrRange> tag_list =
+        it["ip_tags"].as<std::vector<Network::Address::CidrRange>>();
+    tag_data.emplace_back(ip_tag_name, tag_list);
+  }
+  return tag_data;
 }
 
 std::shared_ptr<ValueSetWatcher>

@@ -35,13 +35,14 @@ namespace IpTagging {
  */
 class ValueSet {
 
-public:
-  ValueSet() = default;
+  using tags_set = std::make_unique<Network::LcTrie::LcTrie<std::string>>
+
+  public : ValueSet() = default;
 
   ~ValueSet();
 
 private:
-  // todo
+  // tags_set tag_set_;
 };
 
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
@@ -88,6 +89,8 @@ private:
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
   std::shared_ptr<ValueSet> fileContentsAsValueSet_(absl::string_view contents) const;
+  std::shared_ptr<ValueSet> jsonFileContentsAsValueSet_(absl::string_view contents) const;
+  std::shared_ptr<ValueSet> yamlFileContentsAsValueSet_(absl::string_view contents) const;
   std::shared_ptr<const ValueSet> values_;
 
   Api::Api& api_;
