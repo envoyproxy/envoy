@@ -1600,7 +1600,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   // QUICHE doesn't limit number of headers.
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3; // CI asan use-after-free
   // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -1628,7 +1627,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
-  EXCLUDE_UPSTREAM_HTTP3; // assert failure: validHeaderString
   // Set header (and trailer) count limit to 200.
   uint32_t max_count = 200;
   config_helper_.addConfigModifier(
