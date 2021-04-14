@@ -26,7 +26,6 @@
 #include "common/config/xds_resource.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
-#include "common/http/conn_pool_grid.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
@@ -46,6 +45,7 @@
 #include "common/upstream/subset_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
+#include "common/http/conn_pool_grid.h"
 #include "common/http/http3/conn_pool.h"
 #endif
 
@@ -1521,10 +1521,15 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
+#ifdef ENVOY_ENABLE_QUIC
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
         state, source, std::chrono::milliseconds(300), coptions);
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   }
   if (protocols.size() >= 2) {
     ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
