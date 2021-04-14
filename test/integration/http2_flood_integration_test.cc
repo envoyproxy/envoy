@@ -1351,7 +1351,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
   }
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1,
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
@@ -1417,7 +1417,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneOpenStream) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Downstream client should get stream reset since upstream sent headers but did not complete the
   // stream
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(
       1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
 }
@@ -1475,7 +1475,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnStreamIdleTimeout) {
   // Verify that when RST_STREAM overflows upstream queue it is handled correctly
   // by causing upstream connection to be disconnected.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   //  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());

@@ -693,7 +693,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 
@@ -1144,7 +1144,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
     }
   } else {
@@ -1192,7 +1192,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
     }
   } else {
@@ -1235,7 +1235,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
     } else {
       // Expect a stream reset when the size of the trailers is larger than the maximum
       // limit.
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
       EXPECT_FALSE(response->complete());
     }
@@ -1432,7 +1432,7 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForEndStream());
     codec_client_->close();
   }
 }
@@ -1477,7 +1477,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForEndStream());
       codec_client_->close();
     }
 

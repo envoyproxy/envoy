@@ -142,7 +142,7 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(70000, true);
   test_server_->waitForCounterEq("http2.tx_flush_timeout", 1);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
 }
 
 TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
@@ -171,7 +171,7 @@ TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
   test_server_->waitForCounterEq("http2.keepalive_timeout", 1,
                                  std::chrono::milliseconds(timeout_ms * 2));
 
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
 }
 
 static std::string response_metadata_filter = R"EOF(
@@ -299,7 +299,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   upstream_request_->encodeResetStream();
 
   // Verifies stream is reset.
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   ASSERT_FALSE(response->complete());
 }
 
@@ -502,7 +502,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
   upstream_request_->encodeData(12, true);
 
   // Verifies reset is received.
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   ASSERT_FALSE(response->complete());
 }
 
@@ -882,8 +882,8 @@ TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
   Buffer::OwnedImpl bogus_data("some really bogus data");
   codec_client_->rawConnection().write(bogus_data, false);
 
-  // Verifies reset is received.
-  response->waitForReset();
+  // Verifies error is received.
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 TEST_P(Http2IntegrationTest, Http2BadMagic) {
@@ -1690,7 +1690,7 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   {
     default_request_headers_.addCopy("reset", "yes");
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     ASSERT_FALSE(response->complete());
   }
 }

@@ -544,7 +544,7 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
 }

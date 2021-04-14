@@ -69,11 +69,19 @@ AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::millisec
   return AssertionSuccess();
 }
 
-void IntegrationStreamDecoder::waitForReset() {
+AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds timeout) {
   if (!saw_reset_) {
+    // Set a timer to stop the dispatcher if the timeout has been exceeded.
+    Event::TimerPtr timer(dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); }));
+    timer->enableTimer(timeout);
     waiting_for_reset_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
+    // If the timer has fired, this timed out before a reset was received.
+    if (!timer->enabled()) {
+      return AssertionFailure() << "Timed out waiting for reset.";
+    }
   }
+  return AssertionSuccess();
 }
 
 void IntegrationStreamDecoder::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
