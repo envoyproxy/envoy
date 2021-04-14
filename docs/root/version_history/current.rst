@@ -103,6 +103,7 @@ Bug Fixes
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
 * upstream: retry budgets will now set default values for xDS configurations.
 * zipkin: fix 'verbose' mode to emit annotations for stream events. This was the documented behavior, but wasn't behaving as documented.
+* http: Raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
 
 Removed Config or Runtime
 -------------------------
