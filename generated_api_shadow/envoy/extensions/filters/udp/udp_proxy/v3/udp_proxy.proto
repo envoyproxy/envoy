@@ -33,6 +33,9 @@ message UdpProxyConfig {
 
       // The source IP will be used to compute the hash used by hash-based load balancing algorithms.
       bool source_ip = 1 [(validate.rules).bool = {const: true}];
+
+      // A given key will be used to compute the hash used by hash-based load balancing algorithms.
+      string key = 2 [(validate.rules).string = {min_len: 1}];
     }
   }
 
