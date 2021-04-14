@@ -69,6 +69,6 @@ The ``xds_cluster`` is configured to query a control plane at http://my-control-
 .. literalinclude:: _include/envoy-dynamic-control-plane-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 17-35
+    :lines: 17-39
     :lineno-start: 17
-    :emphasize-lines: 3-17
+    :emphasize-lines: 3-21
