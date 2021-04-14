@@ -250,6 +250,11 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
+      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+      onStreamError(close_connection_upon_invalid_header_);
+      return;
+    }
     request_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();

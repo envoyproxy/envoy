@@ -1586,8 +1586,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {
-  // QUICHE doesn't limit number of headers.
-  EXCLUDE_DOWNSTREAM_HTTP3
   // Send 101 empty headers with limit 60 kB and 100 headers.
   testLargeRequestHeaders(0, 101, 60, 80);
 }
@@ -1598,8 +1596,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
-  // QUICHE doesn't limit number of headers.
-  EXCLUDE_DOWNSTREAM_HTTP3
   // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -1621,7 +1617,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
   } else {
-    response->waitForReset();
+    response->waitForEndStream();
     codec_client_->close();
   }
 }
@@ -1659,9 +1655,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
 // time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
-  // TODO(danzh) re-enable this test after quic headers size become configurable.
-  EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3;
   // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
   testManyRequestHeaders(std::chrono::milliseconds(5000));
 }
