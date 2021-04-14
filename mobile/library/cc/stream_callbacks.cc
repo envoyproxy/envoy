@@ -88,7 +88,7 @@ envoy_http_callbacks StreamCallbacks::as_envoy_http_callbacks() {
   return envoy_http_callbacks{
       .on_headers = &c_on_headers,
       .on_data = &c_on_data,
-      // on_metadata is not used
+      .on_metadata = nullptr,
       .on_trailers = &c_on_trailers,
       .on_error = &c_on_error,
       .on_complete = &c_on_complete,
