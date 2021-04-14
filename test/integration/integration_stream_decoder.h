@@ -42,7 +42,7 @@ public:
   void waitForBodyData(uint64_t size);
   testing::AssertionResult
   waitForEndStream(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-  testing::AssertionResult
+  ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void clearBody() { body_.clear(); }
 

@@ -1432,7 +1432,7 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    ASSERT_TRUE(response->waitForReset());
+    ASSERT_TRUE(response->waitForEndStream());
     codec_client_->close();
   }
 }
