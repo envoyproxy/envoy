@@ -95,7 +95,7 @@ public:
     // Removes this from the owning list, deleting it.
     void deleteThis();
 
-    // Marks HTTP/3 broken If the HTTP/3 attempt failed but the other attempt succeeded.
+    // Marks HTTP/3 broken if the HTTP/3 attempt failed but a TCP attempt succeeded.
     void maybeMarkHttp3Broken();
 
     // Tracks all the connection attempts which currently in flight.
@@ -115,8 +115,8 @@ public:
     PoolIterator current_;
     // True if the HTTP/3 attempt failed.
     bool http3_attempt_failed_{};
-    // True if the ALPN attempt succeeded.
-    bool alpn_attempt_succeeded_{};
+    // True if the TCP attempt succeeded.
+    bool tcp_attempt_succeeded_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -142,7 +142,7 @@ public:
   // Returns the next pool in the ordered priority list.
   absl::optional<PoolIterator> nextPool(PoolIterator pool_it);
 
-  // Returns true if |pool| is the Grid's HTTP/3 connection pool.
+  // Returns true if pool is the grid's HTTP/3 connection pool.
   bool isPoolHttp3(const ConnectionPool::Instance& pool);
 
   bool isHttp3Broken() const { return is_http3_broken_; }

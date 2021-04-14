@@ -78,7 +78,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   }
 
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
-  // original caller.
+  // original caller, if the caller hasn't already been notified.
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
   deleteThis();
@@ -114,14 +114,20 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             host->hostname());
   if (!grid_.isPoolHttp3(attempt->pool())) {
-    alpn_attempt_succeeded_ = true;
+    tcp_attempt_succeeded_ = true;
   }
   maybeMarkHttp3Broken();
 
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
-  // If there are other connection attempts in progress, let them complete.
+  // If an HTTP/3 connection attempts in progress, let it complete. But if there
+  // is a TCP connection attempt in progress, cancel it.
+  if (grid_.isPoolHttp3(attempt->pool())) {
+    for (auto& attempt : connection_attempts_) {
+      attempt->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+    }
+  }
   if (connection_attempts_.empty()) {
     deleteThis();
   }
@@ -131,7 +137,8 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
 }
 
 void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
-  if (http3_attempt_failed_ && alpn_attempt_succeeded_) {
+  if (http3_attempt_failed_ && tcp_attempt_succeeded_) {
+    ENVOY_LOG(trace, "Marking HTTP/3 broken for host '{}'.", grid_.host_->hostname());
     grid_.setIsHttp3Broken(true);
   }
 }
@@ -196,7 +203,7 @@ ConnectivityGrid::~ConnectivityGrid() {
 absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
   // Pools are created by newStream, which should not be called during draining.
   ASSERT(drained_callbacks_.empty());
-  // Right now, only H3 and ALPN are supported, so if there are 2 pools we're done.
+  // Right now, only H3 and TCP are supported, so if there are 2 pools we're done.
   if (pools_.size() == 2 || !drained_callbacks_.empty()) {
     return absl::nullopt;
   }
