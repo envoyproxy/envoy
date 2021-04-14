@@ -74,7 +74,7 @@ public:
     drain_tracker();
   }
 
-  void bindAccount(Buffer::AccountSharedPtr) override {
+  void bindAccount(Buffer::BufferMemoryAccountSharedPtr) override {
     // Not implemented.
     ASSERT(false);
   }

@@ -59,7 +59,7 @@ public:
    * @param account the account to charge.
    * @param freelist to search for the backing storage, if any.
    */
-  Slice(uint64_t min_capacity, AccountSharedPtr account,
+  Slice(uint64_t min_capacity, BufferMemoryAccountSharedPtr account,
         absl::optional<FreeListReference> free_list = absl::nullopt)
       : capacity_(sliceSize(min_capacity)), storage_(newStorage(capacity_, free_list)),
         base_(storage_.get()), data_(0), reservable_(0) {
@@ -318,26 +318,23 @@ public:
 
     if (account_) {
       account_->credit(capacity_);
+      account_.reset();
     }
   }
 
   /**
-   * Charges the provided account for the resources if we're not already
-   * charging for this slice, the account still exists, and the slice owns
-   * backing memory.
+   * Charges the provided account for the resources if these conditions hold:
+   * - we're not already charging for this slice
+   * - the given account is non-null
+   * - the slice owns backing memory
    */
-  void chargeAccountIfValid(const AccountSharedPtr& account) {
-    if (hasAccount() || storage_ == nullptr || !account) {
+  void maybeChargeAccount(const BufferMemoryAccountSharedPtr& account) {
+    if (account_ != nullptr || storage_ == nullptr || !account) {
       return;
     }
     account->charge(capacity_);
     account_ = account;
   }
-
-  /**
-   * Whether there's an associated account for this slice.
-   */
-  bool hasAccount() { return account_ != nullptr; }
 
   static constexpr uint32_t default_slice_size_ = 16384;
 
@@ -421,7 +418,7 @@ protected:
 
   /** Account associated with this slice. This may be null. When
    * coalescing with another slice, we do not transfer over their account. */
-  AccountSharedPtr account_;
+  BufferMemoryAccountSharedPtr account_;
 };
 
 class OwnedImpl;
@@ -672,10 +669,11 @@ public:
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);
+  OwnedImpl(BufferMemoryAccountSharedPtr account);
 
   // Buffer::Instance
   void addDrainTracker(std::function<void()> drain_tracker) override;
-  void bindAccount(AccountSharedPtr account) override;
+  void bindAccount(BufferMemoryAccountSharedPtr account) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
@@ -770,7 +768,7 @@ private:
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
 
-  AccountSharedPtr account_;
+  BufferMemoryAccountSharedPtr account_;
 
   struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
     virtual absl::Span<Slice> ownedSlices() PURE;
@@ -841,18 +839,22 @@ private:
 using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
 
 /**
- * A BufferMemoryAccount tracks allocated bytes across associated buffers and
+ * A BufferMemoryAccountImpl tracks allocated bytes across associated buffers and
  * slices that originate from those buffers, or are untagged and pass through an
  * associated buffer.
  */
-class BufferMemoryAccount : public Account {
+class BufferMemoryAccountImpl : public BufferMemoryAccount {
 public:
-  BufferMemoryAccount() = default;
-  ~BufferMemoryAccount() override { ASSERT(buffer_memory_allocated_ == 0); }
+  BufferMemoryAccountImpl() = default;
+  ~BufferMemoryAccountImpl() override { ASSERT(buffer_memory_allocated_ == 0); }
 
   // Make not copyable
-  BufferMemoryAccount(BufferMemoryAccount&) = delete;
-  BufferMemoryAccount& operator=(BufferMemoryAccount& other) = delete;
+  BufferMemoryAccountImpl(const BufferMemoryAccountImpl&) = delete;
+  BufferMemoryAccountImpl& operator=(const BufferMemoryAccountImpl&) = delete;
+
+  // Make not movable.
+  BufferMemoryAccountImpl(BufferMemoryAccountImpl&&) = delete;
+  BufferMemoryAccountImpl& operator=(BufferMemoryAccountImpl&&) = delete;
 
   uint64_t balance() const override { return buffer_memory_allocated_; }
   void charge(uint64_t amount) override {

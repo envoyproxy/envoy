@@ -41,7 +41,7 @@ void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
   slices_.back().addDrainTracker(std::move(drain_tracker));
 }
 
-void OwnedImpl::bindAccount(AccountSharedPtr account) {
+void OwnedImpl::bindAccount(BufferMemoryAccountSharedPtr account) {
   ASSERT(slices_.empty());
   // We don't yet have an account bound.
   ASSERT(!account_);
@@ -84,8 +84,8 @@ void OwnedImpl::prepend(Instance& data) {
   while (!other.slices_.empty()) {
     uint64_t slice_size = other.slices_.back().dataSize();
     length_ += slice_size;
-    other.slices_.back().chargeAccountIfValid(account_);
     slices_.emplace_front(std::move(other.slices_.back()));
+    slices_.front().maybeChargeAccount(account_);
     other.slices_.pop_back();
     other.length_ -= slice_size;
   }
@@ -264,7 +264,7 @@ void OwnedImpl::coalesceOrAddSlice(Slice&& other_slice) {
     other_slice.transferDrainTrackersTo(slices_.back());
   } else {
     // Take ownership of the slice.
-    other_slice.chargeAccountIfValid(account_);
+    other_slice.maybeChargeAccount(account_);
     slices_.emplace_back(std::move(other_slice));
     length_ += slice_size;
   }
@@ -415,7 +415,7 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
   for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
     Slice& owned_slice = owned_slices[i];
     if (owned_slice.data() != nullptr) {
-      owned_slice.chargeAccountIfValid(account_);
+      owned_slice.maybeChargeAccount(account_);
       slices_.emplace_back(std::move(owned_slice));
     }
     slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
@@ -553,6 +553,8 @@ OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
+
+OwnedImpl::OwnedImpl(BufferMemoryAccountSharedPtr account) : OwnedImpl() { bindAccount(account); }
 
 std::string OwnedImpl::toString() const {
   std::string output;
