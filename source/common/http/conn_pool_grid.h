@@ -19,6 +19,11 @@ public:
     std::vector<Http::Protocol> protocols_;
   };
 
+  enum class StreamCreationResult {
+    ImmediateResult,
+    StreamCreationPending,
+  };
+
   using PoolIterator = std::list<ConnectionPool::InstancePtr>::iterator;
 
   // This is a class which wraps a caller's connection pool callbacks to
@@ -38,8 +43,7 @@ public:
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
 
-      // Returns true if a stream is immediately created, false if it is pending.
-      bool newStream();
+      StreamCreationResult newStream();
 
       // ConnectionPool::Callbacks
       void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -67,9 +71,8 @@ public:
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
-    // Attempt to create a new stream for pool(). Returns true if the stream has
-    // been created.
-    bool newStream();
+    // Attempt to create a new stream for pool().
+    StreamCreationResult newStream();
 
     // Removes this from the owning list, deleting it.
     void deleteThis();
