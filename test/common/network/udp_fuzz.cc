@@ -1,4 +1,5 @@
-#include "test/fuzz/fuzz_runner.h"
+#include <fuzzer/FuzzedDataProvider.h>
+
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -10,6 +11,7 @@
 #include "common/network/utility.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
+#include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -18,8 +20,6 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
-#include <fuzzer/FuzzedDataProvider.h>
-
 namespace Envoy {
 //	namespace Network {
 namespace {
@@ -27,7 +27,7 @@ namespace {
 class UdpFuzz;
 
 class fuzzUdpListenerCallbacks : public Network::UdpListenerCallbacks {
- public:
+public:
   fuzzUdpListenerCallbacks(UdpFuzz* upf) : my_upf(upf) {}
   ~fuzzUdpListenerCallbacks() = default;
   UdpFuzz* my_upf;
@@ -43,7 +43,7 @@ class fuzzUdpListenerCallbacks : public Network::UdpListenerCallbacks {
 };
 
 class UdpFuzz {
- public:
+public:
   UdpFuzz(const uint8_t* buf, size_t len) {
     // Prepare environment
     api_ = Api::createApiForTest();
@@ -51,14 +51,11 @@ class UdpFuzz {
     ip_version_ = TestEnvironment::getIpVersionsForTest()[0];
 
     server_socket_ = createServerSocket(true, ip_version_);
-    server_socket_->addOptions(
-        Network::SocketOptionFactory::buildIpPacketInfoOptions());
-    server_socket_->addOptions(
-        Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    server_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+    server_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
     // Create packet writer
-    udp_packet_writer_ =
-        std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
+    udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
 
     // Set up callbacks
     fuzzUdpListenerCallbacks fuzzCallbacks(this);
@@ -66,14 +63,11 @@ class UdpFuzz {
     // Create listener with default config
     envoy::config::core::v3::UdpSocketConfig config;
     std::unique_ptr<Network::UdpListenerImpl> listener_ =
-        std::make_unique<Network::UdpListenerImpl>(
-            dispatcherImpl(), server_socket_, fuzzCallbacks,
-            dispatcherImpl().timeSource(), config);
+        std::make_unique<Network::UdpListenerImpl>(dispatcherImpl(), server_socket_, fuzzCallbacks,
+                                                   dispatcherImpl().timeSource(), config);
 
-    Network::Address::Instance* send_to_addr_ =
-        new Network::Address::Ipv4Instance(
-            "127.0.0.1",
-            server_socket_->addressProvider().localAddress()->ip()->port());
+    Network::Address::Instance* send_to_addr_ = new Network::Address::Ipv4Instance(
+        "127.0.0.1", server_socket_->addressProvider().localAddress()->ip()->port());
 
     // Now do all of the fuzzing
     FuzzedDataProvider provider(buf, len);
@@ -83,8 +77,8 @@ class UdpFuzz {
     // printf("Sending a total of %d\n", total_packets);
     for (uint16_t i = 0; i < total_packets; i++) {
       // printf("Sending \n");
-      std::string packet_ = provider.ConsumeBytesAsString(
-          provider.ConsumeIntegralInRange<uint32_t>(1, 3000));
+      std::string packet_ =
+          provider.ConsumeBytesAsString(provider.ConsumeIntegralInRange<uint32_t>(1, 3000));
       // printf("packet size: %lu\n", packet_.size());
       if (packet_.size() == 0) {
         packet_ = "EMPTY_PACKET";
@@ -102,14 +96,12 @@ class UdpFuzz {
     // Test[Udp]Listener, which instantiates a [Udp]ListenerImpl, which requires
     // a DispatcherImpl to access DispatcherImpl::base_, which is not part of
     // the Dispatcher API.
-    Event::DispatcherImpl* impl =
-        dynamic_cast<Event::DispatcherImpl*>(dispatcher_.get());
+    Event::DispatcherImpl* impl = dynamic_cast<Event::DispatcherImpl*>(dispatcher_.get());
     // RELEASE_ASSERT(impl, "dispatcher dynamic-cast to DispatcherImpl failed");
     return *impl;
   }
 
-  Network::SocketSharedPtr createServerSocket(
-      bool bind, Network::Address::IpVersion version_) {
+  Network::SocketSharedPtr createServerSocket(bool bind, Network::Address::IpVersion version_) {
     // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source
     // address.
     return std::make_shared<Network::UdpListenSocket>(
@@ -147,8 +139,7 @@ void fuzzUdpListenerCallbacks::onWriteReady(const Network::Socket& socket) {
   return;
 }
 
-void fuzzUdpListenerCallbacks::onReceiveError(
-    Api::IoError::IoErrorCode error_code) {
+void fuzzUdpListenerCallbacks::onReceiveError(Api::IoError::IoErrorCode error_code) {
   my_upf->sent_packets++;
   if (my_upf->sent_packets == my_upf->total_packets) {
     my_upf->dispatcher_->exit();
@@ -177,9 +168,7 @@ void fuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
   UNREFERENCED_PARAMETER(dropped);
 }
 
-DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  UdpFuzz udp_instance(buf, len);
-}
-}  // namespace
+DEFINE_FUZZER(const uint8_t* buf, size_t len) { UdpFuzz udp_instance(buf, len); }
+} // namespace
 //} // Network
-}  // Envoy
+} // namespace Envoy
