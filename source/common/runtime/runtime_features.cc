@@ -1,6 +1,7 @@
 #include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "quiche/quic/core/quic_flags_list.h"
 
 namespace Envoy {
 namespace Runtime {
@@ -11,6 +12,10 @@ bool isRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
+  if (feature.find("envoy.reloadable_features.quic", 0) == 0) {
+    return quiche::FLAGS_quic_reloadable_flag_##feature->value();
+  }
+
   ASSERT(isRuntimeFeature(feature));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(

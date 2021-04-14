@@ -45,6 +45,7 @@ envoy_cc_library(
     deps = [
         "@com_googlesource_quiche//:quic_core_flags_list_lib",
         "@com_googlesource_quiche//:quic_core_protocol_flags_list_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 

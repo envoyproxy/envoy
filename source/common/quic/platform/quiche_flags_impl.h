@@ -10,6 +10,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
+#include "common/runtime/runtime_features.h"
 
 namespace quiche {
 
@@ -127,7 +128,11 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 // |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
 #define SetQuicheFlagImpl(flag, value) (quiche::flag)->setValue(value)
 
-#define GetQuicheReloadableFlagImpl(module, flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
+#define EnvoyReloadableFeature(flag) absl::StrCat("envoy.reloadable_features.", #flag)
+
+#define GetQuicheReloadableFlagImpl(module, flag) Envoy::Runtime::runtimeFeatureEnabled(EnvoyReloadableFeature(flag))
+
+//quiche::FLAGS_quic_reloadable_flag_##flag->value()
 
 #define SetQuicheReloadableFlagImpl(module, flag, value)                                           \
   quiche::FLAGS_quic_reloadable_flag_##flag->setValue(value)
