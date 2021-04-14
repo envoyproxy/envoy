@@ -166,6 +166,8 @@ ValueSetWatcher::jsonFileContentsAsValueSet_(std::string contents) const {
 }
 
 // Yaml parser
+// TODO: techincally yaml is a superset of json so jaml parser should work for json content as well
+// in an ideal world we should be able to just use one parser based on that
 std::shared_ptr<ValueSet>
 ValueSetWatcher::yamlFileContentsAsValueSet_(std::string contents) const {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
