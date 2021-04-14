@@ -38,13 +38,14 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemp
     WrapperCallbacks& parent, PoolIterator it)
     : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
 
-bool ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
+ConnectivityGrid::StreamCreationResult
+ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
   auto* cancellable = pool().newStream(parent_.decoder_, *this);
   if (cancellable == nullptr) {
-    return true;
+    return StreamCreationResult::ImmediateResult;
   }
   cancellable_ = cancellable;
-  return false;
+  return StreamCreationResult::StreamCreationPending;
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailure(
@@ -93,7 +94,7 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
   removeFromList(grid_.wrapped_callbacks_);
 }
 
-bool ConnectivityGrid::WrapperCallbacks::newStream() {
+ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newStream() {
   ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
             describePool(**current_), grid_.host_->hostname());
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
@@ -161,7 +162,10 @@ bool ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
     // If there are no other pools to try, return false.
     return false;
   }
-  // Create a new connection attempt for the next pool.
+  // Create a new connection attempt for the next pool. If we reach this point
+  // return true regardless of if newStream resulted in an immediate result or
+  // an async call, as either way the attempt will result in success/failure
+  // callbacks.
   current_ = next_pool.value();
   newStream();
   return true;
@@ -237,7 +241,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   auto wrapped_callback = std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
-  if (wrapped_callbacks_.front()->newStream()) {
+  if (wrapped_callbacks_.front()->newStream() == StreamCreationResult::ImmediateResult) {
     // If newStream succeeds, return nullptr as the caller has received their
     // callback and does not need a cancellable handle. At this point the
     // WrappedCallbacks object has also been deleted.
