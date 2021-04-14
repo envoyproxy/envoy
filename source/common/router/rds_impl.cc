@@ -89,7 +89,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
           resource_decoder_, {});
   local_init_manager_.add(local_init_target_);
-  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context);
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context, stats_);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -232,7 +232,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->protobufConfiguration(),
-                                                  factory_context_, validator_, false);
+                                                  factory_context_, validator_, false, subscription->stats());
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }

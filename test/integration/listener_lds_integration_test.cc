@@ -264,6 +264,30 @@ TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
 }
 
+TEST_P(ListenerIntegrationTest, IgnoreUnknownTypedPerFilterConfig) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+        typed_per_filter_config:
+          unknown_filter:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(fmt::format("http.config_test.rds.{}.unknown_per_filter_typed_config_factory", route_table_name_), 1);
+}
+
 // Tests that a LDS deletion before Server initManager been initialized will not block the Server
 // from starting.
 TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {

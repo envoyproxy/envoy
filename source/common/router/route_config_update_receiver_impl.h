@@ -18,13 +18,13 @@ namespace Router {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context)
+  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context, RdsStats& stats)
       : factory_context_(factory_context), time_source_(factory_context.timeSource()),
         route_config_proto_(std::make_unique<envoy::config::route::v3::RouteConfiguration>()),
         last_config_hash_(0ull), last_vhds_config_hash_(0ul),
         vhds_virtual_hosts_(
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
-        vhds_configuration_changed_(true) {}
+        vhds_configuration_changed_(true), stats_(stats) {}
 
   void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
@@ -75,6 +75,7 @@ private:
   std::set<std::string> resource_ids_in_last_update_;
   bool vhds_configuration_changed_;
   ConfigConstSharedPtr config_;
+  RdsStats& stats_;
 };
 
 } // namespace Router
