@@ -18,7 +18,8 @@ namespace Router {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context, RdsStats& stats)
+  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context,
+                                RdsStats& stats)
       : factory_context_(factory_context), time_source_(factory_context.timeSource()),
         route_config_proto_(std::make_unique<envoy::config::route::v3::RouteConfiguration>()),
         last_config_hash_(0ull), last_vhds_config_hash_(0ul),

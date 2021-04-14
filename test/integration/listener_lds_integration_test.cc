@@ -285,7 +285,10 @@ TEST_P(ListenerIntegrationTest, IgnoreUnknownTypedPerFilterConfig) {
             "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 )EOF";
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(fmt::format("http.config_test.rds.{}.unknown_per_filter_typed_config_factory", route_table_name_), 1);
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.unknown_per_filter_typed_config_factory",
+                  route_table_name_),
+      1);
 }
 
 // Tests that a LDS deletion before Server initManager been initialized will not block the Server

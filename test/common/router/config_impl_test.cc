@@ -7906,7 +7906,8 @@ virtual_hosts:
     per_filter_config: { unknown.filter: {} }
 )EOF";
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory", "false"}});
+      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory",
+        "false"}});
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
@@ -7927,7 +7928,8 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.Timestamp
 )EOF";
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory", "false"}});
+      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory",
+        "false"}});
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
@@ -7966,12 +7968,12 @@ virtual_hosts:
 )EOF";
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory", "false"}});
+      {{"envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory",
+        "false"}});
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Didn't find a registered implementation for name: 'unknown.filter'");
+      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyPreRouteIgnoreCheck) {

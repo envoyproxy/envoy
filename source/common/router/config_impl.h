@@ -74,8 +74,7 @@ public:
 
 private:
   Server::Configuration::NamedHttpFilterConfigFactory*
-  getRouteSpecificFilterConfigFactory(const std::string& name,
-                                      const VirtualHostImpl& vhost);
+  getRouteSpecificFilterConfigFactory(const std::string& name, const VirtualHostImpl& vhost);
 
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(Server::Configuration::NamedHttpFilterConfigFactory* factory,
@@ -1082,9 +1081,7 @@ public:
     return max_direct_response_body_size_bytes_;
   }
 
-  RdsStats* rdsStats() const {
-    return rds_stats_;
-  }
+  RdsStats* rdsStats() const { return rds_stats_; }
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;

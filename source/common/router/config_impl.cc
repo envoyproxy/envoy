@@ -413,8 +413,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      auto cluster_entry = std::make_unique<WeightedClusterEntry>(
-          this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster, vhost);
+      auto cluster_entry =
+          std::make_unique<WeightedClusterEntry>(this, runtime_key_prefix + "." + cluster.name(),
+                                                 factory_context, validator, cluster, vhost);
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -1495,8 +1496,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator,
-                       bool validate_clusters_default,
-                       RdsStats* rds_stats)
+                       bool validate_clusters_default, RdsStats* rds_stats)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
       uses_vhds_(config.has_vhds()),
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
@@ -1526,41 +1526,42 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
 }
 
 Server::Configuration::NamedHttpFilterConfigFactory*
-PerFilterConfigs::getRouteSpecificFilterConfigFactory(const std::string& name, const VirtualHostImpl& vhost) {
+PerFilterConfigs::getRouteSpecificFilterConfigFactory(const std::string& name,
+                                                      const VirtualHostImpl& vhost) {
   Server::Configuration::NamedHttpFilterConfigFactory* factory = nullptr;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory")) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ignore_check_unknown_typed_per_filter_config_factory")) {
     factory = Envoy::Config::Utility::getFactoryByName<
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
     if (factory == nullptr && vhost.globalRouteConfig().rdsStats() != nullptr) {
       vhost.globalRouteConfig().rdsStats()->unknown_per_filter_typed_config_factory_.inc();
-      ENVOY_LOG(warn,
-                  "Can't find factory for {}. Set runtime "
-                  "config `envoy.reloadable_features.ignore_check_unsupported_typed_per_filter_config` as "
-                  "false to reject any unknown typed per filter config specific configuration.",
-                  name);
+      ENVOY_LOG(
+          warn,
+          "Can't find factory for {}. Set runtime "
+          "config `envoy.reloadable_features.ignore_check_unsupported_typed_per_filter_config` as "
+          "false to reject any unknown typed per filter config specific configuration.",
+          name);
     }
-  }
-  else {
+  } else {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
   }
   return factory;
 }
 
-RouteSpecificFilterConfigConstSharedPtr
-PerFilterConfigs::createRouteSpecificFilterConfig(Server::Configuration::NamedHttpFilterConfigFactory* factory,
-                                const std::string& name, const ProtobufWkt::Any& typed_config,
-                                const ProtobufWkt::Struct& config,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                ProtobufMessage::ValidationVisitor& validator) {
+RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
+    Server::Configuration::NamedHttpFilterConfigFactory* factory, const std::string& name,
+    const ProtobufWkt::Any& typed_config, const ProtobufWkt::Struct& config,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator) {
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
-      throw EnvoyException(fmt::format(
-          "The filter {} doesn't support virtual host-specific configurations", name));
+      throw EnvoyException(
+          fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
     } else {
       ENVOY_LOG(warn,
                 "The filter {} doesn't support virtual host-specific configurations. Set runtime "
@@ -1574,8 +1575,7 @@ PerFilterConfigs::createRouteSpecificFilterConfig(Server::Configuration::NamedHt
 
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
-    const VirtualHostImpl& vhost,
+    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs, const VirtualHostImpl& vhost,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   if (!typed_configs.empty() && !configs.empty()) {
@@ -1590,9 +1590,9 @@ PerFilterConfigs::PerFilterConfigs(
     if (factory == nullptr) {
       continue;
     }
-    auto object = createRouteSpecificFilterConfig(
-        factory, name, it.second, ProtobufWkt::Struct::default_instance(),
-        factory_context, validator);
+    auto object = createRouteSpecificFilterConfig(factory, name, it.second,
+                                                  ProtobufWkt::Struct::default_instance(),
+                                                  factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
     }
@@ -1607,8 +1607,8 @@ PerFilterConfigs::PerFilterConfigs(
     if (factory == nullptr) {
       continue;
     }
-    auto object = createRouteSpecificFilterConfig(factory, name, ProtobufWkt::Any::default_instance(),
-                                                  it.second, factory_context, validator);
+    auto object = createRouteSpecificFilterConfig(
+        factory, name, ProtobufWkt::Any::default_instance(), it.second, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
     }
