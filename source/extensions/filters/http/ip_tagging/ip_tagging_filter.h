@@ -35,14 +35,15 @@ namespace IpTagging {
  */
 class ValueSet {
 
-  using tags_set = std::make_unique<Network::LcTrie::LcTrie<std::string>>
+public :
+  ValueSet() = default;
 
-  public : ValueSet() = default;
+  ValueSet(ValueSet&& o) noexcept : tag_set_(std::move(o.tag_set_)) {}
 
   ~ValueSet();
 
 private:
-  // tags_set tag_set_;
+   Network::LcTrie::LcTrie<std::string> tag_set_;
 };
 
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;

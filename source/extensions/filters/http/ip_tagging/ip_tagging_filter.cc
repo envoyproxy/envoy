@@ -159,7 +159,7 @@ ValueSetWatcher::jsonFileContentsAsValueSet_(absl::string_view contents) const {
     pos++;
   });
 
-  return tag_data;
+  return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
 // Yaml parser
@@ -174,7 +174,7 @@ ValueSetWatcher::yamlFileContentsAsValueSet_(absl::string_view contents) const {
         it["ip_tags"].as<std::vector<Network::Address::CidrRange>>();
     tag_data.emplace_back(ip_tag_name, tag_list);
   }
-  return tag_data;
+  return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
 std::shared_ptr<ValueSetWatcher>
