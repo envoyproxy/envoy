@@ -8,7 +8,7 @@ Incompatible Behavior Changes
 * config: the v2 xDS API is no longer supported by the Envoy binary.
 * grpc_stats: the default value for :ref:`stats_for_all_methods <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>` is switched from true to false, in order to avoid possible memory exhaustion due to an untrusted downstream sending a large number of unique method names. The previous default value was deprecated in version 1.14.0. This only changes the behavior when the value is not set. The previous behavior can be used by setting the value to true. This behavior change by be overridden by setting runtime feature `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
 * http: fixing a standards compliance issue with :scheme. The :scheme header sent upstream is now based on the original URL scheme, rather than set based on the security of the upstream connection. This behavior can be temporarily reverted by setting `envoy.reloadable_features.preserve_downstream_scheme` to false.
-* http: http3 is now enabled/disabled via build option `--define http3=disabled` rather than the extension framework. Behavior is the same, but builds may be affected for platforms or build configurations where http3 is not supported.
+* http: http3 is now enabled/disabled via build option `--define http3=disabled` rather than the extension framework. The behavior is the same, but builds may be affected for platforms or build configurations where http3 is not supported.
 * http: resolving inconsistencies between :scheme and X-Forwarded-Proto. :scheme will now be set for all HTTP/1.1 requests. This changes the behavior of the gRPC access logger, Wasm filters, CSRF filter and oath2 filter for HTTP/1 traffic, where :scheme was previously not set. This change also validates that for front-line Envoys (Envoys configured with  :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` set to 0 and :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>` set to true) that HTTP/1.1 https schemed requests can not be sent over non-TLS connections. All behavioral changes listed here can be temporarily reverted by setting `envoy.reloadable_features.add_and_validate_scheme_header` to false.
 * http: when a protocol error is detected in response from upstream, Envoy sends 502 BadGateway downstream and access log entry contains UPE flag. This behavior change can be overwritten to use error code 503 by setting `envoy.reloadable_features.return_502_for_upstream_protocol_errors` to false.
 
@@ -27,7 +27,7 @@ Minor Behavior Changes
   logging, :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`, etc.
   Setting the hostname manually allows overriding the internal hostname used for such features while
   still allowing the original DNS resolution name to be used.
-* grpc_json_transcoder: filter now adheres to encoder and decoder buffer limits. Requests and responses
+* grpc_json_transcoder: the filter now adheres to encoder and decoder buffer limits. Requests and responses
   that require buffering over the limits will be directly rejected. The behavior can be reverted by
   disabling runtime feature `envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits`.
   To reduce or increase the buffer limits the filter adheres to, reference the :ref:`flow control documentation <faq_flow_control>`.
@@ -48,17 +48,17 @@ Minor Behavior Changes
   depending on the Envoy deployment, the feature flag may need to be flipped on both downstream
   and upstream instances, depending on the reason.
 * http: added support for internal redirects with bodies. This behavior can be disabled temporarily by setting `envoy.reloadable_features.internal_redirects_with_body` to false.
-* http: allow to use path canonicalizer from `googleurl <https://quiche.googlesource.com/googleurl>`_
+* http: increase the maximum allowed number of initial connection WINDOW_UPDATE frames sent by the peer from 1 to 5.
+* http: no longer adding content-length: 0 for requests which should not have bodies. This behavior can be temporarily reverted by setting `envoy.reloadable_features.dont_add_content_length_for_bodiless_requests` false.
+* http: switched the path canonicalizer to `googleurl <https://quiche.googlesource.com/googleurl>`_
   instead of `//source/common/chromium_url`. The new path canonicalizer is enabled by default. To
   revert to the legacy path canonicalizer, enable the runtime flag
   `envoy.reloadable_features.remove_forked_chromium_url`.
-* http: increase the maximum allowed number of initial connection WINDOW_UPDATE frames sent by the peer from 1 to 5.
-* http: no longer adding content-length: 0 for requests which should not have bodies. This behavior can be temporarily reverted by setting `envoy.reloadable_features.dont_add_content_length_for_bodiless_requests` false.
-* http: upstream flood and abuse checks increment the count of opened HTTP/2 streams when Envoy sends
+* http: upstream flood and abuse checks now increment the count of opened HTTP/2 streams when Envoy sends
   initial HEADERS frame for the new stream. Before the counter was incrementred when Envoy received
   response HEADERS frame with the END_HEADERS flag set from upstream server.
 * lua: added function `timestamp` to provide millisecond resolution timestamps by passing in `EnvoyTimestampResolution.MILLISECOND`.
-* oauth filter: added the optional parameter :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. Enables this value to be overridden in the Authorization request to the OAuth provider.
+* oauth filter: added the optional parameter :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. This allows this value to be overridden in the Authorization request to the OAuth provider.
 * perf: allow reading more bytes per operation from raw sockets to improve performance.
 * router: extended custom date formatting to DOWNSTREAM_PEER_CERT_V_START and DOWNSTREAM_PEER_CERT_V_END when using :ref:`custom request/response header formats <config_http_conn_man_headers_custom_request_headers>`.
 * router: made the path rewrite available without finalizing headers, so the filter could calculate the current value of the final url.
@@ -87,8 +87,8 @@ Bug Fixes
 * filter_chain: fix filter chain matching with the server name as the case-insensitive way.
 * grpc-web: fix local reply and non-proto-encoded gRPC response handling for small response bodies. This fix can be temporarily reverted by setting `envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling` to false.
 * grpc_http_bridge: the downstream HTTP status is now correctly set for trailers-only responses from the upstream.
-* header map: pick the right delimiter to append multiple header values to the same key. Previouly header with multiple values are coalesced with ",", after this fix cookie headers should be coalesced with " ;". This doesn't affect Http1 or Http2 requests because these 2 codecs coalesce cookie headers before adding it to header map. To revert to the old behavior, set the runtime feature `envoy.reloadable_features.header_map_correctly_coalesce_cookies` to false.
-* http: avoid grpc-status overwrite on Http::Utility::sendLocalReply() if that field has already been set.
+* header map: pick the right delimiter to append multiple header values to the same key. Previouly header with multiple values were coalesced with ",", after this fix cookie headers should be coalesced with " ;". This doesn't affect Http1 or Http2 requests because these 2 codecs coalesce cookie headers before adding it to header map. To revert to the old behavior, set the runtime feature `envoy.reloadable_features.header_map_correctly_coalesce_cookies` to false.
+* http: avoid grpc-status overwrite on when sending local replies if that field has already been set.
 * http: disallowing "host:" in request_headers_to_add for behavioral consistency with rejecting :authority header. This behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_host_like_authority` to false.
 * http: fixed an issue where Enovy did not handle peer stream limits correctly, and queued streams in nghttp2 rather than establish new connections. This behavior can be temporarily reverted by setting `envoy.reloadable_features.improved_stream_limit_handling` to false.
 * http: fixed a bug where setting :ref:`MaxStreamDuration proto <envoy_v3_api_msg_config.route.v3.RouteAction.MaxStreamDuration>` did not disable legacy timeout defaults.
@@ -149,7 +149,7 @@ New Features
 * http: change frame flood and abuse checks to the upstream HTTP/2 codec to ON by default. It can be disabled by setting the `envoy.reloadable_features.upstream_http2_flood_checks` runtime key to false.
 * http: hash multiple header values instead of only hash the first header value. It can be disabled by setting the `envoy.reloadable_features.hash_multiple_header_values` runtime key to false. See the :ref:`HashPolicy's Header configuration <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.Header>` for more information.
 * json: introduced new JSON parser (https://github.com/nlohmann/json) to replace RapidJSON. The new parser is disabled by default. To test the new RapidJSON parser, enable the runtime feature `envoy.reloadable_features.remove_legacy_json`.
-* kill_request: :ref:`Kill Request <config_http_filters_kill_request>` Now supports bidirection killing.
+* kill_request: :ref:`Kill Request <config_http_filters_kill_request>` now supports bidirection killing.
 * listener: added an optional :ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`.
 * loadbalancer: added the ability to specify the hash_key for a host when using a consistent hashing loadbalancer (ringhash, maglev) using the :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: ``"envoy.lb": {"hash_key": "..."}``.
 * log: added a new custom flag ``%j`` to the log pattern to print the actual message to log as JSON escaped string.
