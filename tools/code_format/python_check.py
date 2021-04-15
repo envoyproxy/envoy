@@ -52,6 +52,11 @@ class PythonChecker(checker.ForkingChecker):
         return os.path.join(self.path, FLAKE8_CONFIG)
 
     @property
+    def recurse(self) -> bool:
+        """Flag to determine whether to apply checks recursively"""
+        return self.args.recurse
+
+    @property
     def yapf_config_path(self) -> str:
         return os.path.join(self.path, YAPF_CONFIG)
 
@@ -59,11 +64,17 @@ class PythonChecker(checker.ForkingChecker):
     def yapf_files(self):
         return yapf.file_resources.GetCommandLineFiles(
             self.args.paths,
-            recursive=self.args.recurse,
+            recursive=self.recurse,
             exclude=yapf.file_resources.GetExcludePatternsForDir(self.path))
 
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
+        parser.add_argument(
+            "--recurse",
+            "-r",
+            choices=["yes", "no"],
+            default="yes",
+            help="Recurse path or paths directories")
         parser.add_argument(
             "--diff-file", default=None, help="Specify the path to a diff file with fixes")
 

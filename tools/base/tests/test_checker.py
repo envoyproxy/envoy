@@ -152,17 +152,6 @@ def test_checker_paths(patches, paths):
     assert "paths" not in checker.__dict__
 
 
-def test_checker_recurse():
-    checker = Checker("path1", "path2", "path3")
-    args_mock = patch(
-        "tools.base.checker.Checker.args",
-        new_callable=PropertyMock)
-
-    with args_mock as m_args:
-        assert checker.recurse == m_args.return_value.recurse
-    assert "recurse" not in checker.__dict__
-
-
 @pytest.mark.parametrize("summary", [True, False])
 @pytest.mark.parametrize("error_count", [0, 1])
 @pytest.mark.parametrize("warning_count", [0, 1])
@@ -280,10 +269,6 @@ def test_checker_add_arguments():
              {'action': 'store_true',
               'default': False,
               'help': 'Display a diff in the console where available'}],
-            [('--recurse', '-r'),
-             {'choices': ['yes', 'no'],
-              'default': 'yes',
-              'help': 'Recurse path or paths directories'}],
             [('--warning', '-w'),
              {'choices': ['warn', 'error'],
               'default': 'warn',

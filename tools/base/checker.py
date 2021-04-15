@@ -66,11 +66,6 @@ class Checker(runner.Runner):
         return self.args.paths or [self.path]
 
     @property
-    def recurse(self) -> bool:
-        """Flag to determine whether to apply checks recursively (where appropriate)"""
-        return self.args.recurse
-
-    @property
     def show_summary(self) -> bool:
         """Show a summary at the end or not"""
         return bool(self.args.summary or self.error_count or self.warning_count)
@@ -97,12 +92,12 @@ class Checker(runner.Runner):
         return sum(len(e) for e in self.success.values())
 
     @cached_property
-    def summary(self) -> CheckerSummary:
+    def summary(self) -> "CheckerSummary":
         """Instance of the checker's summary class"""
         return self.summary_class(self)
 
     @property
-    def summary_class(self) -> Type[CheckerSummary]:
+    def summary_class(self) -> Type["CheckerSummary"]:
         """Checker's summary class"""
         return CheckerSummary
 
@@ -125,12 +120,6 @@ class Checker(runner.Runner):
             action="store_true",
             default=False,
             help="Display a diff in the console where available")
-        parser.add_argument(
-            "--recurse",
-            "-r",
-            choices=["yes", "no"],
-            default="yes",
-            help="Recurse path or paths directories")
         parser.add_argument(
             "--warning",
             "-w",

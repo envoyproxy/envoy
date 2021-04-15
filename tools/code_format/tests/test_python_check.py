@@ -118,7 +118,11 @@ def test_python_add_arguments(patches):
         == [(m_parser,), {}])
     assert (
         list(list(c) for c in m_parser.add_argument.call_args_list)
-        == [[('--diff-file',),
+        == [[('--recurse', '-r'),
+             {'choices': ['yes', 'no'],
+              'default': 'yes',
+              'help': 'Recurse path or paths directories'}],
+            [('--diff-file',),
              {'default': None, 'help': 'Specify the path to a diff file with fixes'}]])
 
 
@@ -158,6 +162,17 @@ def test_python_check_flake8(patches, errors):
             == [('flake8', ['err1', 'err2']), {}])
     else:
         assert not m_error.called
+
+
+def test_python_check_recurse():
+    checker = python_check.PythonChecker("path1", "path2", "path3")
+    args_mock = patch(
+        "tools.code_format.python_check.PythonChecker.args",
+        new_callable=PropertyMock)
+
+    with args_mock as m_args:
+        assert checker.recurse == m_args.return_value.recurse
+    assert "recurse" not in checker.__dict__
 
 
 def test_python_check_yapf(patches):
