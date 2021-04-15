@@ -36,9 +36,13 @@ if [[ $${SYSTEM} == *MSYS_NT* ]]; then
     else
       WEE8_BUILD_ARGS+=" clang_base_path=\"C:/Program Files/LLVM\""
     fi
+
     if [[ -n $${LLVM_VERSION-} ]]; then
       WEE8_BUILD_ARGS+=" clang_version=\"$${LLVM_VERSION}\""
     fi
+
+    # Don't pass "/call-graph-profile-sort:no" which doesn't work in clang-cl.
+    WEE8_BUILD_ARGS+=" enable_call_graph_profile_sort=true"
 
     export IS_CLANG=true
   else
