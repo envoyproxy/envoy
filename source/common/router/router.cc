@@ -759,6 +759,13 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
 
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      cluster_->requestResponseSizeStats();
+  if (req_resp_stats.has_value()) {
+    req_resp_stats->get().upstream_rq_body_size_.recordValue(
+        callbacks_->streamInfo().bytesReceived());
+  }
+
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
@@ -768,13 +775,6 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   downstream_trailers_ = &trailers;
   for (auto& upstream_request : upstream_requests_) {
     upstream_request->encodeTrailers(trailers);
-  }
-
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      cluster_->requestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rq_body_size_.recordValue(
-        callbacks_->streamInfo().bytesReceived());
   }
 
   onRequestComplete();
