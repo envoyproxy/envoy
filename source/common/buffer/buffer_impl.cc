@@ -554,7 +554,7 @@ OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 
-OwnedImpl::OwnedImpl(BufferMemoryAccountSharedPtr account) : OwnedImpl() { bindAccount(account); }
+OwnedImpl::OwnedImpl(BufferMemoryAccountSharedPtr account) : account_(std::move(account)) {}
 
 std::string OwnedImpl::toString() const {
   std::string output;

@@ -1514,7 +1514,7 @@ TEST(BufferMemoryAccountTest, UnusedReservationSlicesShouldBeCreditedAccountAfte
   ASSERT_EQ(buffer_account->balance(), 0);
 
   // Create an excessively large reservation. The unused portion should be
-  // credited on destruction.
+  // credited on commit.
   auto reservation = buffer.reserveForRead();
   EXPECT_EQ(buffer_account->balance(), 16384 * 8);
 
