@@ -673,6 +673,15 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
   Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
       clusterRequestResponseSizeStats();
   if (req_resp_stats.has_value()) {
+    // Note: we record the request headers size here instead of doing it in decodeHeaders()
+    // so that it happens after the filter chain has ran and the destination cluster is final.
+    //
+    // This is still not perfect, because retries won't be accounted for. Also, because this
+    // happens after the router filter has ran, response headers might have been added or
+    // removed so the accounting won't reflect the precise number of bytes either.
+    //
+    // TODO(rgs1): move this into the router filter, where we can precisely account these values.
+    req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
     req_resp_stats->get().upstream_rq_body_size_.recordValue(
         filter_manager_.streamInfo().bytesReceived());
     req_resp_stats->get().upstream_rs_body_size_.recordValue(
@@ -966,16 +975,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
-
-  // Note: this is the earliest point at which we can record headers size stats, given that
-  // cluster info becomes available after refreshCachedRoute() is called. So any additional
-  // headers that were added before this point will be accounted for, thus this number will
-  // be bigger than expected.
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      clusterRequestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
-  }
 
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
     filter_manager_.streamInfo().setTraceReason(
