@@ -88,9 +88,9 @@ def test_checker_has_failed(patches, failed, warned):
         result = checker.has_failed
 
     if failed or warned:
-        assert result == True
+        assert result is True
     else:
-        assert result == False
+        assert result is False
     assert "has_failed" not in checker.__dict__
 
 
@@ -181,9 +181,9 @@ def test_checker_show_summary(patches, summary, error_count, warning_count):
         result = checker.show_summary
 
     if summary or error_count or warning_count:
-        assert result == True
+        assert result is True
     else:
-        assert result == False
+        assert result is False
     assert "show_summary" not in checker.__dict__
 
 
