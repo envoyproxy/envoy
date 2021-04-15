@@ -245,10 +245,6 @@ public:
   virtual void setResponseCode(uint32_t code) PURE;
 
   /**
-   * @param port the port removed fro the authority header, if any.
-   */
-  virtual void setRemovedHostPort(uint32_t port) PURE;
-  /**
    * @param rc_details the response code details string to set for this request.
    * See ResponseCodeDetailValues above for well-known constants.
    */
@@ -306,11 +302,6 @@ public:
    * @return the response code.
    */
   virtual absl::optional<uint32_t> responseCode() const PURE;
-
-  /**
-   * @return the original port from the authority header iff it was removed by Envoy.
-   */
-  virtual absl::optional<uint32_t> removedHostPort() const PURE;
 
   /**
    * @return the response code details.

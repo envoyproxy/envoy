@@ -63,6 +63,10 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
 
 } // namespace
 
+const std::string& OriginalConnectPort::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_portr");
+}
+
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
@@ -567,11 +571,12 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     request_headers_parser_->evaluateHeaders(headers, stream_info);
   }
 
-  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
-      stream_info.removedHostPort().has_value() &&
+  // Restore the port if this was a CONNECT request.
+  if (stream_info.filterState().hasData<OriginalConnectPort>(OriginalConnectPort::key()) &&
       headers.getHostValue().find(":") == absl::string_view::npos) {
-    headers.setHost(
-        absl::StrCat(headers.getHostValue(), ":", stream_info.removedHostPort().value()));
+    const OriginalConnectPort& original_port =
+        stream_info.filterState().getDataReadOnly<OriginalConnectPort>(OriginalConnectPort::key());
+    headers.setHost(absl::StrCat(headers.getHostValue(), ":", original_port.value()));
   }
 
   if (!host_rewrite_.empty()) {

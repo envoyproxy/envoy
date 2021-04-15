@@ -69,8 +69,22 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   }
 }
 
-// Port's part from host header won't be removed if method is "connect"
 TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost:443", "localhost"},
+  };
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first, true);
+    HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
+// Port's part from host header won't be removed if method is "connect"
+TEST_F(HeaderUtilityTest, RemovePortsFromHostConnectLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.strip_port_from_connect", "false"}});
   const std::vector<std::pair<std::string, std::string>> host_headers{
       {"localhost:443", "localhost:443"},
   };
