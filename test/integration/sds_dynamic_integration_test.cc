@@ -48,25 +48,25 @@ const envoy::service::secret::v3::SdsDummy _sds_dummy;
 
 struct TestParams {
   Network::Address::IpVersion ip_version;
-  Grpc::ClientType grpc_type;
+  Grpc::ClientType sds_grpc_type;
   bool test_quic;
 };
 
 std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format("{}_{}_{}",
-                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-                     p.param.grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-                     p.param.test_quic ? "UsesQuic" : "UsesTcp");
+  return fmt::format(
+      "{}_{}_{}", p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+      p.param.sds_grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+      p.param.test_quic ? "UsesQuic" : "UsesTcp");
 }
 
 std::vector<TestParams> getSdsTestsParams(bool test_quic) {
   std::vector<TestParams> ret;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (auto grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
-      ret.push_back(TestParams{ip_version, grpc_type, false});
+    for (auto sds_grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
+      ret.push_back(TestParams{ip_version, sds_grpc_type, false});
       if (test_quic) {
 #ifdef ENVOY_ENABLE_QUIC
-        ret.push_back(TestParams{ip_version, grpc_type, true});
+        ret.push_back(TestParams{ip_version, sds_grpc_type, true});
 #else
         ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
 #endif
@@ -95,7 +95,7 @@ public:
         test_quic_(GetParam().test_quic) {}
 
   Network::Address::IpVersion ipVersion() const override { return GetParam().ip_version; }
-  Grpc::ClientType clientType() const override { return GetParam().grpc_type; }
+  Grpc::ClientType clientType() const override { return GetParam().sds_grpc_type; }
 
 protected:
   void createSdsStream(FakeUpstream&) {

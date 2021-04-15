@@ -143,6 +143,7 @@ public:
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
         listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
+    transport_socket_factory_->initialize();
   }
 
   void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key) {

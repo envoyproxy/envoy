@@ -37,14 +37,11 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
                                        protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicTransportSocketFactoryBase(Stats::Scope& store, Ssl::ContextConfig& context_config,
-                                 const std::string& perspective)
-      : stats_(generateStats(store, perspective)) {
-    context_config.setSecretUpdateCallback([this]() {
-      // The callback also triggers updating config_ with the new secret.
-      onSecretUpdated();
-    });
-  }
+  QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
+      : stats_(generateStats(store, perspective)) {}
+
+  // To be called right after contrustion.
+  virtual void initialize() = 0;
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -55,6 +52,14 @@ public:
   bool usesProxyProtocolOptions() const override { return false; }
 
 protected:
+  // To be called by subclass right after construction.
+  void initializeSecretUpdateCallback(Ssl::ContextConfig& context_config) {
+    context_config.setSecretUpdateCallback([this]() {
+      // The callback also updates config_ with the new secret.
+      onSecretUpdated();
+    });
+  }
+
   virtual void onSecretUpdated() { stats_.context_config_update_by_sds_.inc(); };
 
   QuicTransportSocketFactoryStats stats_;
@@ -67,7 +72,9 @@ private:
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
   QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, *config, "server"), config_(std::move(config)) {}
+      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)) {}
+
+  void initialize() override { initializeSecretUpdateCallback(*config_); }
 
   // Return TLS certificates if the context config is ready.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
@@ -87,7 +94,9 @@ private:
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
   QuicClientTransportSocketFactory(Stats::Scope& store, Ssl::ClientContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, *config, "client"), config_(std::move(config)) {}
+      : QuicTransportSocketFactoryBase(store, "client"), config_(std::move(config)) {}
+
+  void initialize() override { initializeSecretUpdateCallback(*config_); }
 
   const Ssl::ClientContextConfig& clientContextConfig() const { return *config_; }
 
