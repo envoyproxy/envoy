@@ -1,5 +1,7 @@
 #include "common/quic/envoy_quic_utils.h"
 
+#include <memory>
+
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
@@ -225,19 +227,20 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
   return sign_alg;
 }
 
-const Network::FilterChain* getFilterChain(Network::IoHandle& io_handle,
-                                           Network::FilterChainManager& filter_chain_manager,
-                                           const quic::QuicSocketAddress& self_address,
-                                           const quic::QuicSocketAddress& peer_address,
-                                           const std::string& hostname, absl::string_view alpn) {
-  Network::ConnectionSocketImpl connection_socket(std::make_unique<QuicIoHandleWrapper>(io_handle),
-                                                  quicAddressToEnvoyAddressInstance(self_address),
-                                                  quicAddressToEnvoyAddressInstance(peer_address));
-  connection_socket.setDetectedTransportProtocol(
+Network::ConnectionSocketPtr
+createServerConnectionSocket(Network::IoHandle& io_handle,
+                             const quic::QuicSocketAddress& self_address,
+                             const quic::QuicSocketAddress& peer_address,
+                             const std::string& hostname, absl::string_view alpn) {
+  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+      std::make_unique<QuicIoHandleWrapper>(io_handle),
+      quicAddressToEnvoyAddressInstance(self_address),
+      quicAddressToEnvoyAddressInstance(peer_address));
+  connection_socket->setDetectedTransportProtocol(
       Extensions::TransportSockets::TransportProtocolNames::get().Quic);
-  connection_socket.setRequestedServerName(hostname);
-  connection_socket.setRequestedApplicationProtocols({alpn});
-  return filter_chain_manager.findFilterChain(connection_socket);
+  connection_socket->setRequestedServerName(hostname);
+  connection_socket->setRequestedApplicationProtocols({alpn});
+  return connection_socket;
 }
 
 } // namespace Quic

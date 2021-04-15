@@ -11,18 +11,19 @@ namespace Quic {
 
 EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    std::unique_ptr<EnvoyQuicConnection> connection, quic::QuicSession::Visitor* visitor,
+    std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, Network::ListenerConfig& /*listener_config*/)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
+      QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
+                                      send_buffer_limit),
       quic_connection_(std::move(connection)) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
-  QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
+  QuicFilterManagerConnectionImpl::network_connection_ = nullptr;
 }
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
@@ -112,6 +113,14 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
 }
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
+
+const quic::QuicConnection* EnvoyQuicServerSession::quicConnection() const {
+  return initialized_ ? connection() : nullptr;
+}
+
+quic::QuicConnection* EnvoyQuicServerSession::quicConnection() {
+  return initialized_ ? connection() : nullptr;
+}
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();

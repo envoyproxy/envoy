@@ -57,18 +57,19 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
   quic_config.SetInitialSessionFlowControlWindowToSend(
       1.5 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+
+  Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
+      listen_socket_.ioHandle(), self_address, peer_address, std::string(sni), alpn);
+  const Network::FilterChain* filter_chain =
+      listener_config_.filterChainManager().findFilterChain(*connection_socket);
+
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
-      /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listen_socket_);
+      /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, std::move(connection_socket));
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_.perConnectionBufferLimitBytes(), listener_config_);
-
-  const Network::FilterChain* filter_chain =
-      getFilterChain(listen_socket_.ioHandle(), listener_config_.filterChainManager(), self_address,
-                     peer_address, std::string(sni), alpn);
-  ASSERT(filter_chain);
   if (filter_chain != nullptr) {
     const bool has_filter_initialized =
         listener_config_.filterChainFactory().createNetworkFilterChain(

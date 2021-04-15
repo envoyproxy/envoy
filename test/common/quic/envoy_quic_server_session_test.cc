@@ -55,28 +55,6 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
-class TestEnvoyQuicServerConnection : public EnvoyQuicServerConnection {
-public:
-  TestEnvoyQuicServerConnection(quic::QuicConnectionHelperInterface& helper,
-                                quic::QuicAlarmFactory& alarm_factory,
-                                quic::QuicPacketWriter& writer,
-                                const quic::ParsedQuicVersionVector& supported_versions,
-                                Network::Socket& listen_socket)
-      : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
-                                  quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
-                                  quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
-                                  helper, alarm_factory, &writer, /*owns_writer=*/false,
-                                  supported_versions, listen_socket) {}
-
-  Network::Connection::ConnectionStats& connectionStats() const {
-    return EnvoyQuicConnection::connectionStats();
-  }
-
-  MOCK_METHOD(void, SendConnectionClosePacket,
-              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
-  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
-};
-
 // Derive to have simpler priority mechanism.
 class TestEnvoyQuicServerSession : public EnvoyQuicServerSession {
 public:
@@ -154,12 +132,12 @@ public:
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
-        quic_connection_(new TestEnvoyQuicServerConnection(
+        quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
+                            std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
@@ -270,7 +248,7 @@ protected:
   quic::ParsedQuicVersionVector quic_version_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  TestEnvoyQuicServerConnection* quic_connection_;
+  MockEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;

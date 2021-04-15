@@ -5,6 +5,18 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/core/quic_connection.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/http/http3/codec_stats.h"
@@ -24,8 +36,9 @@ namespace Quic {
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
                                         public SendBufferMonitor {
 public:
-  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
-                                  uint32_t send_buffer_limit);
+  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection,
+                                  const quic::QuicConnectionId& connection_id,
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
   ~QuicFilterManagerConnectionImpl() override = default;
 
   // Network::FilterManager
@@ -56,10 +69,10 @@ public:
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {}
   bool readEnabled() const override { return true; }
   const Network::SocketAddressSetter& addressProvider() const override {
-    return quic_connection_->connectionSocket()->addressProvider();
+    return network_connection_->connectionSocket()->addressProvider();
   }
   Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return quic_connection_->connectionSocket()->addressProviderSharedPtr();
+    return network_connection_->connectionSocket()->addressProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
@@ -69,17 +82,17 @@ public:
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
     Network::ConnectionImplBase::setConnectionStats(stats);
-    quic_connection_->setConnectionStats(stats);
+    network_connection_->setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
-    if (!initialized_ || (quic_connection_ != nullptr && quic_connection_->connected())) {
+    if (!initialized_ || (quicConnection() != nullptr && quicConnection()->connected())) {
       return Network::Connection::State::Open;
     }
     return Network::Connection::State::Closed;
   }
   bool connecting() const override {
-    if (initialized_ && (quic_connection_ == nullptr || quic_connection_->IsHandshakeComplete())) {
+    if (initialized_ && (quicConnection() == nullptr || quicConnection()->IsHandshakeComplete())) {
       return false;
     }
     return true;
@@ -130,7 +143,7 @@ public:
   }
 
 protected:
-  // Propagate connection close to network_connection_callbacks_.
+  // Propagate connection close to network_network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
                               quic::ConnectionCloseSource source);
 
@@ -138,12 +151,15 @@ protected:
 
   virtual bool hasDataToWrite() PURE;
 
-  EnvoyQuicConnection* quic_connection_{nullptr};
+  // Returns a QuicConnection interface if initialized_ is true, otherwise nullptr.
+  virtual const quic::QuicConnection* quicConnection() const = 0;
+  virtual quic::QuicConnection* quicConnection() = 0;
+
+  EnvoyQuicConnection* network_connection_{nullptr};
 
   absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
   absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
       http3_options_;
-  // If false, do not call into quic_connection_.
   bool initialized_{false};
 
 private:

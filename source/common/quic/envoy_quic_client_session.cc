@@ -11,20 +11,21 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     quic::QuicCryptoClientConfig* crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit)
-    : QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
+    : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
+                                      send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config, push_promise_index),
       host_name_(server_id.host()) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
-  quic_connection_ = nullptr;
+  network_connection_ = nullptr;
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return host_name_; }
 
 void EnvoyQuicClientSession::connect() {
-  dynamic_cast<EnvoyQuicClientConnection*>(quic_connection_)->setUpConnectionSocket();
+  dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)->setUpConnectionSocket();
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
   CryptoConnect();
@@ -39,7 +40,7 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 void EnvoyQuicClientSession::Initialize() {
   quic::QuicSpdyClientSession::Initialize();
   initialized_ = true;
-  quic_connection_->setEnvoyConnection(*this);
+  network_connection_->setEnvoyConnection(*this);
 }
 
 void EnvoyQuicClientSession::OnCanWrite() {
@@ -99,6 +100,14 @@ EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
 }
 
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
+
+const quic::QuicConnection* EnvoyQuicClientSession::quicConnection() const {
+  return initialized_ ? connection() : nullptr;
+}
+
+quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
+  return initialized_ ? connection() : nullptr;
+}
 
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);

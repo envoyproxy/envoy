@@ -50,11 +50,8 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(quic::test::TestConnectionId(),
-                         quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 123),
-                         quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
-                         connection_helper_, alarm_factory_, &writer_,
-                         /*owns_writer=*/false, {quic_version_}, *listener_config_.socket_),
+        quic_connection_(connection_helper_, alarm_factory_, writer_,
+                         quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
@@ -111,6 +108,8 @@ public:
       EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _)).Times(testing::AtMost(1u));
       EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, quic::QUIC_STREAM_NO_ERROR))
           .Times(testing::AtMost(1u));
+      EXPECT_CALL(quic_connection_,
+                  SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed by application"));
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
   }
@@ -166,7 +165,7 @@ protected:
   quic::QuicConfig quic_config_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
-  EnvoyQuicServerConnection quic_connection_;
+  testing::NiceMock<MockEnvoyQuicServerConnection> quic_connection_;
   MockEnvoyQuicSession quic_session_;
   quic::QuicStreamId stream_id_;
   Http::Http3::CodecStats stats_;
@@ -605,6 +604,8 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   std::string response(16 * 1024 + 1, 'a');
+  EXPECT_CALL(quic_connection_,
+              SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed in WriteHeaders"));
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .Times(testing::AtLeast(1u))
       .WillRepeatedly(
@@ -645,6 +646,8 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
 // onResetStream() callbacks.
 TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
+  EXPECT_CALL(quic_connection_,
+              SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed in WriteHeaders"));
   EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
       .WillOnce(
           Invoke([this](quic::QuicStreamId, size_t, quic::QuicStreamOffset,

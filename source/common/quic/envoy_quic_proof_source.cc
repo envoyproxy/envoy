@@ -83,9 +83,10 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
                                                      const quic::QuicSocketAddress& client_address,
                                                      const std::string& hostname) {
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
+  Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
+      listen_socket_.ioHandle(), server_address, client_address, hostname, "h3-29");
   const Network::FilterChain* filter_chain =
-      getFilterChain(listen_socket_.ioHandle(), filter_chain_manager_, server_address,
-                     client_address, hostname, "h3-29");
+      filter_chain_manager_.findFilterChain(*connection_socket);
 
   if (filter_chain == nullptr) {
     listener_stats_.no_filter_chain_match_.inc();
