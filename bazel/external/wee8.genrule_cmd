@@ -36,6 +36,9 @@ if [[ $${SYSTEM} == *MSYS_NT* ]]; then
     else
       WEE8_BUILD_ARGS+=" clang_base_path=\"C:/Program Files/LLVM\""
     fi
+    if [[ -n $${LLVM_VERSION-} ]]; then
+      WEE8_BUILD_ARGS+=" clang_version=\"$${LLVM_VERSION}\""
+    fi
 
     export IS_CLANG=true
   else
