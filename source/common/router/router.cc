@@ -776,7 +776,6 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   for (auto& upstream_request : upstream_requests_) {
     upstream_request->encodeTrailers(trailers);
   }
-
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
 }
