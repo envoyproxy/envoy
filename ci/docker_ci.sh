@@ -144,7 +144,7 @@ done
 mkdir -p "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
 ENVOY_DOCKER_TAR="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker-images.tar.xz"
 echo "Saving built images to ${ENVOY_DOCKER_TAR}."
-LC_ALL=C docker save "${IMAGES_TO_SAVE[@]}" | LC_ALL=C xz -T0 -2 >"${ENVOY_DOCKER_TAR}"
+docker save "${IMAGES_TO_SAVE[@]}" | xz -T0 -2 >"${ENVOY_DOCKER_TAR}"
 
 # Only push images for main builds, release branch builds, and tag builds.
 if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] &&
