@@ -29,7 +29,6 @@ class FuzzUdpListenerCallbacks : public Network::UdpListenerCallbacks {
 public:
   FuzzUdpListenerCallbacks(UdpFuzz* upf) : my_upf_(upf) {}
   ~FuzzUdpListenerCallbacks() override = default;
-  UdpFuzz* my_upf_;
   void onData(Network::UdpRecvData&& data) override;
   void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
@@ -39,6 +38,9 @@ public:
   void onDatagramsDropped(uint32_t dropped) override;
   uint32_t workerIndex() const override;
   Network::UdpPacketWriter& udpPacketWriter() override;
+
+private:
+  UdpFuzz* my_upf_;
 };
 
 class UdpFuzz {
@@ -70,7 +72,8 @@ public:
 
     // Now do all of the fuzzing
     FuzzedDataProvider provider(buf, len);
-    total_packets_ = provider.ConsumeIntegralInRange<uint16_t>(1, 15);
+    static const int MaxPackets = 15;
+    total_packets_ = provider.ConsumeIntegralInRange<uint16_t>(1, MaxPackets);
     Network::Test::UdpSyncPeer client_(ip_version_);
     for (uint16_t i = 0; i < total_packets_; i++) {
       std::string packet_ =
@@ -92,7 +95,6 @@ public:
     // a DispatcherImpl to access DispatcherImpl::base_, which is not part of
     // the Dispatcher API.
     Event::DispatcherImpl* impl = dynamic_cast<Event::DispatcherImpl*>(dispatcher_.get());
-    // RELEASE_ASSERT(impl, "dispatcher dynamic-cast to DispatcherImpl failed");
     return *impl;
   }
 
