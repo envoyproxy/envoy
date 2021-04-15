@@ -3,6 +3,7 @@
 # 3. Fix MSAN linking.
 # 4. Provide more details on Windows build failures.
 # 5. Don't try to setup Windows x86 toolchain.
+# 6. Use /clang flag for options not supported in clang-cl.
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -84,3 +85,18 @@
    win_toolchains("x64") {
      toolchain_arch = "x64"
    }
+--- wee8/build/config/compiler/BUILD.gn
++++ wee8/build/config/compiler/BUILD.gn
+@@ -282,7 +282,11 @@ config("compiler") {
+   # so only enable it if using_clang. See: https://gcc.gnu.org/PR97913
+   # TODO(mpdenton): remove is_clang once GCC bug is fixed.
+   if (!is_nacl && !is_ubsan && is_clang) {
+-    cflags += [ "-fno-delete-null-pointer-checks" ]
++    if (is_win) {
++      cflags += [ "/clang:-fno-delete-null-pointer-checks" ]
++    } else {
++      cflags += [ "-fno-delete-null-pointer-checks" ]
++    }
+   }
+
+   # In general, Windows is totally different, but all the other builds share

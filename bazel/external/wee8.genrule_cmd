@@ -35,7 +35,6 @@ if [[ $${SYSTEM} == *MSYS_NT* ]]; then
       WEE8_BUILD_ARGS+=" clang_base_path=\"$${LLVM_DIR}\""
     fi
 
-    export CXXFLAGS="$${CXXFLAGS-} -Wno-unknown-argument"
     export IS_CLANG=true
   else
     export IS_CLANG=false
