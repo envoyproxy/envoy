@@ -629,7 +629,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
 
   // The stream should have been reset here before the complete
   // response was received.
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
 }
 
 // Send a request, but wait longer than the "message timeout" before sending a response
