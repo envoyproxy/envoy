@@ -26,10 +26,10 @@ namespace {
 
 class UdpFuzz;
 
-class fuzzUdpListenerCallbacks : public Network::UdpListenerCallbacks {
+class FuzzUdpListenerCallbacks : public Network::UdpListenerCallbacks {
 public:
-  fuzzUdpListenerCallbacks(UdpFuzz* upf) : my_upf(upf) {}
-  ~fuzzUdpListenerCallbacks() = default;
+  FuzzUdpListenerCallbacks(UdpFuzz* upf) : my_upf(upf) {}
+  ~FuzzUdpListenerCallbacks() override = default;
   UdpFuzz* my_upf;
   void onData(Network::UdpRecvData&& data) override;
   void onReadReady() override;
@@ -58,7 +58,7 @@ public:
     udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
 
     // Set up callbacks
-    fuzzUdpListenerCallbacks fuzzCallbacks(this);
+    FuzzUdpListenerCallbacks fuzzCallbacks(this);
 
     // Create listener with default config
     envoy::config::core::v3::UdpSocketConfig config;
@@ -77,7 +77,7 @@ public:
     for (uint16_t i = 0; i < total_packets; i++) {
       std::string packet_ =
           provider.ConsumeBytesAsString(provider.ConsumeIntegralInRange<uint32_t>(1, 3000));
-      if (packet_.size() == 0) {
+      if (packet_.empty()) {
         packet_ = "EMPTY_PACKET";
       }
       client_.write(packet_, *send_to_addr_);
@@ -98,11 +98,11 @@ public:
     return *impl;
   }
 
-  Network::SocketSharedPtr createServerSocket(bool bind, Network::Address::IpVersion version_) {
+  Network::SocketSharedPtr createServerSocket(bool bind, Network::Address::IpVersion version) {
     // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source
     // address.
     return std::make_shared<Network::UdpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(version_),
+        Network::Test::getCanonicalLoopbackAddress(version),
 #ifdef IP_FREEBIND
         Network::SocketOptionFactory::buildIpFreebindOptions(),
 #else
@@ -120,44 +120,39 @@ public:
   Network::Address::IpVersion ip_version_;
 };
 
-void fuzzUdpListenerCallbacks::onData(Network::UdpRecvData&& data) {
+void FuzzUdpListenerCallbacks::onData(Network::UdpRecvData&& data) {
   my_upf->sent_packets++;
   if (my_upf->sent_packets == my_upf->total_packets) {
     my_upf->dispatcher_->exit();
   }
   UNREFERENCED_PARAMETER(data);
-  return;
 }
 
-void fuzzUdpListenerCallbacks::onReadReady() { return; }
+void FuzzUdpListenerCallbacks::onReadReady() { }
 
-void fuzzUdpListenerCallbacks::onWriteReady(const Network::Socket& socket) {
+void FuzzUdpListenerCallbacks::onWriteReady(const Network::Socket& socket) {
   UNREFERENCED_PARAMETER(socket);
-  return;
 }
 
-void fuzzUdpListenerCallbacks::onReceiveError(Api::IoError::IoErrorCode error_code) {
+void FuzzUdpListenerCallbacks::onReceiveError(Api::IoError::IoErrorCode error_code) {
   my_upf->sent_packets++;
   if (my_upf->sent_packets == my_upf->total_packets) {
     my_upf->dispatcher_->exit();
   }
   UNREFERENCED_PARAMETER(error_code);
-  return;
 }
-Network::UdpPacketWriter& fuzzUdpListenerCallbacks::udpPacketWriter() {
+Network::UdpPacketWriter& FuzzUdpListenerCallbacks::udpPacketWriter() {
   return *my_upf->udp_packet_writer_;
 }
-uint32_t fuzzUdpListenerCallbacks::workerIndex() const { return 0; }
-void fuzzUdpListenerCallbacks::onDataWorker(Network::UdpRecvData&& data) {
+uint32_t FuzzUdpListenerCallbacks::workerIndex() const { return 0; }
+void FuzzUdpListenerCallbacks::onDataWorker(Network::UdpRecvData&& data) {
   UNREFERENCED_PARAMETER(data);
-  return;
 }
-void fuzzUdpListenerCallbacks::post(Network::UdpRecvData&& data) {
+void FuzzUdpListenerCallbacks::post(Network::UdpRecvData&& data) {
   UNREFERENCED_PARAMETER(data);
-  return;
 }
 
-void fuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
+void FuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
   my_upf->sent_packets++;
   if (my_upf->sent_packets == my_upf->total_packets) {
     my_upf->dispatcher_->exit();
