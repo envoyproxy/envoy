@@ -756,7 +756,7 @@ message Cluster {
   // in the :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
   // upstream_http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
-  // See ref:`upstream_http_protocol_options
+  // See :ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
   core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46
@@ -769,7 +769,7 @@ message Cluster {
   // in the :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
   // common_http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
-  // See ref:`upstream_http_protocol_options
+  // See :ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
   core.v3.HttpProtocolOptions common_http_protocol_options = 29
@@ -780,7 +780,7 @@ message Cluster {
   // :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
-  // See ref:`upstream_http_protocol_options
+  // See :ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
   core.v3.Http1ProtocolOptions http_protocol_options = 13
@@ -796,7 +796,7 @@ message Cluster {
   // :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`
   // message. http2_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
-  // See ref:`upstream_http_protocol_options
+  // See :ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // for example usage.
   core.v3.Http2ProtocolOptions http2_protocol_options = 14 [

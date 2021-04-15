@@ -238,7 +238,7 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  // [#not-implemented-hide] Transformations that apply to path headers. Transformations are applied
+  // [#not-implemented-hide:] Transformations that apply to path headers. Transformations are applied
   // before any processing of requests by HTTP filters, routing, and matching. Only the normalized
   // path will be visible internally if a transformation is enabled. Any path rewrites that the
   // router performs (e.g. :ref:`regex_rewrite
@@ -252,7 +252,7 @@ message HttpConnectionManager {
         "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager."
         "PathNormalizationOptions";
 
-    // [#not-implemented-hide] Normalization applies internally before any processing of requests by
+    // [#not-implemented-hide:] Normalization applies internally before any processing of requests by
     // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
     // to :ref:`NormalizePathRFC3986
     // <envoy_api_msg_type.http.v3.PathTransformation.Operation.NormalizePathRFC3986>`. When not
@@ -262,7 +262,7 @@ message HttpConnectionManager {
     // normalization due to disallowed characters.)
     type.http.v3.PathTransformation forwarding_transformation = 1;
 
-    // [#not-implemented-hide] Normalization only applies internally before any processing of
+    // [#not-implemented-hide:] Normalization only applies internally before any processing of
     // requests by HTTP filters, routing, and matching. These will be applied after full
     // transformation is applied. The *:path* header before this transformation will be restored in
     // the router filter and sent upstream unless it was mutated by a filter. Defaults to no

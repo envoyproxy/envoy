@@ -171,6 +171,8 @@ rsync -av \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
 
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:rst_check "${GENERATED_RST_DIR}"
+
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
 
