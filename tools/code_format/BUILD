@@ -22,9 +22,3 @@ envoy_py_binary(
         requirement("yapf"),
     ],
 )
-
-py_binary(
-    name = "rst_check",
-    srcs = ["rst_check.py"],
-    visibility = ["//visibility:public"],
-)
