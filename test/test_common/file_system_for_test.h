@@ -35,7 +35,7 @@ protected:
     if (!flags_.test(File::Operation::Append)) {
       info_->data_.clear();
     }
-    info_->data_.append(buffer);
+    info_->data_.append(std::string(buffer));
     const ssize_t size = info_->data_.size();
     return resultSuccess(size);
   }

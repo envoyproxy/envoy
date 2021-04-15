@@ -29,13 +29,13 @@ public:
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value) override {
     ASSERT(Thread::MainThread::isMainThread());
-    (*dynamic_context_[resource_type_url].mutable_params())[key] = value;
+    (*dynamic_context_[resource_type_url].mutable_params())[std::string(key)] = std::string(value);
     update_cb_helper_.runCallbacks(resource_type_url);
   }
   void unsetDynamicContextParam(absl::string_view resource_type_url,
                                 absl::string_view key) override {
     ASSERT(Thread::MainThread::isMainThread());
-    dynamic_context_[resource_type_url].mutable_params()->erase(key);
+    dynamic_context_[resource_type_url].mutable_params()->erase(std::string(key));
     update_cb_helper_.runCallbacks(resource_type_url);
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr

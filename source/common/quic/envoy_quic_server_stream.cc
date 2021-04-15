@@ -45,7 +45,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {
-  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+  ASSERT(GetReceiveWindow() > 8UL * 1024, "Send buffer limit should be larger than 8KB.");
 }
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(
