@@ -285,8 +285,6 @@ private:
       return connection_manager_.enable_internal_redirects_with_body_;
     }
 
-    Upstream::ClusterRequestResponseSizeStatsOptRef clusterRequestResponseSizeStats();
-
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is

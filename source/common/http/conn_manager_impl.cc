@@ -670,24 +670,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
 
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      clusterRequestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    // Note: we record the request headers size here instead of doing it in decodeHeaders()
-    // so that it happens after the filter chain has ran and the destination cluster is final.
-    //
-    // This is still not perfect, because retries won't be accounted for. Also, because this
-    // happens after the router filter has ran, response headers might have been added or
-    // removed so the accounting won't reflect the precise number of bytes either.
-    //
-    // TODO(rgs1): move this into the router filter, where we can precisely account these values.
-    req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
-    req_resp_stats->get().upstream_rq_body_size_.recordValue(
-        filter_manager_.streamInfo().bytesReceived());
-    req_resp_stats->get().upstream_rs_body_size_.recordValue(
-        filter_manager_.streamInfo().bytesSent());
-  }
-
   if (connection_manager_.remote_close_) {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
@@ -780,12 +762,6 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
 
   if (filter_manager_.streamInfo().health_check_request_) {
     return;
-  }
-
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      clusterRequestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
   }
 
   // No response is sent back downstream for internal redirects, so don't charge downstream stats.
@@ -1561,18 +1537,6 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::cluster
   }
 
   return cached_cluster_info_.value();
-}
-
-Upstream::ClusterRequestResponseSizeStatsOptRef
-ConnectionManagerImpl::ActiveStream::clusterRequestResponseSizeStats() {
-  if (cached_cluster_info_.has_value()) {
-    auto& cluster_info = cached_cluster_info_.value();
-    if (cluster_info) {
-      return cluster_info->requestResponseSizeStats();
-    }
-  }
-
-  return absl::nullopt;
 }
 
 Router::RouteConstSharedPtr
