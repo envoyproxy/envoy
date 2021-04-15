@@ -31,6 +31,9 @@ if [[ $${SYSTEM} == *MSYS_NT* ]]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
 
   if [[ $${USE_CLANG_CL-} == "1" ]]; then
+    # Hardcoded path to LLVM on Windows.
+    WEE8_BUILD_ARGS+=" clang_base_path=\"C:/Program Files/LLVM\""
+
     export IS_CLANG=true
   else
     export IS_CLANG=false
