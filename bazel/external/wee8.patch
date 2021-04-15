@@ -63,7 +63,7 @@
      sys_include_flags = "${win_toolchain_data.include_flags_imsvc}"
      sys_lib_flags =
 -        "-libpath:$_clang_lib_dir ${win_toolchain_data.libpath_flags}"
-+        "\"-libpath:$_clang_lib_dir ${win_toolchain_data.libpath_flags}\""
++        "\"-libpath:$_clang_lib_dir\" ${win_toolchain_data.libpath_flags}"
 
      toolchain_args = {
        if (defined(invoker.toolchain_args)) {
