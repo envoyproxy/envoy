@@ -25,11 +25,12 @@ public:
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config, Api::Api& api)
       : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, api)),
         content_type_(
-            !config.content_type().empty() ? config.content_type()
-            : config.format_case() ==
-                    envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
-                ? Http::Headers::get().ContentTypeValues.Json
-                : Http::Headers::get().ContentTypeValues.Text) {}
+            !config.content_type().empty()
+                ? config.content_type()
+                : config.format_case() ==
+                          envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
+                      ? Http::Headers::get().ContentTypeValues.Json
+                      : Http::Headers::get().ContentTypeValues.Text) {}
 
   void format(const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,
