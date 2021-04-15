@@ -36,17 +36,14 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   if (!config.path().empty()) {
-
     watcher_ = ValueSetWatcher::create(factory_context, config.path());
 
   } else if (!config.ip_tags().empty()) {
-
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
         IpTaggingFilterSetTagData(config);
     trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 
   } else {
-
     throw EnvoyException(
         "HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
   }
@@ -99,6 +96,7 @@ ValueSetWatcher::ValueSetWatcher(Server::Configuration::FactoryContext& factory_
   maybeUpdate_(true);
 }
 
+// remove the watcher from the registry
 ValueSetWatcher::~ValueSetWatcher() {
   if (registry_ != nullptr)
     registry_->remove(*this);
@@ -130,13 +128,13 @@ IpTagFileProto ValueSetWatcher::protoFromFileContents_(absl::string_view content
 
   if (extension_ == "Yaml") {
     MessageUtil::loadFromYaml(file_content, ipf, protoValidator());
-
   } else {
     MessageUtil::loadFromJson(file_content, ipf, protoValidator());
   }
   return ipf;
 }
 
+// take proto conetnt and convert it into LcTrie
 std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
 ValueSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
 
@@ -203,7 +201,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
   std::vector<std::string> tags;
 
   if (watcher_ != nullptr) {
-    tags = watcher_->get();
+    tags = watcher_->get().getData(callbacks_->streamInfo().downstreamRemoteAddress());
   } else {
     tags = config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
   }

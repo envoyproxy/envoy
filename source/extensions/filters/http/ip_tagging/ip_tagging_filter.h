@@ -74,6 +74,7 @@ private:
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
   fileContentsAsTagSet_(absl::string_view contents) const;
   IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
+
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
   Api::Api& api_;
   std::string filename_;
