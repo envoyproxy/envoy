@@ -16,7 +16,7 @@ ENVOY_FILTER_EXAMPLE_TESTS=(
 
 if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
   rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  git clone https://github.com/qinggniq/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
 fi
 
 (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f "${ENVOY_FILTER_EXAMPLE_GITSHA}")
