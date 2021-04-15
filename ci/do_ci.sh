@@ -7,9 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
-        "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
-  build_setup_args="-nofetch"
+          "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
+          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+    build_setup_args="-nofetch"
 fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
@@ -470,8 +470,10 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   echo "Run pytest tooling tests..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_pytest -- --cov-collect  /tmp/.coverage-envoy
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_coverage -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_checker -- --cov-collect  /tmp/.coverage-envoy
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_runner -- --cov-collect  /tmp/.coverage-envoy
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_utils -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:pytest_python_check -- --cov-collect  /tmp/.coverage-envoy
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:python_coverage -- --fail-under=95 /tmp/.coverage-envoy /source/generated/tooling
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
