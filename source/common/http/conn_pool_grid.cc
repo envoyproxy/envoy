@@ -307,13 +307,9 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
-bool ConnectivityGrid::isHttp3Broken() const {
-  return broken_http3_tracker_.isHttp3Broken();
-}
+bool ConnectivityGrid::isHttp3Broken() const { return broken_http3_tracker_.isHttp3Broken(); }
 
-void ConnectivityGrid::markHttp3Broken() {
-  broken_http3_tracker_.markHttp3Broken();
-}
+void ConnectivityGrid::markHttp3Broken() { broken_http3_tracker_.markHttp3Broken(); }
 
 void ConnectivityGrid::onDrainReceived() {
   // Don't do any work under the stack of ~ConnectivityGrid()

@@ -11,21 +11,17 @@ std::chrono::minutes DefaultExpirationTime{5};
 } // namespace
 
 BrokenHttp3Tracker::BrokenHttp3Tracker(Event::Dispatcher& dispatcher)
-    : expiration_timer_(dispatcher.createTimer([this]() -> void { onExpirationTimeout(); })) {
-}
+    : expiration_timer_(dispatcher.createTimer([this]() -> void { onExpirationTimeout(); })) {}
 
-bool BrokenHttp3Tracker::isHttp3Broken() const {
-  return state_ == State::Broken;
-}
+bool BrokenHttp3Tracker::isHttp3Broken() const { return state_ == State::Broken; }
 
-bool BrokenHttp3Tracker::isHttp3Confirmed() const {
-  return state_ == State::Confirmed;
-}
+bool BrokenHttp3Tracker::isHttp3Confirmed() const { return state_ == State::Confirmed; }
 
 void BrokenHttp3Tracker::markHttp3Broken() {
   state_ = State::Broken;
   if (!expiration_timer_->enabled()) {
-    expiration_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(DefaultExpirationTime * (1 << consecutive_broken_count_)));
+    expiration_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
+        DefaultExpirationTime * (1 << consecutive_broken_count_)));
     ++consecutive_broken_count_;
   }
 }

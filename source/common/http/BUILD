@@ -164,8 +164,8 @@ envoy_cc_library(
     srcs = ["conn_pool_grid.cc"],
     hdrs = ["conn_pool_grid.h"],
     deps = [
-        ":mixed_conn_pool",
         ":broken_http3_tracker",
+        ":mixed_conn_pool",
         "//source/common/http/http3:conn_pool_lib",
     ],
 )
