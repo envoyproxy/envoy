@@ -37,21 +37,20 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response,
         // processing, but send the buffered request body now.
         ENVOY_LOG(debug, "Sending buffered request body message");
         callback_state_ = CallbackState::BufferedBody;
-        startMessageTimer(std::bind(&Filter::onMessageTimeout, parent_),
-                          parent_->config()->messageTimeout());
-        parent_->sendBodyChunk(*this, *bufferedData(), true);
+        startMessageTimer(std::bind(&Filter::onMessageTimeout, &filter_),
+                          filter_.config().messageTimeout());
+        filter_.sendBufferedData(*this, true);
       }
 
       // Otherwise, we're not ready to continue processing because then
       // we won't be able to modify the headers any more, so do nothing and
       // let the doData callback handle body chunks until the end is reached.
-
-    } else {
-      // If we got here, then the processor doesn't care about the body, and it doesn't
-      // matter whether we already buffered it, so we can just continue.
-      headers_ = nullptr;
-      continueProcessing();
+      return true;
     }
+
+    // If we got here, then the processor doesn't care about the body, so we can just continue.
+    headers_ = nullptr;
+    continueProcessing();
     return true;
   }
   return false;
@@ -86,8 +85,6 @@ void ProcessorState::cleanUpTimer() const {
   }
 }
 
-DecodingProcessorState::~DecodingProcessorState() = default;
-
 void DecodingProcessorState::requestWatermark() {
   if (!watermark_requested_) {
     ENVOY_LOG(debug, "Watermark raised on decoding");
@@ -103,8 +100,6 @@ void DecodingProcessorState::clearWatermark() {
     decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   }
 }
-
-EncodingProcessorState::~EncodingProcessorState() = default;
 
 void EncodingProcessorState::requestWatermark() {
   if (!watermark_requested_) {

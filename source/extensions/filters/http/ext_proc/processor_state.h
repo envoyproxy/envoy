@@ -26,7 +26,7 @@ public:
     BufferedBody,
   };
 
-  ProcessorState(Filter* parent) : parent_(parent) {}
+  explicit ProcessorState(Filter& filter) : filter_(filter) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -64,12 +64,12 @@ public:
   mutableBody(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const PURE;
 
 protected:
-  Filter* const parent_;
+  Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
   CallbackState callback_state_ = CallbackState::Idle;
-  // Keep track of whether we must send the body when the callback is done
+  // Keep track of whether we must send the body when the header processing callback is done.
   bool body_send_deferred_ = false;
-  // Keep track of whether we requested a watermark
+  // Keep track of whether we requested a watermark.
   bool watermark_requested_ = false;
   Http::HeaderMap* headers_ = nullptr;
   Event::TimerPtr message_timer_;
@@ -77,10 +77,9 @@ protected:
 
 class DecodingProcessorState : public ProcessorState {
 public:
-  DecodingProcessorState(Filter* parent) : ProcessorState(parent) {}
+  explicit DecodingProcessorState(Filter& filter) : ProcessorState(filter) {}
   DecodingProcessorState(const DecodingProcessorState&) = delete;
   DecodingProcessorState& operator=(const DecodingProcessorState&) = delete;
-  ~DecodingProcessorState() override;
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
@@ -120,10 +119,9 @@ private:
 
 class EncodingProcessorState : public ProcessorState {
 public:
-  EncodingProcessorState(Filter* parent) : ProcessorState(parent) {}
+  explicit EncodingProcessorState(Filter& filter) : ProcessorState(filter) {}
   EncodingProcessorState(const EncodingProcessorState&) = delete;
   EncodingProcessorState& operator=(const EncodingProcessorState&) = delete;
-  ~EncodingProcessorState() override;
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;

@@ -90,10 +90,11 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
 
 public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
-      : config_(config), client_(std::move(client)), stats_(config->stats()), decoding_state_(this),
-        encoding_state_(this), processing_mode_(config->processingMode()) {}
+      : config_(config), client_(std::move(client)), stats_(config->stats()),
+        decoding_state_(*this), encoding_state_(*this), processing_mode_(config->processingMode()) {
+  }
 
-  const FilterConfig* config() const { return config_.get(); }
+  const FilterConfig& config() const { return *config_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -117,7 +118,10 @@ public:
   void onGrpcClose() override;
 
   void onMessageTimeout();
-  void sendBodyChunk(const ProcessorState& state, const Buffer::Instance& data, bool end_stream);
+
+  void sendBufferedData(const ProcessorState& state, bool end_stream) {
+    sendBodyChunk(state, *state.bufferedData(), end_stream);
+  }
 
 private:
   StreamOpenState openStream();
@@ -125,6 +129,7 @@ private:
   void cleanUpTimers();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+  void sendBodyChunk(const ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state, Http::HeaderMap& headers,
                                       bool end_stream);

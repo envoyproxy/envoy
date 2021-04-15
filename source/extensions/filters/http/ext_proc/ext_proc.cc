@@ -102,13 +102,14 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, ProcessingMode::Bod
                                       Buffer::Instance& data, bool end_stream) {
   if (state.callbackState() == ProcessorState::CallbackState::Headers) {
     ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
+    // We don't know what to do with the body until the response comes back.
+    // We must buffer it in case we need it when that happens.
     if (end_stream) {
-      // Buffer the data and we'll send the callback when the response callback returns.
+      // Indicate to continue processing when the response returns.
       state.setBodySendDeferred(true);
       return FilterDataStatus::StopIterationAndBuffer;
     } else {
-      // We're not ready to decide whether we want to buffer the body, but we
-      // also don't want to fill the buffer, so pause receiving additional chunks.
+      // Raise a watermark to prevent a buffer overflow until the response comes back.
       state.requestWatermark();
       return FilterDataStatus::StopIterationAndWatermark;
     }
@@ -135,7 +136,8 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, ProcessingMode::Bod
       state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this),
                               config_->messageTimeout());
       sendBodyChunk(state, *state.bufferedData(), true);
-      // Since we just manually adjusted the buffer, don't buffer again
+      // Since we just just moved the data into the buffer, return NoBuffer
+      // so that we do not buffer this chunk twice.
       return FilterDataStatus::StopIterationNoBuffer;
     }
 
