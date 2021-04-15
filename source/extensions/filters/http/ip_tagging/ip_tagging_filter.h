@@ -78,10 +78,8 @@ private:
   void fileExtension_(std::string filename_) {
     if (absl::EndsWith(filename_, MessageUtil::FileExtensions::get().Yaml)) {
       extension_ = "Yaml";
-    } else if (absl::EndsWith(filename_, MessageUtil::FileExtensions::get().Json)) {
-      extension_ = "Json";
     } else {
-      extension_ = "Unknown";
+      extension_ = "Json";
     }
   }
 
@@ -106,7 +104,7 @@ private:
  */
 class ValueSetWatcher::Registry {
 private:
-  using map_type = absl::flat_hash_map<absl::string_view, std::weak_ptr<ValueSetWatcher>,
+  using map_type = absl::flat_hash_map<std::string, std::weak_ptr<ValueSetWatcher>,
                                        absl::Hash<absl::string_view>>;
 
 public:

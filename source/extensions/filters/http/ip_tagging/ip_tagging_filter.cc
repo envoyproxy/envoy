@@ -31,14 +31,13 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // to be implemented.
   // TODO(ccaraman): Remove size check once file system support is implemented.
   // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
-  if (config.ip_tags().empty() && config.path().empty()) {
-    throw EnvoyException(
-        "HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
+  if (!config.ip_tags().empty() && !config.path().empty()) {
+    throw EnvoyException("Only one of path or ip_tags can be specified");
   }
 
   if (!config.path().empty()) {
 
-    watcher_ = ValueSetWatcher::create(factory_context, std::move(config.path()));
+    watcher_ = ValueSetWatcher::create(factory_context, config.path());
 
   } else if (!config.ip_tags().empty()) {
 
@@ -48,7 +47,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
   } else {
 
-    throw EnvoyException("Only one of path or ip_tags can be specified");
+    throw EnvoyException(
+        "HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
   }
 }
 
