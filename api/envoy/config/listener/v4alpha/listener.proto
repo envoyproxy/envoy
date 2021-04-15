@@ -37,7 +37,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.listener.v3.Listener";
 
@@ -110,6 +110,11 @@ message Listener {
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
   core.v4alpha.Address address = 2 [(validate.rules).message = {required: true}];
+
+  // Optional prefix to use on listener stats. If empty, the stats will be rooted at
+  // `listener.<address as string>.`. If non-empty, stats will be rooted at
+  // `listener.<stat_prefix>.`.
+  string stat_prefix = 28;
 
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_api_msg_config.listener.v4alpha.FilterChain>` with the most specific
