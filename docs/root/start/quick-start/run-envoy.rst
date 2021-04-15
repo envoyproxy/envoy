@@ -157,13 +157,6 @@ Check Envoy is proxying on http://localhost:10000.
    $ curl -v localhost:10000
    ...
 
-The Envoy admin endpoint should also be available at http://localhost:9901.
-
-.. code-block:: console
-
-   $ curl -v localhost:9901
-   ...
-
 You can exit the server with `Ctrl-c`.
 
 See the :ref:`admin quick start guide <start_quick_start_admin>` for more information about the Envoy admin interface.
@@ -325,7 +318,7 @@ to ``/dev/stdout``:
    :linenos:
    :lineno-start: 12
    :lines: 12-22
-   :emphasize-lines: 4-8
+   :emphasize-lines: 4-7
 
 The default configuration in the Envoy Docker container also logs access in this way.
 

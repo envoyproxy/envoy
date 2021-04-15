@@ -21,3 +21,9 @@ py_binary(
         requirement("pep8-naming"),
     ],
 )
+
+py_binary(
+    name = "rst_check",
+    srcs = ["rst_check.py"],
+    visibility = ["//visibility:public"],
+)

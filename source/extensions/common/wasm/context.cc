@@ -657,10 +657,16 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
   case WasmHeaderMapType::RequestHeaders:
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
+    if (request_trailers_ == nullptr && request_body_buffer_ && end_of_stream_) {
+      request_trailers_ = &decoder_callbacks_->addDecodedTrailers();
+    }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
+    if (response_trailers_ == nullptr && response_body_buffer_ && end_of_stream_) {
+      response_trailers_ = &encoder_callbacks_->addEncodedTrailers();
+    }
     return response_trailers_;
   default:
     return nullptr;
