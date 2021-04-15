@@ -22,3 +22,7 @@ New Features
 
 Deprecated
 ----------
+Bug Fixes
+---------
+
+code: fixed some whitespace to make fix_format happy.

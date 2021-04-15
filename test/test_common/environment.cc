@@ -362,9 +362,9 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   out_json_string = substitute(out_json_string, version);
 
   auto name = Filesystem::fileSystemForTest().splitPathFromFilename(path).file_;
-  const std::string extension = absl::EndsWith(name, ".yaml")
-                                    ? ".yaml"
-                                    : absl::EndsWith(name, ".pb_text") ? ".pb_text" : ".json";
+  const std::string extension = absl::EndsWith(name, ".yaml")      ? ".yaml"
+                                : absl::EndsWith(name, ".pb_text") ? ".pb_text"
+                                                                   : ".json";
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;
   {
