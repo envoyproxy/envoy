@@ -243,7 +243,7 @@ absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& head
     return absl::nullopt;
   }
   // According to RFC3986 v6 address is always enclosed in "[]". section 3.2.2.
-  const auto v6_end_index = original_host.rfind("]");
+  const auto v6_end_index = original_host.rfind(']');
   if (v6_end_index == absl::string_view::npos || v6_end_index < port_start) {
     if ((port_start + 1) > original_host.size()) {
       return absl::nullopt;

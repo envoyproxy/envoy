@@ -573,7 +573,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 
   // Restore the port if this was a CONNECT request.
   if (stream_info.filterState().hasData<OriginalConnectPort>(OriginalConnectPort::key()) &&
-      headers.getHostValue().find(":") == absl::string_view::npos) {
+      headers.getHostValue().find(':') == absl::string_view::npos) {
     const OriginalConnectPort& original_port =
         stream_info.filterState().getDataReadOnly<OriginalConnectPort>(OriginalConnectPort::key());
     headers.setHost(absl::StrCat(headers.getHostValue(), ":", original_port.value()));

@@ -208,6 +208,12 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
 
   performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
   ASSERT_EQ(upstream_request_->headers().getHostValue(), "host:80");
+
+  codec_client_->sendData(*request_encoder_, "bye!", false);
+  codec_client_->close();
+  // Verify the final data was received and that the connection is torn down.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "bye!"));
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
