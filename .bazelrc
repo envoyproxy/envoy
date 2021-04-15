@@ -319,8 +319,6 @@ build:compdb --build_tag_filters=-nocompdb
 
 # Windows build quirks
 build:windows --action_env=TMPDIR
-build:windows --action_env=INCLUDE
-build:windows --action_env=LIB
 build:windows --define signal_trace=disabled
 build:windows --define hot_restart=disabled
 build:windows --define tcmalloc=disabled
