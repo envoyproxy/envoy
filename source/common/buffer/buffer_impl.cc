@@ -353,7 +353,9 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
       break;
     }
 
-    Slice slice(size, account_, slices_owner->free_list_);
+    // We will tag the reservation slices on commit. This avoids unnecessary
+    // work in the case that the entire reservation isn't used.
+    Slice slice(size, nullptr, slices_owner->free_list_);
     const auto raw_slice = slice.reserve(size);
     reservation_slices.push_back(raw_slice);
     slices_owner->owned_slices_.emplace_back(std::move(slice));

@@ -1508,18 +1508,32 @@ TEST(BufferMemoryAccountTest, ExtractingSliceWithExistingStorageCreditsAccountOn
   EXPECT_EQ(buffer_account->balance(), 4096);
 }
 
-TEST(BufferMemoryAccountTest, UnusedReservationSlicesShouldBeCreditedAccountAfterCommit) {
+TEST(BufferMemoryAccountTest, NewReservationSlicesOnlyChargedAfterCommit) {
   auto buffer_account = std::make_shared<BufferMemoryAccountImpl>();
   Buffer::OwnedImpl buffer(buffer_account);
   ASSERT_EQ(buffer_account->balance(), 0);
 
-  // Create an excessively large reservation. The unused portion should be
-  // credited on commit.
   auto reservation = buffer.reserveForRead();
-  EXPECT_EQ(buffer_account->balance(), 16384 * 8);
+  EXPECT_EQ(buffer_account->balance(), 0);
 
-  reservation.commit(16384); // Commit a slice.
+  // We should only be charged for the slices committed.
+  reservation.commit(16384);
   EXPECT_EQ(buffer_account->balance(), 16384);
+}
+
+TEST(BufferMemoryAccountTest, ReservationShouldNotChargeForExistingSlice) {
+  auto buffer_account = std::make_shared<BufferMemoryAccountImpl>();
+  Buffer::OwnedImpl buffer(buffer_account);
+  ASSERT_EQ(buffer_account->balance(), 0);
+
+  buffer.add("Many bytes remaining in this slice to use for reservation.");
+  EXPECT_EQ(buffer_account->balance(), 4096);
+
+  // The account shouldn't be charged again at commit since the commit
+  // uses memory from the slice already charged for.
+  auto reservation = buffer.reserveForReadWithLengthForTest(3000);
+  reservation.commit(2000);
+  EXPECT_EQ(buffer_account->balance(), 4096);
 }
 
 } // namespace
