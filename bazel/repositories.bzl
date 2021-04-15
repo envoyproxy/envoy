@@ -356,6 +356,9 @@ def _com_github_zlib_ng_zlib_ng():
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
+# If you're looking for envoy-filter-example / envoy_filter_example
+# the hash is in ci/filter_example_setup.sh
+
 def _org_brotli():
     external_http_archive(
         name = "org_brotli",

@@ -62,7 +62,7 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
     waitForNextUpstreamRequest();
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   }
 
@@ -73,7 +73,7 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
                                                             {"match-header", "match"},
                                                             {":authority", "blah"}};
     auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
   }
 }
