@@ -92,7 +92,7 @@ private:
 
   Api::Api& api_;
   std::string filename_;
-  static std::string extension_;
+  std::string extension_;
   std::uint64_t content_hash_ = 0;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   Server::Configuration::FactoryContext& factory_context_;
