@@ -1,6 +1,7 @@
 import argparse
 import os
 from functools import cached_property
+from typing import Optional, Sequence, Tuple, Type
 
 from tools.base import runner
 
@@ -11,7 +12,7 @@ class Checker(runner.Runner):
     Check methods should call the `self.warn`, `self.error` or `self.succeed`
     depending upon the outcome of the checks.
     """
-    checks = ()
+    checks: Tuple[str, ...] = ()
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -43,7 +44,7 @@ class Checker(runner.Runner):
     def has_failed(self) -> bool:
         """Shows whether there are any failures"""
         # add logic for warn/error
-        return self.failed or self.warned
+        return bool(self.failed or self.warned)
 
     @cached_property
     def path(self) -> str:
@@ -96,12 +97,12 @@ class Checker(runner.Runner):
         return sum(len(e) for e in self.success.values())
 
     @cached_property
-    def summary(self) -> bool:
+    def summary(self) -> CheckerSummary:
         """Instance of the checker's summary class"""
         return self.summary_class(self)
 
     @property
-    def summary_class(self):
+    def summary_class(self) -> Type[CheckerSummary]:
         """Checker's summary class"""
         return CheckerSummary
 
@@ -177,7 +178,7 @@ class Checker(runner.Runner):
             "Paths to check. At least one path must be specified, or the `path` argument should be provided"
         )
 
-    def error(self, name: str, errors: list, log: bool = True) -> None:
+    def error(self, name: str, errors: list, log: bool = True) -> int:
         """Record (and log) errors for a check type"""
         self.errors[name] = self.errors.get(name, [])
         self.errors[name].extend(errors)
@@ -185,7 +186,7 @@ class Checker(runner.Runner):
             self.log.error("\n".join(errors))
         return 1
 
-    def get_checks(self) -> list:
+    def get_checks(self) -> Sequence[str]:
         """Get list of checks for this checker class filtered according to user args"""
         return (
             self.checks if not self.args.check else

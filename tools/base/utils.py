@@ -7,7 +7,7 @@ import os
 import tempfile
 from configparser import ConfigParser
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
-from typing import Iterator
+from typing import Callable, Iterator, List, Optional, Union
 
 
 # this is testing specific - consider moving to tools.testing.utils
@@ -40,7 +40,10 @@ def nested(*contexts):
 
 
 @contextmanager
-def buffered(stdout: list = None, stderr: list = None, mangle=None) -> None:
+def buffered(
+        stdout: list = None,
+        stderr: list = None,
+        mangle: Optional[Callable[[list], list]] = None) -> Iterator[None]:
     """Captures stdout and stderr and feeds lines to supplied lists"""
 
     mangle = mangle or (lambda lines: lines)
@@ -48,7 +51,7 @@ def buffered(stdout: list = None, stderr: list = None, mangle=None) -> None:
     if stdout is None and stderr is None:
         raise BufferUtilError("You must specify stdout and/or stderr")
 
-    contexts = []
+    contexts: List[Union[redirect_stderr[io.StringIO], redirect_stdout[io.StringIO]]] = []
 
     if stdout is not None:
         _stdout = io.StringIO()

@@ -54,7 +54,7 @@ class Runner(object):
         return dict(LOG_LEVELS)[self.args.log_level]
 
     @property
-    def name(self) -> bool:
+    def name(self) -> str:
         """Name of the runner"""
         return self.__class__.__name__
 
