@@ -342,7 +342,7 @@ struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
   Network::Address::InstanceConstSharedPtr address_;
   // Whether this is the only address in the XFF header.
-  bool single_address_;
+  bool allow_trusted_address_checks_;
 };
 
 /**

@@ -14,6 +14,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Custom header original IP detection extension]
 
+// [#not-implemented-hide:]
 // This extension allows for the original downstream remote IP to be detected
 // by reading the value from a configured header name. If the value is successfully parsed
 // as an IP, it'll be treated as the effective downstream remote address and seen as such
@@ -28,6 +29,9 @@ message CustomHeaderConfig {
   message RejectOptions {
     // If reject_request_if_detection_fails is set, this sets the HTTP status that is sent downstream
     // when detection fails. The default status is HTTP 403 Forbidden.
+    //
+    // .. note::
+    //   If this is set to < 400, the default status 403 will be used instead.
     type.v3.HttpStatus status_on_error = 1;
 
     // If reject_request_if_detection_fails is set, this sets the HTTP body in the response

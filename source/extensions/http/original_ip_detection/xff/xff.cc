@@ -19,7 +19,7 @@ Envoy::Http::OriginalIPDetectionResult
 XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
   auto ret =
       Envoy::Http::Utility::getLastAddressFromXFF(params.request_headers, xff_num_trusted_hops_);
-  return {ret.address_, ret.single_address_, absl::nullopt};
+  return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt};
 }
 
 } // namespace Xff

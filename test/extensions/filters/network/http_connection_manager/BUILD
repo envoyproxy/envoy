@@ -47,8 +47,6 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/extensions/http/original_ip_detection/custom_header:config",
-        "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
