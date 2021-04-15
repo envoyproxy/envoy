@@ -744,6 +744,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   if (end_stream) {
+    // TODO(rgs1): should we skip this if there's no body?
     Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
         cluster_->requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
@@ -769,6 +770,15 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   for (auto& upstream_request : upstream_requests_) {
     upstream_request->encodeTrailers(trailers);
   }
+
+  // TODO(rgs1): should we skip this if there's no body?
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      cluster_->requestResponseSizeStats();
+  if (req_resp_stats.has_value()) {
+    req_resp_stats->get().upstream_rq_body_size_.recordValue(
+        callbacks_->streamInfo().bytesReceived());
+  }
+
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
 }
@@ -1398,6 +1408,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   // streams.
   ASSERT(upstream_requests_.size() == 1);
   if (end_stream) {
+    // TODO(rgs1): should we skip this if there's no body?
     Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
         cluster_->requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
@@ -1430,6 +1441,13 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
     } else {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
+  }
+
+  // TODO(rgs1): should we skip this if there's no body?
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      cluster_->requestResponseSizeStats();
+  if (req_resp_stats.has_value()) {
+    req_resp_stats->get().upstream_rs_body_size_.recordValue(callbacks_->streamInfo().bytesSent());
   }
 
   onUpstreamComplete(upstream_request);

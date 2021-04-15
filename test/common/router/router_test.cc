@@ -5969,5 +5969,66 @@ TEST_F(RouterTest, PostHttpUpstream) {
 
   router_.onDestroy();
 }
+
+// Test that request/response header/body sizes are properly recorded.
+TEST_F(RouterTest, RequestResponseSize) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(generic_config);
+  callbacks_.route_->route_entry_.connect_config_ =
+      absl::make_optional<RouteEntry::ConnectConfig>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 74ull));
+  router_.decodeHeaders(headers, false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 5ull));
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  callbacks_.stream_info_.addBytesReceived(5);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, true));
+
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull));
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 10ull));
+  callbacks_.stream_info_.addBytesSent(10);
+  Buffer::OwnedImpl response_data("1234567890");
+  response_decoder->decodeData(response_data, true);
+
+  router_.onDestroy();
+}
+
 } // namespace Router
 } // namespace Envoy
