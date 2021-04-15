@@ -33,6 +33,8 @@ if [[ $${SYSTEM} == *MSYS_NT* ]]; then
   if [[ $${USE_CLANG_CL-} == "1" ]]; then
     if [[ -n $${LLVM_DIR-} ]]; then
       WEE8_BUILD_ARGS+=" clang_base_path=\"$${LLVM_DIR}\""
+    else
+      WEE8_BUILD_ARGS+=" clang_base_path=\"C:/Program Files/LLVM\""
     fi
 
     export IS_CLANG=true
