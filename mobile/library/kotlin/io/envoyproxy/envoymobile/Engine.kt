@@ -15,4 +15,9 @@ interface Engine {
    *  @return a {@link PulseClient} for recording time series metrics.
    */
   fun pulseClient(): PulseClient
+
+  /**
+   * Terminates the running engine.
+   */
+  fun terminate()
 }

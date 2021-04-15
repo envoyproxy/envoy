@@ -145,6 +145,13 @@ def kotlin_repos():
         urls = ["https://github.com/pinterest/ktlint/releases/download/0.37.1/ktlint"],
     )
 
+    http_archive(
+        name = "robolectric",
+        sha256 = "d4f2eb078a51f4e534ebf5e18b6cd4646d05eae9b362ac40b93831bdf46112c7",
+        urls = ["https://github.com/robolectric/robolectric-bazel/archive/4.4.tar.gz"],
+        strip_prefix = "robolectric-bazel-4.4",
+    )
+
 def android_repos():
     http_archive(
         name = "build_bazel_rules_android",

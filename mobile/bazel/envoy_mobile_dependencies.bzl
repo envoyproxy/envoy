@@ -7,6 +7,7 @@ load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@rules_proto_grpc//protobuf:repositories.bzl", "protobuf_repos")
 load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos = "java_repos")
+load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 
 def envoy_mobile_dependencies():
     swift_dependencies()
@@ -28,6 +29,13 @@ def kotlin_dependencies():
             "junit:junit:4.12",
             "org.mockito:mockito-inline:2.28.2",
             "org.mockito:mockito-core:2.28.2",
+            # Android test artifacts
+            "androidx.test:core:1.3.0",
+            "androidx.test:rules:1.3.0",
+            "androidx.test:runner:1.3.0",
+            "androidx.test:monitor:1.3.0",
+            "androidx.test.ext:junit:1.1.2",
+            "org.robolectric:robolectric:4.4",
         ],
         repositories = [
             "https://repo1.maven.org/maven2",
@@ -37,6 +45,7 @@ def kotlin_dependencies():
     )
     kotlin_repositories()
     rules_detekt_dependencies()
+    robolectric_repositories()
 
     grpc_java_repositories(
         omit_bazel_skylib = True,
