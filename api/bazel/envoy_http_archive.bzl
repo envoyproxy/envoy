@@ -18,5 +18,6 @@ def envoy_http_archive(name, locations, **kwargs):
         urls = location["urls"],
         sha256 = location["sha256"],
         strip_prefix = location.get("strip_prefix", ""),
+        output = location["output"],
         **kwargs
     )

@@ -40,33 +40,33 @@ def distfiles_imports():
 """
 
 if __name__ == '__main__':
-  output_path = None
-  if len(sys.argv) > 1:
-    output_path = sys.argv[1]
-  else:
-    output_path = "bazel/distfiles.bzl"
+    output_path = None
+    if len(sys.argv) > 1:
+      output_path = sys.argv[1]
+    else:
+      output_path = "bazel/distfiles.bzl"
 
-  archives = []
-  sha256 = {}
-  urls = {}
-  dirname = "distdir"
+    archives = []
+    sha256 = {}
+    urls = {}
+    dirname = "distdir"
 
-  for k, v in dep_utils.RepositoryLocations().items():
-    if k in EXCLUDED_DEPS:
-      continue
+    for k, v in dep_utils.RepositoryLocations().items():
+      if k in EXCLUDED_DEPS:
+        continue
 
-    # Archive file name. Bazel lookup files in distdir using the last part of url path.
-    # https://github.com/bazelbuild/bazel/blob/4.0.0/src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/DownloadManager.java#L113
-    output = v["urls"][0].rsplit("/", 1)[-1]
-    if "output" in v:
-      output = v["output"]
-    archives.append(output)
-    sha256[output] = v["sha256"]
-    urls[output] = v["urls"]
+      # Archive file name. Bazel lookup files in distdir using the last part of url path.
+      # https://github.com/bazelbuild/bazel/blob/4.0.0/src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/DownloadManager.java#L113
+      output = v["urls"][0].rsplit("/", 1)[-1]
+      if "output" in v:
+        output = v["output"]
+      archives.append(output)
+      sha256[output] = v["sha256"]
+      urls[output] = v["urls"]
 
-  template = Template(template_string)
-  render_result = template.render(archives=archives, sha256=sha256, urls=urls, dirname=dirname)
+    template = Template(template_string)
+    render_result = template.render(archives=archives, sha256=sha256, urls=urls, dirname=dirname)
 
-  file = open(output_path, "w")
-  file.write(render_result)
-  file.close()
+    file = open(output_path, "w")
+    file.write(render_result)
+    file.close()
