@@ -20,6 +20,8 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
       - run: bazel test --test_output=all --build_tests_only //test/kotlin/...
         name: 'Run Kotlin library tests'
   javatests:
@@ -35,5 +37,7 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
       - run: bazel test --test_output=all --build_tests_only //test/java/...
         name: 'Run Java library tests'

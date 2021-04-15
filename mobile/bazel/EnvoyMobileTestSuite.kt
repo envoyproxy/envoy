@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.bazel
 
 import java.io.File
-import java.lang.RuntimeException
 import java.net.URLClassLoader
 import java.util.zip.ZipFile
 import junit.framework.JUnit4TestAdapter
@@ -21,13 +20,11 @@ import org.junit.runner.RunWith
 object EnvoyMobileTestSuite {
   private const val TEST_SUFFIX = "Test"
   private const val CLASS_SUFFIX = ".class"
-  private const val ENVOY_MOBILE_PACKAGE = "io.envoyproxy.envoymobile"
 
   @JvmStatic
   fun suite(): TestSuite {
     val suite = TestSuite()
     val classLoader = Thread.currentThread().contextClassLoader as URLClassLoader
-
     val testAdapters = mutableListOf<JUnit4TestAdapter>()
     // The first entry on the classpath contains the srcs from java_test
     val classesInJar = findClassesInJar(File(classLoader.urLs[0].path))
@@ -38,7 +35,7 @@ object EnvoyMobileTestSuite {
     }
 
     if (testAdapters.isEmpty()) {
-      throw RuntimeException("Unable to find any tests in test target")
+      throw NoTestFoundException("Unable to find any tests in test target")
     }
 
     for (testAdapter in testAdapters) {
@@ -58,13 +55,14 @@ object EnvoyMobileTestSuite {
         if (entryName.endsWith(CLASS_SUFFIX)) {
           val classNameEnd = entryName.length - CLASS_SUFFIX.length
           val resolvedClass = entryName.substring(0, classNameEnd).replace('/', '.')
-          if (resolvedClass.contains(ENVOY_MOBILE_PACKAGE) && resolvedClass.endsWith(TEST_SUFFIX)) {
+          if (resolvedClass.endsWith(TEST_SUFFIX)) {
             classNames.add(resolvedClass)
           }
         }
       }
     }
-
     return classNames
   }
 }
+
+class NoTestFoundException(message: String) : RuntimeException(message)

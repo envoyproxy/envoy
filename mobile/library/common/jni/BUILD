@@ -1,3 +1,4 @@
+load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 
@@ -23,6 +24,7 @@ envoy_cc_library(
     ],
 )
 
+# Main dynamic library for the Envoy Mobile aar
 cc_binary(
     name = "libenvoy_jni.so",
     srcs = [
@@ -44,11 +46,55 @@ cc_binary(
     ],
 )
 
-# Java JNI library
+## Targets for local execution
+# OS X binary (.jnilib) for NDK testing
+envoy_mobile_so_to_jni_lib(
+    name = "ndk_envoy_lib.jnilib",
+    native_dep = "ndk_envoy_lib.so",
+)
+
+# Base binary (.so) for NDK testing
+cc_binary(
+    name = "ndk_envoy_lib.so",
+    srcs = [
+        "android_test_jni_interface.cc",
+        "jni_interface.cc",
+        "@local_jdk//:jni_header",
+    ],
+    copts = ["-std=c++17"],
+    linkopts = [
+    ],
+    linkshared = True,
+    deps = [
+        "java_jni_lib",
+        ":java_jni_support",
+        "//bazel:jni",
+        "//library/common:envoy_main_interface_lib",
+        "//library/common/api:c_types",
+    ],
+)
+
+# OS X binary (.jnilib) for JVM testing
+envoy_mobile_so_to_jni_lib(
+    name = "java_jni_lib.jnilib",
+    native_dep = "java_jni_lib.so",
+)
+
+# Base binary (.so) for JVM testing
+cc_binary(
+    name = "java_jni_lib.so",
+    srcs = ["jni_interface.cc"],
+    copts = ["-std=c++17"],
+    linkopts = [
+        "-lm",
+    ],
+    linkshared = True,
+    deps = ["java_jni_lib"],
+)
+
 cc_library(
     name = "java_jni_lib",
     srcs = [
-        "jni_interface.cc",
         "jni_utility.cc",
         "jni_version.cc",
         "@local_jdk//:jni_header",

@@ -1,6 +1,5 @@
 load("@rules_java//java:defs.bzl", "java_binary")
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@build_bazel_rules_android//android:rules.bzl", "android_binary")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
 
 # This file is based on https://github.com/aj-michael/aar_with_jni which is
@@ -184,7 +183,7 @@ def _create_jni_library(name, native_deps = []):
     )
 
     # This outputs {jni_archive_name}_unsigned.apk which will contain the base files for our aar
-    android_binary(
+    native.android_binary(
         name = jni_archive_name,
         manifest = name + "_generated_AndroidManifest.xml",
         custom_package = "does.not.matter",
@@ -214,7 +213,7 @@ def _create_classes_jar(name, manifest, android_library):
 
     # This creates bazel-bin/library/kotlin/io/envoyproxy/envoymobile/{name}_bin_deploy.jar
     # This jar has all the classes needed for our aar and will be our `classes.jar`
-    android_binary(
+    native.android_binary(
         name = android_binary_name,
         manifest = manifest,
         custom_package = "does.not.matter",

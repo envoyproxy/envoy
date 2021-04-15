@@ -18,6 +18,7 @@ kt_jvm_library(
 
 exports_files([
     "pom_template.xml",
+    "test_manifest.xml",
 ])
 
 alias(

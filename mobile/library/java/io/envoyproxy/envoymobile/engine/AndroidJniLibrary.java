@@ -9,6 +9,10 @@ public class AndroidJniLibrary {
   // Volatile to ensure double-checked locking works correctly.
   private static volatile AndroidLoader loader = null;
 
+  // Load test libraries based on the jvm_flag `envoy_jni_library_name`.
+  // WARNING: This should only be used for testing.
+  public static void loadTestLibrary() { JniLibrary.loadTestLibrary(); }
+
   public static void load(Context context) {
     if (loader != null) {
       return;
