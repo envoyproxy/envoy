@@ -1,5 +1,5 @@
-1.16.3 (Pending)
-================
+1.16.3 (April 15, 2021)
+=======================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -14,10 +14,12 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * aggregate cluster: fixed a crash due to a TLS initialization issue.
+* http: fixed a crash upon receiving empty HTTP/2 metadata frames. Received empty metadata frames are now counted in the HTTP/2 codec stat :ref:`metadata_empty_frames <config_http_conn_man_stats_per_codec>`.
+* http: fixed a remotely exploitable integer overflow via a very large grpc-timeout value causes undefined behavior.
 * http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
-
 * lua: fixed crash when Lua script contains streamInfo():downstreamSslConnection().
 * overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
+* tls: fix a crash when peer sends a TLS Alert with an unknown code.
 * tls: fix detection of the upstream connection close event.
 
 Removed Config or Runtime
