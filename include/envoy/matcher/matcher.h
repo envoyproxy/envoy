@@ -19,6 +19,7 @@ namespace Configuration {
 class FactoryContext;
 }
 } // namespace Server
+
 namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
@@ -66,9 +67,9 @@ public:
   /**
    * Helper to convert this action to its underlying type.
    */
-  template <class T> T& getTyped() {
-    ASSERT(dynamic_cast<T*>(this) != nullptr);
-    return static_cast<T&>(*this);
+  template <class T> const T& getTyped() const {
+    ASSERT(dynamic_cast<const T*>(this) != nullptr);
+    return static_cast<const T&>(*this);
   }
 };
 
@@ -78,8 +79,8 @@ using ActionFactoryCb = std::function<ActionPtr()>;
 class ActionFactory : public Config::TypedFactory {
 public:
   virtual ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        Server::Configuration::FactoryContext& factory_context) PURE;
+  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
+                        Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
