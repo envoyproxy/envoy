@@ -442,7 +442,7 @@ public:
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
 
-  std::atomic<uint64_t> num_handler_connections_{};
+  uint64_t num_handler_connections_{};
 };
 
 class MockIp : public Address::Ip {

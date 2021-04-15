@@ -179,7 +179,7 @@ MockConnectionHandler::MockConnectionHandler() {
     --num_handler_connections_;
   }));
   ON_CALL(*this, numConnections()).WillByDefault(Invoke([this]() {
-    return num_handler_connections_.load();
+    return num_handler_connections_;
   }));
 }
 MockConnectionHandler::~MockConnectionHandler() = default;
