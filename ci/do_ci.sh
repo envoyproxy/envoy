@@ -150,7 +150,7 @@ function run_process_test_result() {
 
 function run_ci_verify () {
   echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
+  LC_ALL=C docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
   _images=$(docker image list --format "{{.Repository}}")
   while read -r line; do images+=("$line"); done \
       <<< "$_images"
