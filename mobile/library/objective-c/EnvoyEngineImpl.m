@@ -280,11 +280,14 @@ static void ios_http_filter_on_error(envoy_error error, const void *context) {
     return;
   }
 
-  NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
-                                                    length:error.message.length
-                                                  encoding:NSUTF8StringEncoding];
-  error.message.release(error.message.context);
-  filter.onError(error.error_code, errorMessage, error.attempt_count);
+  @autoreleasepool {
+    NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
+                                                      length:error.message.length
+                                                    encoding:NSUTF8StringEncoding];
+
+    error.message.release(error.message.context);
+    filter.onError(error.error_code, errorMessage, error.attempt_count);
+  }
 }
 
 static void ios_http_filter_release(const void *context) {
