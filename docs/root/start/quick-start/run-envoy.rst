@@ -23,13 +23,21 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
          $ envoy --version
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
          $ docker run --rm \
                envoyproxy/|envoy_docker_image| \
                    --version
+         ...
+   .. tab:: Docker (Windows Image)
+
+      .. substitution-code-block:: powershell
+
+         PS> docker run --rm
+               'envoyproxy/|envoy_windows_docker_image|'
+                  --version
          ...
 
 .. _start_quick_start_help:
@@ -49,13 +57,22 @@ flag:
          $ envoy --help
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
          $ docker run --rm \
                envoyproxy/|envoy_docker_image| \
                    --help
+         ...
+
+   .. tab:: Docker (Windows Image)
+
+      .. substitution-code-block:: powershell
+
+         PS> docker run --rm
+               'envoyproxy/|envoy_windows_docker_image|'
+                    --help
          ...
 
 .. _start_quick_start_config:
@@ -77,7 +94,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
          $ envoy -c envoy-demo.yaml
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       You can start the Envoy Docker image without specifying a configuration file, and
       it will use the demo config by default.
@@ -104,64 +121,38 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
                    -c /envoy-custom.yaml
          ...
 
-   .. tab:: Windows Service
+   .. tab:: Docker (Windows Image)
 
-      .. note::
+      You can start the Envoy Docker image without specifying a configuration file, and
+      it will use the demo config by default.
 
-         This feature is still in Experimental state.
+      .. substitution-code-block:: powershell
 
-      You can start Envoy as Windows Service that is managed under `Windows Service Control Manager <https://docs.microsoft.com/en-us/windows/win32/services/using-services/>`_.
-
-      First, you need to create the service. Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``. After you create the service you
-      can start it.
-
-      From an **administrator** prompt run the following commands (note that you need replace C:\EnvoyProxy\ with the path to the envoy.exe binary and the config file):
-
-      .. substitution-code-block:: console
-
-         > sc create EnvoyProxy binpath="C:\EnvoyProxy\envoy.exe --config-path C:\EnvoyProxy\envoy-demo.yaml" start=auto depend=Tcpip/Afd
-            [SC] CreateService SUCCESS
-         > sc start EnvoyProxy
-            SERVICE_NAME: envoyproxy
-               TYPE               : 10  WIN32_OWN_PROCESS
-               STATE              : 2  START_PENDING
-                                       (NOT_STOPPABLE, NOT_PAUSABLE, IGNORES_SHUTDOWN)
-               WIN32_EXIT_CODE    : 0  (0x0)
-               SERVICE_EXIT_CODE  : 0  (0x0)
-               CHECKPOINT         : 0x0
-               WAIT_HINT          : 0x7d0
-               PID                : 3924
-               FLAGS              :
-         > sc query EnvoyProxy
-            SERVICE_NAME: envoyproxy
-               TYPE               : 10  WIN32_OWN_PROCESS
-               STATE              : 4  RUNNING
-                                       (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)
-               WIN32_EXIT_CODE    : 0  (0x0)
-               SERVICE_EXIT_CODE  : 0  (0x0)
-               CHECKPOINT         : 0x0
-               WAIT_HINT          : 0x0
+         PS> docker run --rm -it
+               -p '9901:9901'
+               -p '10000:10000'
+               'envoyproxy/|envoy_windows_docker_image|'
          ...
 
-      Use `sc.exe <https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/sc-create/>`_ to configure the service startup and error handling.
+      To specify a custom configuration you can mount the config into the container, and specify the path with ``-c``.
 
-      .. tip::
+      Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``, from PowerShell run:
 
-         The output of ``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``. For more information
-         Envoy is reporting startup failures with error messages on Windows Event Viewer.
+      .. substitution-code-block:: powershell
+
+         PS> docker run --rm -it
+               -v "$PWD\:`"C:\envoy-configs`""
+               -p '9901:9901'
+               -p '10000:10000'
+               'envoyproxy/|envoy_windows_docker_image|'
+                   -c 'C:\envoy-configs\envoy-custom.yaml'
+         ...
 
 Check Envoy is proxying on http://localhost:10000.
 
 .. code-block:: console
 
    $ curl -v localhost:10000
-   ...
-
-The Envoy admin endpoint should also be available at http://localhost:9901.
-
-.. code-block:: console
-
-   $ curl -v localhost:9901
    ...
 
 You can exit the server with `Ctrl-c`.
@@ -193,12 +184,21 @@ Next, start the Envoy server using the override configuration:
 
    .. tab:: System
 
+      On Linux/Mac: run:
+
       .. code-block:: console
 
          $ envoy -c envoy-demo.yaml --config-yaml "$(cat envoy-override.yaml)"
          ...
 
-   .. tab:: Docker
+      On Windows run:
+
+      .. code-block:: powershell
+
+         $ envoy -c envoy-demo.yaml --config-yaml "$(Get-Content -Raw envoy-override.yaml)"
+         ...
+
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -208,6 +208,18 @@ Next, start the Envoy server using the override configuration:
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \
                    --config-yaml "$(cat envoy-override.yaml)"
+         ...
+
+   .. tab:: Docker (Windows Image)
+
+      .. substitution-code-block:: powershell
+
+         PS> docker run --rm -it
+               -p '9902:9902'
+               -p '10000:10000'
+               'envoyproxy/|envoy_windows_docker_image|'
+                  -c 'C:\ProgramData\envoy.yaml'
+                  --config-yaml "$(Get-Content -Raw envoy-override.yaml)"
          ...
 
 The Envoy admin interface should now be available on http://localhost:9902.
@@ -260,7 +272,7 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -283,6 +295,20 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
 
+   .. tab:: Docker (Windows Image)
+
+      .. substitution-code-block:: powershell
+
+         PS> docker run --rm -it
+               -v "$PWD\:`"C:\envoy-configs`""
+               -p '9901:9901'
+               -p '10000:10000'
+               'envoyproxy/|envoy_windows_docker_image|'
+                  --mode validate
+                  -c 'C:\envoy-configs\my-envoy-config.yaml'
+
+         configuration 'my-envoy-config.yaml' OK
+
 Envoy logging
 -------------
 
@@ -299,7 +325,7 @@ This can be overridden using :option:`--log-path`.
          $ mkdir logs
          $ envoy -c envoy-demo.yaml --log-path logs/custom.log
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -311,6 +337,24 @@ This can be overridden using :option:`--log-path`.
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \
                    --log-path logs/custom.log
+
+   .. tab:: Docker (Windows Image)
+
+      .. substitution-code-block:: powershell
+
+            PS> mkdir logs
+            PS> docker run --rm -it
+                  -p '10000:10000'
+                  -v "$PWD\logs\:`"C:\logs`""
+                  'envoyproxy/|envoy_windows_docker_image|'
+                     -c 'C:\ProgramData\envoy.yaml'
+                     --log-path 'C:\logs\custom.log'
+
+      .. note::
+
+         Envoy on a Windows system Envoy will output to ``CON`` by default.
+
+         This can also be used as a logging path when configuring logging.
 
 :ref:`Access log <arch_overview_access_logs>` paths can be set for the
 :ref:`admin interface <start_quick_start_admin>`, and for configured
@@ -325,7 +369,7 @@ to ``/dev/stdout``:
    :linenos:
    :lineno-start: 12
    :lines: 12-22
-   :emphasize-lines: 4-8
+   :emphasize-lines: 4-7
 
 The default configuration in the Envoy Docker container also logs access in this way.
 
@@ -337,12 +381,6 @@ Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additiona
 
 Envoy can be configured to log to :ref:`different formats <config_access_log>`, and to
 :ref:`different outputs <api-v3_config_accesslog>` in addition to files and ``stdout/err``.
-
-.. note::
-
-   If you are running Envoy on a Windows system Envoy will output to ``CON`` by default.
-
-   This can also be used as a logging path when configuring logging.
 
 Debugging Envoy
 ---------------
@@ -375,7 +413,7 @@ which are set to ``debug`` and ``trace`` respectively.
          $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -387,6 +425,19 @@ which are set to ``debug`` and ``trace`` respectively.
                    -l off \
                    --component-log-level upstream:debug,connection:trace
          ...
+
+   .. tab:: Docker (Windows Image)
+
+      .. substitution-code-block:: powershell
+
+            PS> mkdir logs
+            PS> docker run --rm -it
+                  -p '10000:10000'
+                  envoyproxy/|envoy_windws_docker_image|
+                     -c 'C:\ProgramData\envoy.yaml'
+                     -l off
+                     --component-log-level 'upstream:debug,connection:trace'
+            ...
 
 .. tip::
 
