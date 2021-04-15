@@ -72,8 +72,6 @@ build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
 build:macos --cxxopt=-std=c++17
-build:macos --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:macos --action_env=BAZEL_LINKOPTS=-lm
 
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
