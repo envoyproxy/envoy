@@ -198,7 +198,7 @@ build:rbe-toolchain-msvc-cl --platforms=@rbe_windows_msvc_cl//config:platform
 build:rbe-toolchain-msvc-cl --crosstool_top=@rbe_windows_msvc_cl//cc:toolchain
 build:rbe-toolchain-msvc-cl --extra_toolchains=@rbe_windows_msvc_cl//config:cc-toolchain
 
-build:rbe-toolchain-clang-cl --action_env=LLVM_DIR="C:\Program Files\LLVM"
+build:rbe-toolchain-clang-cl --action_env=LLVM_DIR="C:/Program Files/LLVM"
 build:rbe-toolchain-clang-cl --host_platform=@rbe_windows_clang_cl//config:platform
 build:rbe-toolchain-clang-cl --platforms=@rbe_windows_clang_cl//config:platform
 build:rbe-toolchain-clang-cl --crosstool_top=@rbe_windows_clang_cl//cc:toolchain
