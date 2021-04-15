@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "common/network/address_impl.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -12,6 +13,7 @@
 #include "common/config/api_version.h"
 #include "common/network/utility.h"
 
+#include "envoy/network/address.h"
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -22,6 +24,9 @@
 #include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
+
+// tmp start
+#include "extensions/io_socket/user_space/io_handle_impl.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -67,6 +72,105 @@ void TcpProxyIntegrationTest::initialize() {
 
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
+}
+
+void InternalTcpProxyIntegrationTest::initialize() {
+  if (GetParam().test_original_version) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "false");
+  } else {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "true");
+  }
+
+  config_helper_.renameListener("tcp_proxy");
+  BaseIntegrationTest::initialize();
+}
+
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, InternalTcpProxyIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+
+// Test upstream writing before downstream downstream does.
+TEST_P(InternalTcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
+  initialize();
+
+  Event::Dispatcher* dispatcher = getWorkerDispatcher(1);
+
+  // IntegrationTcpClientPtr tcp_client = std::make_unique<IntegrationTcpClient>(
+  //     *dispatcher, *mock_buffer_factory_,
+  //     std::make_shared<Network::Address::EnvoyInternalInstance>("hello"), enableHalfClose(),
+  //     nullptr, nullptr);
+
+  // lambda-expression cannot captures a structured binding so we must use tie() here.
+  Network::IoHandlePtr io_handle_client;
+  Network::IoHandlePtr io_handle_server;
+
+  std::tie(io_handle_client, io_handle_server) =
+      Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
+
+  auto server_address = std::make_shared<Network::Address::EnvoyInternalInstance>("test_internal_listener_foo");
+  auto client_address = std::make_shared<Network::Address::EnvoyInternalInstance>("client_bar");
+
+  dispatcher->post([&]() mutable {
+    auto internal_listener =
+        dispatcher->getInternalListenerManagerForTest().value().get().findByAddress(server_address);
+    std::unique_ptr<Network::IoHandle> io_handle = std::move(io_handle_server);
+    auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
+        std::move(io_handle), server_address, client_address);
+    internal_listener.value().get().onAccept(std::move(accepted_socket));
+  });
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
+  // tcp_client->waitForData("hello");
+  // // Make sure inexact matches work also on data already received.
+  // tcp_client->waitForData("ello", false);
+
+  // // Make sure length based wait works for the data already received
+  // ASSERT_TRUE(tcp_client->waitForData(5));
+  // ASSERT_TRUE(tcp_client->waitForData(4));
+  Buffer::OwnedImpl buffer;
+  Thread::MutexBasicLockable dispatcher_mutex;
+
+  while (buffer.length() < 5) {
+    Thread::CondVar post_complete;
+    dispatcher->post([&]() {
+      Thread::LockGuard guard(dispatcher_mutex);
+      io_handle_client->read(buffer, absl::nullopt);
+      post_complete.notifyOne();
+    });
+
+    Thread::LockGuard guard(dispatcher_mutex);
+    post_complete.wait(dispatcher_mutex);
+    ENVOY_LOG_MISC(debug, "current buffer: {}", buffer.toString());
+  }
+
+  // tmp start
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  // ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  // ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // // Drain part of the received message
+  // tcp_client->clearData(2);
+  // tcp_client->waitForData("llo");
+  // ASSERT_TRUE(tcp_client->waitForData(3));
+
+  // ASSERT_TRUE(tcp_client->write("hello"));
+  // ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // ASSERT_TRUE(fake_upstream_connection->write("", true));
+  // tcp_client->waitForHalfClose();
+  // ASSERT_TRUE(tcp_client->write("", true));
+  // ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  // ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  // // Any time an associated connection is destroyed, it increments both counters.
+  // test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  // test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+
+  // IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  // FakeRawConnectionPtr fake_upstream_connection2;
+  // ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  // tcp_client2->close();
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyIntegrationTest,

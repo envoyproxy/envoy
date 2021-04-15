@@ -19,6 +19,7 @@ WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overl
   Event::DispatcherPtr dispatcher(
       api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
   auto conn_handler = std::make_unique<ConnectionHandlerImpl>(*dispatcher, index);
+  dispatcher->registerInternalListenerManager(*conn_handler);
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher), std::move(conn_handler),
                                       overload_manager, api_);
 }

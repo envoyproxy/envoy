@@ -1,3 +1,56 @@
+
+#include <chrono>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/server/listener_manager.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "common/api/os_sys_calls_impl.h"
+#include "common/config/metadata.h"
+#include "common/init/manager_impl.h"
+#include "common/network/address_impl.h"
+#include "common/network/io_socket_handle_impl.h"
+#include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
+
+#include "server/configuration_impl.h"
+#include "server/listener_manager_impl.h"
+
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/guard_dog.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/worker.h"
+#include "test/mocks/init/mocks.h"
+#include "test/server/utility.h"
+#include "test/mocks/server/instance.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
+#include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/worker.h"
+#include "test/mocks/server/worker_factory.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
+
+#include "absl/strings/escaping.h"
+#include "absl/strings/match.h"
+
+// Above from listener_manager_impl_test.cc
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/exception.h"
@@ -203,12 +256,8 @@ public:
   };
 
   // TestListener* addInternalListener(
-  //   uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
   //     const std::string& name, Network::Listener* listener,
   //     Network::InternalListenerCallbacks** listener_callbacks = nullptr,
-  //     std::shared_ptr<Network::MockConnectionBalancer> connection_balancer = nullptr,
-  //     Network::BalancedConnectionHandler** balanced_connection_handler = nullptr,
-  //     Network::Socket::Type socket_type = Network::Socket::Type::Stream,
   //     std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
   //     bool continue_on_listener_filters_timeout = false,
   //     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager
@@ -1423,6 +1472,135 @@ TEST_F(ConnectionHandlerTest, TcpBacklogCustom) {
       }));
   handler_->addListener(absl::nullopt, *test_listener);
 }
+
+// TEST_F(ConnectionHandlerTest, InternalListenerWithConnection) {
+//   NiceMock<MockInstance> server_;
+//   NiceMock<MockListenerComponentFactory> listener_factory_;
+//   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+//   MockWorker* worker_ = new MockWorker();
+//   NiceMock<MockWorkerFactory> worker_factory_;
+//   std::unique_ptr<ListenerManagerImpl> manager_;
+//   NiceMock<MockGuardDog> guard_dog_;
+//   Event::SimulatedTimeSystem time_system_;
+//   Api::ApiPtr api_;
+//   Network::Address::InstanceConstSharedPtr local_address_;
+//   Network::Address::InstanceConstSharedPtr remote_address_;
+//   {
+//     api_ = Api::createApiForTest(server_.api_.random_);
+//     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
+//     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+//     ON_CALL(server_.validation_context_, staticValidationVisitor())
+//         .WillByDefault(ReturnRef(validation_visitor));
+//     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
+//         .WillByDefault(ReturnRef(validation_visitor));
+//     manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+//                                                      enable_dispatcher_stats_);
+
+//     // Use real filter loading by default.
+//     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+//         .WillByDefault(Invoke(
+//             [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+//                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+//                 -> std::vector<Network::FilterFactoryCb> {
+//               return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+//                   filters, filter_chain_factory_context);
+//             }));
+//     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+//         .WillByDefault(
+//             Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+//                           filters,
+//                       Configuration::ListenerFactoryContext& context)
+//                        -> std::vector<Network::ListenerFilterFactoryCb> {
+//               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
+//                                                                                     context);
+//             }));
+//     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
+//         .WillByDefault(
+//             Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+//                           filters,
+//                       Configuration::ListenerFactoryContext& context)
+//                        -> std::vector<Network::UdpListenerFilterFactoryCb> {
+//               return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
+//                                                                                        context);
+//             }));
+//     ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
+//       return listener_tag_++;
+//     }));
+
+//     local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
+//     remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
+//     EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
+//     EXPECT_CALL(os_sys_calls_, getsockname)
+//         .WillRepeatedly(Invoke([this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+//           return os_sys_calls_actual_.getsockname(sockfd, addr, addrlen);
+//         }));
+//     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+//   }
+
+//   Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
+//   // Extract listener_factory_context avoid accessing private member.
+//   ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+//       .WillByDefault(
+//           Invoke([&listener_factory_context](
+//                      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+//                          filters,
+//                      Configuration::ListenerFactoryContext& context)
+//                      -> std::vector<Network::ListenerFilterFactoryCb> {
+//             listener_factory_context = &context;
+//             return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+//           }));
+//   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
+//   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+//   ASSERT_NE(nullptr, listener_factory_context);
+
+//   bool add_via_api = true;
+//   bool need_init = false;
+//   if (added_via_api) {
+//     EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
+//     EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+//   } else {
+//     EXPECT_CALL(server_.validation_context_, staticValidationVisitor());
+//     EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor()).Times(0);
+//   }
+//   auto raw_listener = new ListenerHandle();
+//   EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
+//       .WillOnce(Return(raw_listener->drain_manager_));
+//   EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+//       .WillOnce(
+//           Invoke([raw_listener, need_init](
+//                      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+//                      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+//                      -> std::vector<Network::FilterFactoryCb> {
+//             std::shared_ptr<ListenerHandle> notifier(raw_listener);
+//             raw_listener->context_ = &filter_chain_factory_context;
+//             if (need_init) {
+//               filter_chain_factory_context.initManager().add(notifier->target_);
+//             }
+//             return {[notifier](Network::FilterManager&) -> void {}};
+//           }));
+
+//   const std::string listener_foo_yaml = R"EOF(
+// name: test_internal_listener
+// address:
+//   envoy_internal_address:
+//     server_listener_name: test_internal_listener_name
+// internal_listener: {}
+// filter_chains: 
+// - filters:
+//   - name: envoy.filters.network.tcp_proxy
+//     typed_config:
+//       "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+//       cluster: service_wss_passthrough
+//       stat_prefix: wss_passthrough
+//   )EOF";
+
+//   EXPECT_TRUE(
+//       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
+//   ConnectionHandlerImpl conn_handlder(dispatcher_, 0);
+
+//   handler_->addListener(absl::nullopt, *raw_listener);
+//   EXPECT_CALL(*raw_listener, onDestroy());
+// }
 
 } // namespace
 } // namespace Server

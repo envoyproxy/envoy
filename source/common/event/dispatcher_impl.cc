@@ -214,6 +214,16 @@ DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
                                                     config);
 }
 
+void DispatcherImpl::registerInternalListenerManager(
+    Network::InternalListenerManager& internal_listener_manager) {
+  ASSERT(!internal_listener_manager_.has_value());
+  internal_listener_manager_ = internal_listener_manager;
+}
+
+Network::InternalListenerManagerOptRef DispatcherImpl::getInternalListenerManagerForTest() {
+  return internal_listener_manager_;
+}
+
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
   return createTimerInternal(cb);

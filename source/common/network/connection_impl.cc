@@ -274,7 +274,7 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  if (socket_->addressType() == Address::Type::Pipe) {
+  if (socket_->addressType() == Address::Type::Pipe || socket_->addressType() == Address::Type::EnvoyInternal) {
     return;
   }
 

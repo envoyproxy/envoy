@@ -78,6 +78,11 @@ public:
   Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) override;
+  
+  void registerInternalListenerManager(
+      Network::InternalListenerManager& internal_listener_manager) override;
+  Network::InternalListenerManagerOptRef getInternalListenerManagerForTest() override;
+
   TimerPtr createTimer(TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override;
@@ -175,6 +180,7 @@ private:
   MonotonicTime approximate_monotonic_time_;
   WatchdogRegistrationPtr watchdog_registration_;
   const ScaledRangeTimerManagerPtr scaled_timer_manager_;
+  Network::InternalListenerManagerOptRef internal_listener_manager_;
 };
 
 } // namespace Event
