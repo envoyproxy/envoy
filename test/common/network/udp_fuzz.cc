@@ -21,16 +21,15 @@
 #include "test/test_common/utility.h"
 
 namespace Envoy {
-//	namespace Network {
 namespace {
 
 class UdpFuzz;
 
 class FuzzUdpListenerCallbacks : public Network::UdpListenerCallbacks {
 public:
-  FuzzUdpListenerCallbacks(UdpFuzz* upf) : my_upf(upf) {}
+  FuzzUdpListenerCallbacks(UdpFuzz* upf) : my_upf_(upf) {}
   ~FuzzUdpListenerCallbacks() override = default;
-  UdpFuzz* my_upf;
+  UdpFuzz* my_upf_;
   void onData(Network::UdpRecvData&& data) override;
   void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
@@ -71,10 +70,9 @@ public:
 
     // Now do all of the fuzzing
     FuzzedDataProvider provider(buf, len);
-    total_packets = provider.ConsumeIntegralInRange<uint16_t>(1, 15);
-    sent_packets = 0;
+    total_packets_ = provider.ConsumeIntegralInRange<uint16_t>(1, 15);
     Network::Test::UdpSyncPeer client_(ip_version_);
-    for (uint16_t i = 0; i < total_packets; i++) {
+    for (uint16_t i = 0; i < total_packets_; i++) {
       std::string packet_ =
           provider.ConsumeBytesAsString(provider.ConsumeIntegralInRange<uint32_t>(1, 3000));
       if (packet_.empty()) {
@@ -115,52 +113,49 @@ public:
   Event::DispatcherPtr dispatcher_;
   Api::ApiPtr api_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
-  uint16_t sent_packets;
-  uint16_t total_packets;
+  uint16_t sent_packets_ = 0;
+  uint16_t total_packets_;
   Network::Address::IpVersion ip_version_;
 };
 
 void FuzzUdpListenerCallbacks::onData(Network::UdpRecvData&& data) {
-  my_upf->sent_packets++;
-  if (my_upf->sent_packets == my_upf->total_packets) {
-    my_upf->dispatcher_->exit();
+  my_upf_->sent_packets_++;
+  if (my_upf_->sent_packets_ == my_upf_->total_packets_) {
+    my_upf_->dispatcher_->exit();
   }
   UNREFERENCED_PARAMETER(data);
 }
 
-void FuzzUdpListenerCallbacks::onReadReady() { }
+void FuzzUdpListenerCallbacks::onReadReady() {}
 
 void FuzzUdpListenerCallbacks::onWriteReady(const Network::Socket& socket) {
   UNREFERENCED_PARAMETER(socket);
 }
 
 void FuzzUdpListenerCallbacks::onReceiveError(Api::IoError::IoErrorCode error_code) {
-  my_upf->sent_packets++;
-  if (my_upf->sent_packets == my_upf->total_packets) {
-    my_upf->dispatcher_->exit();
+  my_upf_->sent_packets_++;
+  if (my_upf_->sent_packets_ == my_upf_->total_packets_) {
+    my_upf_->dispatcher_->exit();
   }
   UNREFERENCED_PARAMETER(error_code);
 }
 Network::UdpPacketWriter& FuzzUdpListenerCallbacks::udpPacketWriter() {
-  return *my_upf->udp_packet_writer_;
+  return *my_upf_->udp_packet_writer_;
 }
 uint32_t FuzzUdpListenerCallbacks::workerIndex() const { return 0; }
 void FuzzUdpListenerCallbacks::onDataWorker(Network::UdpRecvData&& data) {
   UNREFERENCED_PARAMETER(data);
 }
-void FuzzUdpListenerCallbacks::post(Network::UdpRecvData&& data) {
-  UNREFERENCED_PARAMETER(data);
-}
+void FuzzUdpListenerCallbacks::post(Network::UdpRecvData&& data) { UNREFERENCED_PARAMETER(data); }
 
 void FuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
-  my_upf->sent_packets++;
-  if (my_upf->sent_packets == my_upf->total_packets) {
-    my_upf->dispatcher_->exit();
+  my_upf_->sent_packets_++;
+  if (my_upf_->sent_packets_ == my_upf_->total_packets_) {
+    my_upf_->dispatcher_->exit();
   }
   UNREFERENCED_PARAMETER(dropped);
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) { UdpFuzz udp_instance(buf, len); }
 } // namespace
-//} // Network
 } // namespace Envoy
