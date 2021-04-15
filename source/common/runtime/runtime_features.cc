@@ -1,10 +1,13 @@
 #include "common/runtime/runtime_features.h"
 
+#include "common/quic/platform/flags_impl.h"
+
 #include "absl/strings/match.h"
-#include "quiche/quic/core/quic_flags_list.h"
 
 namespace Envoy {
 namespace Runtime {
+
+std::string ConstantQuicFlagPrefix = "envoy.reloadable_features.quic";
 
 bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
@@ -12,10 +15,6 @@ bool isRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  if (feature.find("envoy.reloadable_features.quic", 0) == 0) {
-    return quiche::FLAGS_quic_reloadable_flag_##feature->value();
-  }
-
   ASSERT(isRuntimeFeature(feature));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
@@ -134,6 +133,26 @@ RuntimeFeatures::RuntimeFeatures() {
   for (auto& feature : disabled_runtime_features) {
     disabled_features_.insert(feature);
   }
+}
+
+bool RuntimeFeatures::enabledByDefault(absl::string_view feature) const {
+  if (feature.substr(0, ConstantQuicFlagPrefix.length()) == ConstantQuicFlagPrefix) {
+    auto res = quiche::FlagRegistry::getInstance().findFlag(absl::StrCat(
+        "FLAGS_quic_reloadable_flag_", feature.substr(ConstantQuicFlagPrefix.length() - 4)));
+    ASSERT(res != nullptr);
+    return static_cast<quiche::TypedFlag<bool>*>(res)->value();
+  }
+  return enabled_features_.find(feature) != enabled_features_.end();
+}
+
+bool RuntimeFeatures::existsButDisabled(absl::string_view feature) const {
+  if (feature.substr(0, ConstantQuicFlagPrefix.length()) == ConstantQuicFlagPrefix) {
+    auto res = quiche::FlagRegistry::getInstance().findFlag(absl::StrCat(
+        "FLAGS_quic_reloadable_flag_", feature.substr(ConstantQuicFlagPrefix.length() - 4)));
+    ASSERT(res != nullptr);
+    return !static_cast<quiche::TypedFlag<bool>*>(res)->value();
+  }
+  return disabled_features_.find(feature) != disabled_features_.end();
 }
 
 } // namespace Runtime

@@ -24,7 +24,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/singleton:threadsafe_singleton",
-        "@com_googlesource_quiche//:quic_core_flags_list_lib",
+        "//source/common/quic/platform:flags_impl_lib",
     ],
 )
 

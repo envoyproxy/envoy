@@ -4,7 +4,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quiche_flags_impl.h"
+#include "common/quic/platform/flags_impl.h"
 
 #include <set>
 
@@ -53,7 +53,7 @@ void FlagRegistry::resetFlags() const {
   }
 }
 
-Flag* FlagRegistry::findFlag(const std::string& name) const {
+Flag* FlagRegistry::findFlag(absl::string_view name) const {
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;
 }

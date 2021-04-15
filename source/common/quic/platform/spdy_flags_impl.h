@@ -8,7 +8,8 @@
 
 #include "common/quic/platform/flags_impl.h"
 
-#define GetSpdyReloadableFlagImpl(flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
+#define GetSpdyReloadableFlagImpl(flag)                                                            \
+  Envoy::Runtime::runtimeFeatureEnabled(EnvoyReloadableFeature(flag))
 
 #define GetSpdyRestartFlagImpl(flag) quiche::FLAGS_quic_restart_flag_##flag->value()
 

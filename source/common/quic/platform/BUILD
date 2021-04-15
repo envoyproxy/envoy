@@ -34,9 +34,9 @@ envoy_package()
 # TODO: add build target for quic_platform_impl_lib
 
 envoy_cc_library(
-    name = "quiche_flags_impl_lib",
-    srcs = ["quiche_flags_impl.cc"],
-    hdrs = ["quiche_flags_impl.h"],
+    name = "flags_impl_lib",
+    srcs = ["flags_impl.cc"],
+    hdrs = ["flags_impl.h"],
     external_deps = [
         "abseil_base",
         "abseil_synchronization",
@@ -45,6 +45,15 @@ envoy_cc_library(
     deps = [
         "@com_googlesource_quiche//:quic_core_flags_list_lib",
         "@com_googlesource_quiche//:quic_core_protocol_flags_list_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_flags_impl_lib",
+    hdrs = ["quiche_flags_impl.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":flags_impl_lib",
         "//source/common/runtime:runtime_features_lib",
     ],
 )
@@ -75,8 +84,8 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":flags_impl_lib",
         ":quic_platform_logging_impl_lib",
-        ":quiche_flags_impl_lib",
         ":string_utils_lib",
     ],
 )
@@ -276,8 +285,8 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":flags_impl_lib",
         ":quic_platform_logging_impl_lib",
-        ":quiche_flags_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
         "@com_googlesource_quiche//:quiche_common_lib",
