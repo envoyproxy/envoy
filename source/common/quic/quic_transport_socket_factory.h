@@ -40,7 +40,7 @@ public:
   QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
       : stats_(generateStats(store, perspective)) {}
 
-  // To be called right after contrustion.
+  // To be called right after construction.
   virtual void initialize() = 0;
 
   // Network::TransportSocketFactory
