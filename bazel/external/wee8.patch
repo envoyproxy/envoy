@@ -2,6 +2,7 @@
 # 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix MSAN linking.
 # 4. Provide more details on Windows build failures.
+# 5. Don't try to setup Windows x86 toolchain.
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -66,3 +67,20 @@
    return available_versions[0]
 
 
+--- wee8/build/toolchain/win/BUILD.gn
++++ wee8/build/toolchain/win/BUILD.gn
+@@ -472,10 +472,13 @@ template("win_toolchains") {
+   }
+ }
+ 
+-if (target_cpu == "x86" || target_cpu == "x64") {
++if (target_cpu == "x86") {
+   win_toolchains("x86") {
+     toolchain_arch = "x86"
+   }
++}
++
++if (target_cpu == "x64") {
+   win_toolchains("x64") {
+     toolchain_arch = "x64"
+   }
