@@ -50,6 +50,7 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
   auto exception_msgs =
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   sendAwaiting();
+  status_ = StartStatus::InitialFetchDone;
   if (!exception_msgs.empty()) {
     throw EnvoyException(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
@@ -60,16 +61,16 @@ void OdCdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason
                                         const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   sendAwaiting();
+  status_ = StartStatus::InitialFetchDone;
 }
 
 void OdCdsApiImpl::sendAwaiting() {
-  if (status_ != StartStatus::Started) {
-    return;
-  }
-  status_ = StartStatus::InitialFetchDone;
   if (awaiting_names_.empty()) {
     return;
   }
+  // The awaiting names are sent only once. After the state transition from Starting to
+  // InitialFetchDone (which happens on the first received response), the awaiting names list is not
+  // used any more.
   ENVOY_LOG(debug, "odcds: sending request for awaiting cluster names {}",
             fmt::join(awaiting_names_, ", "));
   subscription_->requestOnDemandUpdate(awaiting_names_);

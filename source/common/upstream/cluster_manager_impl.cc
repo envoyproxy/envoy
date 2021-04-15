@@ -1138,6 +1138,8 @@ ClusterDiscoveryCallbackHandlePtr ClusterManagerImpl::requestOnDemandClusterDisc
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto [handle, discovery_in_progress] = cluster_manager.cdm_.addCallback(name, callback);
+  // This check will catch requests for discoveries from this thread only. If other thread requested
+  // the same discovery, we will detect it in the main thread later.
   if (discovery_in_progress) {
     ENVOY_LOG(debug,
               "cm odcds: on-demand discovery for cluster {} is already in progress, something else "
