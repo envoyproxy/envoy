@@ -1,7 +1,7 @@
 import argparse
 import os
 from functools import cached_property
-from typing import Optional, Sequence, Tuple, Type
+from typing import Sequence, Tuple, Type
 
 from tools.base import runner
 

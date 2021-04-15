@@ -456,7 +456,7 @@ if __name__ == "__main__":
 ```
 
 Just like with the `Runner` class described [above](#using-the-toolsbaserunnerrunner-class) you can
-user both with and without `bazel`. To use without, you will need make it executable, and the end
+use both with and without `bazel`. To use without, you will need make it executable, and the end
 user will need to have any dependencies locally installed.
 
 Notice in the check methods the results of the check are logged to one of `self.error`, `self.warn`,
