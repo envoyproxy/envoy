@@ -19,42 +19,85 @@ public:
     std::vector<Http::Protocol> protocols_;
   };
 
+  enum class StreamCreationResult {
+    ImmediateResult,
+    StreamCreationPending,
+  };
+
   using PoolIterator = std::list<ConnectionPool::InstancePtr>::iterator;
 
   // This is a class which wraps a caller's connection pool callbacks to
   // auto-retry pools in the case of connection failure.
   //
   // It also relays cancellation calls between the original caller and the
-  // pools currently trying to connect.
-  //
-  // TODO(#15649) currently this tries one connection at a time.
-  // It should instead have a timer of its own and start the second connection
-  // in parallel after a suitable delay.
-  class WrapperCallbacks : public ConnectionPool::Callbacks,
-                           public ConnectionPool::Cancellable,
+  // current connection attempts.
+  class WrapperCallbacks : public ConnectionPool::Cancellable,
                            public LinkedObject<WrapperCallbacks> {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
                      ConnectionPool::Callbacks& callbacks);
 
-    // ConnectionPool::Callbacks
-    void onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                       absl::string_view transport_failure_reason,
-                       Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                     const StreamInfo::StreamInfo& info,
-                     absl::optional<Http::Protocol> protocol) override;
+    // This holds state for a single connection attempt to a specific pool.
+    class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
+                                       public LinkedObject<ConnectionAttemptCallbacks> {
+    public:
+      ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
+
+      StreamCreationResult newStream();
+
+      // ConnectionPool::Callbacks
+      void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                         absl::string_view transport_failure_reason,
+                         Upstream::HostDescriptionConstSharedPtr host) override;
+      void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
+                       const StreamInfo::StreamInfo& info,
+                       absl::optional<Http::Protocol> protocol) override;
+
+      ConnectionPool::Instance& pool() { return **pool_it_; }
+
+      void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy);
+
+    private:
+      // A pointer back up to the parent.
+      WrapperCallbacks& parent_;
+      // The pool for this connection attempt.
+      const PoolIterator pool_it_;
+      // The handle to cancel this connection attempt.
+      // This is owned by the pool which created it.
+      Cancellable* cancellable_;
+    };
+    using ConnectionAttemptCallbacksPtr = std::unique_ptr<ConnectionAttemptCallbacks>;
 
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
-    // Attempt to create a new stream for pool();
-    void newStream();
+    // Attempt to create a new stream for pool().
+    StreamCreationResult newStream();
 
     // Removes this from the owning list, deleting it.
     void deleteThis();
 
-    ConnectionPool::Instance& pool() { return **pool_it_; }
+    // Called on pool failure or timeout to kick off another connection attempt.
+    // Returns true if there is a failover pool and a connection has been
+    // attempted, false if all pools have been tried.
+    bool tryAnotherConnection();
+
+    // Called by a ConnectionAttempt when the underlying pool fails.
+    void onConnectionAttemptFailed(ConnectionAttemptCallbacks* attempt,
+                                   ConnectionPool::PoolFailureReason reason,
+                                   absl::string_view transport_failure_reason,
+                                   Upstream::HostDescriptionConstSharedPtr host);
+
+    // Called by a ConnectionAttempt when the underlying pool is ready.
+    void onConnectionAttemptReady(ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
+                                  Upstream::HostDescriptionConstSharedPtr host,
+                                  const StreamInfo::StreamInfo& info,
+                                  absl::optional<Http::Protocol> protocol);
+
+  private:
+    // Tracks all the connection attempts which currently in flight.
+    std::list<ConnectionAttemptCallbacksPtr> connection_attempts_;
+
     // The owning grid.
     ConnectivityGrid& grid_;
     // The decoder for the original newStream, needed to create streams on subsequent pools.
@@ -62,11 +105,10 @@ public:
     // The callbacks from the original caller, which must get onPoolFailure or
     // onPoolReady unless there is call to cancel().
     ConnectionPool::Callbacks& inner_callbacks_;
-    // The current pool being connected to.
-    PoolIterator pool_it_;
-    // The handle to cancel the request to the current pool.
-    // This is owned by the pool which created it.
-    Cancellable* cancellable_;
+    // The timer which tracks when new connections should be attempted.
+    Event::TimerPtr next_attempt_timer_;
+    // The iterator to the last pool which had a connection attempt.
+    PoolIterator current_;
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -75,6 +117,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                   std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
 
@@ -107,9 +150,10 @@ private:
   Random::RandomGenerator& random_generator_;
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
-  const Network::ConnectionSocket::OptionsSharedPtr& options_;
-  const Network::TransportSocketOptionsSharedPtr& transport_socket_options_;
+  const Network::ConnectionSocket::OptionsSharedPtr options_;
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
+  std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is

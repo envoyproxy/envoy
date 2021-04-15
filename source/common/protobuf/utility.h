@@ -9,6 +9,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/hash.h"
+#include "common/common/stl_helpers.h"
 #include "common/common/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
@@ -153,14 +154,8 @@ public:
 
   template <class ProtoType>
   static std::string debugString(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    if (source.empty()) {
-      return "[]";
-    }
-    return std::accumulate(std::next(source.begin()), source.end(), "[" + source[0].DebugString(),
-                           [](std::string debug_string, const Protobuf::Message& message) {
-                             return debug_string + ", " + message.DebugString();
-                           }) +
-           "]";
+    return accumulateToString<ProtoType>(
+        source, [](const Protobuf::Message& message) { return message.DebugString(); });
   }
 
   // Based on MessageUtil::hash() defined below.

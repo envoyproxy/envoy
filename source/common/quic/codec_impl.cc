@@ -19,8 +19,16 @@ EnvoyQuicClientStream* quicStreamToEnvoyClientStream(quic::QuicStream* stream) {
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSend() > 0; }
 
 QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
-    EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks)
-    : QuicHttpConnectionImplBase(quic_session), quic_server_session_(quic_session) {
+    EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
+    Http::Http3::CodecStats& stats,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t /*max_request_headers_kb*/,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
+    : QuicHttpConnectionImplBase(quic_session, stats), quic_server_session_(quic_session) {
+  quic_session.setCodecStats(stats);
+  quic_session.setHttp3Options(http3_options);
+  quic_session.setHeadersWithUnderscoreAction(headers_with_underscores_action);
   quic_session.setHttpConnectionCallbacks(callbacks);
 }
 
@@ -42,7 +50,7 @@ void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
 
 void QuicHttpServerConnectionImpl::shutdownNotice() {
   if (quic::VersionUsesHttp3(quic_server_session_.transport_version())) {
-    quic_server_session_.SendHttp3Shutdown();
+    quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server shutdown");
   } else {
     ENVOY_CONN_LOG(debug, "Shutdown notice is not propagated to QUIC.", quic_server_session_);
   }
@@ -56,9 +64,14 @@ void QuicHttpServerConnectionImpl::goAway() {
   }
 }
 
-QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                                                           Http::ConnectionCallbacks& callbacks)
-    : QuicHttpConnectionImplBase(session), quic_client_session_(session) {
+QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
+    EnvoyQuicClientSession& session, Http::ConnectionCallbacks& callbacks,
+    Http::Http3::CodecStats& stats,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t /*max_request_headers_kb*/)
+    : QuicHttpConnectionImplBase(session, stats), quic_client_session_(session) {
+  session.setCodecStats(stats);
+  session.setHttp3Options(http3_options);
   session.setHttpConnectionCallbacks(callbacks);
 }
 

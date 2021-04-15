@@ -104,7 +104,7 @@ protected:
   }
 
   void verifyDownstreamResponse(IntegrationStreamDecoder& response, int status_code) {
-    response.waitForEndStream();
+    ASSERT_TRUE(response.waitForEndStream());
     EXPECT_TRUE(response.complete());
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
@@ -629,7 +629,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
 
   // The stream should have been reset here before the complete
   // response was received.
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
 }
 
 // Send a request, but wait longer than the "message timeout" before sending a response
