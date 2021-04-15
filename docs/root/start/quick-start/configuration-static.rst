@@ -56,4 +56,4 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
     :language: yaml
     :lineno-start: 29
     :lines: 29-52
-    :emphasize-lines: 4-23
+    :emphasize-lines: 5-24
