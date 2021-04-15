@@ -30,20 +30,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-/**
- * Class that represents the IP tag values from the file
- */
-class ValueSet {
-
-public :
-  ValueSet() = default;
-
-  ~ValueSet();
-
-private:
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> tag_set_;
-};
-
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
 
 /**
@@ -67,7 +53,7 @@ public:
 
   ~ValueSetWatcher();
 
-  std::shared_ptr<const ValueSet> get() const;
+  const Network::LcTrie::LcTrie<std::string>& get() const { return *trie_; }
   const std::string& filename() { return filename_; }
 
 private:
@@ -85,11 +71,10 @@ private:
 
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
-  std::shared_ptr<ValueSet> fileContentsAsValueSet_(absl::string_view contents) const;
-  std::shared_ptr<ValueSet> jsonFileContentsAsValueSet_(std::string contents) const;
-  std::shared_ptr<ValueSet> yamlFileContentsAsValueSet_(std::string contents) const;
-  std::shared_ptr<const ValueSet> values_;
-
+  std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
+  fileContentsAsTagSet_(absl::string_view contents) const;
+  IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
+  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
   Api::Api& api_;
   std::string filename_;
   std::string extension_;
@@ -146,7 +131,7 @@ public:
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
   IpTaggingFilterSetTagData(
-      const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config);
+      const envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag& config);
 
 private:
   static FilterRequestType requestTypeEnum(

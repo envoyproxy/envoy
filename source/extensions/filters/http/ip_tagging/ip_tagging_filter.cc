@@ -54,7 +54,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
 std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
 IpTaggingFilterConfig::IpTaggingFilterSetTagData(
-    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config) {
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag& config) {
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(config.ip_tags().size());
@@ -81,8 +81,6 @@ IpTaggingFilterConfig::IpTaggingFilterSetTagData(
   return tag_data;
 }
 
-ValueSet::~ValueSet() = default;
-
 // Check the registry and either return a watcher for a file or create one
 std::shared_ptr<ValueSetWatcher>
 ValueSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
@@ -106,8 +104,6 @@ ValueSetWatcher::~ValueSetWatcher() {
     registry_->remove(*this);
 }
 
-std::shared_ptr<const ValueSet> ValueSetWatcher::get() const { return values_; }
-
 // read the file from filesystem, load the content and only update if the hash has changed.
 void ValueSetWatcher::maybeUpdate_(bool force) {
   std::string contents = api_.fileSystem().fileReadToEnd(filename_);
@@ -120,65 +116,35 @@ void ValueSetWatcher::maybeUpdate_(bool force) {
 }
 
 void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
-  std::shared_ptr<const ValueSet> new_values = fileContentsAsValueSet_(contents);
+  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> new_values =
+      fileContentsAsTagSet_(contents);
 
-  new_values.swap(values_); // Fastest way to replace the values.
+  new_values.swap(trie_); // Fastest way to replace the values.
   content_hash_ = hash;
 }
 
-// Validate and parse both yaml and json file content.
-std::shared_ptr<ValueSet>
-ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) const {
+// Validate and parse both yaml and json file content to proto.
+IpTagFileProto ValueSetWatcher::protoFromFileContents_(absl::string_view contents) const {
   const std::string file_content = std::string(contents);
-  std::shared_ptr<ValueSet> values = std::make_shared<ValueSet>();
   IpTagFileProto ipf;
 
   if (extension_ == "Yaml") {
     MessageUtil::loadFromYaml(file_content, ipf, protoValidator());
-    values = yamlFileContentsAsValueSet_(std::move(file_content));
-
-  } else if (extension_ == "Json") {
-    MessageUtil::loadFromJson(file_content, ipf, protoValidator());
-    values = jsonFileContentsAsValueSet_(std::move(file_content));
 
   } else {
-    throw EnvoyException("HTTP IP Tagging Filter supports only json or yaml file types");
+    MessageUtil::loadFromJson(file_content, ipf, protoValidator());
   }
-
-  return values;
+  return ipf;
 }
 
-// Json parser
-std::shared_ptr<ValueSet>
-ValueSetWatcher::jsonFileContentsAsValueSet_(std::string contents) const {
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-  Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(contents);
-  int pos = 0;
+std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
+ValueSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
 
-  json_data->iterate([&pos](const std::string& key, const Json::Object& value) {
-    std::string ip_tag_name = value.getString("ip_tag_name");
-    std::vector<Envoy::Json::ObjectSharedPtr> tag_list = value.getObjectArray("ip_tags");
-    tag_data.emplace_back(ip_tag_name, tag_list);
-    pos++;
-  });
+  IpTagFileProto proto_content = protoFromFileContents_(contents);
 
-  return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
-}
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
+      IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
 
-// Yaml parser
-// TODO: techincally yaml is a superset of json so jaml parser should work for json content as well
-// in an ideal world we should be able to just use one parser based on that
-std::shared_ptr<ValueSet>
-ValueSetWatcher::yamlFileContentsAsValueSet_(std::string contents) const {
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-  YAML::Node data = YAML::Load(contents);
-
-  for (std::size_t i=0;i<data.size();i++) {
-    std::string ip_tag_name = data[i]["ip_tag_name"].as<std::string>();
-    std::vector<Network::Address::CidrRange> tag_list =
-        data[i]["ip_tags"].as<std::vector<Network::Address::CidrRange>>();
-    tag_data.emplace_back(ip_tag_name, tag_list);
-  }
   return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
