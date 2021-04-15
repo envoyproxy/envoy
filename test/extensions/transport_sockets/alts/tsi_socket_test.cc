@@ -187,10 +187,10 @@ protected:
 
     EXPECT_EQ("", client_.tsi_socket_->protocol());
 
-    client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+    client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
     EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-    expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+    expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                    client_.tsi_socket_->doWrite(client_.write_buffer_, false));
     EXPECT_EQ(makeFakeTsiFrame(data), client_to_server_.toString());
     EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -462,10 +462,10 @@ TEST_F(TsiSocketTest, DoReadEndOfStream) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -489,10 +489,10 @@ TEST_F(TsiSocketTest, DoReadNoData) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -521,10 +521,10 @@ TEST_F(TsiSocketTest, DoReadTwiceError) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -553,10 +553,10 @@ TEST_F(TsiSocketTest, DoReadOnceError) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -580,10 +580,10 @@ TEST_F(TsiSocketTest, DoReadDrainBuffer) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -606,10 +606,10 @@ TEST_F(TsiSocketTest, DoReadDrainBufferTwice) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -626,7 +626,7 @@ TEST_F(TsiSocketTest, DoReadDrainBufferTwice) {
   server_.read_buffer_.drain(server_.read_buffer_.length());
   client_.write_buffer_.add(ClientToServerData);
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
-  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
@@ -659,7 +659,7 @@ TEST_F(TsiSocketTest, DoWriteSmallFrameSize) {
   EXPECT_EQ(0L, client_.read_buffer_.length());
 
   EXPECT_EQ("", client_.tsi_socket_->protocol());
-  client_.tsi_socket_->setActualFrameSizeToUse(SmallFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(SmallFrameSize);
   // Since we use a small frame size, original data is divided into two parts,
   // and written to network in two iterations.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -674,9 +674,7 @@ TEST_F(TsiSocketTest, DoWriteSmallFrameSize) {
         client_to_server_.move(buffer);
         return result;
       }));
-  // Since original data is divided into two parts with each of them being
-  // protected individually, we need to add in 4*2 frame size overhead.
-  expectIoResult({Network::PostIoAction::KeepOpen, 25UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_EQ(makeFakeTsiFrame(ClientToServerDataFirstHalf) +
@@ -702,7 +700,7 @@ TEST_F(TsiSocketTest, DoWriteSingleShortWrite) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   // Write the whole data except for the last byte.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -711,7 +709,7 @@ TEST_F(TsiSocketTest, DoWriteSingleShortWrite) {
         client_to_server_.add(buffer.linearize(0), buffer.length() - 1);
         return result;
       }));
-  expectIoResult({Network::PostIoAction::KeepOpen, 20UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_EQ(makeFakeTsiFrame(ClientToServerData).substr(0, 20), client_to_server_.toString());
@@ -735,7 +733,7 @@ TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
 
   // Write the whole data except for the last byte.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -745,7 +743,7 @@ TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
         buffer.drain(buffer.length() - 1);
         return result;
       }));
-  expectIoResult({Network::PostIoAction::KeepOpen, 20UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
 
   EXPECT_EQ(makeFakeTsiFrame(ClientToServerData).substr(0, 20), client_to_server_.toString());
@@ -756,7 +754,7 @@ TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
         client_to_server_.add(buffer.linearize(buffer.length() - 1), 1);
         return result;
       }));
-  expectIoResult({Network::PostIoAction::KeepOpen, 1UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
   EXPECT_EQ(makeFakeTsiFrame(ClientToServerData), client_to_server_.toString());
 
@@ -779,7 +777,7 @@ TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setActualFrameSizeToUse(SmallFrameSize);
+  client_.tsi_socket_->setMaxUnprotectedFrameSize(SmallFrameSize);
 
   // Short write occurred when writing the first half of data.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -789,7 +787,7 @@ TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
         buffer.drain(buffer.length() - 1);
         return result;
       }));
-  expectIoResult({Network::PostIoAction::KeepOpen, 12UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
   EXPECT_EQ(makeFakeTsiFrame(ClientToServerDataFirstHalf).substr(0, 12),
             client_to_server_.toString());
@@ -808,7 +806,7 @@ TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
         client_to_server_.move(buffer);
         return result;
       }));
-  expectIoResult({Network::PostIoAction::KeepOpen, 13UL, false},
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
   EXPECT_EQ(makeFakeTsiFrame(ClientToServerDataFirstHalf) +
                 makeFakeTsiFrame(ClientToServerDataSecondHalf),

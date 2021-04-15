@@ -74,8 +74,8 @@ public:
 
   // This API should be called only after ALTS handshake finishes successfully.
   size_t actualFrameSizeToUse() { return actual_frame_size_to_use_; }
-  // Set actual_frame_size_to_use_. Exposed for testing purpose.
-  void setActualFrameSizeToUse(size_t frame_size) { actual_frame_size_to_use_ = frame_size; }
+  // Set max_unprotected_frame_size_. Exposed for testing purpose.
+  void setMaxUnprotectedFrameSize(size_t frame_size) { max_unprotected_frame_size_ = frame_size; }
 
 private:
   Network::PostIoAction doHandshake();
@@ -101,6 +101,8 @@ private:
   // actual_frame_size_to_use_ is the actual frame size used by
   // frame protector, which is the result of frame size negotiation.
   size_t actual_frame_size_to_use_{0};
+  // maximum size of data that can be protected for a single frame.
+  size_t max_unprotected_frame_size_{0};
 
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
   std::unique_ptr<TsiTransportSocketCallbacks> tsi_callbacks_;
