@@ -54,6 +54,6 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 30
-    :lines: 29-54
-    :emphasize-lines: 4-27
+    :lineno-start: 29
+    :lines: 29-52
+    :emphasize-lines: 4-23
