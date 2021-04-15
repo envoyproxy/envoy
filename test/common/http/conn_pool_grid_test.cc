@@ -424,7 +424,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 
 // Test that when HTTP/3 is broken then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
-  grid_.setIsHttp3Broken(true);
+  grid_.markHttp3Broken();
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'first', skipping.",

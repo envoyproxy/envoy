@@ -150,11 +150,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "broken_http3_tracker",
+    srcs = ["broken_http3_tracker.cc"],
+    hdrs = ["broken_http3_tracker.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_grid",
     srcs = ["conn_pool_grid.cc"],
     hdrs = ["conn_pool_grid.h"],
     deps = [
         ":mixed_conn_pool",
+        ":broken_http3_tracker",
         "//source/common/http/http3:conn_pool_lib",
     ],
 )

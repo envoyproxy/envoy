@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/http/conn_pool_base.h"
-
 #include "absl/container/flat_hash_map.h"
+#include "common/http/broken_http3_tracker.h"
+#include "common/http/conn_pool_base.h"
 
 namespace Envoy {
 namespace Http {
@@ -150,8 +150,8 @@ public:
   // Returns true if pool is the grid's HTTP/3 connection pool.
   bool isPoolHttp3(const ConnectionPool::Instance& pool);
 
-  bool isHttp3Broken() const { return is_http3_broken_; }
-  void setIsHttp3Broken(bool is_http3_broken) { is_http3_broken_ = is_http3_broken; }
+  bool isHttp3Broken() const;
+  void markHttp3Broken();
 
 private:
   friend class ConnectivityGridForTest;
@@ -174,7 +174,7 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  bool is_http3_broken_{};
+  BrokenHttp3Tracker broken_http3_tracker_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and

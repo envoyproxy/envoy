@@ -440,6 +440,16 @@ envoy_cc_test(
     ]),
 )
 
+envoy_cc_test(
+    name = "broken_http3_tracker_test",
+    srcs = ["broken_http3_tracker_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:broken_http3_tracker",
+        "//test/mocks:common_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "path_utility_fuzz_proto",
     srcs = ["path_utility_fuzz.proto"],
