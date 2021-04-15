@@ -12,7 +12,7 @@ namespace Alts {
 namespace {
 // Include 4 bytes frame message type and 16 bytes tag length.
 // It is consistent with gRPC ALTS zero copy frame protector implementation.
-static constexpr int FrameOverheadSize = 0;
+static constexpr int FrameOverheadSize = 20;
 } // namespace
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
