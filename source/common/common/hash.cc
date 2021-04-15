@@ -4,6 +4,13 @@
 
 namespace Envoy {
 
+uint64_t HashUtil::xxHash64(absl::Span<absl::string_view> input, uint64_t seed) {
+  for (auto& i : input) {
+    seed = XXH64(i.data(), i.size(), seed);
+  }
+  return seed;
+}
+
 // Computes a 64-bit murmur hash 2, only works with 64-bit platforms. Revisit if support for 32-bit
 // platforms are needed.
 // from
