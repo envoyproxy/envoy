@@ -72,8 +72,6 @@ build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
 build:macos --cxxopt=-std=c++17
-build:macos --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:macos --action_env=BAZEL_LINKOPTS=-lm
 
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
@@ -249,7 +247,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3d0491e2034287959a292806e3891fd0b7dd2703
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
