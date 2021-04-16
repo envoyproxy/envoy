@@ -24,6 +24,8 @@ public:
   const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
   // HTTP connection manager filter
   const std::string HttpConnectionManager = "envoy.filters.network.http_connection_manager";
+  // Connection limit filter
+  const std::string ConnectionLimit = "envoy.filters.network.connection_limit";
   // Local rate limit filter
   const std::string LocalRateLimit = "envoy.filters.network.local_ratelimit";
   // Mongo proxy filter
