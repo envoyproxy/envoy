@@ -13,7 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5%.
+* xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.
 
 Removed Config or Runtime
 -------------------------
