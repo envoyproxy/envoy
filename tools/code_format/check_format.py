@@ -143,7 +143,7 @@ BUILD_URLS_ALLOWLIST = (
     "./api/bazel/envoy_http_archive.bzl",
 )
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-11")
 BUILDIFIER_PATH = paths.get_buildifier()
 BUILDOZER_PATH = paths.get_buildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(
