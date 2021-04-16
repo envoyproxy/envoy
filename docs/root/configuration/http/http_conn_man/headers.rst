@@ -473,6 +473,15 @@ tracing context for the SkyWalking tracer and is used to establish the relations
 the tracing spans of downstream and Envoy. See more on SkyWalking tracing
 `here <https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md>`__.
 
+.. _config_http_conn_man_headers_x-amzn-trace-id:
+
+x-amzn-trace-id
+---------------
+
+The *x-amzn-trace-id* HTTP header is used by the AWS X-Ray tracer in Envoy. The trace ID,
+parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
+`here <https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader>`__.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
