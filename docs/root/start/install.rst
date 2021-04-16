@@ -135,10 +135,10 @@ Install Envoy on Windows
 
 You can run Envoy using the official Windows development Docker image.
 
-.. code-block:: console
+.. substitution-code-block:: console
 
-   $ docker pull envoyproxy/envoy-windows-dev:latest
-   $ docker run --rm envoyproxy/envoy-windows-dev:latest --version
+   $ docker pull envoyproxy/|envoy_windows_docker_image|
+   $ docker run --rm envoyproxy/|envoy_windows_docker_image| --version
 
 .. _start_install_docker:
 
