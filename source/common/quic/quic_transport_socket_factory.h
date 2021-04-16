@@ -1,11 +1,13 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
 
 #include "common/common/assert.h"
 
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -50,21 +52,11 @@ public:
   }
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }
+  bool supportsAlpn() const override { return true; }
 
 protected:
-  // To be called by subclass right after construction.
-  void initializeSecretUpdateCallback(Ssl::ContextConfig& context_config) {
-    context_config.setSecretUpdateCallback([this]() {
-      // The callback also updates config_ with the new secret.
-      onSecretUpdated();
-    });
-  }
-
-  virtual void onSecretUpdated() { stats_.context_config_update_by_sds_.inc(); };
-
+  virtual void onSecretUpdated() = 0;
   QuicTransportSocketFactoryStats stats_;
-
-private:
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
@@ -74,7 +66,12 @@ public:
   QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
       : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)) {}
 
-  void initialize() override { initializeSecretUpdateCallback(*config_); }
+  void initialize() override {
+    config_->setSecretUpdateCallback([this]() {
+      // The callback also updates config_ with the new secret.
+      onSecretUpdated();
+    });
+  }
 
   // Return TLS certificates if the context config is ready.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
@@ -87,27 +84,48 @@ public:
     return config_->tlsCertificates();
   }
 
+protected:
+  void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
+
 private:
   Ssl::ServerContextConfigPtr config_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicClientTransportSocketFactory(Stats::Scope& store, Ssl::ClientContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, "client"), config_(std::move(config)) {}
+  QuicClientTransportSocketFactory(
+      Ssl::ClientContextConfigPtr config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
 
-  void initialize() override { initializeSecretUpdateCallback(*config_); }
+  void initialize() override {
+    // TODO(14829) fallback_factory_ needs to call onSecretUpdated() upon SDS update.
+  }
 
-  const Ssl::ClientContextConfig& clientContextConfig() const { return *config_; }
+  // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
+  // code does not create transport sockets.
+  // QuicClientTransportSocketFactory::createTransportSocket is called by the
+  // connection grid when upstream HTTP/3 fails over to TCP, and a raw SSL socket
+  // is needed. In this case the QuicClientTransportSocketFactory falls over to
+  // using the fallback factory.
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override {
+    return fallback_factory_->createTransportSocket(options);
+  }
+
+  // TODO(14829) make sure that clientContextConfig() is safe when secrets are updated.
+  const Ssl::ClientContextConfig& clientContextConfig() const {
+    return fallback_factory_->config();
+  }
 
 protected:
   void onSecretUpdated() override {
-    QuicTransportSocketFactoryBase::onSecretUpdated();
-    // TODO(danzh) Client transport socket factory may also need to update quic crypto.
+    // fallback_factory_ will update the stats.
+    // TODO(14829) Client transport socket factory may also need to update quic crypto.
   }
 
 private:
-  Ssl::ClientContextConfigPtr config_;
+  // The QUIC client transport socket can create TLS sockets for fallback to TCP.
+  std::unique_ptr<Extensions::TransportSockets::Tls::ClientSslSocketFactory> fallback_factory_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client

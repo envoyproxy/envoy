@@ -27,7 +27,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   IntegrationStreamDecoderPtr response;
   while (!test_server_->counter("http.config_test.downstream_cx_drain_close")->value()) {
     response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
   }
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_drain_close")->value(), 1L);
 
@@ -60,7 +60,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
 
   IntegrationStreamDecoderPtr response;
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
@@ -85,7 +85,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   // The request is completed but the connection remains open.
@@ -102,7 +102,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 
@@ -139,7 +139,7 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   // Invoke /drain_listeners with graceful drain
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
@@ -155,7 +155,7 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 

@@ -338,3 +338,12 @@ envoy_cc_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "platform_interface",
+    hdrs = ["platform.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/thread:thread_interface",
+    ],
+)
