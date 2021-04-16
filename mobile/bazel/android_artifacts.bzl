@@ -310,5 +310,9 @@ def _manifest(package_name):
     return """
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="{}" >
+
+    <uses-sdk
+            android:minSdkVersion="21"
+            android:targetSdkVersion="29"/>
 </manifest>
 """.format(package_name)
