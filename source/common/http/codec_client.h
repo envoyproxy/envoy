@@ -60,6 +60,11 @@ public:
   ~CodecClient() override;
 
   /**
+   * Connect to the host.
+   */
+  void connect();
+
+  /**
    * Add a connection callback to the underlying network connection.
    */
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) {

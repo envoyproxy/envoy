@@ -112,6 +112,7 @@ public:
   void initialize(Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase& parent) {
     real_host_description_ = data.host_description_;
     codec_client_ = parent.createCodecClient(data);
+    codec_client_->connect();
     codec_client_->addConnectionCallbacks(*this);
     codec_client_->setConnectionStats(
         {parent_.host()->cluster().stats().upstream_cx_rx_bytes_total_,

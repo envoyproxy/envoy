@@ -81,7 +81,6 @@ IntegrationCodecClient::IntegrationCodecClient(
       dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
-  dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
 void IntegrationCodecClient::flushWrite() {
@@ -270,6 +269,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   // in-connection version negotiation.
   auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
                                                         host_description, downstream_protocol_);
+  codec->connect();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP3 && codec->disconnected()) {
     // Connection may get closed during version negotiation or handshake.
     // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate

@@ -258,6 +258,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
     client_.reset(parent_.createCodecClient(conn));
+    client_->connect();
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
     expect_reset_ = false;
@@ -706,6 +707,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
     client_ = parent_.createCodecClient(conn);
+    client_->connect();
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
   }

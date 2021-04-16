@@ -34,19 +34,6 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  // Do not start handshake for H3 connection till it is initialized.
-  if (type_ != Type::HTTP3) {
-    // In general, codecs are handed new not-yet-connected connections, but in the
-    // case of ALPN, the codec may be handed an already connected connection.
-    if (!connection_->connecting()) {
-      ASSERT(connection_->state() == Network::Connection::State::Open);
-      connected_ = true;
-    } else {
-      ENVOY_CONN_LOG(debug, "connecting", *connection_);
-      connection_->connect();
-    }
-  }
-
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
     enableIdleTimer();
@@ -58,6 +45,18 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 }
 
 CodecClient::~CodecClient() = default;
+
+void CodecClient::connect() {
+  // In general, codecs are handed new not-yet-connected connections, but in the
+  // case of ALPN, the codec may be handed an already connected connection.
+  if (!connection_->connecting()) {
+    ASSERT(connection_->state() == Network::Connection::State::Open);
+    connected_ = true;
+  } else {
+    ENVOY_CONN_LOG(debug, "connecting", *connection_);
+    connection_->connect();
+  }
+}
 
 void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
@@ -195,14 +194,6 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     // Initialize the session after max request header size is changed in above http client
     // connection creation.
     quic_session.Initialize();
-    // The other two codecs have already connected in base class.
-    if (!connection_->connecting()) {
-      ASSERT(connection_->state() == Network::Connection::State::Open);
-      connected_ = true;
-    } else {
-      ENVOY_CONN_LOG(debug, "connecting", *connection_);
-      connection_->connect();
-    }
     break;
 #else
     // Should be blocked by configuration checking at an earlier point.

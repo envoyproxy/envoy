@@ -77,6 +77,7 @@ public:
     EXPECT_CALL(dispatcher_, createTimer_(_));
     client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
                                                    codec_, nullptr, host_, dispatcher_);
+    client_->connect();
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
@@ -107,22 +108,21 @@ public:
                              Quic::EnvoyQuicAlarmFactory& alarm_factory,
                              quic::QuicCryptoClientConfig* crypto_config,
                              Event::Dispatcher& dispatcher)
-      : EnvoyQuicClientSession(quic::QuicConfig(), quic_version,
-                               std::make_unique<Quic::EnvoyQuicClientConnection>(
-                                   quic::test::TestConnectionId(), connection_helper, alarm_factory,
-                                   new testing::NiceMock<quic::test::MockPacketWriter>(),
-                                   /*owns_writer=*/true, quic_version, dispatcher,
-                                   std::unique_ptr<Network::ConnectionSocket>(
-                                       new testing::NiceMock<Network::MockConnectionSocket>())),
-                               quic::QuicServerId("example.com", 443, false), crypto_config,
-                               /*push_promise_index=*/nullptr, dispatcher,
-                               /*send_buffer_limit=*/16 * 1024 * 2) {}
+      : EnvoyQuicClientSession(
+            quic::QuicConfig(), quic_version,
+            std::make_unique<Quic::EnvoyQuicClientConnection>(
+                quic::test::TestConnectionId(), connection_helper, alarm_factory,
+                new testing::NiceMock<quic::test::MockPacketWriter>(),
+                /*owns_writer=*/true, quic_version, dispatcher,
+                std::make_unique<testing::NiceMock<Network::MockConnectionSocket>>()),
+            quic::QuicServerId("example.com", 443, false), crypto_config,
+            /*push_promise_index=*/nullptr, dispatcher,
+            /*send_buffer_limit=*/16 * 1024 * 2) {}
 
   ~MockEnvoyQuicClientSession() override = default;
 
   // Network::ClientConnection
   MOCK_METHOD(void, connect, ());
-  MOCK_METHOD(bool, connecting, (), (const));
   MOCK_METHOD(void, addConnectionCallbacks, (Network::ConnectionCallbacks & cb));
   MOCK_METHOD(void, addReadFilter, (Network::ReadFilterSharedPtr filter));
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));
@@ -142,11 +142,11 @@ TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
   EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
   EXPECT_CALL(*connection, addReadFilter(_));
-  EXPECT_CALL(*connection, connecting()).WillOnce(Return(true));
   EXPECT_CALL(*connection, connect());
 
   auto client = std::make_unique<CodecClientProd>(CodecClient::Type::HTTP3, std::move(connection),
                                                   host_, dispatcher, random);
+  client->connect();
   EXPECT_EQ(0U, client->numActiveRequests());
   client->close();
 }
@@ -372,6 +372,7 @@ public:
     client_ =
         std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
                                              codec_, nullptr, host_, *dispatcher_);
+    client_->connect();
 
     int expected_callbacks = 2;
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
