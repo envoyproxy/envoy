@@ -9,6 +9,8 @@
 
 namespace quiche {
 
+const std::string ConstantQuicFlagPrefix = "envoy.reloadable_features.quic";
+
 class Flag;
 
 // Registry of QUICHE flags. Can be used to reset all flags to default values,
@@ -29,7 +31,7 @@ public:
 private:
   FlagRegistry();
 
-  const absl::flat_hash_map<std::string, Flag*> flags_;
+  const absl::flat_hash_map<absl::string_view, Flag*> flags_;
 };
 
 // Abstract class for QUICHE protocol and feature flags.
@@ -46,10 +48,10 @@ public:
   virtual void resetValue() = 0;
 
   // Return flag name.
-  std::string name() const { return name_; }
+  absl::string_view name() const { return name_; }
 
   // Return flag help string.
-  std::string help() const { return help_; }
+  absl::string_view help() const { return help_; }
 
 private:
   std::string name_;
@@ -113,6 +115,7 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
+// Transform quic flag into envoy reloadable flag.
 #define EnvoyReloadableFeature(flag) absl::StrCat("envoy.reloadable_features.", #flag)
 
 } // namespace quiche

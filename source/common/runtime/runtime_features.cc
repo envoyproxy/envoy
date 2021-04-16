@@ -1,13 +1,13 @@
 #include "common/runtime/runtime_features.h"
 
+#ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/platform/flags_impl.h"
+#endif
 
 #include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Runtime {
-
-std::string ConstantQuicFlagPrefix = "envoy.reloadable_features.quic";
 
 bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
@@ -136,22 +136,29 @@ RuntimeFeatures::RuntimeFeatures() {
 }
 
 bool RuntimeFeatures::enabledByDefault(absl::string_view feature) const {
-  if (feature.substr(0, ConstantQuicFlagPrefix.length()) == ConstantQuicFlagPrefix) {
-    auto res = quiche::FlagRegistry::getInstance().findFlag(absl::StrCat(
-        "FLAGS_quic_reloadable_flag_", feature.substr(ConstantQuicFlagPrefix.length() - 4)));
+#ifdef ENVOY_ENABLE_QUIC
+  // TODO(12923): Document this flag conversion in QUIC docs.
+  if (feature.substr(0, quiche::ConstantQuicFlagPrefix.length()) ==
+      quiche::ConstantQuicFlagPrefix) {
+    auto res = quiche::FlagRegistry::getInstance().findFlag(feature);
     ASSERT(res != nullptr);
     return static_cast<quiche::TypedFlag<bool>*>(res)->value();
   }
+#endif
+
   return enabled_features_.find(feature) != enabled_features_.end();
 }
 
 bool RuntimeFeatures::existsButDisabled(absl::string_view feature) const {
-  if (feature.substr(0, ConstantQuicFlagPrefix.length()) == ConstantQuicFlagPrefix) {
-    auto res = quiche::FlagRegistry::getInstance().findFlag(absl::StrCat(
-        "FLAGS_quic_reloadable_flag_", feature.substr(ConstantQuicFlagPrefix.length() - 4)));
+#ifdef ENVOY_ENABLE_QUIC
+  if (feature.substr(0, quiche::ConstantQuicFlagPrefix.length()) ==
+      quiche::ConstantQuicFlagPrefix) {
+    auto res = quiche::FlagRegistry::getInstance().findFlag(feature);
     ASSERT(res != nullptr);
     return !static_cast<quiche::TypedFlag<bool>*>(res)->value();
   }
+#endif
+
   return disabled_features_.find(feature) != disabled_features_.end();
 }
 

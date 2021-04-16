@@ -15,11 +15,12 @@ namespace quiche {
 
 namespace {
 
-absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
-  absl::flat_hash_map<std::string, Flag*> flags;
+absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
+  absl::flat_hash_map<absl::string_view, Flag*> flags;
 
 #define QUIC_FLAG(flag, ...) flags.emplace(flag->name(), flag);
 #include "quiche/quic/core/quic_flags_list.h"
+  // These test only flags are not part of quiche and are thus declared here.
   QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
   QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
   QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
@@ -54,6 +55,11 @@ void FlagRegistry::resetFlags() const {
 }
 
 Flag* FlagRegistry::findFlag(absl::string_view name) const {
+  if (name.substr(0, ConstantQuicFlagPrefix.length()) == ConstantQuicFlagPrefix) {
+    // Convert the envoy reloadable flag to quiche flag.
+    name = absl::StrCat("FLAGS_quic_reloadable_flag_",
+                        name.substr(ConstantQuicFlagPrefix.length() - 4));
+  }
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;
 }
