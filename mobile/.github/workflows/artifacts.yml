@@ -99,7 +99,7 @@ jobs:
   main_ios_dist:
     name: main_ios_dist
     runs-on: macOS-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
         with:
