@@ -214,11 +214,10 @@ envoy_cc_test(
     ],
     shard_count = 3,
     deps = [
+        ":ip_detection_extensions_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
-        "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
-        "//source/extensions/http/original_ip_detection/xff:xff_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",

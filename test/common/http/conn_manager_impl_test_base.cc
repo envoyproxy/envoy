@@ -1,4 +1,5 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
+#include "test/common/http/ip_detection_extensions.h"
 
 #include "extensions/request_id/uuid/config.h"
 
@@ -34,8 +35,7 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
 
-  ip_detection_extensions_.push_back(
-      std::make_shared<Extensions::Http::OriginalIPDetection::Xff::XffIPDetection>(0));
+  ip_detection_extensions_.push_back(getXFFExtension(0));
 }
 
 HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {
