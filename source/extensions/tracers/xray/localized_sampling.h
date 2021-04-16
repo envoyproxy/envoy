@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <functional>
@@ -119,11 +120,6 @@ public:
    * @return default sampling rule
    */
   LocalizedSamplingRule& defaultRule() { return default_rule_; }
-
-  /**
-   * @return default sampling rule's sampling rate. Mainly for unit testing purposes.
-   */
-  double defaultRuleRate() const { return default_rule_.rate(); }
 
   /**
    * @return the user-defined sampling rules
