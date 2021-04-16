@@ -26,6 +26,7 @@ using ::testing::An;
 using ::testing::ElementsAre;
 using ::testing::InSequence;
 using ::testing::Invoke;
+using ::testing::Matcher;
 using ::testing::Pair;
 using ::testing::Return;
 using ::testing::ReturnRef;
@@ -76,7 +77,7 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
  */
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
-  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), false));
+  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), Matcher<bool>(false)));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
