@@ -1,0 +1,25 @@
+name: tsan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  tsan:
+    name: tsan
+    runs-on: ubuntu-18.04
+    timeout-minutes: 90
+    container:
+      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - run: echo $PATH
+      - name: 'Run tests'
+        run: bazel test --config=clang-tsan --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only //test/common/...
