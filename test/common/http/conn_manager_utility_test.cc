@@ -12,10 +12,9 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "extensions/http/original_ip_detection/custom_header/custom_header.h"
-#include "extensions/http/original_ip_detection/xff/xff.h"
 #include "extensions/request_id/uuid/config.h"
 
+#include "test/common/http/ip_detection_extensions.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -108,8 +107,7 @@ public:
     ON_CALL(config_, requestIDExtension())
         .WillByDefault(ReturnRef(request_id_extension_to_return_));
 
-    detection_extensions_.push_back(
-        std::make_shared<Extensions::Http::OriginalIPDetection::Xff::XffIPDetection>(0));
+    detection_extensions_.push_back(getXFFExtension(0));
     ON_CALL(config_, originalIpDetectionExtensions())
         .WillByDefault(ReturnRef(detection_extensions_));
   }
@@ -381,8 +379,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   // Reconfigure XFF detection.
   detection_extensions_.clear();
-  detection_extensions_.push_back(
-      std::make_shared<Extensions::Http::OriginalIPDetection::Xff::XffIPDetection>(1));
+  detection_extensions_.push_back(getXFFExtension(1));
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
@@ -1608,8 +1605,7 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
 // Test detecting the original IP via a header (no rejection if it fails).
 TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
   const std::string header_name = "x-cdn-detected-ip";
-  auto detection_extension = std::make_shared<
-      Extensions::Http::OriginalIPDetection::CustomHeader::CustomHeaderIPDetection>(header_name);
+  auto detection_extension = getCustomHeaderExtension(header_name);
   const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {detection_extension};
 
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
