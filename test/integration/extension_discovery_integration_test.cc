@@ -725,7 +725,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilte
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
