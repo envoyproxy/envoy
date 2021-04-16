@@ -84,7 +84,6 @@ envoy_cc_test(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/extensions/http/original_ip_detection/xff:config",
         "//test/integration:integration_lib",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
