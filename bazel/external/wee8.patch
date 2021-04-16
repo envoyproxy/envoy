@@ -2,8 +2,8 @@
 # 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix MSAN linking.
 # 4. Don't try to setup Windows x86 toolchain.
-# 5. Use /clang flag for options not supported in clang-cl.
-# 6. Quote libpath which might include spaces.
+# 5. Fix linking on Windows.
+# 6. Fix building with clang-cl on Windows.
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -97,3 +97,17 @@
    }
 
    # In general, Windows is totally different, but all the other builds share
+@@ -1543,6 +1547,13 @@ config("default_warnings") {
+     ]
+   }
+
++  # Disable warnings seen on Windows when using clang-cl.
++  if (is_win && is_clang) {
++    cflags += [
++      "-Wno-invalid-offsetof",
++    ]
++  }
++
+   if (is_clang) {
+     cflags += [
+       # TODO(thakis): Consider -Wloop-analysis (turns on
