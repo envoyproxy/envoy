@@ -127,6 +127,7 @@ public:
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull));
     Http::ResponseHeaderMapPtr response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+    // NOLINTNEXTLINE: Silence null pointer access warning
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
     EXPECT_CALL(
@@ -134,11 +135,13 @@ public:
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 10ull));
     callbacks_.stream_info_.addBytesSent(10);
     Buffer::OwnedImpl response_data("1234567890");
+    // NOLINTNEXTLINE: Silence null pointer access warning
     response_decoder->decodeData(response_data, !with_trailers);
 
     if (with_trailers) {
       Http::ResponseTrailerMapPtr response_trailers(
           new Http::TestResponseTrailerMapImpl{{"some-trailer", "13"}});
+      // NOLINTNEXTLINE: Silence null pointer access warning
       response_decoder->decodeTrailers(std::move(response_trailers));
     }
 
