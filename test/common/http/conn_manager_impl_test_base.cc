@@ -1,7 +1,8 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
-#include "test/common/http/ip_detection_extensions.h"
 
 #include "extensions/request_id/uuid/config.h"
+
+#include "test/common/http/ip_detection_extensions.h"
 
 using testing::AtLeast;
 using testing::InSequence;
