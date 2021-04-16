@@ -24,6 +24,7 @@
 
 #include "absl/hash/hash.h"
 #include "absl/strings/string_view.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,11 +72,12 @@ private:
 
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
+
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
   fileContentsAsTagSet_(absl::string_view contents) const;
+
   IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
 
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
   Api::Api& api_;
   std::string filename_;
   std::string extension_;
@@ -83,6 +85,7 @@ private:
   std::unique_ptr<Filesystem::Watcher> watcher_;
   Server::Configuration::FactoryContext& factory_context_;
   Registry* registry_ = nullptr; // Set by registry.
+  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 
 /**
@@ -96,6 +99,7 @@ private:
 public:
   std::shared_ptr<ValueSetWatcher>
   getOrCreate(Server::Configuration::FactoryContext& factory_context, std::string filename);
+
   void remove(ValueSetWatcher& watcher) noexcept;
 
   static Registry& singleton();
@@ -130,7 +134,7 @@ public:
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
 
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
+  static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
   IpTaggingFilterSetTagData(
       const envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag& config);
 
@@ -151,7 +155,6 @@ private:
 
   void incCounter(Stats::StatName name);
 
-  std::shared_ptr<const ValueSetWatcher> watcher_;
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -160,6 +163,7 @@ private:
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
+  std::shared_ptr<const ValueSetWatcher> watcher_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 

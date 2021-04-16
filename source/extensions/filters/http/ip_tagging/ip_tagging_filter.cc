@@ -6,10 +6,8 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/json/json_loader.h"
 
 #include "absl/strings/str_join.h"
-#include "yaml-cpp/yaml.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,7 +38,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
   } else if (!config.ip_tags().empty()) {
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
-        IpTaggingFilterSetTagData(config);
+        IpTaggingFilterSetTagData(config.ip_tags());
     trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 
   } else {
@@ -51,12 +49,12 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
 std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
 IpTaggingFilterConfig::IpTaggingFilterSetTagData(
-    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag& config) {
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag& ip_tags) {
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-  tag_data.reserve(config.ip_tags().size());
+  tag_data.reserve(ip_tags.size());
 
-  for (const auto& ip_tag : config.ip_tags()) {
+  for (const auto& ip_tag : ip_tags) {
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
     for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
