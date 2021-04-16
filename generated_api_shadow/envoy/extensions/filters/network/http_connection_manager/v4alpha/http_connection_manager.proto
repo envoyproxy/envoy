@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 44]
+// [#next-free-field: 45]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -238,7 +238,7 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  // [#not-implemented-hide] Transformations that apply to path headers. Transformations are applied
+  // [#not-implemented-hide:] Transformations that apply to path headers. Transformations are applied
   // before any processing of requests by HTTP filters, routing, and matching. Only the normalized
   // path will be visible internally if a transformation is enabled. Any path rewrites that the
   // router performs (e.g. :ref:`regex_rewrite
@@ -252,7 +252,7 @@ message HttpConnectionManager {
         "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager."
         "PathNormalizationOptions";
 
-    // [#not-implemented-hide] Normalization applies internally before any processing of requests by
+    // [#not-implemented-hide:] Normalization applies internally before any processing of requests by
     // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
     // to :ref:`NormalizePathRFC3986
     // <envoy_api_msg_type.http.v3.PathTransformation.Operation.NormalizePathRFC3986>`. When not
@@ -262,7 +262,7 @@ message HttpConnectionManager {
     // normalization due to disallowed characters.)
     type.http.v3.PathTransformation forwarding_transformation = 1;
 
-    // [#not-implemented-hide] Normalization only applies internally before any processing of
+    // [#not-implemented-hide:] Normalization only applies internally before any processing of
     // requests by HTTP filters, routing, and matching. These will be applied after full
     // transformation is applied. The *:path* header before this transformation will be restored in
     // the router filter and sent upstream unless it was mutated by a filter. Defaults to no
@@ -327,6 +327,10 @@ message HttpConnectionManager {
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
   config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 9
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
+
+  // Additional HTTP/3 settings that are passed directly to the HTTP/3 codec.
+  // [#not-implemented-hide:]
+  config.core.v4alpha.Http3ProtocolOptions http3_protocol_options = 44;
 
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.

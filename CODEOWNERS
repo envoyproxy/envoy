@@ -57,7 +57,7 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.datadog extension
 /*/extensions/tracers/datadog @cgilmour @palazzem @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
+/*/extensions/tracers/xray @abaptiste @lavignes @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
 # mysql_proxy extension
@@ -75,13 +75,14 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/filters/http/composite @snowp @mattklein123
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @jmarantz
 # aws_iam grpc credentials
-/*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123
-/*/extensions/common/aws @lavignes @mattklein123
+/*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
+/*/extensions/common/aws @lavignes @mattklein123 @tonya11en
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # admission control extension.
@@ -143,8 +144,8 @@ extensions/filters/common/original_src @snowp @klarose
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @lambdai
 /*/extensions/filters/network/local_ratelimit @mattklein123 @junr03
-/*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy
-/*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes
+/*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy @tonya11en
+/*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @lavignes @tonya11en
 # Compression
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov

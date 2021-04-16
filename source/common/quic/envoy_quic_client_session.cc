@@ -31,9 +31,6 @@ void EnvoyQuicClientSession::connect() {
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
   CryptoConnect();
-  if (quic::VersionUsesHttp3(transport_version())) {
-    SetMaxPushId(0u);
-  }
 }
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
@@ -86,8 +83,10 @@ void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
+  ASSERT(codec_stats_.has_value() && http3_options_.has_value());
   return std::make_unique<EnvoyQuicClientStream>(GetNextOutgoingBidirectionalStreamId(), this,
-                                                 quic::BIDIRECTIONAL);
+                                                 quic::BIDIRECTIONAL, codec_stats_.value(),
+                                                 http3_options_.value());
 }
 
 quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {

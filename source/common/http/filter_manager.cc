@@ -242,6 +242,10 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::route(const Router::RouteCal
   return parent_.filter_manager_callbacks_.route(cb);
 }
 
+void ActiveStreamFilterBase::setRoute(Router::RouteConstSharedPtr route) {
+  parent_.filter_manager_callbacks_.setRoute(std::move(route));
+}
+
 void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
 }
@@ -1374,7 +1378,8 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
+  if (!complete() ||
+      (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
     return false;
   }
 

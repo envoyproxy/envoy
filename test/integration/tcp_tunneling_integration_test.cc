@@ -91,7 +91,7 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
 
   // Now send a FIN from upstream. This should result in clean shutdown downstream.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -114,7 +114,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
 
   // Now send a FIN from upstream. This should result in clean shutdown downstream.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -135,7 +135,7 @@ TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
 
   // Now send a FIN from upstream. This should result in clean shutdown downstream.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -169,7 +169,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
 
   // Tear down by closing the upstream connection.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  response_->waitForReset();
+  ASSERT_TRUE(response_->waitForReset());
 }
 
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
@@ -179,7 +179,7 @@ TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   setUpConnection();
 
   // Wait for the timeout to close the connection.
-  response_->waitForReset();
+  ASSERT_TRUE(response_->waitForReset());
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 }
 
@@ -205,7 +205,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
 
   // Either with early close, or half close, the FIN from upstream should result
   // in clean stream teardown.
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
   ASSERT_FALSE(response_->reset());
 }
 
@@ -229,7 +229,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response_->waitForReset();
+    ASSERT_TRUE(response_->waitForReset());
     codec_client_->close();
   }
 }
