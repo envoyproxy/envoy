@@ -66,7 +66,8 @@ public:
                          const std::vector<std::string>& resource_names_unsubscribe,
                          const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-                         const std::string& error_message = "") {
+                         const std::string& error_message = "",
+                         const std::map<std::string, std::string>& initial_resource_versions = {}) {
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
     expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(local_info_.node()));
     for (const auto& resource : resource_names_subscribe) {
@@ -75,6 +76,9 @@ public:
     for (const auto& resource : resource_names_unsubscribe) {
       expected_request.add_resource_names_unsubscribe(resource);
     }
+    for (const auto& v : initial_resource_versions) {
+      (*expected_request.mutable_initial_resource_versions())[v.first] = v.second;
+    }
     expected_request.set_response_nonce(nonce);
     expected_request.set_type_url(type_url);
     if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
@@ -82,7 +86,8 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false))
+        .Times(1);
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -129,12 +134,13 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
 // Validate behavior when dynamic context parameters are updated.
 TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
   Event::TimerCb grpc_stream_retry_timer_cb;
   EXPECT_CALL(dispatcher_, createTimer_(_))
       .WillOnce(
           testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
       // Happens when add first watch.
-      .WillRepeatedly(Return(new Event::MockTimer()));
+      .WillRepeatedly(Return(ttl_mgr_timer));
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
