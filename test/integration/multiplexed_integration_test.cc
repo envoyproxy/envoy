@@ -1729,7 +1729,7 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamSendingEmptyMetadata) {
   upstream_request_->encodeData(0, true);
 
   // Verifies that no metadata was received by the client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(0, response->metadataMapsDecodedCount());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.metadata_empty_frames")->value());
