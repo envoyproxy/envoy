@@ -72,7 +72,7 @@ sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
     'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx_tabs.tabs',
-    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe'
+    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe', 'powershell_lexer'
 ]
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
@@ -81,9 +81,11 @@ extlinks = {
 
 # Setup global substitutions
 if 'pre-release' in release_level:
-    substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha))]
+    substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha)),
+                     ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha))]
 else:
-    substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha))]
+    substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha)),
+                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

@@ -10,15 +10,23 @@ Example plugin configuration:
 
 .. code-block:: yaml
 
-  wasm:
-    config:
+  bootstrap_extensions:
+  - name: envoy.bootstrap.wasm
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.wasm.v3.WasmService
+      singleton: true
       config:
         name: "my_plugin"
+        configuration:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: |
+            {
+              "my_config_value": "my_value"
+            }
         vm_config:
           runtime: "envoy.wasm.runtime.v8"
           code:
             local:
               filename: "/etc/envoy_filter_http_wasm_example.wasm"
-      singleton: true
 
 The preceding snippet configures a plugin singleton service from a Wasm binary on local disk.

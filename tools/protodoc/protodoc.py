@@ -321,8 +321,7 @@ def format_message_as_json(type_context, msg):
 
     if lines:
         return '.. code-block:: json\n\n  {\n' + ',\n'.join(indent_lines(4, lines)) + '\n  }\n\n'
-    else:
-        return '.. code-block:: json\n\n  {}\n\n'
+    return ""
 
 
 def normalize_field_type_name(field_fqn):

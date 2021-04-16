@@ -371,6 +371,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
 )
