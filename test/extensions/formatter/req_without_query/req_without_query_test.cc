@@ -35,7 +35,7 @@ TEST_F(ReqWithoutQueryTest, TestStripQueryString) {
   formatters:
     - name: envoy.formatter.req_without_query
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
+        "@type": type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
@@ -53,7 +53,7 @@ TEST_F(ReqWithoutQueryTest, TestSelectMainHeader) {
   formatters:
     - name: envoy.formatter.req_without_query
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
+        "@type": type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
@@ -71,7 +71,7 @@ TEST_F(ReqWithoutQueryTest, TestSelectAlternativeHeader) {
   formatters:
     - name: envoy.formatter.req_without_query
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
+        "@type": type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
@@ -89,7 +89,7 @@ TEST_F(ReqWithoutQueryTest, TestTruncateHeader) {
   formatters:
     - name: envoy.formatter.req_without_query
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
+        "@type": type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 

@@ -1,5 +1,7 @@
 #include "extensions/formatter/req_without_query/config.h"
 
+#include "envoy/extensions/formatter/req_without_query/v3/req_without_query.pb.h"
+
 #include "extensions/formatter/req_without_query/req_without_query.h"
 
 namespace Envoy {
@@ -12,7 +14,7 @@ ReqWithoutQueryFactory::createCommandParserFromProto(const Protobuf::Message&) {
 }
 
 ProtobufTypes::MessagePtr ReqWithoutQueryFactory::createEmptyConfigProto() {
-  return std::make_unique<ProtobufWkt::StringValue>();
+  return std::make_unique<envoy::extensions::formatter::req_without_query::v3::ReqWithoutQuery>();
 }
 
 std::string ReqWithoutQueryFactory::name() const { return "envoy.formatter.req_without_query"; }
