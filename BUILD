@@ -4,6 +4,8 @@ exports_files([
     "VERSION",
     "API_VERSION",
     ".clang-format",
+    "pytest.ini",
+    ".coveragerc",
 ])
 
 # These two definitions exist to help reduce Envoy upstream core code depending on extensions.
