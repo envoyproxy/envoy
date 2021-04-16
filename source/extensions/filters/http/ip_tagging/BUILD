@@ -22,7 +22,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:lc_trie_lib",
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
