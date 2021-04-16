@@ -552,7 +552,7 @@ void FakeUpstream::cleanUp() {
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   absl::MutexLock lock(&lock_);
-  if (read_disable_on_new_connection_) {
+  if (read_disable_on_new_connection_ && http_type_ != FakeHttpConnection::Type::HTTP3) {
     // Disable early close detection to avoid closing the network connection before full
     // initialization is complete.
     connection.detectEarlyCloseWhenReadDisabled(false);
@@ -709,7 +709,8 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
          connection_wrapper->connection().dispatcher().isThreadSafe());
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
-  if (read_disable_on_new_connection_ && connection_wrapper->connected()) {
+  if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
+      http_type_ != FakeHttpConnection::Type::HTTP3) {
     // Re-enable read and early close detection.
     auto& connection = connection_wrapper->connection();
     connection.detectEarlyCloseWhenReadDisabled(true);
