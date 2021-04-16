@@ -169,10 +169,10 @@ private:
   void logError(const std::string& error) const;
   spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
 
-  uint64_t base_id_;
-  bool use_dynamic_base_id_;
+  uint64_t base_id_{0};
+  bool use_dynamic_base_id_{false};
   std::string base_id_path_;
-  uint32_t concurrency_;
+  uint32_t concurrency_{1};
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   absl::optional<uint32_t> bootstrap_version_;
@@ -181,35 +181,35 @@ private:
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};
   std::string admin_address_path_;
-  Network::Address::IpVersion local_address_ip_version_;
-  spdlog::level::level_enum log_level_;
+  Network::Address::IpVersion local_address_ip_version_{Network::Address::IpVersion::v4};
+  spdlog::level::level_enum log_level_{spdlog::level::info};
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
-  std::string log_format_;
-  bool log_format_escaped_;
+  std::string log_format_{Logger::Logger::DEFAULT_LOG_FORMAT};
+  bool log_format_escaped_{false};
   std::string log_path_;
-  uint64_t restart_epoch_;
+  uint64_t restart_epoch_{0};
   std::string service_cluster_;
   std::string service_node_;
   std::string service_zone_;
-  std::chrono::milliseconds file_flush_interval_msec_;
-  std::chrono::seconds drain_time_;
-  std::chrono::seconds parent_shutdown_time_;
-  Server::DrainStrategy drain_strategy_;
-  Server::Mode mode_;
-  bool hot_restart_disabled_;
-  bool signal_handling_enabled_;
-  bool mutex_tracing_enabled_;
-  bool core_dump_enabled_;
-  bool cpuset_threads_;
+  std::chrono::milliseconds file_flush_interval_msec_{10000};
+  std::chrono::seconds drain_time_{600};
+  std::chrono::seconds parent_shutdown_time_{900};
+  Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
+  Server::Mode mode_{Server::Mode::Serve};
+  bool hot_restart_disabled_{false};
+  bool signal_handling_enabled_{true};
+  bool mutex_tracing_enabled_{false};
+  bool core_dump_enabled_{false};
+  bool cpuset_threads_{false};
   std::vector<std::string> disabled_extensions_;
-  uint32_t count_;
+  uint32_t count_{0};
 
   // Initialization added here to avoid integration_admin_test failure caused by uninitialized
   // enable_fine_grain_logging_.
   bool enable_fine_grain_logging_ = false;
-  std::string socket_path_;
-  mode_t socket_mode_;
+  std::string socket_path_{"@envoy_domain_socket"};
+  mode_t socket_mode_{0};
 };
 
 /**
