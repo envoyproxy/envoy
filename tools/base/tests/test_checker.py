@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.base.checker import Checker, CheckerSummary, ForkingChecker
+from tools.base.checker import BazelChecker, Checker, CheckerSummary, ForkingChecker
 
 
 class DummyChecker(Checker):
@@ -495,6 +495,20 @@ def test_checker_succeed(patches, log, success):
             == [('success1\nsuccess2\nsuccess3',), {}])
     else:
         assert not m_log.return_value.info.called
+
+
+# BazelChecker tests
+
+def test_bazelchecker_fork():
+    checker = BazelChecker("path1", "path2", "path3")
+    bazel_mock = patch("tools.base.checker.runner.BazelAdapter")
+
+    with bazel_mock as m_bazel:
+        assert checker.bazel == m_bazel.return_value
+    assert (
+        list(m_bazel.call_args)
+        == [(checker,), {}])
+    assert "bazel" in checker.__dict__
 
 
 # ForkingChecker tests

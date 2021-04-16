@@ -169,6 +169,14 @@ def test_runner_log_filter(level):
         assert not logfilter.filter(DummyRecord())
 
 
+# BazelAdapter tests
+
+def test_bazeladapter_constructor():
+    _runner = DummyRunner()
+    adapter = runner.BazelAdapter(_runner)
+    assert adapter.context == _runner
+
+
 # ForkingAdapter tests
 
 def test_forkingadapter_constructor():
