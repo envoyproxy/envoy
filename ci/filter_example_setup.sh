@@ -5,7 +5,7 @@
 set -e
 
 # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-ENVOY_FILTER_EXAMPLE_GITSHA="da983d42da849d6c384c70d3df5e7c2b300ce3db"
+ENVOY_FILTER_EXAMPLE_GITSHA="953f9b286a00b1b408d32b13d6fc9970c64b7210"
 ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
 # shellcheck disable=SC2034
