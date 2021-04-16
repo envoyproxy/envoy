@@ -48,7 +48,8 @@ TEST_F(KillRequestFilterTest, KillRequestCrashEnvoy) {
   request_headers_.addCopy("x-envoy-kill-request", "true");
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
-  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
+  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 TEST_F(KillRequestFilterTest, KillRequestCrashEnvoyWithCustomKillHeader) {
@@ -59,7 +60,8 @@ TEST_F(KillRequestFilterTest, KillRequestCrashEnvoyWithCustomKillHeader) {
   request_headers_.addCopy("x-custom-kill-request", "true");
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
-  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
+  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 TEST_F(KillRequestFilterTest, KillRequestWithMillionDenominatorCrashEnvoy) {
@@ -70,7 +72,8 @@ TEST_F(KillRequestFilterTest, KillRequestWithMillionDenominatorCrashEnvoy) {
   request_headers_.addCopy("x-envoy-kill-request", "yes");
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
-  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
+  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 TEST_F(KillRequestFilterTest, KillRequestDisabledWhenIsKillRequestEnabledReturnsFalse) {
@@ -101,7 +104,8 @@ TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
           perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
       .WillByDefault(Return(&kill_settings));
-  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
+  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 // Kill request should be disabled when isKillRequestEnabled returns false
@@ -184,7 +188,8 @@ TEST_F(KillRequestFilterTest, CanKillOnResponse) {
   // We should crash on the OUTBOUND request
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   response_headers_.addCopy("x-envoy-kill-request", "true");
-  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false), "");
+  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
@@ -201,7 +206,8 @@ TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
   // We should crash on the RESPONSE kill request
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   response_headers_.addCopy("x-envoy-kill-request", "true");
-  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false), "");
+  EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 } // namespace
