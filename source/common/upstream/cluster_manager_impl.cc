@@ -1532,8 +1532,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
-           (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11));
+    ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
                                                          priority, options,
                                                          transport_socket_options, state);

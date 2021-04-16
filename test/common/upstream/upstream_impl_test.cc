@@ -3250,7 +3250,7 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
                           "HTTP3 requires a QuicUpstreamTransport transport socket: name.*");
 }
 
-TEST_F(ClusterInfoImplTest, Http3Alpn) {
+TEST_F(ClusterInfoImplTest, Http3Auto) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3288,7 +3288,7 @@ TEST_F(ClusterInfoImplTest, Http3Alpn) {
   ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
   EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
 
-  const std::string explicit_http3 = R"EOF(
+  const std::string auto_http3 = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3300,12 +3300,11 @@ TEST_F(ClusterInfoImplTest, Http3Alpn) {
           idle_timeout: 1s
   )EOF";
 
-  auto explicit_h3 = makeCluster(yaml + explicit_http3);
+  auto auto_h3 = makeCluster(yaml + auto_http3);
   EXPECT_EQ(Http::Protocol::Http3,
-            explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+            auto_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(
-      explicit_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(),
-      2);
+      auto_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(), 2);
 }
 
 #else

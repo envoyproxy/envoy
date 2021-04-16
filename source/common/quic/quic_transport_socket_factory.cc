@@ -36,14 +36,11 @@ QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
   return std::make_unique<QuicClientTransportSocketFactory>(std::move(client_config), context);
 }
 
-void QuicClientTransportSocketFactory::maybeCreateFallbackFactory() {
-  if (fallback_factory_) {
-    return;
-  }
-
-  fallback_factory_ = std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
-      std::move(config_), manager_, scope_);
-}
+QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
+    Ssl::ClientContextConfigPtr config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context)
+    : fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
+          std::move(config), factory_context.sslContextManager(), factory_context.scope())) {}
 
 ProtobufTypes::MessagePtr QuicClientTransportSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>();

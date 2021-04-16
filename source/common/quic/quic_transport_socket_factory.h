@@ -47,9 +47,7 @@ class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
   QuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context)
-      : config_(std::move(config)), manager_(factory_context.sslContextManager()),
-        scope_(factory_context.scope()) {}
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
   // code does not create transport sockets.
@@ -59,25 +57,15 @@ public:
   // using the fallback factory.
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override {
-    // TODO(#15649) make createTransportSocket non-const to avoid the const cast.
-    const_cast<QuicClientTransportSocketFactory*>(this)->maybeCreateFallbackFactory();
     return fallback_factory_->createTransportSocket(options);
   }
 
-  // Creates fallback_factory_ if it does not already exist.
-  void maybeCreateFallbackFactory();
-
-  // Generally the QuicClientTransportSocketFactory owns its own client context
-  // config, but in the case of failover to TCP, it hands it off to the fallback_factory_
+  // TODO(14829) make sure that clientContextConfig() is safe when secrets are updated.
   const Ssl::ClientContextConfig& clientContextConfig() const {
-    return fallback_factory_ ? fallback_factory_->config() : *config_;
+    return fallback_factory_->config();
   }
 
 private:
-  Envoy::Ssl::ClientContextConfigPtr config_;
-  Envoy::Ssl::ContextManager& manager_;
-  Stats::Scope& scope_;
-  envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_config_;
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.
   std::unique_ptr<Extensions::TransportSockets::Tls::ClientSslSocketFactory> fallback_factory_;
 };
