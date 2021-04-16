@@ -133,7 +133,7 @@ You can install Envoy on Mac OSX using the official brew repositories, or from
 Install Envoy on Windows
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can run Envoy using the official Windows development Docker image.
+You can run Envoy using the official Windows Docker image.
 
 .. substitution-code-block:: console
 
