@@ -16,7 +16,7 @@ Http::OriginalIPDetectionSharedPtr getCustomHeaderExtension(const std::string& h
 
 Http::OriginalIPDetectionSharedPtr
 getCustomHeaderExtension(const std::string& header_name,
-                         OriginalIPRejectRequestOptions reject_options) {
+                         Http::OriginalIPRejectRequestOptions reject_options) {
   return std::make_shared<
       Extensions::Http::OriginalIPDetection::CustomHeader::CustomHeaderIPDetection>(header_name,
                                                                                     reject_options);
