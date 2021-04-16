@@ -104,8 +104,7 @@ TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
           perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
       .WillByDefault(Return(&kill_settings));
-  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false),
-               "KillRequestFilter is crashing Envoy!!!");
+  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
 
 // Kill request should be disabled when isKillRequestEnabled returns false
