@@ -46,9 +46,7 @@ public:
    */
   absl::Status validDecodeDependencies();
 
-  int filterChainSizeForTest() const {
-    return filter_chain_.size();
-  }
+  int filterChainSizeForTest() const { return filter_chain_.size(); }
 
 private:
   // Mapping of filter names to dependencies. This corresponds to a filter chain
