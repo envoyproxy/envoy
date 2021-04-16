@@ -48,6 +48,9 @@ getHttp3Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
       options.use_downstream_protocol_config().has_http3_protocol_options()) {
     return options.use_downstream_protocol_config().http3_protocol_options();
   }
+  if (options.has_auto_config()) {
+    return options.auto_config().http3_protocol_options();
+  }
   return options.explicit_http_config().http3_protocol_options();
 }
 
@@ -107,6 +110,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
   if (options.has_auto_config()) {
     use_http2_ = true;
     use_alpn_ = true;
+    use_http3_ = options.auto_config().has_http3_protocol_options();
   }
 }
 

@@ -469,6 +469,8 @@ protected:
   bool v2_bootstrap_{false};
 
 private:
+  friend class MixedUpstreamIntegrationTest;
+
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.

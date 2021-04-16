@@ -97,6 +97,13 @@ message HttpProtocolOptions {
     config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
 
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
+
+    // [#not-implemented-hide:]
+    // Unlike HTTP/1 and HTTP/2, HTTP/3 will not be configured unless it is
+    // present. If HTTP/3 is present, attempts to connect will first be made
+    // via HTTP/3, and if the HTTP/3 connection fails, TCP (HTTP/1 or HTTP/2
+    // based on ALPN) will be used instead.
+    config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
   }
 
   // This contains options common across HTTP/1 and HTTP/2

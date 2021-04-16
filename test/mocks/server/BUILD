@@ -242,6 +242,7 @@ envoy_cc_mock(
         "//source/common/secret:secret_manager_impl_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/server:config_tracker_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )

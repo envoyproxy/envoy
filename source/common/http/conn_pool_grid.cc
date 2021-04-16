@@ -6,18 +6,6 @@
 namespace Envoy {
 namespace Http {
 
-// Helper function to make sure each protocol in expected_protocols is present
-// in protocols (only used for an ASSERT in debug builds)
-bool contains(const std::vector<Http::Protocol>& protocols,
-              const std::vector<Http::Protocol>& expected_protocols) {
-  for (auto protocol : expected_protocols) {
-    if (std::find(protocols.begin(), protocols.end(), protocol) == protocols.end()) {
-      return false;
-    }
-  }
-  return true;
-}
-
 absl::string_view describePool(const ConnectionPool::Instance& pool) {
   return pool.protocolDescription();
 }
@@ -157,10 +145,10 @@ ConnectivityGrid::ConnectivityGrid(
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source) {
+  // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
+  // HTTP/3.
   // TODO(#15649) support v6/v4, WiFi/cellular.
   ASSERT(connectivity_options.protocols_.size() == 3);
-  ASSERT(contains(connectivity_options.protocols_,
-                  {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
 }
 
 ConnectivityGrid::~ConnectivityGrid() {
