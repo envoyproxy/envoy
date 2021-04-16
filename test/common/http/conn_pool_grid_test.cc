@@ -235,7 +235,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
 }
 
 // Test both connections happening in parallel and the second connecting before
-// the first eventually fails..
+// the first eventually fails.
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) {
   EXPECT_EQ(grid_.first(), nullptr);
 

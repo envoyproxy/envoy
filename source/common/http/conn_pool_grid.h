@@ -96,6 +96,7 @@ public:
     void deleteThis();
 
     // Marks HTTP/3 broken if the HTTP/3 attempt failed but a TCP attempt succeeded.
+    // While HTTP/3 is broken the grid will not attempt to make new HTTP/3 connections.
     void maybeMarkHttp3Broken();
 
     // Tracks all the connection attempts which currently in flight.

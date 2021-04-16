@@ -121,8 +121,9 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
-  // If an HTTP/3 connection attempts in progress, let it complete. But if there
-  // is a TCP connection attempt in progress, cancel it.
+  // If an HTTP/3 connection attempts is in progress, let it complete so that if it succeeds
+  // it can be used for future requests. But if there is a TCP connection attempt in progress,
+  // cancel it.
   if (grid_.isPoolHttp3(attempt->pool())) {
     for (auto& attempt : connection_attempts_) {
       attempt->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
@@ -243,7 +244,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     // Since HTTP/3 is broken, presumably both pools have already been created so this
     // is just to be safe.
     createNextPool();
-    pool = ++pool;
+    ++pool;
   }
   auto wrapped_callback = std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
