@@ -402,7 +402,6 @@ protected:
   virtual void refresh(uint32_t priority);
 
   bool noHostsAreInSlowStart();
-  bool adheresToEndpointWarmingPolicy(const Host& host);
 
   virtual void recalculateHostsInSlowStart(const HostVector& hosts_added);
 
@@ -479,15 +478,18 @@ private:
     if (slow_start_enabled_) {
       auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           time_source_.monotonicTime() - host.creationTime());
-      if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(host)) {
+      if (host_create_duration < slow_start_window_ &&
+          host.health() == Upstream::Host::Health::Healthy) {
 
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
 
         if (time_bias_ < 0.0) {
           time_bias_ = 1.0;
         }
-        if (time_bias_ > 0.0) {
-          return host.weight() * time_bias_;
+        if (time_bias_ > 0.0 && host_create_duration.count() > 0) {
+          // Slow start window cannot be set 0 due to validation in api protos.
+          auto time_factor = (1.0 / slow_start_window_.count()) * host_create_duration.count();
+          return host.weight() * time_bias_ * time_factor;
         }
         return host.weight() * time_bias_;
       } else {

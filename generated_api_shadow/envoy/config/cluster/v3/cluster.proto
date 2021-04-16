@@ -518,8 +518,9 @@ message Cluster {
       // This parameter linearly affects load balancing weight of an endpoint. Defaults to 1.0.
       // The smaller the time bias is, the less traffic would be sent to endpoint that is within slow start window.
       // The value of time bias should be greater than or equal to 0.0 and less than or equal to 1.0.
-      // If slow start window and time bias are configured, effective weight of an endpoint would be scaled with time bias during the duration of slow start window:
-      // `weight = load_balancing_weight * time_bias`
+      // If slow start window and time bias are configured, effective weight of an endpoint would be scaled with time bias and time factor during the duration of slow start window:
+      // `weight = load_balancing_weight * time_bias * time_factor`,
+      // where  `time_factor = (1 / slow_start_window_in_seconds) * host_create_duration_in_seconds`.
       //
       // When `time bias == 0.0` the Round Robin and Least Request Load Balancers will not scale endpoint weight with time bias
       // and will behave as if slow start is not enabled.

@@ -93,12 +93,6 @@ public:
   }
 };
 
-class TestHealthCheckHostMonitor : public HealthCheckHostMonitor {
-public:
-  void setUnhealthy(UnhealthyType) override {}
-  bool isNull() override { return false; }
-};
-
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
 public:
   void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts,
@@ -1523,7 +1517,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 
   hosts_added.clear();
   auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
-  host2->setHealthChecker(std::move(std::make_unique<HealthCheckHostMonitorNullImpl>()));
 
   hosts_added.push_back(host2);
 
@@ -1551,7 +1544,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
   // Now expect 1:1 ratio.
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
@@ -1567,10 +1560,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
-  host1->setHealthChecker(std::move(std::make_unique<TestHealthCheckHostMonitor>()));
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  auto health_checker = std::make_unique<TestHealthCheckHostMonitor>();
-  host1->setHealthChecker(std::move(health_checker));
 
   host_set_.hosts_ = {host1};
 
@@ -1590,7 +1580,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
 
   hosts_added.clear();
   auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
-  host2->setHealthChecker(std::move(std::make_unique<TestHealthCheckHostMonitor>()));
   hosts_added.push_back(host2);
 
   hostSet().hosts_ = {host1, host2};
@@ -1652,12 +1641,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBias) {
                               makeTestHost(info_, "tcp://127.0.0.1:100", simTime(), 1)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().healthy_hosts_[0]->setHealthChecker(
-      std::move(std::make_unique<TestHealthCheckHostMonitor>()));
-  hostSet().healthy_hosts_[1]->setHealthChecker(
-      std::move(std::make_unique<TestHealthCheckHostMonitor>()));
-  hostSet().healthy_hosts_[2]->setHealthChecker(
-      std::move(std::make_unique<TestHealthCheckHostMonitor>()));
   hostSet().runCallbacks({}, {});
   const auto hosts_in_slow_start =
       EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));

@@ -741,7 +741,8 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
     auto host_create_duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(current_time - host->creationTime());
     // Check if host existence time is within slow start window.
-    if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(*host)) {
+    if (host_create_duration <= slow_start_window_ &&
+        host->health() == Upstream::Host::Health::Healthy) {
       hosts_in_slow_start_->insert(host);
     } else {
       // Yields a noop if `hosts_in_slow_start_` do not contain host.
@@ -786,7 +787,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       auto host_weight = hostWeight(*host);
       auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           time_source_.monotonicTime() - host->creationTime());
-      if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(*host)) {
+      if (host_create_duration < slow_start_window_ &&
+          host->health() == Upstream::Host::Health::Healthy) {
 
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : time_bias_;
 
@@ -795,8 +797,10 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
                     time_bias_runtime_->runtimeKey());
           time_bias_ = 1.0;
         }
-        if (time_bias_ > 0.0) {
-          host_weight *= time_bias_;
+        if (time_bias_ > 0.0 && host_create_duration.count() > 0) {
+          // Slow start window cannot be set 0 due to validation in api protos.
+          auto time_factor = (1.0 / slow_start_window_.count()) * host_create_duration.count();
+          host_weight = host_weight * time_bias_ * time_factor;
         }
       }
       scheduler.edf_->add(host_weight, host);
@@ -833,18 +837,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
   if (slow_start_enabled_) {
     recalculateHostsInSlowStart(host_set->hosts());
-  }
-}
-
-bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
-  // Enter slow start immediately.
-  if (host.healthChecker().isNull()) {
-    return true;
-    // Enter slow start upon passing an active health check.
-  } else if (!host.healthChecker().isNull() && host.health() == Upstream::Host::Health::Healthy) {
-    return true;
-  } else {
-    return false;
   }
 }
 
