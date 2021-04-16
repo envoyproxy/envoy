@@ -24,11 +24,6 @@ class Checker(runner.Runner):
         self.errors = {}
         self.warnings = {}
 
-    @cached_property
-    def args(self) -> argparse.Namespace:
-        """Parsed args"""
-        return self.parser.parse_args(self._args)
-
     @property
     def diff(self) -> bool:
         """Flag to determine whether the checker should print diffs to the console"""

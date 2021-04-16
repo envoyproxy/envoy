@@ -39,27 +39,6 @@ def test_checker_constructor():
     assert checker.summary_class == CheckerSummary
 
 
-def test_checker_constructor():
-    checker = Checker("path1", "path2", "path3")
-    assert checker._args == ("path1", "path2", "path3")
-    assert checker.summary_class == CheckerSummary
-
-
-def test_checker_args():
-    checker = Checker("path1", "path2", "path3")
-    parser_mock = patch(
-        "tools.base.checker.Checker.parser",
-        new_callable=PropertyMock)
-
-    with parser_mock as m_parser:
-        assert checker.args == m_parser.return_value.parse_args.return_value
-
-    assert (
-        list(m_parser.return_value.parse_args.call_args)
-        == [(('path1', 'path2', 'path3'),), {}])
-    assert "args" in checker.__dict__
-
-
 def test_checker_diff():
     checker = Checker("path1", "path2", "path3")
     args_mock = patch(
@@ -292,13 +271,6 @@ def test_checker_add_arguments():
              {'action': 'store_true',
               'default': False,
               'help': 'Display a diff in the console where available'}],
-<<<<<<< HEAD
-=======
-            [('--recurse', '-r'),
-             {'choices': ['yes', 'no'],
-              'default': 'yes',
-              'help': 'Recurse path or paths directories'}],
->>>>>>> 303261629 (python: Integrate linting/utils/tests)
             [('--warning', '-w'),
              {'choices': ['warn', 'error'],
               'default': 'warn',
