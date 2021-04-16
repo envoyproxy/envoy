@@ -143,7 +143,7 @@ public:
   }
 
 protected:
-  // Propagate connection close to network_network_connection_callbacks_.
+  // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
                               quic::ConnectionCloseSource source);
 

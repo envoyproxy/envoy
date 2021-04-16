@@ -182,7 +182,6 @@ protected:
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
-  bool connected_{};
 
 private:
   /**
@@ -260,6 +259,7 @@ private:
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};
   CodecClientCallbacks* codec_client_callbacks_{};
+  bool connected_{};
   bool remote_closed_{};
   bool protocol_error_{false};
 };
