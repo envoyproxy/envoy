@@ -10,6 +10,8 @@
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
+#include "envoy/config/endpoint/v3/endpoint.proto.h"
+#include "envoy/event/timer.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
@@ -29,11 +31,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Config {
@@ -121,6 +125,51 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, {});
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
   expectSendMessage("foo", {}, {"x", "y"});
+}
+
+// Validate behavior when dynamic context parameters are updated.
+TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when add first watch.
+      .WillRepeatedly(Return(new Event::MockTimer()));
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {"x", "y"}, {});
+  grpc_mux_->start();
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("3000");
+  response->set_nonce("111");
+  envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+  cla.set_cluster_name("xxx");
+  auto res = response->add_resources();
+  res->set_name("x");
+  res->mutable_resource()->PackFrom(cla);
+  res->set_version("2000");
+  res = response->add_resources();
+  res->set_name("y");
+  cla.set_cluster_name("yyy");
+  res->mutable_resource()->PackFrom(cla);
+  res->set_version("3000");
+  auto resume_cds = grpc_mux_->pause(type_url);
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  // Now disconnect.
+  // Grpc stream retry timer will kick in and reconnection will happen.
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                    {{"x", "2000"}, {"y", "3000"}});
+  grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+  // Destruction of the subscription will issue "unsubscribe" request.
+  expectSendMessage(type_url, {}, {"x", "y"});
 }
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.
