@@ -2,7 +2,6 @@
 # This is pytest plugin providing fixtures for tests.
 #
 
-import importlib
 from contextlib import contextmanager, ExitStack
 from typing import ContextManager, Iterator
 from unittest.mock import patch
