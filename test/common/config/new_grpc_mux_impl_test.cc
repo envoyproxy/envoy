@@ -2,6 +2,7 @@
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/event/timer.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/empty_string.h"
@@ -10,7 +11,6 @@
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
-#include "envoy/event/timer.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
@@ -86,8 +86,7 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false))
-        .Times(1);
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
