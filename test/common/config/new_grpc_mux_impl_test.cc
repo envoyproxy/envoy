@@ -10,7 +10,6 @@
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
-#include "envoy/config/endpoint/v3/endpoint.proto.h"
 #include "envoy/event/timer.h"
 
 #include "test/common/stats/stat_test_utility.h"
