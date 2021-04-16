@@ -28,6 +28,7 @@ public:
   void registerFilter(
       const std::string& filter_name,
       const envoy::extensions::filters::common::dependency::v3::FilterDependencies& dependencies) {
+    // Check if any fields in the proto are set to avoid unnecessary copies.
     if (dependencies.ByteSizeLong() != 0) {
       filter_chain_.push_back({filter_name, dependencies});
     }

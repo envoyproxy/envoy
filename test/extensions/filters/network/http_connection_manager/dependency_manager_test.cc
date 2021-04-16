@@ -45,22 +45,22 @@ TEST(DependencyManagerTest, RegisterFilterIffNonEmptyDependencies) {
   manager.registerFilter("a", dependencies);
   EXPECT_EQ(manager.filterChainSizeForTest(), 0);
 
-  dependencies.Clear();
+  dependencies = FilterDependencies();
   *(dependencies.add_decode_required()) = potato;
   manager.registerFilter("b", dependencies);
   EXPECT_EQ(manager.filterChainSizeForTest(), 1);
 
-  dependencies.Clear();
+  dependencies = FilterDependencies();
   *(dependencies.add_decode_provided()) = potato;
   manager.registerFilter("c", dependencies);
   EXPECT_EQ(manager.filterChainSizeForTest(), 2);
 
-  dependencies.Clear();
+  dependencies = FilterDependencies();
   *(dependencies.add_encode_required()) = potato;
   manager.registerFilter("c", dependencies);
   EXPECT_EQ(manager.filterChainSizeForTest(), 3);
 
-  dependencies.Clear();
+  dependencies = FilterDependencies();
   *(dependencies.add_encode_provided()) = potato;
   manager.registerFilter("d", dependencies);
   EXPECT_EQ(manager.filterChainSizeForTest(), 4);
