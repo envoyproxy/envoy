@@ -1,4 +1,4 @@
-1.18.0 (April 15, 2021)
+1.18.2 (April 15, 2021)
 =======================
 
 Bug Fixes
@@ -122,4 +122,4 @@ Deprecated
 
 * admin: :ref:`access_log_path <envoy_v3_api_field_config.bootstrap.v3.Admin.access_log_path>` is deprecated in favor for :ref:`access loggers <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`.
 
-code: fixed some whitespace to make fix_format happy.
+code: fixed more build issues on our path to a glorious release.
