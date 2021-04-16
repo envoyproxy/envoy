@@ -14,7 +14,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Custom header original IP detection extension]
 
-// [#not-implemented-hide:]
 // This extension allows for the original downstream remote IP to be detected
 // by reading the value from a configured header name. If the value is successfully parsed
 // as an IP, it'll be treated as the effective downstream remote address and seen as such
