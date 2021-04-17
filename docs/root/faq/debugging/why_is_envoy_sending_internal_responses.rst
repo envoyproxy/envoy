@@ -1,9 +1,13 @@
 .. _why_is_envoy_sending_internal_responses:
 
-Why is Envoy sending internal responses?
+为什么 Envoy 要发送内部响应？
 ========================================
 
-One of the easiest ways to get an understanding of why Envoy sends a given local response, is to turn on trace logging. If you can run your instance with “-l trace” you will slow Envoy down significantly, but get detailed information on various events in the lifetime of each stream and connection. Any time Envoy sends an internally generated response it will log to the _debug_ level “Sending local reply with details [unique reason]” which gives you information about why the local response was sent. Each individual response detail is used at one point in the code base, be it a codec validation check or a failed route match.
+想了解 Envoy 为何会发送给定的内部响应，其中最简单的方法之一就是打开跟踪日志记录。
+如果可以使用 "-l trace" 参数运行实例，那么速度就会有明显地降低，但却可以获得每个流和连接生命周期中各种事件的详细信息。
+每当 Envoy 发送内部生成的响应时，它会记录到 "Sending local reply with details [unique reason]" 调试级别，该级别能提供有关发送本地响应的原因信息。
+每个单独的响应信息都在代码库中的一个点上使用，无论是编解码器验证检测或者失败的路由匹配。
 
-If turning on debug logging is not plausible, the response details can be added to the access logs using _%RESPONSE_CODE_DETAILS%_, and again it will let you pinpoint the exact reason a given response was generated. Documentation on response code details can be found :ref:`here<config_http_conn_man_details>`
+如果启用调试日志不合理，那么可以使用 _%RESPONSE_CODE_DETAILS%_ 将响应信息添加到访问日志中，这样就可以再次确定生成给定的响应的确切原因。
+有关响应代码详细信息的文档可以在 :ref:`这里 <config_http_conn_man_details>` 找到。
 
