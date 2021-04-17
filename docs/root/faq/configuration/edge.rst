@@ -1,7 +1,6 @@
 .. _faq_edge:
 
-How do I configure Envoy as an edge proxy?
+如何将 Envoy 配置为边缘代理？
 ==========================================
 
-Refer to :ref:`configuring Envoy as an edge proxy <best_practices_edge>`
-for an example of the edge proxy configuration.
+参考边缘代理配置的示例 :ref:`配置 Envoy 为边缘代理 <best_practices_edge>` 。
