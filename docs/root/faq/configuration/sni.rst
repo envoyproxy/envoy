@@ -1,17 +1,16 @@
 .. _faq_how_to_setup_sni:
 
-How do I configure SNI for listeners?
+如何为监听器配置 SNI？
 =====================================
 
-`SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ is only supported in the :ref:`v3
-configuration/API <config_overview>`.
+`SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ 只在 :ref:`v3
+配置/API <config_overview>` 中支持
 
 .. attention::
 
-  :ref:`TLS Inspector <config_listener_filters_tls_inspector>` listener filter must be configured
-  in order to detect requested SNI.
+  必须配置 :ref:`TLS 检查器 <config_listener_filters_tls_inspector>` 监听过滤器才能检测到所请求的 SNI 。
 
-The following is a YAML example of the above requirement.
+以下是上述要求的 YAML 示例。
 
 .. code-block:: yaml
 
@@ -67,12 +66,12 @@ The following is a YAML example of the above requirement.
               route: { cluster: service_foo }
 
 
-How do I configure SNI for clusters?
+如何为群集配置 SNI？
 ====================================
 
-For clusters, a fixed SNI can be set in :ref:`UpstreamTlsContext <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>`.
-To derive SNI from HTTP `host` or `:authority` header, turn on
-:ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>` to override the fixed SNI in
-`UpstreamTlsContext`. If upstream will present certificates with the hostname in SAN, turn on
-:ref:`auto_san_validation <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_san_validation>` too.
-It still needs a trust CA in validation context in `UpstreamTlsContext` for trust anchor.
+对于集群而言， 可以在 :ref:`UpstreamTlsContext <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>` 中设置固定的 SNI。
+要从 HTTP `host` 或者 `:authority` 头派生 SNI, 请开启
+:ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>` 去覆盖
+`UpstreamTlsContext` 中固定的 SNI。 如果上游需要在 SAN 中出示包含主机名的证书，请也打开
+:ref:`auto_san_validation <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_san_validation>` 。
+在 `UpstreamTlsContext` 的验证上下文中，它仍需要信任的 CA 证书以用于认证。
