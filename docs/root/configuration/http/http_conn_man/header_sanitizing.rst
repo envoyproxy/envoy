@@ -1,21 +1,13 @@
 .. _config_http_conn_man_header_sanitizing:
 
-HTTP header sanitizing
+HTTP 头修正
 ======================
 
-For security reasons, Envoy will "sanitize" various incoming HTTP headers depending on whether the
-request is an internal or external request. The sanitizing action depends on the header and may
-result in addition, removal, or modification. Ultimately, whether the request is considered internal
-or external is governed by the :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`
-header (please read the linked section carefully as how Envoy populates the header is complex and depends on the
-:ref:`use_remote_address
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
-setting). In addition, the
-:ref:`internal_address_config
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
-setting can be used to configure the internal/external determination.
+出于安全原因，Envoy 会根据请求来自内部或外部来“修正”各种 HTTP 头。修正操作取决于请求头，并可能对其执行增加、移除或修改等操作。最终，将根据请求头 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 来判断请求来自内部或外部（请仔细阅读链接的内容，因为 Envoy 填充请求头的过程比较复杂，且该过程取决于请求头 :ref:`use_remote_address
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>` 的设置）。另外，请求头 :ref:`internal_address_config
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>` 可以用来设置内部/外部请求的判断。
 
-Envoy will potentially sanitize the following headers:
+Envoy 可能对下列请求头执行修正操作：
 
 * :ref:`x-envoy-decorator-operation <config_http_filters_router_x-envoy-decorator-operation>`
 * :ref:`x-envoy-downstream-service-cluster
