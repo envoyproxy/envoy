@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Http {
 
-namespace{
+namespace {
 absl::string_view describePool(const ConnectionPool::Instance& pool) {
   return pool.protocolDescription();
 }
