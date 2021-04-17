@@ -45,15 +45,8 @@ public:
     quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
         dispatcher, transport_socket_factory, host->cluster().statsScope(), time_source,
         source_address);
-    if (host_->cluster().http3Options().has_quic_protocol_options()) {
-      Quic::configQuicInitialFlowControlWindow(
-          host_->cluster().http3Options().quic_protocol_options(), quic_info_->quic_config_);
-    } else {
-      quic_info_->quic_config_.SetInitialStreamFlowControlWindowToSend(
-          ::Envoy::Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-      quic_info_->quic_config_.SetInitialSessionFlowControlWindowToSend(
-          ::Envoy::Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-    }
+    Quic::configQuicInitialFlowControlWindow(
+        host_->cluster().http3Options().quic_protocol_options(), quic_info_->quic_config_);
   }
 
   // Make sure all connections are torn down before quic_info_ is deleted.

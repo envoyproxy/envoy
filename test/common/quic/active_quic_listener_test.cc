@@ -27,6 +27,7 @@
 #include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/quic/active_quic_listener.h"
+#include "common/http/utility.h"
 #include "test/common/quic/test_utils.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
@@ -333,7 +334,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
   ASSERT(session != nullptr);
-  EXPECT_EQ(Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE,
+  EXPECT_EQ(Http3::Utility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
             const_cast<quic::QuicSession*>(session)
                 ->config()
                 ->GetInitialSessionFlowControlWindowToSend());

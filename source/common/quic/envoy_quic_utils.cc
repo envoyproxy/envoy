@@ -226,11 +226,9 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config) {
-  // Use HTTP2 minimum value instead of default ones because the defaults are way too large.
-  size_t stream_flow_control_window_to_send =
-      config.has_initial_stream_window_size()
-          ? config.initial_stream_window_size().value()
-          : Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE;
+  size_t stream_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, initial_stream_window_size,
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
   if (stream_flow_control_window_to_send < quic::kMinimumFlowControlSendWindow) {
     // If the configured value is smaller than 16kB, only use it for IETF QUIC, because Google QUIC
     // requires minimum 16kB stream flow control window. The QUICHE default 16kB will be used for
@@ -242,11 +240,11 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
     quic_config.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
   }
 
-  uint32_t session_flow_control_window_to_send =
-      config.has_initial_connection_window_size()
-          ? config.initial_connection_window_size().value()
-          : Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE;
-  // The minimum flow control window supported in QUICHE is 16kB.
+  uint32_t session_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, initial_connection_window_size,
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  // Config connection level flow control window shouldn't be smaller than the minimum flow control
+  // window supported in QUICHE which is 16kB.
   quic_config.SetInitialSessionFlowControlWindowToSend(
       std::max(quic::kMinimumFlowControlSendWindow,
                static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));

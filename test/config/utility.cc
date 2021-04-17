@@ -947,7 +947,9 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
         ->mutable_quic_options()
         ->mutable_quic_protocol_options()
         ->mutable_initial_stream_window_size()
-        ->set_value(stream_buffer_size);
+        // The same as kStreamReceiveWindowLimit in QUICHE which only supports stream flow control
+        // window no larger than 16MB.
+        ->set_value(std::min(16u * 1024 * 1024, stream_buffer_size));
   }
 
   auto* static_resources = bootstrap_.mutable_static_resources();

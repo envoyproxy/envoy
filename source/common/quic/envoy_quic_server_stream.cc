@@ -114,7 +114,7 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
   // TODO(danzh): add stats for metadata not supported error.
-  ENVOY_STREAM_LOG(error, "METADATA is not supported in Http3.", *this);
+  ENVOY_BUG(false, "METADATA is not supported in Http3.");
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {

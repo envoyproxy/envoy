@@ -341,11 +341,13 @@ void HttpIntegrationTest::initialize() {
   // Needs to outlive all QUIC connections.
   auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       *dispatcher_, *quic_transport_socket_factory_, stats_store_, timeSystem(), server_addr);
+  // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
-          Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE);
+          Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  // Config Google QUIC flow control window.
   quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
-      Http2::Utility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE);
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
   quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
 
 #else
