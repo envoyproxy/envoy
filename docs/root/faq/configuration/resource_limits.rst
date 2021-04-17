@@ -1,20 +1,14 @@
 .. _faq_resource_limits:
 
-How does Envoy prevent file descriptor exhaustion?
-==================================================
+Envoy 如何防止文件描述符耗尽？
+================================
 
-:ref:`Per-listener connection limits <config_listeners_runtime>` may be configured as an upper bound
-on the number of active connections a particular listener will accept. The listener may accept more
-connections than the configured value on the order of the number of worker threads.
+:ref:`每个监听器的连接限制 <config_listeners_runtime>` 可以配置为特定侦听器将接受的活动连接数的上限。在工作线程数量的顺序上，侦听器可以接受的连接数量多于配置值。
 
-In addition, one may configure a :ref:`global limit <config_overload_manager>` on the number of
-connections that will apply across all listeners.
+另外，可以配置 :ref:`全局限制 <config_overload_manager>` 应用于所有监听器连接数上。
 
-On Unix-based systems, it is recommended to keep the sum of all connection limits less than half of
-the system's file descriptor limit to account for upstream connections, files, and other usage of
-file descriptors.
+在基于 Unix 的系统上，建议将所有连接限制的总和保持小于系统文件描述符限制的一半，以考虑上游连接、文件和文件描述符的其他使用。
 
 .. note::
 
-    This per-listener connection limiting will eventually be handled by the :ref:`overload manager
-    <arch_overview_overload_manager>`.
+    这个监听器连接的限制最终将由 :ref:`过载管理器 <arch_overview_overload_manager>` 来处理。
