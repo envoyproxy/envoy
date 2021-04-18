@@ -320,7 +320,6 @@ message ExtensionFilter {
 
   // Custom configuration that depends on the filter being instantiated.
   oneof config_type {
-    // [#extension-category: envoy.formatter]
     google.protobuf.Any typed_config = 3;
   }
 }
