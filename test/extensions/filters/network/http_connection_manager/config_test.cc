@@ -1851,7 +1851,7 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
 
-  auto original_ip_detection_extensions = config.originalIpDetectionExtensions();
+  const auto& original_ip_detection_extensions = config.originalIpDetectionExtensions();
   EXPECT_EQ(1, original_ip_detection_extensions.size());
 }
 
