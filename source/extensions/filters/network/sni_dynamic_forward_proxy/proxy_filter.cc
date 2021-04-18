@@ -43,6 +43,10 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
 
   uint32_t default_port = config_->port();
 
+  if (default_port == 0) {
+    default_port = read_callbacks_->connection().addressProvider().localAddress()->ip()->port();
+  }
+
   auto result = config_->cache().loadDnsCacheEntry(sni, default_port, *this);
 
   cache_load_handle_ = std::move(result.handle_);
