@@ -64,9 +64,9 @@ class PipChecker(checker.Checker):
 
     def check_dependabot(self) -> None:
         """Check that dependabot config matches requirements.txt files found in repo"""
-        missing_dirs = self.config_requirements - self.requirements_dirs
-        missing_config = self.requirements_dirs - self.config_requirements
-        correct = self.requirements_dirs & self.config_requirements
+        missing_dirs = self.config_requirements.difference(self.requirements_dirs)
+        missing_config = self.requirements_dirs.difference(self.config_requirements)
+        correct = self.requirements_dirs.intersection(self.config_requirements)
         if correct:
             self.dependabot_success(correct)
         if missing_dirs:
