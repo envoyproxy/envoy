@@ -1,6 +1,7 @@
 #include "extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
 #include "common/common/assert.h"
+#include "common/common/macros.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,20 +23,20 @@ public:
 
 class KeyHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  KeyHashMethod(const std::string& key) : Key(key) {}
-  const std::string& Key;
+  explicit KeyHashMethod(const std::string& key) : key_(key) {}
 
   absl::optional<uint64_t>
   evaluate(const Network::Address::Instance& downstream_addr) const override {
-    (void)downstream_addr;
-    // ASSERT(!Key.empty());
-    if (!Key.empty()) {
-      uint64_t hash = HashUtil::xxHash64(Key);
-      return hash;
+    UNREFERENCED_PARAMETER(downstream_addr);
+    if (!key_.empty()) {
+      return HashUtil::xxHash64(key_);
     }
 
     return absl::nullopt;
   }
+
+private:
+  const std::string& key_;
 };
 
 HashPolicyImpl::HashPolicyImpl(

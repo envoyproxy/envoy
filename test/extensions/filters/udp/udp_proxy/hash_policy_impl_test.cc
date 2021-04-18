@@ -54,12 +54,12 @@ public:
 
 class HashPolicyImplKeyTest : public HashPolicyImplBaseTest {
 public:
-  HashPolicyImplKeyTest() : Key("key"), EmptyKey("") {}
+  HashPolicyImplKeyTest() : key_("key"), empty_key_("") {}
 
-  void additionalSetup() override { hash_policy_config_->set_key(Key); }
+  void additionalSetup() override { hash_policy_config_->set_key(key_); }
 
-  const std::string Key;
-  const std::string EmptyKey;
+  const std::string key_;
+  const std::string empty_key_;
 };
 
 // Check invalid policy type
@@ -90,7 +90,7 @@ TEST_F(HashPolicyImplSourceIpTest, SourceIpWithUnixDomainSocketType) {
 TEST_F(HashPolicyImplKeyTest, KeyHash) {
   setup();
 
-  auto generated_hash = HashUtil::xxHash64(Key);
+  auto generated_hash = HashUtil::xxHash64(key_);
   auto hash = hash_policy_->generateHash(*peer_address_);
 
   EXPECT_EQ(generated_hash, hash.value());
@@ -100,7 +100,7 @@ TEST_F(HashPolicyImplKeyTest, KeyHash) {
 TEST_F(HashPolicyImplKeyTest, KeyWithEmptyString) {
   setup();
 
-  hash_policy_config_->set_key(EmptyKey);
+  hash_policy_config_->set_key(empty_key_);
   auto hash = hash_policy_->generateHash(*peer_address_);
 
   EXPECT_FALSE(hash.has_value());
