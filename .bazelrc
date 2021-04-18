@@ -13,8 +13,6 @@ startup --host_jvm_args=-Xmx2g
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --experimental_strict_action_env=true
 build --host_force_python=PY3
-build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
@@ -26,6 +24,8 @@ build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
 build:linux --features=per_object_debug_info
+build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
+build:linux --action_env=BAZEL_LINKOPTS=-lm
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -72,6 +72,7 @@ build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
 build:macos --cxxopt=-std=c++17
+
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
@@ -246,7 +247,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3d0491e2034287959a292806e3891fd0b7dd2703
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -352,7 +353,6 @@ build:clang-cl --copt="-Wno-builtin-macro-redefined"
 #     overrides a member function but is not marked 'override'
 #   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
 build:clang-cl --copt="-Wno-inconsistent-missing-override"
-build:clang-cl --action_env=USE_CLANG_CL=1
 
 # Defaults to 'auto' - Off for windows, so override to linux behavior
 build:windows --enable_runfiles=yes

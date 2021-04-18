@@ -89,6 +89,11 @@ def _python_deps():
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
+        name = "testing_pip3",
+        requirements = "@envoy//tools/testing:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "thrift_pip3",
         requirements = "@envoy//test/extensions/filters/network/thrift_proxy:requirements.txt",
         extra_pip_args = ["--require-hashes"],
