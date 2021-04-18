@@ -45,6 +45,7 @@
 #include "common/upstream/subset_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
+#include "common/http/conn_pool_grid.h"
 #include "common/http/http3/conn_pool.h"
 #endif
 
@@ -57,6 +58,18 @@ void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
   if (to_add != nullptr) {
     Network::Socket::appendOptions(options, to_add);
   }
+}
+
+// Helper function to make sure each protocol in expected_protocols is present
+// in protocols (only used for an ASSERT in debug builds)
+bool contains(const std::vector<Http::Protocol>& protocols,
+              const std::vector<Http::Protocol>& expected_protocols) {
+  for (auto protocol : expected_protocols) {
+    if (std::find(protocols.begin(), protocols.end(), protocol) == protocols.end()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 } // namespace
@@ -1505,14 +1518,25 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
     ClusterConnectivityState& state) {
-  if (protocols.size() == 2) {
-    ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
-           (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11));
+  if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+    ASSERT(contains(protocols,
+                    {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
+#ifdef ENVOY_ENABLE_QUIC
+    Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
+    return std::make_unique<Http::ConnectivityGrid>(
+        dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
+        state, source, std::chrono::milliseconds(300), coptions);
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
+  }
+  if (protocols.size() >= 2) {
+    ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
                                                          priority, options,
                                                          transport_socket_options, state);
   }
-
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,

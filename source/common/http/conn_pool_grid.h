@@ -19,6 +19,11 @@ public:
     std::vector<Http::Protocol> protocols_;
   };
 
+  enum class StreamCreationResult {
+    ImmediateResult,
+    StreamCreationPending,
+  };
+
   using PoolIterator = std::list<ConnectionPool::InstancePtr>::iterator;
 
   // This is a class which wraps a caller's connection pool callbacks to
@@ -38,8 +43,7 @@ public:
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
 
-      // Returns true if a stream is immediately created, false if it is pending.
-      bool newStream();
+      StreamCreationResult newStream();
 
       // ConnectionPool::Callbacks
       void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -51,6 +55,9 @@ public:
 
       ConnectionPool::Instance& pool() { return **pool_it_; }
 
+      void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy);
+
+    private:
       // A pointer back up to the parent.
       WrapperCallbacks& parent_;
       // The pool for this connection attempt.
@@ -64,9 +71,8 @@ public:
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
-    // Attempt to create a new stream for pool(). Returns true if the stream has
-    // been created.
-    bool newStream();
+    // Attempt to create a new stream for pool().
+    StreamCreationResult newStream();
 
     // Removes this from the owning list, deleting it.
     void deleteThis();
@@ -75,6 +81,18 @@ public:
     // Returns true if there is a failover pool and a connection has been
     // attempted, false if all pools have been tried.
     bool tryAnotherConnection();
+
+    // Called by a ConnectionAttempt when the underlying pool fails.
+    void onConnectionAttemptFailed(ConnectionAttemptCallbacks* attempt,
+                                   ConnectionPool::PoolFailureReason reason,
+                                   absl::string_view transport_failure_reason,
+                                   Upstream::HostDescriptionConstSharedPtr host);
+
+    // Called by a ConnectionAttempt when the underlying pool is ready.
+    void onConnectionAttemptReady(ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
+                                  Upstream::HostDescriptionConstSharedPtr host,
+                                  const StreamInfo::StreamInfo& info,
+                                  absl::optional<Http::Protocol> protocol);
 
   private:
     // Tracks all the connection attempts which currently in flight.
