@@ -15,7 +15,7 @@ ParserStatus intToStatus(int rc) {
   // See
   // https://github.com/nodejs/llhttp/blob/a620012f3fd1b64ace16d31c52cd57b97ee7174c/src/native/api.h#L29-L36
   switch (rc) {
-  case -1:
+  case HPE_USER:
     return ParserStatus::Error;
   case HPE_OK:
     return ParserStatus::Success;
@@ -206,9 +206,9 @@ int HttpParserImpl::statusToInt(const ParserStatus code) const {
   // https://github.com/nodejs/llhttp/blob/a620012f3fd1b64ace16d31c52cd57b97ee7174c/src/native/api.h#L29-L36
   switch (code) {
   case ParserStatus::Error:
-    return -1;
+    return HPE_USER;
   case ParserStatus::Success:
-    return 0;
+    return HPE_OK;
   case ParserStatus::NoBody:
     return 1;
   case ParserStatus::NoBodyData:
