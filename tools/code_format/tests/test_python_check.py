@@ -376,17 +376,7 @@ def test_python_strip_line(line):
             == line[7:] if line.startswith(f"REMOVE/") else line)
 
 
-def test_python_checker_main():
-    class_mock = patch("tools.code_format.python_check.PythonChecker")
-
-    with class_mock as m_class:
-        assert (
-            python_check.main("arg0", "arg1", "arg2")
-            == m_class.return_value.run_checks.return_value)
-
-    assert (
-        list(m_class.call_args)
-        == [('arg0', 'arg1', 'arg2'), {}])
-    assert (
-        list(m_class.return_value.run_checks.call_args)
-        == [(), {}])
+def test_python_checker_main(command_main):
+    command_main(
+        python_check.main,
+        "tools.code_format.python_check.PythonChecker")
