@@ -62,14 +62,6 @@ private:
     return factory_context_.messageValidationVisitor();
   }
 
-  void fileExtension_(std::string filename_) {
-    if (absl::EndsWith(filename_, MessageUtil::FileExtensions::get().Yaml)) {
-      extension_ = "Yaml";
-    } else {
-      extension_ = "Json";
-    }
-  }
-
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
 
@@ -86,6 +78,9 @@ private:
   Server::Configuration::FactoryContext& factory_context_;
   Registry* registry_ = nullptr; // Set by registry.
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+
+protected:
+  bool yaml;
 };
 
 /**

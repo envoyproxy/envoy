@@ -92,7 +92,8 @@ ValueSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
 ValueSetWatcher::ValueSetWatcher(Server::Configuration::FactoryContext& factory_context,
                                  Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
     : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()),
-      factory_context_(factory_context) {
+      factory_context_(factory_context),
+      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
   watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
                      [this]([[maybe_unused]] std::uint32_t event) { maybeUpdate_(); });
@@ -130,7 +131,7 @@ IpTagFileProto ValueSetWatcher::protoFromFileContents_(absl::string_view content
   const std::string file_content = std::string(contents);
   IpTagFileProto ipf;
 
-  if (extension_ == "Yaml") {
+  if (yaml) {
     MessageUtil::loadFromYaml(file_content, ipf, protoValidator());
   } else {
     MessageUtil::loadFromJson(file_content, ipf, protoValidator());
