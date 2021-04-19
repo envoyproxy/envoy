@@ -1097,6 +1097,8 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:set_is_terminal_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_is_terminal_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:utility_lib",
