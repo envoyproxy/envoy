@@ -474,6 +474,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_runner -- --cov-collect  /tmp/.coverage-envoy
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_utils -- --cov-collect  /tmp/.coverage-envoy
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:pytest_python_check -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pytest_pip_check -- --cov-collect  /tmp/.coverage-envoy
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:python_coverage -- --fail-under=95 /tmp/.coverage-envoy /source/generated/tooling
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
