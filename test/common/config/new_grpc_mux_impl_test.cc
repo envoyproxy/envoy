@@ -2,6 +2,7 @@
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/event/timer.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/empty_string.h"
@@ -29,11 +30,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Config {
@@ -63,7 +66,8 @@ public:
                          const std::vector<std::string>& resource_names_unsubscribe,
                          const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-                         const std::string& error_message = "") {
+                         const std::string& error_message = "",
+                         const std::map<std::string, std::string>& initial_resource_versions = {}) {
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
     expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(local_info_.node()));
     for (const auto& resource : resource_names_subscribe) {
@@ -71,6 +75,9 @@ public:
     }
     for (const auto& resource : resource_names_unsubscribe) {
       expected_request.add_resource_names_unsubscribe(resource);
+    }
+    for (const auto& v : initial_resource_versions) {
+      (*expected_request.mutable_initial_resource_versions())[v.first] = v.second;
     }
     expected_request.set_response_nonce(nonce);
     expected_request.set_type_url(type_url);
@@ -121,6 +128,55 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, {});
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
   expectSendMessage("foo", {}, {"x", "y"});
+}
+
+// Validate cached nonces are cleared on reconnection.
+TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Send on connection.
+  expectSendMessage(type_url, {"x", "y"}, {});
+  grpc_mux_->start();
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("3000");
+  response->set_nonce("111");
+  auto add_response_resource = [](const std::string& name, const std::string& version,
+                                  envoy::service::discovery::v3::DeltaDiscoveryResponse& response) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+    cla.set_cluster_name(name);
+    auto res = response.add_resources();
+    res->set_name(name);
+    res->mutable_resource()->PackFrom(cla);
+    res->set_version(version);
+  };
+  add_response_resource("x", "2000", *response);
+  add_response_resource("y", "3000", *response);
+  // Pause EDS to allow the ACK to be cached.
+  auto resume_cds = grpc_mux_->pause(type_url);
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  // Now disconnect.
+  // Grpc stream retry timer will kick in and reconnection will happen.
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // initial_resource_versions should contain client side all resource:version info.
+  expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                    {{"x", "2000"}, {"y", "3000"}});
+  grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+  // Destruction of the EDS subscription will issue an "unsubscribe" request.
+  expectSendMessage(type_url, {}, {"x", "y"});
 }
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.
