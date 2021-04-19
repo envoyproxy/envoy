@@ -45,7 +45,7 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
     Upstream::HostDescriptionConstSharedPtr host) {
-  cancellable_ = nullptr;  // Attempt failed and can no longer be cancelled.
+  cancellable_ = nullptr; // Attempt failed and can no longer be cancelled.
   parent_.onConnectionAttemptFailed(this, reason, transport_failure_reason, host);
 }
 
@@ -140,14 +140,14 @@ void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
     RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
     const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
-  cancellable_ = nullptr;  // Attempt succeeded and can no longer be cancelled.
+  cancellable_ = nullptr; // Attempt succeeded and can no longer be cancelled.
   parent_.onConnectionAttemptReady(this, encoder, host, info, protocol);
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::cancel(
     Envoy::ConnectionPool::CancelPolicy cancel_policy) {
   auto cancellable = cancellable_;
-  cancellable_ = nullptr;  // Prevent repeated cancellations.
+  cancellable_ = nullptr; // Prevent repeated cancellations.
   cancellable->cancel(cancel_policy);
 }
 
@@ -158,7 +158,8 @@ void ConnectivityGrid::WrapperCallbacks::cancel(Envoy::ConnectionPool::CancelPol
   deleteThis();
 }
 
-void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(Envoy::ConnectionPool::CancelPolicy cancel_policy) {
+void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(
+    Envoy::ConnectionPool::CancelPolicy cancel_policy) {
   for (auto& attempt : connection_attempts_) {
     attempt->cancel(cancel_policy);
   }
