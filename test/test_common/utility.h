@@ -848,7 +848,7 @@ public:
     context_map_[std::string(key)] = std::string(value);
   }
 
-  std::unordered_map<std::string, std::string> context_map_;
+  absl::flat_hash_map<std::string, std::string> context_map_;
 };
 } // namespace Tracing
 
