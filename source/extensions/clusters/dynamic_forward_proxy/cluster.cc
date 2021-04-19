@@ -161,11 +161,18 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
+  std::string sni;
   absl::string_view host;
   if (context->downstreamHeaders()) {
     host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
-    host = context->downstreamConnection()->requestedServerName();
+    // Embed downstream TCP connection destination port into SNI hostname. This is not necessary
+    // when using the Host header since the port is embeded by the client
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host
+    sni = std::string(context->downstreamConnection()->requestedServerName()).c_str();
+    uint32_t port = context->downstreamConnection()->addressProvider().localAddress()->ip()->port();
+    absl::StrAppend(&sni, ":", port);
+    host = sni;
   }
 
   if (host.empty()) {
