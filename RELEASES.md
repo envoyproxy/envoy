@@ -53,6 +53,7 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2020 Q3 | Yuchen Dai ([lambdai](https://github.com/lambdai))             |
 | 2020 Q4 | Christoph Pakulski ([cpakulski](https://github.com/cpakulski)) |
 | 2021 Q1 | Rei Shimizu ([Shikugawa](https://github.com/Shikugawa))        |
+| 2021 Q2 | Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d))      |
 
 ## Release schedule
 
