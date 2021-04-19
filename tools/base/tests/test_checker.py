@@ -398,7 +398,7 @@ def test_checker_on_checks_complete(patches, failed, show_summary):
         assert not m_summary.return_value.print_summary.called
 
 
-def test_checker_run_checks(patches):
+def test_checker_run(patches):
     checker = DummyCheckerWithChecks("path1", "path2", "path3")
     patched = patches(
         "Checker.get_checks",
@@ -410,7 +410,7 @@ def test_checker_run_checks(patches):
 
     with patched as (m_get, m_begin, m_complete, m_log, m_name):
         m_get.return_value = ("check1", "check2")
-        assert checker.run_checks() == m_complete.return_value
+        assert checker.run() == m_complete.return_value
 
     assert (
         list(m_get.call_args)
