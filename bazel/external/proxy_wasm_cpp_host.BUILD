@@ -58,13 +58,13 @@ cc_library(
 
 cc_library(
     name = "wamr_lib",
-    defines = [
-        "ENVOY_WASM_WAMR",
-    ],
     srcs = glob([
         "src/wamr/*.h",
         "src/wamr/*.cc",
     ]),
+    defines = [
+        "ENVOY_WASM_WAMR",
+    ],
     deps = [
         ":common_lib",
         "@com_github_wamr//:libiwasm",

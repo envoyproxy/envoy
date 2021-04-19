@@ -92,7 +92,7 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/wasm_runtime/null:config",
         "//source/extensions/wasm_runtime/v8:config",
-	"//source/extensions/wasm_runtime/wamr:config",
+        "//source/extensions/wasm_runtime/wamr:config",
         "//source/extensions/wasm_runtime/wasmtime:config",
         "//source/extensions/wasm_runtime/wavm:config",
     ],
