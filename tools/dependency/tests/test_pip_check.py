@@ -183,11 +183,11 @@ def test_pip_checker_main():
     with class_mock as m_class:
         assert (
             pip_check.main("arg0", "arg1", "arg2")
-            == m_class.return_value.run_checks.return_value)
+            == m_class.return_value.run.return_value)
 
     assert (
         list(m_class.call_args)
         == [('arg0', 'arg1', 'arg2'), {}])
     assert (
-        list(m_class.return_value.run_checks.call_args)
+        list(m_class.return_value.run.call_args)
         == [(), {}])

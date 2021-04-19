@@ -92,7 +92,7 @@ class PipChecker(checker.Checker):
 
 
 def main(*args) -> int:
-    return PipChecker(*args).run_checks()
+    return PipChecker(*args).run()
 
 
 if __name__ == "__main__":
