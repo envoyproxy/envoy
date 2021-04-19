@@ -2,7 +2,7 @@ from unittest.mock import patch, PropertyMock
 
 import pytest
 
-from tools.dependency import pip_check, pytest_pip_check
+from tools.dependency import pip_check
 
 
 def test_pip_checker_constructor():
