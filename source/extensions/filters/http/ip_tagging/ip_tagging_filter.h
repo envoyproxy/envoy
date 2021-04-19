@@ -32,7 +32,8 @@ namespace HttpFilters {
 namespace IpTagging {
 
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
-
+using IPTagsProto =
+    Protobuf::RepeatedPtrField<::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>;
 /**
  * Coordinates with the Filesystem::Watcher and when that reports a change, load up
  * the change and updates it's internal settings.
@@ -130,9 +131,7 @@ public:
   void incTotal() { incCounter(total_); }
 
   static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-  IpTaggingFilterSetTagData(
-      const ::google::protobuf::RepeatedPtrField<
-          ::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>& ip_tags);
+  IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);
 
 private:
   static FilterRequestType requestTypeEnum(

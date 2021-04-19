@@ -37,9 +37,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     watcher_ = ValueSetWatcher::create(factory_context, config.path());
 
   } else if (!config.ip_tags().empty()) {
-    const ::google::protobuf::RepeatedPtrField<
-        ::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>
-        tags = config.ip_tags();
+    const IPTagsProto tags = config.ip_tags();
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
         IpTaggingFilterSetTagData(tags);
     trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
@@ -51,9 +49,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 }
 
 std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-IpTaggingFilterConfig::IpTaggingFilterSetTagData(
-    const ::google::protobuf::RepeatedPtrField<
-        ::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>& ip_tags) {
+IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(ip_tags.size());
