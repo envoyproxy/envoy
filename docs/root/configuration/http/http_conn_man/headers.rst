@@ -304,12 +304,11 @@ Example 6: The internal Envoy from Example 5, receiving a request proxied by ano
 
 A few very important notes about XFF:
 
+.. _config_http_conn_man_headers_x-forwarded-for_internal_origin:
+
 1. If *use_remote_address* is set to true, Envoy sets the
    :ref:`config_http_conn_man_headers_x-envoy-external-address` header to the trusted
    client address.
-
-.. _config_http_conn_man_headers_x-forwarded-for_internal_origin:
-
 2. XFF is what Envoy uses to determine whether a request is internal origin or external origin.
    If *use_remote_address* is set to true, the request is internal if and only if the
    request contains no XFF and the immediate downstream node's connection to Envoy has

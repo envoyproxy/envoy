@@ -6,7 +6,7 @@ Redis
 Envoy can act as a Redis proxy, partitioning commands among instances in a cluster.
 In this mode, the goals of Envoy are to maintain availability and partition tolerance
 over consistency. This is the key point when comparing Envoy to `Redis Cluster
-<https://redis.io/topics/cluster-spec>`_. Envoy is designed as a best-effort cache,
+<https://redis.io/topics/cluster-spec>`__. Envoy is designed as a best-effort cache,
 meaning that it will not try to reconcile inconsistent data or keep a globally consistent
 view of cluster membership. It also supports routing commands from different workload to
 different to different upstream clusters based on their access patterns, eviction, or isolation
@@ -63,9 +63,9 @@ close map to 5xx. All other responses from Redis are counted as a success.
 .. _arch_overview_redis_cluster_support:
 
 Redis Cluster Support (Experimental)
-----------------------------------------
+------------------------------------
 
-Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`__.
 
 When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
 implemented in any language to connect to the proxy as if it's a single node Redis instance.

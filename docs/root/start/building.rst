@@ -1,5 +1,3 @@
-.. _building:
-
 
 Building
 ========
