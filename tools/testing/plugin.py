@@ -45,16 +45,10 @@ def _command_main(main, handler):
     class_mock = patch(handler)
 
     with class_mock as m_class:
-        assert (
-            main("arg0", "arg1", "arg2")
-            == m_class.return_value.run.return_value)
+        assert (main("arg0", "arg1", "arg2") == m_class.return_value.run.return_value)
 
-    assert (
-        list(m_class.call_args)
-        == [('arg0', 'arg1', 'arg2'), {}])
-    assert (
-        list(m_class.return_value.run.call_args)
-        == [(), {}])
+    assert (list(m_class.call_args) == [('arg0', 'arg1', 'arg2'), {}])
+    assert (list(m_class.return_value.run.call_args) == [(), {}])
 
 
 @pytest.fixture
