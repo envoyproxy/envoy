@@ -20,8 +20,8 @@ class ValidationAdmin : public Admin {
 public:
   // We want to implement the socket interface without implementing the http listener function.
   // This is useful for TAP because it wants to emit warnings when the address type is UDS
-  ValidationAdmin(Network::Address::InstanceConstSharedPtr address)
-      : socket_(address ? std::make_shared<Network::TcpListenSocket>(nullptr, address, nullptr)
+  explicit ValidationAdmin(Network::Address::InstanceConstSharedPtr address)
+      : socket_(address ? std::make_shared<Network::TcpListenSocket>(nullptr, std::move(address), nullptr)
                         : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
   bool removeHandler(const std::string&) override;
