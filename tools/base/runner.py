@@ -4,6 +4,7 @@
 
 import argparse
 import logging
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -72,6 +73,15 @@ class Runner(object):
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Override this method to add custom arguments to the arg parser"""
         pass
+
+    def parallel(self, cmd, args, handle):
+        errors = 0
+        pool = multiprocessing.Pool(multiprocessing.cpu_count())
+        try:
+            handle(pool.map(cmd, args))
+        finally:
+            pool.close()
+        return errors
 
 
 class ForkingAdapter(object):

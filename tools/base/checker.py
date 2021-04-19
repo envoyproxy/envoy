@@ -58,7 +58,7 @@ class Checker(runner.Runner):
             raise self.parser.error(
                 "Incorrect path: `path` must be a directory, set either as first arg or with --path"
             )
-        return path
+        return path.rstrip("/")
 
     @property
     def paths(self) -> list:

@@ -42,6 +42,11 @@ def _python_deps():
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
+        name = "docs_pip3",
+        requirements = "@envoy//docs:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "kafka_pip3",
         requirements = "@envoy//source/extensions/filters/network/kafka:requirements.txt",
         extra_pip_args = ["--require-hashes"],
