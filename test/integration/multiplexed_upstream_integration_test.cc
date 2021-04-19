@@ -262,6 +262,7 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
+  EXCLUDE_UPSTREAM_HTTP3; // No H3 support yet.
   use_alpn_ = true;
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
@@ -618,5 +619,46 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamGoaway) {
   fake_upstream_connection2.reset();
   cleanupUpstreamAndDownstream();
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+
+class MixedUpstreamIntegrationTest : public Http2UpstreamIntegrationTest {
+protected:
+  void initialize() override {
+    use_alpn_ = true;
+    Http2UpstreamIntegrationTest::initialize();
+  }
+  void createUpstreams() override {
+    ASSERT_EQ(upstreamProtocol(), FakeHttpConnection::Type::HTTP3);
+    if (use_http2_) {
+      // Generally we always want to set these fields via accessors, which
+      // changes both the upstreams and Envoy's configuration at the same time.
+      // In this particular case, we want to change the upstreams without
+      // touching config, so edit the raw members directly.
+      upstream_config_.udp_fake_upstream_ = absl::nullopt;
+      upstream_config_.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+    }
+    Http2UpstreamIntegrationTest::createUpstreams();
+    upstream_config_.upstream_protocol_ = FakeHttpConnection::Type::HTTP3;
+  }
+
+  bool use_http2_{false};
+};
+
+TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp3) {
+  testRouterRequestAndResponseWithBody(0, 0, false);
+}
+
+TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp2) {
+  use_http2_ = true;
+  testRouterRequestAndResponseWithBody(0, 0, false);
+}
+
+INSTANTIATE_TEST_SUITE_P(Protocols, MixedUpstreamIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+#endif
 
 } // namespace Envoy
