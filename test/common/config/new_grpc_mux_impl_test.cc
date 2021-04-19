@@ -130,7 +130,7 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("foo", {}, {"x", "y"});
 }
 
-// Validate behavior when dynamic context parameters are updated.
+// Validate cached nonces are cleared on reconnection.
 TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
   Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
@@ -138,30 +138,32 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   EXPECT_CALL(dispatcher_, createTimer_(_))
       .WillOnce(
           testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
-      // Happens when add first watch.
+      // Happens when adding a type url watch.
       .WillRepeatedly(Return(ttl_mgr_timer));
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Send on connection.
   expectSendMessage(type_url, {"x", "y"}, {});
   grpc_mux_->start();
   auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_system_version_info("3000");
   response->set_nonce("111");
-  envoy::config::endpoint::v3::ClusterLoadAssignment cla;
-  cla.set_cluster_name("xxx");
-  auto res = response->add_resources();
-  res->set_name("x");
-  res->mutable_resource()->PackFrom(cla);
-  res->set_version("2000");
-  res = response->add_resources();
-  res->set_name("y");
-  cla.set_cluster_name("yyy");
-  res->mutable_resource()->PackFrom(cla);
-  res->set_version("3000");
+  auto add_response_resource = [](const std::string& name, const std::string& version,
+                                  envoy::service::discovery::v3::DeltaDiscoveryResponse& response) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+    cla.set_cluster_name(name);
+    auto res = response.add_resources();
+    res->set_name(name);
+    res->mutable_resource()->PackFrom(cla);
+    res->set_version(version);
+  };
+  add_response_resource("x", "2000", *response);
+  add_response_resource("y", "3000", *response);
+  // Pause EDS to allow the ACK to be cached.
   auto resume_cds = grpc_mux_->pause(type_url);
   grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   // Now disconnect.
@@ -169,10 +171,11 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // initial_resource_versions should contain client side all resource:version info.
   expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     {{"x", "2000"}, {"y", "3000"}});
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
-  // Destruction of the subscription will issue "unsubscribe" request.
+  // Destruction of the EDS subscription will issue an "unsubscribe" request.
   expectSendMessage(type_url, {}, {"x", "y"});
 }
 

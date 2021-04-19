@@ -21,7 +21,7 @@ bool PausableAckQueue::empty() {
 }
 
 // In the event of a reconnection, clear all the cached nonces.
-void PausableAckQueue::clearNonces() { storage_.clear(); }
+void PausableAckQueue::clear() { storage_.clear(); }
 
 const UpdateAck& PausableAckQueue::front() {
   for (const auto& entry : storage_) {

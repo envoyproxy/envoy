@@ -108,7 +108,7 @@ void NewGrpcMuxImpl::onStreamEstablished() {
     UNREFERENCED_PARAMETER(type_url);
     subscription->sub_state_.markStreamFresh();
   }
-  pausable_ack_queue_.clearNonces();
+  pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
 }
 
