@@ -38,22 +38,22 @@ using IPTagsProto =
  * Coordinates with the Filesystem::Watcher and when that reports a change, load up
  * the change and updates it's internal settings.
  */
-class ValueSetWatcher {
+class TagSetWatcher {
 private:
   class Registry;
 
 public:
-  static std::shared_ptr<ValueSetWatcher>
+  static std::shared_ptr<TagSetWatcher>
   create(Server::Configuration::FactoryContext& factory_context, std::string filename);
 
-  ValueSetWatcher(Server::Configuration::FactoryContext& factory_context,
-                  Event::Dispatcher& dispatcher, Api::Api& api, std::string filename);
+  TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
+                Event::Dispatcher& dispatcher, Api::Api& api, std::string filename);
 
-  ValueSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
-      : ValueSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
-                        std::move(filename)) {}
+  TagSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
+      : TagSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
+                      std::move(filename)) {}
 
-  ~ValueSetWatcher();
+  ~TagSetWatcher();
 
   const Network::LcTrie::LcTrie<std::string>& get() const { return *trie_; }
   const std::string& filename() { return filename_; }
@@ -87,16 +87,16 @@ protected:
 /**
  * The purpose of the registry is to create a single watcher for a file.
  */
-class ValueSetWatcher::Registry {
+class TagSetWatcher::Registry {
 private:
-  using map_type = absl::flat_hash_map<std::string, std::weak_ptr<ValueSetWatcher>,
-                                       absl::Hash<absl::string_view>>;
+  using map_type =
+      absl::flat_hash_map<std::string, std::weak_ptr<TagSetWatcher>, absl::Hash<absl::string_view>>;
 
 public:
-  std::shared_ptr<ValueSetWatcher>
-  getOrCreate(Server::Configuration::FactoryContext& factory_context, std::string filename);
+  std::shared_ptr<TagSetWatcher> getOrCreate(Server::Configuration::FactoryContext& factory_context,
+                                             std::string filename);
 
-  void remove(ValueSetWatcher& watcher) noexcept;
+  void remove(TagSetWatcher& watcher) noexcept;
 
   static Registry& singleton();
 
@@ -158,7 +158,7 @@ private:
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
-  std::shared_ptr<const ValueSetWatcher> watcher_;
+  std::shared_ptr<const TagSetWatcher> watcher_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 
@@ -184,7 +184,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  std::shared_ptr<const ValueSetWatcher> watcher_;
+  std::shared_ptr<const TagSetWatcher> watcher_;
   IpTaggingFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };

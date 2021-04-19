@@ -34,7 +34,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   if (!config.path().empty()) {
-    watcher_ = ValueSetWatcher::create(factory_context, config.path());
+    watcher_ = TagSetWatcher::create(factory_context, config.path());
 
   } else if (!config.ip_tags().empty()) {
     const IPTagsProto tags = config.ip_tags();
@@ -79,14 +79,14 @@ IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
 }
 
 // Check the registry and either return a watcher for a file or create one
-std::shared_ptr<ValueSetWatcher>
-ValueSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
-                        std::string filename) {
+std::shared_ptr<TagSetWatcher>
+TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
+                      std::string filename) {
   return Registry::singleton().getOrCreate(factory_context, std::move(filename));
 }
 
-ValueSetWatcher::ValueSetWatcher(Server::Configuration::FactoryContext& factory_context,
-                                 Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
+TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
+                             Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
     : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()),
       factory_context_(factory_context),
       yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
@@ -98,13 +98,13 @@ ValueSetWatcher::ValueSetWatcher(Server::Configuration::FactoryContext& factory_
 }
 
 // remove the watcher from the registry
-ValueSetWatcher::~ValueSetWatcher() {
+TagSetWatcher::~TagSetWatcher() {
   if (registry_ != nullptr)
     registry_->remove(*this);
 }
 
 // read the file from filesystem, load the content and only update if the hash has changed.
-void ValueSetWatcher::maybeUpdate_(bool force) {
+void TagSetWatcher::maybeUpdate_(bool force) {
   std::string contents = api_.fileSystem().fileReadToEnd(filename_);
 
   uint64_t hash = 0;
@@ -114,7 +114,7 @@ void ValueSetWatcher::maybeUpdate_(bool force) {
     update_(std::move(contents), hash);
 }
 
-void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
+void TagSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> new_values =
       fileContentsAsTagSet_(contents);
 
@@ -123,7 +123,7 @@ void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
 }
 
 // Validate and parse both yaml and json file content to proto.
-IpTagFileProto ValueSetWatcher::protoFromFileContents_(absl::string_view contents) const {
+IpTagFileProto TagSetWatcher::protoFromFileContents_(absl::string_view contents) const {
   const std::string file_content = std::string(contents);
   IpTagFileProto ipf;
 
@@ -135,9 +135,9 @@ IpTagFileProto ValueSetWatcher::protoFromFileContents_(absl::string_view content
   return ipf;
 }
 
-// take proto conetnt and convert it into LcTrie
+// take proto content and convert it into LcTrie
 std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
-ValueSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
+TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
 
   IpTagFileProto proto_content = protoFromFileContents_(contents);
 
@@ -147,9 +147,9 @@ ValueSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
   return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
-std::shared_ptr<ValueSetWatcher>
-ValueSetWatcher::Registry::getOrCreate(Server::Configuration::FactoryContext& factory_context,
-                                       std::string filename) {
+std::shared_ptr<TagSetWatcher>
+TagSetWatcher::Registry::getOrCreate(Server::Configuration::FactoryContext& factory_context,
+                                     std::string filename) {
   Thread::LockGuard lock(mtx_);
 
   auto& ptr_ref = map_[filename];
@@ -157,12 +157,12 @@ ValueSetWatcher::Registry::getOrCreate(Server::Configuration::FactoryContext& fa
   if (ptr != nullptr)
     return ptr;
 
-  ptr_ref = ptr = std::make_shared<ValueSetWatcher>(factory_context, std::move(filename));
+  ptr_ref = ptr = std::make_shared<TagSetWatcher>(factory_context, std::move(filename));
   ptr->registry_ = this;
   return ptr;
 }
 
-void ValueSetWatcher::Registry::remove(ValueSetWatcher& watcher) noexcept {
+void TagSetWatcher::Registry::remove(TagSetWatcher& watcher) noexcept {
   Thread::LockGuard lock(mtx_);
 
   // This is safe, even if the registered watcher is not the same
@@ -172,7 +172,7 @@ void ValueSetWatcher::Registry::remove(ValueSetWatcher& watcher) noexcept {
   map_.erase(watcher.filename());
 }
 
-ValueSetWatcher::Registry& ValueSetWatcher::Registry::singleton() {
+TagSetWatcher::Registry& TagSetWatcher::Registry::singleton() {
   static Registry impl;
   return impl;
 }
