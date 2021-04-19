@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/http/broken_http3_tracker.h"
 #include "common/http/conn_pool_base.h"
+#include "common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -175,7 +175,7 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  BrokenHttp3Tracker broken_http3_tracker_;
+  Http3StatusTracker http3_status_tracker_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and

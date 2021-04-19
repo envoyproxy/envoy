@@ -1,4 +1,4 @@
-#include "common/http/broken_http3_tracker.h"
+#include "common/http/http3_status_tracker.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -16,21 +16,21 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-class BrokenHttp3TrackerTest : public testing::Test {
+class Http3StatusTrackerTest : public testing::Test {
 public:
-  BrokenHttp3TrackerTest() : timer_(&dispatcher_), tracker_(dispatcher_) {}
+  Http3StatusTrackerTest() : timer_(&dispatcher_), tracker_(dispatcher_) {}
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::StrictMock<MockTimer> timer_;
-  BrokenHttp3Tracker tracker_;
+  Http3StatusTracker tracker_;
 };
 
-TEST_F(BrokenHttp3TrackerTest, Initialized) {
+TEST_F(Http3StatusTrackerTest, Initialized) {
   EXPECT_FALSE(tracker_.isHttp3Broken());
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
-TEST_F(BrokenHttp3TrackerTest, MarkBroken) {
+TEST_F(Http3StatusTrackerTest, MarkBroken) {
   EXPECT_CALL(timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
   tracker_.markHttp3Broken();
@@ -38,7 +38,7 @@ TEST_F(BrokenHttp3TrackerTest, MarkBroken) {
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
-TEST_F(BrokenHttp3TrackerTest, MarkBrokenRepeatedly) {
+TEST_F(Http3StatusTrackerTest, MarkBrokenRepeatedly) {
   EXPECT_CALL(timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
   tracker_.markHttp3Broken();
@@ -51,7 +51,7 @@ TEST_F(BrokenHttp3TrackerTest, MarkBrokenRepeatedly) {
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
-TEST_F(BrokenHttp3TrackerTest, MarkBrokenThenExpires) {
+TEST_F(Http3StatusTrackerTest, MarkBrokenThenExpires) {
   EXPECT_CALL(timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
   tracker_.markHttp3Broken();
@@ -61,7 +61,7 @@ TEST_F(BrokenHttp3TrackerTest, MarkBrokenThenExpires) {
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
-TEST_F(BrokenHttp3TrackerTest, MarkBrokenWithBackoff) {
+TEST_F(Http3StatusTrackerTest, MarkBrokenWithBackoff) {
   // markBroken will only be called when the time is not enabled.
   EXPECT_CALL(timer_, enabled()).WillRepeatedly(Return(false));
 
@@ -96,7 +96,7 @@ TEST_F(BrokenHttp3TrackerTest, MarkBrokenWithBackoff) {
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
-TEST_F(BrokenHttp3TrackerTest, MarkBrokenThenExpiresThenConfirmedThenBroken) {
+TEST_F(Http3StatusTrackerTest, MarkBrokenThenExpiresThenConfirmedThenBroken) {
   EXPECT_CALL(timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
   tracker_.markHttp3Broken();
@@ -117,7 +117,7 @@ TEST_F(BrokenHttp3TrackerTest, MarkBrokenThenExpiresThenConfirmedThenBroken) {
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
-TEST_F(BrokenHttp3TrackerTest, MarkBrokenThenConfirmed) {
+TEST_F(Http3StatusTrackerTest, MarkBrokenThenConfirmed) {
   EXPECT_CALL(timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
   tracker_.markHttp3Broken();

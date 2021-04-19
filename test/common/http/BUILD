@@ -441,11 +441,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "broken_http3_tracker_test",
-    srcs = ["broken_http3_tracker_test.cc"],
+    name = "http3_status_tracker_test",
+    srcs = ["http3_status_tracker_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:broken_http3_tracker",
+        "//source/common/http:http3_status_tracker",
         "//test/mocks:common_lib",
     ],
 )

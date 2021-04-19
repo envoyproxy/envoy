@@ -1,4 +1,4 @@
-#include "common/http/broken_http3_tracker.h"
+#include "common/http/http3_status_tracker.h"
 
 namespace Envoy {
 namespace Http {
@@ -6,18 +6,18 @@ namespace Http {
 namespace {
 
 // Initially, HTTP/3 is be marked broken for 5 minutes.
-std::chrono::minutes DefaultExpirationTime{5};
+const std::chrono::minutes DefaultExpirationTime{5};
 
 } // namespace
 
-BrokenHttp3Tracker::BrokenHttp3Tracker(Event::Dispatcher& dispatcher)
+Http3StatusTracker::Http3StatusTracker(Event::Dispatcher& dispatcher)
     : expiration_timer_(dispatcher.createTimer([this]() -> void { onExpirationTimeout(); })) {}
 
-bool BrokenHttp3Tracker::isHttp3Broken() const { return state_ == State::Broken; }
+bool Http3StatusTracker::isHttp3Broken() const { return state_ == State::Broken; }
 
-bool BrokenHttp3Tracker::isHttp3Confirmed() const { return state_ == State::Confirmed; }
+bool Http3StatusTracker::isHttp3Confirmed() const { return state_ == State::Confirmed; }
 
-void BrokenHttp3Tracker::markHttp3Broken() {
+void Http3StatusTracker::markHttp3Broken() {
   state_ = State::Broken;
   if (!expiration_timer_->enabled()) {
     expiration_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -26,7 +26,7 @@ void BrokenHttp3Tracker::markHttp3Broken() {
   }
 }
 
-void BrokenHttp3Tracker::markHttp3Confirmed() {
+void Http3StatusTracker::markHttp3Confirmed() {
   consecutive_broken_count_ = 0;
   if (expiration_timer_->enabled()) {
     expiration_timer_->disableTimer();
@@ -34,7 +34,7 @@ void BrokenHttp3Tracker::markHttp3Confirmed() {
   state_ = State::Confirmed;
 }
 
-void BrokenHttp3Tracker::onExpirationTimeout() {
+void Http3StatusTracker::onExpirationTimeout() {
   if (state_ != State::Broken) {
     return;
   }
