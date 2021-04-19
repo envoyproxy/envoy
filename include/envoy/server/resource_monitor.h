@@ -20,25 +20,25 @@ struct ResourceUsage {
   double resource_pressure_;
 };
 
+/**
+ * Notifies caller of updated resource usage.
+ */
+class Callbacks {
+public:
+  virtual ~Callbacks() = default;
+
   /**
-   * Notifies caller of updated resource usage.
+   * Called when the request for updated resource usage succeeds.
+   * @param usage the updated resource usage
    */
-  class Callbacks {
-  public:
-    virtual ~Callbacks() = default;
+  virtual void onSuccess(const ResourceUsage& usage) PURE;
 
-    /**
-     * Called when the request for updated resource usage succeeds.
-     * @param usage the updated resource usage
-     */
-    virtual void onSuccess(const ResourceUsage& usage) PURE;
-
-    /**
-     * Called when the request for updated resource usage fails.
-     * @param error the exception caught when trying to get updated resource usage
-     */
-    virtual void onFailure(const EnvoyException& error) PURE;
-  };
+  /**
+   * Called when the request for updated resource usage fails.
+   * @param error the exception caught when trying to get updated resource usage
+   */
+  virtual void onFailure(const EnvoyException& error) PURE;
+};
 
 class ResourceMonitor {
 public:
@@ -84,10 +84,9 @@ public:
     return true;
   }
 
-
   bool tryDeallocateResource(uint64_t decrement, Callbacks& callbacks) {
     if (currentResourceUsage() - decrement > 0) {
-      current_ -= decrement;  
+      current_ -= decrement;
     }
     // Invoke callback actions.
 
@@ -103,7 +102,7 @@ public:
 
 protected:
   uint64_t max_;
-  std::atomic<uint64_t> current_;  
+  std::atomic<uint64_t> current_;
 };
 
 } // namespace Server
