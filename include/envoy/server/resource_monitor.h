@@ -20,10 +20,6 @@ struct ResourceUsage {
   double resource_pressure_;
 };
 
-class ResourceMonitor {
-public:
-  virtual ~ResourceMonitor() = default;
-
   /**
    * Notifies caller of updated resource usage.
    */
@@ -44,6 +40,10 @@ public:
     virtual void onFailure(const EnvoyException& error) PURE;
   };
 
+class ResourceMonitor {
+public:
+  virtual ~ResourceMonitor() = default;
+
   /**
    * Recalculate resource usage.
    * This must be non-blocking so if RPCs need to be made they should be
@@ -52,18 +52,14 @@ public:
   virtual void updateResourceUsage(Callbacks& callbacks) PURE;
 };
 
-class ReactiveResourceMonitor : public ResourceMonitor {
+class ReactiveResourceMonitor {
 public:
-  ReactiveResourceMonitor(uint64_t max, uint64_t current) : max_(max), current_(current){};
+  ReactiveResourceMonitor() = default;
   virtual ~ReactiveResourceMonitor() = default;
-  using ResourceMonitor::updateResourceUsage;
-  virtual void updateResourceUsage(uint64_t curr_value, Callbacks& callbacks) PURE;
-  uint64_t currentResourceUsage() const { return current_.load(); }
-  uint64_t maxResourceUsage() const { return max_; };
-
-protected:
-  uint64_t max_;
-  std::atomic<uint64_t> current_;
+  virtual bool tryAllocateResource(uint64_t increment, Callbacks& callbacks) PURE;
+  virtual bool tryDeallocateResource(uint64_t decrement, Callbacks& callbacks) PURE;
+  virtual uint64_t currentResourceUsage() const PURE;
+  virtual uint64_t maxResourceUsage() const PURE;
 };
 
 using ResourceMonitorPtr = std::unique_ptr<ResourceMonitor>;
@@ -74,9 +70,9 @@ using ReactiveResourceMonitorPtr = std::unique_ptr<ReactiveResourceMonitor>;
 class ActiveConnectionsResourceMonitor : public ReactiveResourceMonitor {
 public:
   ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
-      : ReactiveResourceMonitor(max_active_conns, 0){};
+      : max_(max_active_conns), current_(0){};
 
-  void updateResourceUsage(uint64_t increment, Callbacks& callbacks) {
+  bool tryAllocateResource(uint64_t increment, Callbacks& callbacks) {
     // Calling code will need to reset its current value after this.
     current_ += increment;
     // Invoke callback actions.
@@ -85,9 +81,29 @@ public:
     usage.resource_pressure_ = currentResourceUsage() / maxResourceUsage();
 
     callbacks.onSuccess(usage);
+    return true;
   }
 
-  void updateResourceUsage(Callbacks&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  bool tryDeallocateResource(uint64_t decrement, Callbacks& callbacks) {
+    if (currentResourceUsage() - decrement > 0) {
+      current_ -= decrement;  
+    }
+    // Invoke callback actions.
+
+    Server::ResourceUsage usage;
+    usage.resource_pressure_ = currentResourceUsage() / maxResourceUsage();
+
+    callbacks.onSuccess(usage);
+    return true;
+  }
+
+  uint64_t currentResourceUsage() const { return current_.load(); }
+  uint64_t maxResourceUsage() const { return max_; };
+
+protected:
+  uint64_t max_;
+  std::atomic<uint64_t> current_;  
 };
 
 } // namespace Server

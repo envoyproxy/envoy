@@ -134,7 +134,7 @@ protected:
 
 private:
   using FlushEpochId = uint64_t;
-  class Resource : public ResourceMonitor::Callbacks {
+  class Resource : public Callbacks {
   public:
     Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager,
              Stats::Scope& stats_scope);
@@ -156,16 +156,17 @@ private:
     Stats::Counter& skipped_updates_counter_;
   };
 
-  class ReactiveResource : public ResourceMonitor::Callbacks {
+  class ReactiveResource : public Callbacks {
   public:
     ReactiveResource(const std::string& name, ReactiveResourceMonitorPtr monitor,
                      OverloadManagerImpl& manager, Stats::Scope& stats_scope);
 
-    // ResourceMonitor::Callbacks
+    // Callbacks
     void onSuccess(const ResourceUsage& usage) override;
     void onFailure(const EnvoyException& error) override;
 
-    void update(uint64_t increment);
+    bool tryAllocateResource(uint64_t increment);
+    bool tryDeallocateResource(uint64_t decrement);
 
   private:
     const std::string name_;

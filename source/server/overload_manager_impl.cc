@@ -415,7 +415,7 @@ void OverloadManagerImpl::updateReactiveResource(std::string name, uint64_t incr
   } else {
     const auto reactive_resource = reactive_resources_.find(name);
     if (reactive_resource != reactive_resources_.end()) {
-      reactive_resource->second.update(increment);
+      reactive_resource->second.tryAllocateResource(increment);
     }
   }
 }
@@ -594,9 +594,12 @@ OverloadManagerImpl::ReactiveResource::ReactiveResource(const std::string& name,
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),
       skipped_updates_counter_(makeCounter(stats_scope, name, "skipped_updates")) {}
 
-void OverloadManagerImpl::ReactiveResource::update(uint64_t increment) {
-  monitor_->updateResourceUsage(increment, *this);
-  return;
+bool OverloadManagerImpl::ReactiveResource::tryAllocateResource(uint64_t increment) {
+  return monitor_->tryAllocateResource(increment, *this);
+}
+
+bool OverloadManagerImpl::ReactiveResource::tryDeallocateResource(uint64_t decrement) {
+  return monitor_->tryDeallocateResource(decrement, *this);
 }
 
 void OverloadManagerImpl::ReactiveResource::onSuccess(const ResourceUsage& usage) {
