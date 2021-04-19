@@ -5,7 +5,7 @@
 set -e
 
 # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-ENVOY_FILTER_EXAMPLE_GITSHA="1c81b5fbbdac5125a37a20aed7e75d8eb0ed2158"
+ENVOY_FILTER_EXAMPLE_GITSHA="dfdc226d44d1b7c300e6e691e2e8ada98b045edb"
 ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
 # shellcheck disable=SC2034
@@ -16,7 +16,7 @@ ENVOY_FILTER_EXAMPLE_TESTS=(
 
 if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
   rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  git clone https://github.com/qinggniq/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
 fi
 
 (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f "${ENVOY_FILTER_EXAMPLE_GITSHA}")
