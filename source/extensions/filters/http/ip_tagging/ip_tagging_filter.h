@@ -20,11 +20,11 @@
 #include "common/common/thread.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
+#include "common/protobuf/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/hash/hash.h"
 #include "absl/strings/string_view.h"
-#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -136,7 +136,8 @@ public:
 
   static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
   IpTaggingFilterSetTagData(
-      const envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag& config);
+      const ::google::protobuf::RepeatedPtrField<
+          ::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>& ip_tags);
 
 private:
   static FilterRequestType requestTypeEnum(
