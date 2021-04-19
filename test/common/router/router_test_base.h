@@ -106,6 +106,7 @@ public:
       new Http::TestResponseHeaderMapImpl{{":status", "302"}, {"location", "http://www.foo.com"}}};
   NiceMock<Tracing::MockSpan> span_;
   NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_;
+  std::string redirect_records_data_ = "some data";
 };
 
 } // namespace Router

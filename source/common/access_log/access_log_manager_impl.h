@@ -44,7 +44,7 @@ public:
 
   // AccessLog::AccessLogManager
   void reopen() override;
-  AccessLogFileSharedPtr createAccessLog(const std::string& file_name) override;
+  AccessLogFileSharedPtr createAccessLog(const Filesystem::FilePathAndType& file_info) override;
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
@@ -84,7 +84,7 @@ public:
 private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
-  void open();
+  Api::IoCallBoolResult open();
   void createFlushStructures();
 
   // return default flags set which used by open

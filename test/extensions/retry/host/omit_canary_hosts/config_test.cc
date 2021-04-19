@@ -43,7 +43,8 @@ TEST(OmitCanaryHostsRetryPredicateTest, EmptyConfig) {
   ASSERT_NE(nullptr, factory);
 
   ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
-  EXPECT_TRUE(dynamic_cast<envoy::config::retry::omit_canary_hosts::v2::OmitCanaryHostsPredicate*>(
+  EXPECT_TRUE(dynamic_cast<
+              envoy::extensions::retry::host::omit_canary_hosts::v3::OmitCanaryHostsPredicate*>(
       config.get()));
 }
 

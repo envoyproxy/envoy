@@ -12,15 +12,21 @@ envoy_cc_library(
     name = "cert_validator_lib",
     srcs = [
         "default_validator.cc",
+        "factory.cc",
+        "utility.cc",
     ],
     hdrs = [
         "cert_validator.h",
         "default_validator.h",
+        "factory.h",
+        "utility.h",
+        "well_known_names.h",
     ],
     external_deps = [
         "ssl",
+        "abseil_base",
+        "abseil_hash",
     ],
-    # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/ssl:context_config_interface",

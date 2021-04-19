@@ -37,6 +37,13 @@ TEST(HeaderStringTest, All) {
     EXPECT_TRUE(banana == banana);
   }
 
+  // Static LowerCaseString move assignment operator
+  {
+    LowerCaseString hello_string("HELLO");
+    LowerCaseString goodbye_string("GOODBYE");
+    hello_string = std::move(goodbye_string);
+    EXPECT_EQ("goodbye", hello_string.get());
+  }
   // Static std::string constructor
   {
     std::string static_string("HELLO");
@@ -739,6 +746,24 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
   ASSERT_EQ(set_cookie_value.size(), 2);
   ASSERT_EQ(set_cookie_value[0]->value().getStringView(), "foo");
   ASSERT_EQ(set_cookie_value[1]->value().getStringView(), "bar");
+}
+
+TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
+    return;
+  }
+  TestRequestHeaderMapImpl headers;
+  const std::string foo("foo=1");
+  const std::string bar("bar=2");
+  const LowerCaseString& cookie = Http::Headers::get().Cookie;
+  headers.addReference(cookie, foo);
+  headers.appendCopy(cookie, bar);
+  EXPECT_EQ(1UL, headers.size());
+
+  const auto cookie_value = headers.get(LowerCaseString("cookie"));
+  ASSERT_EQ(cookie_value.size(), 1);
+  ASSERT_EQ(cookie_value[0]->value().getStringView(), "foo=1; bar=2");
 }
 
 TEST_P(HeaderMapImplTest, DoubleInlineSet) {

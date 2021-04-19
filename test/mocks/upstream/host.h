@@ -6,7 +6,7 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
+#include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/symbol_table_impl.h"
@@ -44,7 +44,7 @@ public:
 
   MOCK_METHOD(void, logEject,
               (const HostDescriptionConstSharedPtr& host, Detector& detector,
-               envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
+               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced));
   MOCK_METHOD(void, logUneject, (const HostDescriptionConstSharedPtr& host));
 };
 
@@ -113,6 +113,7 @@ public:
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
+  envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };

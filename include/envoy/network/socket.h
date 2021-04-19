@@ -72,6 +72,14 @@ public:
    *         connected peer, and cannot be modified by listener filters.
    */
   virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+
+  /**
+   * Dumps the state of the SocketAddressProvider to the given ostream.
+   *
+   * @param os the std::ostream to dump to.
+   * @param indent_level the level of indentation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level) const PURE;
 };
 
 class SocketAddressSetter : public SocketAddressProvider {
@@ -190,6 +198,14 @@ public:
    *   is successful, errno_ shouldn't be used.
    */
   virtual Api::SysCallIntResult connect(const Address::InstanceConstSharedPtr address) PURE;
+
+  /**
+   * @see MSDN WSAIoctl. Controls the mode of a socket.
+   */
+  virtual Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
+                                      unsigned long in_buffer_len, void* out_buffer,
+                                      unsigned long out_buffer_len,
+                                      unsigned long* bytes_returned) PURE;
 
   /**
    * Propagates option to underlying socket (@see man 2 setsockopt)

@@ -6,7 +6,6 @@
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -88,9 +87,6 @@ static RouteConfiguration genRouteConfig(benchmark::State& state,
  */
 static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierCase match_type) {
   // Setup router for benchmarking.
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_query_string_in_path_redirects", "false"}});
   Api::ApiPtr api = Api::createApiForTest();
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;

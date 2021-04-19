@@ -20,11 +20,13 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/common/safe_memcpy.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/common/wasm/well_known_names.h"
 #include "extensions/filters/common/expr/context.h"
@@ -148,7 +150,7 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, absl::string_view data)
 Context::Context() = default;
 Context::Context(Wasm* wasm) : ContextBase(wasm) {}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
-  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->local_info_;
+  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin)
     : ContextBase(wasm, root_context_id, plugin) {}
@@ -199,15 +201,16 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   auto buffer = std::unique_ptr<char[]>(new char[s]);
   char* b = buffer.get();
   uint32_t n = response.size();
-  memcpy(b, &n, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &n);
   b += sizeof(uint32_t);
   for (auto& e : response) {
     uint32_t ttl = e.ttl_.count();
-    memcpy(b, &ttl, sizeof(uint32_t));
+    safeMemcpyUnsafeDst(b, &ttl);
     b += sizeof(uint32_t);
   };
   for (auto& e : response) {
-    memcpy(b, e.address_->asStringView().data(), e.address_->asStringView().size());
+    memcpy(b, e.address_->asStringView().data(), // NOLINT(safe-memcpy)
+           e.address_->asStringView().size());
     b += e.address_->asStringView().size();
     *b++ = 0;
   };
@@ -268,45 +271,46 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
   auto buffer = std::unique_ptr<char[]>(new char[counter_block_size + gauge_block_size]);
   char* b = buffer.get();
 
-  memcpy(b, &counter_block_size, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &counter_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &counter_type, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &counter_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_counters, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &num_counters);
   b += sizeof(uint32_t);
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
       n = counter.counter_.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t));
+      safeMemcpyUnsafeDst(b, &n);
       b += sizeof(uint32_t);
-      memcpy(b, counter.counter_.get().name().data(), counter.counter_.get().name().size());
+      memcpy(b, counter.counter_.get().name().data(), // NOLINT(safe-memcpy)
+             counter.counter_.get().name().size());
       b = align<uint64_t>(b + counter.counter_.get().name().size());
       v = counter.counter_.get().value();
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
       v = counter.delta_;
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
 
-  memcpy(b, &gauge_block_size, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &gauge_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &gauge_type, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &gauge_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_gauges, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &num_gauges);
   b += sizeof(uint32_t);
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
       n = gauge.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t));
+      safeMemcpyUnsafeDst(b, &n);
       b += sizeof(uint32_t);
-      memcpy(b, gauge.get().name().data(), gauge.get().name().size());
+      memcpy(b, gauge.get().name().data(), gauge.get().name().size()); // NOLINT(safe-memcpy)
       b = align<uint64_t>(b + gauge.get().name().size());
       v = gauge.get().value();
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
@@ -493,7 +497,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     if (root_local_info_) {
       return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
-      return CelProtoWrapper::CreateMessage(&plugin()->local_info_.node(), arena);
+      return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
     }
     break;
   case PropertyToken::SOURCE:
@@ -510,12 +514,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::LISTENER_DIRECTION:
     if (plugin_) {
-      return CelValue::CreateInt64(plugin()->direction_);
+      return CelValue::CreateInt64(plugin()->direction());
     }
     break;
   case PropertyToken::LISTENER_METADATA:
     if (plugin_) {
-      return CelProtoWrapper::CreateMessage(plugin()->listener_metadata_, arena);
+      return CelProtoWrapper::CreateMessage(plugin()->listenerMetadata(), arena);
     }
     break;
   case PropertyToken::CLUSTER_NAME:
@@ -653,10 +657,16 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
   case WasmHeaderMapType::RequestHeaders:
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
+    if (request_trailers_ == nullptr && request_body_buffer_ && end_of_stream_) {
+      request_trailers_ = &decoder_callbacks_->addDecodedTrailers();
+    }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
+    if (response_trailers_ == nullptr && response_body_buffer_ && end_of_stream_) {
+      response_trailers_ = &encoder_callbacks_->addEncodedTrailers();
+    }
     return response_trailers_;
   default:
     return nullptr;
@@ -666,19 +676,22 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
 const Http::HeaderMap* Context::getConstMap(WasmHeaderMapType type) {
   switch (type) {
   case WasmHeaderMapType::RequestHeaders:
-    if (access_log_request_headers_) {
+    if (access_log_phase_) {
       return access_log_request_headers_;
     }
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
+    if (access_log_phase_) {
+      return nullptr;
+    }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
-    if (access_log_response_headers_) {
+    if (access_log_phase_) {
       return access_log_response_headers_;
     }
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
-    if (access_log_response_trailers_) {
+    if (access_log_phase_) {
       return access_log_response_trailers_;
     }
     return response_trailers_;
@@ -722,6 +735,16 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, absl::string_view 
                                       absl::string_view* value) {
   auto map = getConstMap(type);
   if (!map) {
+    if (access_log_phase_) {
+      // Maps might point to nullptr in the access log phase.
+      if (wasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
+        *value = "";
+        return WasmResult::Ok;
+      } else {
+        return WasmResult::NotFound;
+      }
+    }
+    // Requested map type is not currently available.
     return WasmResult::BadArgument;
   }
   const Http::LowerCaseString lower_key{std::string(key)};
@@ -938,6 +961,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
 
   uint32_t token = nextHttpCallToken();
   auto& handler = http_request_[token];
+  handler.context_ = this;
+  handler.token_ = token;
 
   // set default hash policy to be based on :authority to enable consistent hash
   Http::AsyncClient::RequestOptions options;
@@ -951,8 +976,6 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
     http_request_.erase(token);
     return WasmResult::InternalFailure;
   }
-  handler.context_ = this;
-  handler.token_ = token;
   handler.request_ = http_request;
   *token_ptr = token;
   return WasmResult::Ok;
@@ -980,7 +1003,19 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
                              uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
+      return WasmResult::ParseFailure;
+    }
   }
   uint32_t token = nextGrpcCallToken();
   auto& handler = grpc_call_request_[token];
@@ -1038,7 +1073,19 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
                                uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
+      return WasmResult::ParseFailure;
+    }
   }
   uint32_t token = nextGrpcStreamToken();
   auto& handler = grpc_stream_[token];
@@ -1479,6 +1526,7 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
     onCreate();
   }
 
+  access_log_phase_ = true;
   access_log_request_headers_ = request_headers;
   // ? request_trailers  ?
   access_log_response_headers_ = response_headers;
@@ -1487,6 +1535,7 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
 
   onLog();
 
+  access_log_phase_ = false;
   access_log_request_headers_ = nullptr;
   // ? request_trailers  ?
   access_log_response_headers_ = nullptr;
@@ -1517,6 +1566,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
       wasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
     }
     break;
+  case WasmStreamType::Downstream:
+    if (network_read_filter_callbacks_) {
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { network_read_filter_callbacks_->continueReading(); });
+    }
+    return WasmResult::Ok;
+  case WasmStreamType::Upstream:
+    return WasmResult::Unimplemented;
   default:
     return WasmResult::BadArgument;
   }
@@ -1552,8 +1609,10 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
-    network_write_filter_callbacks_->connection().close(
-        Envoy::Network::ConnectionCloseType::FlushWrite);
+    if (network_write_filter_callbacks_) {
+      network_write_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;
@@ -1737,12 +1796,16 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
     });
     return;
   }
+  auto handler = http_request_.find(token);
+  if (handler == http_request_.end()) {
+    return;
+  }
   http_call_response_ = &response;
   uint32_t body_size = response->body().length();
   onHttpCallResponse(token, response->headers().size(), body_size,
                      headerSize(response->trailers()));
   http_call_response_ = nullptr;
-  http_request_.erase(token);
+  http_request_.erase(handler);
 }
 
 void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason) {
@@ -1751,13 +1814,17 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
     wasm()->addAfterVmCallAction([this, token, reason] { onHttpCallFailure(token, reason); });
     return;
   }
+  auto handler = http_request_.find(token);
+  if (handler == http_request_.end()) {
+    return;
+  }
   status_code_ = static_cast<uint32_t>(WasmResult::BrokenConnection);
   // This is the only value currently.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   status_message_ = "reset";
   onHttpCallResponse(token, 0, 0, 0);
   status_message_ = "";
-  http_request_.erase(token);
+  http_request_.erase(handler);
 }
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {
