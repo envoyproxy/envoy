@@ -55,6 +55,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           use_remote_address: true
+          normalize_path: true
+          merge_slashes: true
+          path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
           common_http_protocol_options:
             idle_timeout: 3600s # 1 hour
             headers_with_underscores_action: REJECT_REQUEST

@@ -48,6 +48,7 @@ statistics:
    downstream_rq_non_relative_path, Counter, Total requests with a non-relative HTTP path
    downstream_rq_too_large, Counter, Total requests resulting in a 413 due to buffering an overly large body
    downstream_rq_completed, Counter, Total requests that resulted in a response (e.g. does not include aborted requests)
+   downstream_rq_failed_path_normalization, Counter, Total requests redirected due to different original and normalized URL paths or when path normalization failed. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
    downstream_rq_1xx, Counter, Total 1xx responses
    downstream_rq_2xx, Counter, Total 2xx responses
    downstream_rq_3xx, Counter, Total 3xx responses
@@ -59,6 +60,7 @@ statistics:
    downstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
    downstream_rq_timeout, Counter, Total requests closed due to a timeout on the request path
    downstream_rq_overload_close, Counter, Total requests closed due to Envoy overload
+   downstream_rq_redirected_with_normalized_path, Counter, Total requests redirected due to different original and normalized URL paths. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
    rs_too_large, Counter, Total response errors due to buffering an overly large body
 
 Per user agent statistics

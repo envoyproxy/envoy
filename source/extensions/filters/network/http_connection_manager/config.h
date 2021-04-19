@@ -180,6 +180,11 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return path_with_escaped_slashes_action_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -267,6 +272,8 @@ private:
   static const uint64_t RequestTimeoutMs = 0;
   // request header timeout is disabled by default
   static const uint64_t RequestHeaderTimeoutMs = 0;
+  const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
 };
 
 /**

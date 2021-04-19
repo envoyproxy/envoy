@@ -92,6 +92,51 @@ public:
   }
 };
 
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+    PathWithEscapedSlashesAction
+    getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
+  // The default behavior is to leave escaped slashes unchanged.
+  uint64_t runtime_override = context.runtime().snapshot().getInteger(
+      "http_connection_manager.path_with_escaped_slashes_action", 0);
+  switch (runtime_override) {
+  default:
+    // Also includes runtime override values of 0 and 1
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        KEEP_UNCHANGED;
+  case 2:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        REJECT_REQUEST;
+  case 3:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        UNESCAPE_AND_REDIRECT;
+  case 4:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        UNESCAPE_AND_FORWARD;
+  }
+}
+
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+    PathWithEscapedSlashesAction
+    getPathWithEscapedSlashesAction(const envoy::extensions::filters::network::
+                                        http_connection_manager::v3::HttpConnectionManager& config,
+                                    Server::Configuration::FactoryContext& context) {
+  envoy::type::v3::FractionalPercent default_fraction;
+  default_fraction.set_numerator(100);
+  default_fraction.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  if (context.runtime().snapshot().featureEnabled(
+          "http_connection_manager.path_with_escaped_slashes_action_enabled", default_fraction)) {
+    return config.path_with_escaped_slashes_action() ==
+                   envoy::extensions::filters::network::http_connection_manager::v3::
+                       HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT
+               ? getPathWithEscapedSlashesActionRuntimeOverride(context)
+               : config.path_with_escaped_slashes_action();
+  }
+
+  // When action is disabled through runtime the behavior is to keep escaped slashes unchanged.
+  return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      KEEP_UNCHANGED;
+}
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
@@ -260,7 +305,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
-      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
+      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
+      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
