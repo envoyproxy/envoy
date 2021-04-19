@@ -42,7 +42,7 @@ public:
                                        public LinkedObject<ConnectionAttemptCallbacks> {
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
-      ~ConnectionAttemptCallbacks();
+      ~ConnectionAttemptCallbacks() override;
 
       StreamCreationResult newStream();
 
