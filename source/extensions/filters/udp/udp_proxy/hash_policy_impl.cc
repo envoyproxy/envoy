@@ -23,7 +23,9 @@ public:
 
 class KeyHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  explicit KeyHashMethod(const std::string& key) { hash_ = HashUtil::xxHash64(key); }
+  explicit KeyHashMethod(const std::string& key) : hash_{HashUtil::xxHash64(key)} {
+    ASSERT(!key.empty());
+  }
 
   absl::optional<uint64_t>
   evaluate(const Network::Address::Instance& downstream_addr) const override {
