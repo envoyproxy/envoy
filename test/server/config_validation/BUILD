@@ -1,5 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_cc_test_library", "envoy_package", "envoy_proto_library")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
+load("//source/extensions:extensions_build_config.bzl", "UNKNOWN_SECURITY_EXTENSIONS")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 
 licenses(["notice"])  # Apache 2
@@ -88,9 +89,9 @@ envoy_cc_fuzz_test(
         "//test/mocks/server:options_mocks",
         "//test/test_common:environment_lib",
     ] + select({
-        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
-        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//conditions:default": envoy_all_extensions(),
+        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS + UNKNOWN_SECURITY_EXTENSIONS),
+        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS + UNKNOWN_SECURITY_EXTENSIONS),
+        "//conditions:default": envoy_all_extensions(UNKNOWN_SECURITY_EXTENSIONS),
     }),
 )
 

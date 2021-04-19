@@ -95,6 +95,16 @@ def get_extension_metadata(target):
         'categories': categories,
     }
 
+def validate_unknowns(unknown_extensions, extensions):
+    for extension, data in extensions.items():
+        if data['security_posture'] == 'unknown':
+            if extension not in unknown_extensions:
+                return False
+        else:
+            if extension in unknown_extensions:
+                return False
+    return True
+
 
 if __name__ == '__main__':
     try:
@@ -109,6 +119,9 @@ if __name__ == '__main__':
     all_extensions.update(extensions_build_config.EXTENSIONS)
     for extension, target in all_extensions.items():
         extension_db[extension] = get_extension_metadata(target)
+    if not validate_unknowns(extensions_build_config.UNKNOWN_SECURITY_EXTENSIONS, extension_db):
+        raise ExtensionDbError(
+            'Check that _unknown_security_extensions in all_extensions.bzl is up to date')
     if num_robust_to_downstream_network_filters(extension_db) != num_read_filters_fuzzed():
         raise ExtensionDbError(
             'Check that all network filters robust against untrusted'

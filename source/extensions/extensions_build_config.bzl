@@ -276,3 +276,31 @@ EXTENSIONS = {
 # need to directly reference Envoy extensions.
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
+
+# Extensions with unknown security posture. This will be kept in sync by CI.
+# This is used to exclude while fuzzing.
+UNKNOWN_SECURITY_EXTENSIONS = [
+    "envoy.access_loggers.wasm",
+    "envoy.bootstrap.wasm",
+    "envoy.filters.http.adaptive_concurrency",
+    "envoy.filters.http.admission_control",
+    "envoy.filters.http.cdn_loop",
+    "envoy.filters.http.ext_proc",
+    "envoy.filters.http.grpc_http1_bridge",
+    "envoy.filters.http.grpc_http1_reverse_bridge",
+    "envoy.filters.http.grpc_stats",
+    "envoy.filters.http.local_ratelimit",
+    "envoy.filters.http.wasm",
+    "envoy.filters.network.direct_response",
+    "envoy.filters.network.echo",
+    "envoy.filters.network.sni_cluster",
+    "envoy.filters.network.sni_dynamic_forward_proxy",
+    "envoy.filters.network.wasm",
+    "envoy.io_socket.user_space",
+    "envoy.rate_limit_descriptors.expr",
+    "envoy.tls.cert_validator.spiffe",
+    "envoy.wasm.runtime.null",
+    "envoy.wasm.runtime.v8",
+    "envoy.wasm.runtime.wasmtime",
+    "envoy.wasm.runtime.wavm",
+]
