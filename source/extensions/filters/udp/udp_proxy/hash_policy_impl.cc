@@ -23,20 +23,16 @@ public:
 
 class KeyHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  explicit KeyHashMethod(const std::string& key) : key_(key) {}
+  explicit KeyHashMethod(const std::string& key) { hash_ = HashUtil::xxHash64(key); }
 
   absl::optional<uint64_t>
   evaluate(const Network::Address::Instance& downstream_addr) const override {
     UNREFERENCED_PARAMETER(downstream_addr);
-    if (!key_.empty()) {
-      return HashUtil::xxHash64(key_);
-    }
-
-    return absl::nullopt;
+    return hash_;
   }
 
 private:
-  const std::string& key_;
+  uint64_t hash_;
 };
 
 HashPolicyImpl::HashPolicyImpl(
