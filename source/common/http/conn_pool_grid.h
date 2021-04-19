@@ -42,6 +42,7 @@ public:
                                        public LinkedObject<ConnectionAttemptCallbacks> {
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
+      ~ConnectionAttemptCallbacks();
 
       StreamCreationResult newStream();
 
@@ -98,6 +99,9 @@ public:
     // Marks HTTP/3 broken if the HTTP/3 attempt failed but a TCP attempt succeeded.
     // While HTTP/3 is broken the grid will not attempt to make new HTTP/3 connections.
     void maybeMarkHttp3Broken();
+
+    // Cancels any pending attempts and deletes them.
+    void cancelAllPendingAttempts(Envoy::ConnectionPool::CancelPolicy cancel_policy);
 
     // Tracks all the connection attempts which currently in flight.
     std::list<ConnectionAttemptCallbacksPtr> connection_attempts_;

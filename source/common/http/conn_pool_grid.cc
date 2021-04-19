@@ -26,6 +26,12 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemp
     WrapperCallbacks& parent, PoolIterator it)
     : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
 
+ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttemptCallbacks() {
+  if (cancellable_ != nullptr) {
+    cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  }
+}
+
 ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
   auto* cancellable = pool().newStream(parent_.decoder_, *this);
@@ -39,6 +45,7 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
     Upstream::HostDescriptionConstSharedPtr host) {
+  cancellable_ = nullptr;  // Attempt failed and can no longer be cancelled.
   parent_.onConnectionAttemptFailed(this, reason, transport_failure_reason, host);
 }
 
@@ -113,9 +120,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   // it can be used for future requests. But if there is a TCP connection attempt in progress,
   // cancel it.
   if (grid_.isPoolHttp3(attempt->pool())) {
-    for (auto& attempt : connection_attempts_) {
-      attempt->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
-    }
+    cancelAllPendingAttempts(Envoy::ConnectionPool::CancelPolicy::Default);
   }
   if (connection_attempts_.empty()) {
     deleteThis();
@@ -135,21 +140,29 @@ void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
     RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
     const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+  cancellable_ = nullptr;  // Attempt succeeded and can no longer be cancelled.
   parent_.onConnectionAttemptReady(this, encoder, host, info, protocol);
 }
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::cancel(
     Envoy::ConnectionPool::CancelPolicy cancel_policy) {
-  cancellable_->cancel(cancel_policy);
+  auto cancellable = cancellable_;
+  cancellable_ = nullptr;  // Prevent repeated cancellations.
+  cancellable->cancel(cancel_policy);
 }
 
 void ConnectivityGrid::WrapperCallbacks::cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) {
   // If the newStream caller cancels the stream request, pass the cancellation on
   // to each connection attempt.
+  cancelAllPendingAttempts(cancel_policy);
+  deleteThis();
+}
+
+void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(Envoy::ConnectionPool::CancelPolicy cancel_policy) {
   for (auto& attempt : connection_attempts_) {
     attempt->cancel(cancel_policy);
   }
-  deleteThis();
+  connection_attempts_.clear();
 }
 
 bool ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
@@ -186,6 +199,9 @@ ConnectivityGrid::ConnectivityGrid(
 ConnectivityGrid::~ConnectivityGrid() {
   // Ignore drained callbacks while the pools are destroyed below.
   destroying_ = true;
+  // Callbacks might have pending streams registered with the pools, so cancel and delete
+  // the callback before deleting the pools.
+  wrapped_callbacks_.clear();
   pools_.clear();
 }
 
