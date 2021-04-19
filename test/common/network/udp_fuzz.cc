@@ -23,6 +23,12 @@
 namespace Envoy {
 namespace {
 
+class OverrideOsSysCallsImpl : public Api::OsSysCallsImpl {
+public:
+  MOCK_METHOD(bool, supportsUdpGro, (), (const));
+  MOCK_METHOD(bool, supportsMmsg, (), (const));
+};
+
 class UdpFuzz;
 
 class FuzzUdpListenerCallbacks : public Network::UdpListenerCallbacks {
@@ -63,6 +69,19 @@ public:
 
     // Create listener with default config
     envoy::config::core::v3::UdpSocketConfig config;
+
+    FuzzedDataProvider provider(buf, len);
+    uint16_t SocketType = provider.ConsumeIntegralInRange<uint16_t>(0, 2);
+    if (SocketType == 0) {
+      config.mutable_prefer_gro()->set_value(true);
+      ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
+    } else if (SocketType == 1) {
+      ON_CALL(override_syscall_, supportsMmsg()).WillByDefault(Return(true));
+    } else {
+      ON_CALL(override_syscall_, supportsMmsg()).WillByDefault(Return(false));
+      ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(false));
+    }
+
     std::unique_ptr<Network::UdpListenerImpl> listener_ =
         std::make_unique<Network::UdpListenerImpl>(dispatcherImpl(), server_socket_, fuzzCallbacks,
                                                    dispatcherImpl().timeSource(), config);
@@ -71,7 +90,6 @@ public:
         "127.0.0.1", server_socket_->addressProvider().localAddress()->ip()->port());
 
     // Now do all of the fuzzing
-    FuzzedDataProvider provider(buf, len);
     static const int MaxPackets = 15;
     total_packets_ = provider.ConsumeIntegralInRange<uint16_t>(1, MaxPackets);
     Network::Test::UdpSyncPeer client_(ip_version_);
@@ -118,6 +136,8 @@ public:
   uint16_t sent_packets_ = 0;
   uint16_t total_packets_;
   Network::Address::IpVersion ip_version_;
+  NiceMock<OverrideOsSysCallsImpl> override_syscall_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&override_syscall_};
 };
 
 void FuzzUdpListenerCallbacks::onData(Network::UdpRecvData&& data) {
