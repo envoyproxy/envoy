@@ -138,8 +138,7 @@ RuntimeFeatures::RuntimeFeatures() {
 bool RuntimeFeatures::enabledByDefault(absl::string_view feature) const {
 #ifdef ENVOY_ENABLE_QUIC
   // TODO(12923): Document this flag conversion in QUIC docs.
-  if (feature.substr(0, quiche::ConstantQuicFlagPrefix.length()) ==
-      quiche::ConstantQuicFlagPrefix) {
+  if (feature.substr(0, quiche::QuicFlagPrefix.length()) == quiche::QuicFlagPrefix) {
     auto res = quiche::FlagRegistry::getInstance().findFlag(feature);
     ASSERT(res != nullptr);
     return static_cast<quiche::TypedFlag<bool>*>(res)->value();
@@ -151,8 +150,7 @@ bool RuntimeFeatures::enabledByDefault(absl::string_view feature) const {
 
 bool RuntimeFeatures::existsButDisabled(absl::string_view feature) const {
 #ifdef ENVOY_ENABLE_QUIC
-  if (feature.substr(0, quiche::ConstantQuicFlagPrefix.length()) ==
-      quiche::ConstantQuicFlagPrefix) {
+  if (feature.substr(0, quiche::QuicFlagPrefix.length()) == quiche::QuicFlagPrefix) {
     auto res = quiche::FlagRegistry::getInstance().findFlag(feature);
     ASSERT(res != nullptr);
     return !static_cast<quiche::TypedFlag<bool>*>(res)->value();

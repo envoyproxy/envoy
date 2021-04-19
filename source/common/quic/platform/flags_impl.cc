@@ -55,10 +55,9 @@ void FlagRegistry::resetFlags() const {
 }
 
 Flag* FlagRegistry::findFlag(absl::string_view name) const {
-  if (name.substr(0, ConstantQuicFlagPrefix.length()) == ConstantQuicFlagPrefix) {
+  if (name.substr(0, QuicFlagPrefix.length()) == QuicFlagPrefix) {
     // Convert the envoy reloadable flag to quiche flag.
-    name = absl::StrCat("FLAGS_quic_reloadable_flag_",
-                        name.substr(ConstantQuicFlagPrefix.length() - 4));
+    name = name.substr(QuicFlagPrefix.length() - 10);
   }
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;

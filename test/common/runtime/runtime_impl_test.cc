@@ -194,13 +194,21 @@ TEST_F(DiskLoaderImplTest, All) {
 
 #ifdef ENVOY_ENABLE_QUIC
   // Test that QUIC flags have correct default values
-  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.quic_testonly_default_false"));
-  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.quic_testonly_default_true"));
+  EXPECT_EQ(
+      false,
+      runtimeFeatureEnabled(
+          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
+  EXPECT_EQ(true,
+            runtimeFeatureEnabled(
+                "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true"));
   // Test that QUIC flags can be overridden.
-  EXPECT_EQ(true, snapshot->runtimeFeatureEnabled(
-                      "envoy.reloadable_features.quic_testonly_default_false"));
-  EXPECT_EQ(false, snapshot->runtimeFeatureEnabled(
-                       "envoy.reloadable_features.quic_testonly_default_true"));
+  EXPECT_EQ(
+      true,
+      snapshot->runtimeFeatureEnabled(
+          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
+  EXPECT_EQ(false,
+            snapshot->runtimeFeatureEnabled(
+                "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true"));
 #endif
 
   // Deprecation
