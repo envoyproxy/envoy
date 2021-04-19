@@ -5,15 +5,6 @@ import pytest
 from tools.dependency import pip_check, pytest_pip_check
 
 
-def test_pytest_pip_check():
-    with patch("tools.dependency.pytest_pip_check.python_pytest") as m_pytest:
-        pytest_pip_check.main("arg1", "arg2", "arg3")
-
-    assert (
-        list(m_pytest.main.call_args)
-        == [('arg1', 'arg2', 'arg3', '--cov', 'tools.dependency'), {}])
-
-
 def test_pip_checker_constructor():
     checker = pip_check.PipChecker("path1", "path2", "path3")
     assert checker.checks == ("dependabot",)
