@@ -75,7 +75,9 @@ IpTaggingFilterConfig::IpTaggingFilterSetTagData(
     }
 
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
+#if 0 // TODO: re-enable this, somewhere
     stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
+#endif
   }
   return tag_data;
 }
