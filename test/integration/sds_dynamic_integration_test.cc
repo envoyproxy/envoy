@@ -225,9 +225,8 @@ public:
 
   void configToUseSds(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-    common_tls_context.add_alpn_protocols(downstream_protocol_ == Http::CodecClient::Type::HTTP1
-                                              ? Http::Utility::AlpnNames::get().Http11
-                                              : Http::Utility::AlpnNames::get().Http3);
+    common_tls_context.add_alpn_protocols(test_quic_ ? Http::Utility::AlpnNames::get().Http3
+                                                     : Http::Utility::AlpnNames::get().Http11);
 
     auto* validation_context = common_tls_context.mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
@@ -441,7 +440,10 @@ public:
           bootstrap,
           [this](
               envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-            configInlinedCerts(&common_tls_context);
+            common_tls_context.add_alpn_protocols(test_quic_
+                                                      ? Http::Utility::AlpnNames::get().Http3
+                                                      : Http::Utility::AlpnNames::get().Http11);
+            configureInlinedCerts(&common_tls_context);
           });
 
       // Add a static sds cluster
@@ -475,10 +477,8 @@ public:
     client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
-  void configInlinedCerts(
+  void configureInlinedCerts(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* common_tls_context) {
-    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
-
     auto* tls_certificate = common_tls_context->add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));

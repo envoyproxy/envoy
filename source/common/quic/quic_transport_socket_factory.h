@@ -43,7 +43,7 @@ public:
       : stats_(generateStats(store, perspective)) {}
 
   // To be called right after construction.
-  virtual void initialize() = 0;
+  virtual void initialize() PURE;
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -55,7 +55,7 @@ public:
   bool supportsAlpn() const override { return true; }
 
 protected:
-  virtual void onSecretUpdated() = 0;
+  virtual void onSecretUpdated() PURE;
   QuicTransportSocketFactoryStats stats_;
 };
 

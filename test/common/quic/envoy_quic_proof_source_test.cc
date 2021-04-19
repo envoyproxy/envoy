@@ -1,6 +1,5 @@
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "common/quic/envoy_quic_proof_source.h"

@@ -395,7 +395,6 @@ namespace Http {
 namespace {
 
 TEST_F(ConnectivityGridTest, RealGrid) {
-  ASSERT(false);
   testing::InSequence s;
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
