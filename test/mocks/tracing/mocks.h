@@ -63,7 +63,7 @@ public:
   }
 
   MOCK_METHOD(Span*, startSpan_,
-              (const Config& config, TracingContext& tracing_context,
+              (const Config& config, Http::RequestHeaderMap& request_headers,
                const StreamInfo::StreamInfo& stream_info,
                const Tracing::Decision tracing_decision));
 };
