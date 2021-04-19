@@ -20,7 +20,6 @@ envoy_cc_library(
         "dynamic_opentracing_driver_impl.h",
     ],
     deps = [
-        "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers/common/ot:opentracing_driver_lib",
     ],
 )

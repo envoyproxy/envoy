@@ -426,7 +426,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
 
 void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view value) {
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
-  auto entry = getExisting(key);
+  auto entry = getExisting(key.get());
   if (!entry.empty()) {
     const std::string delimiter = (key == Http::Headers::get().Cookie ? "; " : ",");
     const uint64_t added_size = header_map_correctly_coalesce_cookies_
@@ -451,7 +451,7 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_vie
 void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http_set_copy_replace_all_headers")) {
-    auto entry = getExisting(key);
+    auto entry = getExisting(key.get());
     if (!entry.empty()) {
       updateSize(entry[0]->value().size(), value.size());
       entry[0]->value(value);
@@ -477,16 +477,16 @@ void HeaderMapImpl::verifyByteSizeInternalForTest() const {
 }
 
 HeaderMap::GetResult HeaderMapImpl::get(const LowerCaseString& key) const {
-  return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key));
+  return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key.get()));
 }
 
-HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& key) {
+HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const absl::string_view key) {
   // Attempt a trie lookup first to see if the user is requesting an O(1) header. This may be
   // relatively common in certain header matching / routing patterns.
   // TODO(mattklein123): Add inline handle support directly to the header matcher code to support
   // this use case more directly.
   HeaderMap::NonConstGetResult ret;
-  auto lookup = staticLookup(key.get());
+  auto lookup = staticLookup(key);
   if (lookup.has_value()) {
     if (*lookup.value().entry_ != nullptr) {
       ret.push_back(*lookup.value().entry_);
@@ -497,7 +497,7 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& k
   // If the requested header is not an O(1) header try using the lazy map to
   // search for it instead of iterating the headers list.
   if (headers_.maybeMakeMap()) {
-    HeaderList::HeaderLazyMap::iterator iter = headers_.mapFind(key.get());
+    HeaderList::HeaderLazyMap::iterator iter = headers_.mapFind(key);
     if (iter != headers_.mapEnd()) {
       const HeaderList::HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
@@ -513,7 +513,7 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& k
   // scan. Doing the trie lookup is wasteful in the miss case, but is present for code consistency
   // with other functions that do similar things.
   for (HeaderEntryImpl& header : headers_) {
-    if (header.key() == key.get().c_str()) {
+    if (header.key() == key) {
       ret.push_back(&header);
     }
   }
@@ -567,16 +567,7 @@ size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate)
   return old_size - headers_.size();
 }
 
-size_t HeaderMapImpl::remove(const LowerCaseString& key) {
-  const size_t old_size = headers_.size();
-  auto lookup = staticLookup(key.get());
-  if (lookup.has_value()) {
-    removeInline(lookup.value().entry_);
-  } else {
-    subtractSize(headers_.remove(key.get()));
-  }
-  return old_size - headers_.size();
-}
+size_t HeaderMapImpl::remove(const LowerCaseString& key) { return remove(key.get()); }
 
 size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
   return HeaderMapImpl::removeIf([&prefix](const HeaderEntry& entry) -> bool {
@@ -619,6 +610,17 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
+}
+
+size_t HeaderMapImpl::remove(const absl::string_view key) {
+  const size_t old_size = headers_.size();
+  auto lookup = staticLookup(key);
+  if (lookup.has_value()) {
+    removeInline(lookup.value().entry_);
+  } else {
+    subtractSize(headers_.remove(key));
+  }
+  return old_size - headers_.size();
 }
 
 size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {

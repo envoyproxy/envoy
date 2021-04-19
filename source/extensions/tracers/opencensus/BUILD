@@ -42,8 +42,10 @@ envoy_cc_library(
         "opencensus_exporter_zipkin",
     ],
     deps = [
+        "//source/common/tracing:common_values_lib",
+        "//source/common/tracing:null_span_lib",
         "//source/common/config:utility_lib",
-        "//source/common/tracing:http_tracer_lib",
+        "//include/envoy/tracing:trace_driver_interface",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )

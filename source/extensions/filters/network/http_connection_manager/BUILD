@@ -51,7 +51,7 @@ envoy_cc_extension(
         "//source/common/router:rds_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/tracing:http_tracer_config_lib",
+        "//source/common/tracing:tracer_config_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:http_tracer_manager_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

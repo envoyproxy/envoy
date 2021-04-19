@@ -187,7 +187,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
       addGrpcRequestTags(span, *request_headers);
     }
   }
-  CustomTagContext ctx{request_headers, stream_info};
+  CustomTagContext ctx{request_headers, &stream_info};
 
   const CustomTagMap* custom_tag_map = tracing_config.customTags();
   if (custom_tag_map) {
@@ -272,7 +272,7 @@ HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& ta
   }
 }
 
-HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
+HttpTracerImpl::HttpTracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
@@ -317,12 +317,12 @@ RequestHeaderCustomTag::RequestHeaderCustomTag(
       default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (!ctx.request_headers) {
+  if (!ctx.tracing_context) {
     return default_value_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.request_headers->get(name_);
-  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
+  const auto result = ctx.tracing_context->getTracingContext(name_.get());
+  return result.has_value() ? result.value() : default_value_;
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
@@ -365,7 +365,11 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
 
 const envoy::config::core::v3::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  const StreamInfo::StreamInfo& info = ctx.stream_info;
+  if (!ctx.stream_info) {
+    return nullptr;
+  }
+  const StreamInfo::StreamInfo& info = *ctx.stream_info;
+
   switch (kind_) {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
     return &info.dynamicMetadata();

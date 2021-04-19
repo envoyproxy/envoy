@@ -9,6 +9,27 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "null_span_lib",
+    hdrs = [
+        "null_span_impl.h",
+    ],
+    deps = [
+        "//include/envoy/tracing:trace_driver_interface",
+        "//source/common/common:empty_string",
+    ],
+)
+
+envoy_cc_library(
+    name = "common_values_lib",
+    hdrs = [
+        "common_values.h",
+    ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
     name = "http_tracer_lib",
     srcs = [
         "http_tracer_impl.cc",
@@ -17,6 +38,8 @@ envoy_cc_library(
         "http_tracer_impl.h",
     ],
     deps = [
+        ":common_values_lib",
+        ":null_span_lib",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -45,9 +68,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http_tracer_config_lib",
+    name = "tracer_config_lib",
     hdrs = [
-        "http_tracer_config_impl.h",
+        "tracer_config_impl.h",
     ],
     deps = [
         "//include/envoy/server:tracer_config_interface",

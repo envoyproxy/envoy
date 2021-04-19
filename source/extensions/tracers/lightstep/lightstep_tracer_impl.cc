@@ -14,7 +14,6 @@
 #include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -5,7 +5,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/trace_driver.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/empty_string.h"
@@ -71,7 +71,7 @@ public:
 
   void log(SystemTime timestamp, const std::string& event) override;
 
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TracingContext& tracing_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -114,14 +114,14 @@ public:
   /**
    * This function is inherited from the abstract Driver class.
    *
-   * It starts a new Zipkin span. Depending on the request headers, it can create a root span,
+   * It starts a new Zipkin span. Depending on the tracing context, it can create a root span,
    * a child span, or a shared-context span.
    *
    * The third parameter (operation_name) does not actually make sense for Zipkin.
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::RequestHeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TracingContext& tracing_context,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 

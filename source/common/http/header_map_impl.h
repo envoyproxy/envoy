@@ -322,7 +322,8 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderMap::NonConstGetResult getExisting(const LowerCaseString& key);
+  HeaderMap::NonConstGetResult getExisting(const absl::string_view key);
+  size_t remove(const absl::string_view key);
   size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
@@ -479,6 +480,18 @@ public:
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
+
+  absl::optional<absl::string_view> getTracingContext(const absl::string_view key) const override {
+    auto result = HeaderMap::GetResult(const_cast<RequestHeaderMapImpl*>(this)->getExisting(key));
+    if (!result.empty()) {
+      return result[0]->value().getStringView();
+    }
+    return absl::nullopt;
+  }
+  void setTracingContext(const absl::string_view key, const absl::string_view value) override {
+    Http::LowerCaseString low_case_key{key};
+    setCopy(low_case_key, value);
+  }
 
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the

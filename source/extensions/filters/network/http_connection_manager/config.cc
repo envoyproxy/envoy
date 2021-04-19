@@ -33,8 +33,8 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
+#include "common/tracing/tracer_config_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/codec_impl.h"

@@ -10,7 +10,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "common/tracing/null_span_impl.h"
 
 #include "extensions/tracers/zipkin/span_context_extractor.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
@@ -40,21 +40,22 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
 void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
 std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
-void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
+void ZipkinSpan::injectContext(Tracing::TracingContext& tracing_context) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                  span_.traceIdAsHexString());
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
+  tracing_context.setTracingContext(ZipkinCoreConstants::get().X_B3_TRACE_ID.get(),
+                                    span_.traceIdAsHexString());
+  tracing_context.setTracingContext(ZipkinCoreConstants::get().X_B3_SPAN_ID.get(),
+                                    span_.idAsHexString());
 
   // Set the parent-span header properly, based on the newly-created span structure.
   if (span_.isSetParentId()) {
-    request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                    span_.parentIdAsHexString());
+    tracing_context.setTracingContext(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.get(),
+                                      span_.parentIdAsHexString());
   }
 
   // Set the sampled header.
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                  span_.sampled() ? SAMPLED : NOT_SAMPLED);
+  tracing_context.setTracingContext(ZipkinCoreConstants::get().X_B3_SAMPLED.get(),
+                                    span_.sampled() ? SAMPLED : NOT_SAMPLED);
 }
 
 void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
@@ -108,23 +109,29 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers, const std::string&,
+                                   Tracing::TracingContext& tracing_context, const std::string&,
                                    SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
-  SpanContextExtractor extractor(request_headers);
+  SpanContextExtractor extractor(tracing_context);
   bool sampled{extractor.extractSampled(tracing_decision)};
   try {
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
-      new_zipkin_span =
-          tracer.startSpan(config, std::string(request_headers.getHostValue()), start_time);
+      new_zipkin_span = tracer.startSpan(
+          config,
+          std::string(tracing_context.getTracingContext(Http::Headers::get().HostLegacy.get())
+                          .value_or("")),
+          start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, std::string(request_headers.getHostValue()),
-                                         start_time, ret_span_context.first);
+      new_zipkin_span = tracer.startSpan(
+          config,
+          std::string(tracing_context.getTracingContext(Http::Headers::get().HostLegacy.get())
+                          .value_or("")),
+          start_time, ret_span_context.first);
     }
 
   } catch (const ExtractorException& e) {

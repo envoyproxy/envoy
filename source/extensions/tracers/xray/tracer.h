@@ -124,7 +124,7 @@ public:
   /**
    * Adds X-Ray trace header to the set of outgoing headers.
    */
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TracingContext& tracing_context) override;
 
   /**
    * Gets the start time of this Span.

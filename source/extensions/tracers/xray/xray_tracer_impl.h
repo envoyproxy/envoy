@@ -2,9 +2,7 @@
 
 #include "envoy/server/tracer_config.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
-
-#include "common/tracing/http_tracer_impl.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "extensions/tracers/xray/tracer.h"
 #include "extensions/tracers/xray/xray_configuration.h"
@@ -19,7 +17,8 @@ public:
   Driver(const XRay::XRayConfiguration& config,
          Server::Configuration::TracerFactoryContext& context);
 
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::RequestHeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config& config,
+                             Tracing::TracingContext& tracing_context,
                              const std::string& operation_name, Envoy::SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 

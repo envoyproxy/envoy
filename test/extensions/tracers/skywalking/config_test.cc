@@ -45,7 +45,7 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracer) {
   SkyWalkingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr skywalking_tracer = factory.createHttpTracer(*message, context);
+  auto skywalking_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, skywalking_tracer);
 }
 
@@ -79,7 +79,7 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracerWithClientConfig) {
   SkyWalkingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr skywalking_tracer = factory.createHttpTracer(*message, context);
+  auto skywalking_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, skywalking_tracer);
 }
 

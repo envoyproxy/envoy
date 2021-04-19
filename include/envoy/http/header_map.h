@@ -11,6 +11,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_formatter.h"
+#include "envoy/tracing/trace_context.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -64,7 +65,7 @@ public:
     return *this;
   }
 
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
+  explicit LowerCaseString(const absl::string_view new_string) : string_(new_string) {
     ASSERT(valid());
     lower();
   }
@@ -817,7 +818,8 @@ public:
 // Request headers.
 class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
-      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders> {
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders>,
+      public Tracing::TracingContext {
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
