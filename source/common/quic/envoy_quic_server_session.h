@@ -88,6 +88,7 @@ protected:
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
+  // Used by base class to access quic connection after initialization.
   const quic::QuicConnection* quicConnection() const override;
   quic::QuicConnection* quicConnection() override;
 

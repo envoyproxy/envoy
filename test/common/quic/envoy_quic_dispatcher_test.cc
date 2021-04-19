@@ -226,7 +226,7 @@ public:
         // Stop iteration to avoid calling getRead/WriteBuffer().
         .WillOnce(Return(Network::FilterStatus::StopIteration));
     if (!quicVersionUsesTls()) {
-      // 0-RTT is not supported in Quic TLS handshake yet.
+      // The test utility can't generate 0-RTT packet for Quic TLS handshake yet.
       EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
     }
 

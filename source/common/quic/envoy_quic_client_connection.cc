@@ -47,7 +47,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
                                connection_socket->addressProvider().remoteAddress()->ip()),
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_CLIENT, supported_versions),
-      EnvoyQuicConnection(std::move(connection_socket)), dispatcher_(dispatcher) {}
+      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher) {}
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,

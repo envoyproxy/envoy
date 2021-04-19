@@ -9,13 +9,13 @@
 namespace Envoy {
 namespace Quic {
 
-// Derived for network filter chain, stats and QoS. This is used on both client
-// and server side.
-class EnvoyQuicConnection : protected Logger::Loggable<Logger::Id::connection> {
+// A base class of both the client and server connections which keeps stats and
+// connection socket.
+class QuicNetworkConnection : protected Logger::Loggable<Logger::Id::connection> {
 public:
-  EnvoyQuicConnection(Network::ConnectionSocketPtr&& connection_socket);
+  QuicNetworkConnection(Network::ConnectionSocketPtr&& connection_socket);
 
-  virtual ~EnvoyQuicConnection();
+  virtual ~QuicNetworkConnection();
 
   // Called by EnvoyQuicSession::setConnectionStats().
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {

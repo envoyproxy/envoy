@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Quic {
 
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
-    EnvoyQuicConnection& connection, const quic::QuicConnectionId& connection_id,
+    QuicNetworkConnection& connection, const quic::QuicConnectionId& connection_id,
     Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.

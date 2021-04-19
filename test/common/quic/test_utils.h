@@ -57,7 +57,7 @@ public:
                                          "example.com", "h3-29")) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
-    return EnvoyQuicConnection::connectionStats();
+    return QuicNetworkConnection::connectionStats();
   }
 
   MOCK_METHOD(void, SendConnectionClosePacket,

@@ -21,7 +21,7 @@
 #include "common/common/logger.h"
 #include "common/http/http3/codec_stats.h"
 #include "common/network/connection_impl_base.h"
-#include "common/quic/envoy_quic_connection.h"
+#include "common/quic/quic_network_connection.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "common/quic/send_buffer_monitor.h"
 #include "common/stream_info/stream_info_impl.h"
@@ -36,7 +36,7 @@ namespace Quic {
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
                                         public SendBufferMonitor {
 public:
-  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection,
+  QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
                                   Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
   ~QuicFilterManagerConnectionImpl() override = default;
@@ -155,7 +155,7 @@ protected:
   virtual const quic::QuicConnection* quicConnection() const = 0;
   virtual quic::QuicConnection* quicConnection() = 0;
 
-  EnvoyQuicConnection* network_connection_{nullptr};
+  QuicNetworkConnection* network_connection_{nullptr};
 
   absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
   absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>

@@ -2,8 +2,8 @@
 
 #include "envoy/network/listener.h"
 
-#include "common/quic/envoy_quic_connection.h"
 #include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_network_connection.h"
 
 #include "server/connection_handler_impl.h"
 
@@ -22,7 +22,7 @@
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicServerConnection : public quic::QuicConnection, public EnvoyQuicConnection {
+class EnvoyQuicServerConnection : public quic::QuicConnection, public QuicNetworkConnection {
 public:
   EnvoyQuicServerConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicSocketAddress initial_self_address,
@@ -33,7 +33,7 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::ConnectionSocketPtr connection_socket);
 
-  // EnvoyQuicConnection
+  // QuicNetworkConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
 };

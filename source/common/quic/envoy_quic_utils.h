@@ -126,8 +126,8 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::str
 // not supported, return 0 with error_details populated correspondingly.
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
 
-// Return a connection socket which can get information from io_handle, but not
-// be able to modify it.
+// Return a connection socket which read and write via io_handle, but doesn't close it when the
+// socket gets closed nor set options on the socket.
 Network::ConnectionSocketPtr
 createServerConnectionSocket(Network::IoHandle& io_handle,
                              const quic::QuicSocketAddress& self_address,

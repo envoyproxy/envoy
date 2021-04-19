@@ -3,8 +3,8 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/network/utility.h"
-#include "common/quic/envoy_quic_connection.h"
 #include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_network_connection.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -23,7 +23,7 @@ namespace Quic {
 
 // A client QuicConnection instance managing its own file events.
 class EnvoyQuicClientConnection : public quic::QuicConnection,
-                                  public EnvoyQuicConnection,
+                                  public QuicNetworkConnection,
                                   public Network::UdpPacketProcessor {
 public:
   // A connection socket will be created with given |local_addr|. If binding

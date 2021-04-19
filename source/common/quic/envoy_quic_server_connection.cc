@@ -19,7 +19,7 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_SERVER, supported_versions),
-      EnvoyQuicConnection(std::move(connection_socket)) {}
+      QuicNetworkConnection(std::move(connection_socket)) {}
 
 bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
   quic::QuicSocketAddress old_self_address = self_address();
