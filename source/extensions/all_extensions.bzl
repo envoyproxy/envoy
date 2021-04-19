@@ -9,7 +9,6 @@ _required_extensions = {
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
 }
 
-
 # Return the extension cc_library target after select
 def _selected_extension_target(target):
     return target + "_envoy_extension"
