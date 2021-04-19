@@ -128,7 +128,7 @@ class PythonChecker(checker.ForkingChecker):
 
 
 def main(*args: list) -> None:
-    return PythonChecker(*args).run_checks()
+    return PythonChecker(*args).run()
 
 
 if __name__ == "__main__":
