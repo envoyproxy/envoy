@@ -54,12 +54,11 @@ public:
 
 class HashPolicyImplKeyTest : public HashPolicyImplBaseTest {
 public:
-  HashPolicyImplKeyTest() : key_("key"), empty_key_("") {}
+  HashPolicyImplKeyTest() : key_("key") {}
 
   void additionalSetup() override { hash_policy_config_->set_key(key_); }
 
   const std::string key_;
-  const std::string empty_key_;
 };
 
 // Check invalid policy type
@@ -94,16 +93,6 @@ TEST_F(HashPolicyImplKeyTest, KeyHash) {
   auto hash = hash_policy_->generateHash(*peer_address_);
 
   EXPECT_EQ(generated_hash, hash.value());
-}
-
-// Check that returns null hash in case of hash key has been changed to an empty string
-TEST_F(HashPolicyImplKeyTest, KeyWithEmptyString) {
-  setup();
-
-  hash_policy_config_->set_key(empty_key_);
-  auto hash = hash_policy_->generateHash(*peer_address_);
-
-  EXPECT_FALSE(hash.has_value());
 }
 
 } // namespace
