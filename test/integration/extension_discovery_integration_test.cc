@@ -4,6 +4,7 @@
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/integration/filters/set_is_terminal_filter_config.pb.h"
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
@@ -50,6 +51,8 @@ std::string allowAllConfig() { return "code: 200"; }
 
 std::string invalidConfig() { return "code: 90"; }
 
+std::string terminalFilterConfig() { return "is_terminal_filter: true"; }
+
 class ExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                           public HttpIntegrationTest {
 public:
@@ -68,6 +71,8 @@ public:
           auto* discovery = filter->mutable_config_discovery();
           discovery->add_type_urls(
               "type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig");
+          discovery->add_type_urls(
+              "type.googleapis.com/test.integration.filters.SetIsTerminalFilterConfig");
           discovery->add_type_urls(
               "type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher");
           if (set_default_config) {
@@ -222,19 +227,29 @@ public:
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version,
-                       const std::string& yaml_config, bool ttl = false) {
+                       const std::string& yaml_config, bool ttl = false,
+                       bool is_set_resp_code_config = true) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
-    const auto configuration =
-        TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
-            yaml_config);
+
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
 
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
-    typed_config.mutable_typed_config()->PackFrom(configuration);
+
+    if (is_set_resp_code_config) {
+      const auto configuration =
+          TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
+              yaml_config);
+      typed_config.mutable_typed_config()->PackFrom(configuration);
+    } else {
+      const auto configuration =
+          TestUtility::parseYaml<test::integration::filters::SetIsTerminalFilterConfig>(
+              yaml_config);
+      typed_config.mutable_typed_config()->PackFrom(configuration);
+    }
     resource.mutable_resource()->PackFrom(typed_config);
     if (ttl) {
       resource.mutable_ttl()->set_seconds(1);
@@ -690,6 +705,29 @@ TEST_P(ExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   auto result = ecds_connection_->waitForDisconnect();
   RELEASE_ASSERT(result, result.message());
   ecds_connection_.reset();
+}
+
+// Validate that a listener update should fail if the subscribed extension configuration make filter
+// terminal but the filter position is not at the last position at filter chain.
+TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilterChain) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false, false);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({"http"});
+  sendXdsResponse("foo", "1", terminalFilterConfig(), false, false);
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_fail", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
 } // namespace

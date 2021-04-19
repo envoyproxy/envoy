@@ -186,12 +186,13 @@ private:
   void
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
-                int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-                const char* filter_chain_type, bool last_filter_in_current_config);
+                int i, const std::string& prefix, FilterFactoriesList& filter_factories,
+                const std::string& filter_chain_type, bool last_filter_in_current_config);
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-                             FilterFactoriesList& filter_factories, const char* filter_chain_type,
+                             FilterFactoriesList& filter_factories,
+                             const std::string& filter_chain_type,
                              bool last_filter_in_current_config);
   void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
                                      const FilterFactoriesList& filter_factories);

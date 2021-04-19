@@ -131,7 +131,7 @@ public:
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilter() { return false; }
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&, FactoryContext&) { return false; }
 };
 
 /**
@@ -206,7 +206,7 @@ public:
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilter() { return false; }
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&, FactoryContext&) { return false; }
 
   /**
    * @return FilterDependenciesPtr specification of dependencies required or

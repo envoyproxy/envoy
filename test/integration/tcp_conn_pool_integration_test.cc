@@ -101,7 +101,10 @@ public:
   }
 
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
-  bool isTerminalFilter() override { return true; }
+  bool isTerminalFilterByProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return true;
+  }
 };
 
 } // namespace
