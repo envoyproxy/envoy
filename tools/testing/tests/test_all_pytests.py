@@ -87,6 +87,23 @@ def test_all_pytests_pytest_bazel_args(patches, cov_enabled):
     assert "pytest_bazel_args" not in checker.__dict__
 
 
+def test_all_pytests_pytest_targets():
+    checker = all_pytests.PytestChecker("path1", "path2", "path3")
+    bazel_mock = patch("tools.testing.all_pytests.PytestChecker.bazel", new_callable=PropertyMock)
+
+    with bazel_mock as m_bazel:
+        m_bazel.return_value.query.return_value = [
+            "foo", ":pytest_foo",
+            ":notpytest_foo", ":not_foo",
+            "bar", "//asdf:pytest_barbaz"]
+        assert (
+            checker.pytest_targets
+            == set([":pytest_foo", "//asdf:pytest_barbaz"]))
+    assert (
+        list(m_bazel.return_value.query.call_args)
+        == [('tools/...',), {}])
+
+
 def test_all_pytests_add_arguments():
     checker = all_pytests.PytestChecker("path1", "path2", "path3")
     parser = MagicMock()
@@ -106,6 +123,57 @@ def test_all_pytests_add_arguments():
             [('--cov-html',),
              {'default': None,
               'help': 'Specify a path to collect html coverage with'}]])
+
+
+
+
+def test_all_pytests_check_pytests(patches):
+    checker = all_pytests.PytestChecker("path1", "path2", "path3")
+    patched = patches(
+        "PytestChecker.error",
+        "PytestChecker.succeed",
+        ("PytestChecker.pytest_targets", dict(new_callable=PropertyMock)),
+        ("PytestChecker.bazel", dict(new_callable=PropertyMock)),
+        prefix="tools.testing.all_pytests")
+
+    check_runs = dict(
+        check1=True,
+        check2=True,
+        check3=False,
+        check4=False,
+        check5=True,
+        check6=False,
+        check7=True)
+
+    def _run_bazel(target):
+        if not check_runs[target]:
+            raise BazelRunError()
+
+    with patched as (m_error, m_succeed, m_targets, m_bazel):
+        m_targets.return_value = check_runs.keys()
+        m_bazel.return_value.run.side_effect = _run_bazel
+        checker.check_pytests()
+
+    assert (
+        list(list(c) for c in m_bazel.return_value.run.call_args_list)
+        == [[('check1',), {}],
+            [('check2',), {}],
+            [('check3',), {}],
+            [('check4',), {}],
+            [('check5',), {}],
+            [('check6',), {}],
+            [('check7',), {}]])
+    assert (
+        list(list(c) for c in m_error.call_args_list)
+        == [[('pytest', ['check3 failed']), {}],
+            [('pytest', ['check4 failed']), {}],
+            [('pytest', ['check6 failed']), {}]])
+    assert (
+        list(list(c) for c in m_succeed.call_args_list)
+        == [[('pytest', ['check1']), {}],
+            [('pytest', ['check2']), {}],
+            [('pytest', ['check5']), {}],
+            [('pytest', ['check7']), {}]])
 
 
 @pytest.mark.parametrize("exists", [True, False])
@@ -129,6 +197,32 @@ def test_all_pytests_on_checks_begin(patches, exists, cov_path):
             == [('SOMEPATH',), {}])
     else:
         assert not m_unlink.called
+
+
+@pytest.mark.parametrize("cov_html", ["", "SOMEPATH"])
+def test_all_pytests_on_checks_complete(patches, cov_html):
+    checker = all_pytests.PytestChecker("path1", "path2", "path3")
+    patched = patches(
+        ("PytestChecker.bazel", dict(new_callable=PropertyMock)),
+        "checker.Checker.on_checks_complete",
+        ("PytestChecker.cov_path", dict(new_callable=PropertyMock)),
+        ("PytestChecker.cov_html", dict(new_callable=PropertyMock)),
+        prefix="tools.testing.all_pytests")
+
+    with patched as (m_bazel, m_complete, m_cov_path, m_cov_html):
+        m_cov_html.return_value = cov_html
+        assert checker.on_checks_complete() == m_complete.return_value
+        assert (
+            list(m_complete.call_args)
+            == [(), {}])
+
+    if cov_html:
+        assert (
+            list(m_bazel.return_value.run.call_args)
+            == [('//tools/testing:python_coverage',
+                 m_cov_path.return_value, cov_html), {}])
+    else:
+        assert not m_bazel.return_value.called
 
 
 def test_coverage_main(command_main):
