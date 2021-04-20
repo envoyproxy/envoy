@@ -641,7 +641,6 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
 
-
 class AuthenticatorJwtCacheTest : public testing::Test {
 public:
   void SetUp() override {
@@ -653,11 +652,8 @@ public:
   }
 
   void createAuthenticator(const absl::optional<std::string>& provider) {
-    auth_ = Authenticator::create(
-        nullptr, provider, false, false,
-        jwks_cache_, cm_,
-        mock_fetcher_.AsStdFunction(),
-        time_system_);
+    auth_ = Authenticator::create(nullptr, provider, false, false, jwks_cache_, cm_,
+                                  mock_fetcher_.AsStdFunction(), time_system_);
   }
 
   void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers) {
@@ -699,9 +695,9 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheMissGoodToken) {
   createAuthenticator("provider");
 
   // jwt_cache miss: lookup return nullptr
-  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(nullptr)) ;
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(nullptr));
   // jwt_cache insert is called for a good jwt.
-  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(GoodToken, _)).Times(1);
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(GoodToken, _));
 
   Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::Ok, headers);
@@ -711,7 +707,7 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheMissExpiredToken) {
   createAuthenticator("provider");
 
   // jwt_cache miss: lookup return nullptr
-  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(nullptr)) ;
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(nullptr));
   // jwt_cache insert is not called for a bad Jwt
   EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(_, _)).Times(0);
 
@@ -729,7 +725,7 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
   ::google::jwt_verify::Jwt cached_jwt;
   cached_jwt.parseFromString(GoodToken);
   // jwt_cache hit: lookup return a cached jwt.
-  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(&cached_jwt)) ;
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(&cached_jwt));
   // jwt_cache insert is not called.
   EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(_, _)).Times(0);
 
@@ -748,7 +744,6 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
 }
-
 
 } // namespace
 } // namespace JwtAuthn

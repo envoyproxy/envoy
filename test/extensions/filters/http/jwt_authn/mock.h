@@ -5,8 +5,8 @@
 #include "common/http/message_impl.h"
 
 #include "extensions/filters/http/jwt_authn/authenticator.h"
-#include "extensions/filters/http/jwt_authn/verifier.h"
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
+#include "extensions/filters/http/jwt_authn/verifier.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
 
@@ -62,13 +62,13 @@ public:
 };
 
 class MockJwtCache : public JwtCache {
- public:
+public:
   MOCK_METHOD(::google::jwt_verify::Jwt*, lookup, (const std::string&), ());
   MOCK_METHOD(void, insert, (const std::string&, std::unique_ptr<::google::jwt_verify::Jwt>&&), ());
 };
 
 class MockJwksData : public JwksCache::JwksData {
- public:
+public:
   MockJwksData() {
     ON_CALL(*this, areAudiencesAllowed(_)).WillByDefault(::testing::Return(true));
     ON_CALL(*this, getJwtProvider()).WillByDefault(::testing::ReturnRef(jwt_provider_));
@@ -77,10 +77,12 @@ class MockJwksData : public JwksCache::JwksData {
   }
 
   MOCK_METHOD(bool, areAudiencesAllowed, (const std::vector<std::string>&), (const));
-  MOCK_METHOD(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&, getJwtProvider, (), (const));
-  MOCK_METHOD(const ::google::jwt_verify::Jwks*,  getJwksObj, (), (const));
-  MOCK_METHOD(bool,  isExpired, (), (const));
-  MOCK_METHOD(const ::google::jwt_verify::Jwks*, setRemoteJwks, (::google::jwt_verify::JwksPtr&&), ());
+  MOCK_METHOD(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&, getJwtProvider,
+              (), (const));
+  MOCK_METHOD(const ::google::jwt_verify::Jwks*, getJwksObj, (), (const));
+  MOCK_METHOD(bool, isExpired, (), (const));
+  MOCK_METHOD(const ::google::jwt_verify::Jwks*, setRemoteJwks, (::google::jwt_verify::JwksPtr &&),
+              ());
   MOCK_METHOD(JwtCache&, getJwtCache, (), ());
 
   envoy::extensions::filters::http::jwt_authn::v3::JwtProvider jwt_provider_;
@@ -88,7 +90,7 @@ class MockJwksData : public JwksCache::JwksData {
 };
 
 class MockJwksCache : public JwksCache {
- public:
+public:
   MockJwksCache() {
     ON_CALL(*this, findByIssuer(_)).WillByDefault(::testing::Return(&jwks_data_));
     ON_CALL(*this, findByProvider(_)).WillByDefault(::testing::Return(&jwks_data_));
