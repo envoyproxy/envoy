@@ -25,7 +25,7 @@ public:
       auto slice = std::make_unique<Slice>(*fragment);
       return slice;
     } else {
-      auto slice = std::make_unique<Slice>(data.size());
+      auto slice = std::make_unique<Slice>(data.size(), nullptr);
       slice->append(data.data(), data.size());
       return slice;
     }
@@ -160,7 +160,7 @@ TEST_F(OwnedSliceTest, Create) {
   static constexpr std::pair<uint64_t, uint64_t> Sizes[] = {
       {0, 0}, {1, 4096}, {64, 4096}, {4095, 4096}, {4096, 4096}, {4097, 8192}, {65535, 65536}};
   for (const auto& [size, expected_size] : Sizes) {
-    Slice slice{size};
+    Slice slice{size, nullptr};
     EXPECT_NE(nullptr, slice.data());
     EXPECT_EQ(0, slice.dataSize());
     EXPECT_LE(size, slice.reservableSize());
@@ -169,7 +169,7 @@ TEST_F(OwnedSliceTest, Create) {
 }
 
 TEST_F(OwnedSliceTest, ReserveCommit) {
-  Slice slice{100};
+  Slice slice{100, nullptr};
   const uint64_t initial_capacity = slice.reservableSize();
   EXPECT_LE(100, initial_capacity);
 
@@ -231,7 +231,7 @@ TEST_F(OwnedSliceTest, ReserveCommit) {
     // Try to commit a reservation from the wrong slice, and verify that the slice rejects it.
     Slice::Reservation reservation = slice.reserve(10);
     expectReservationSuccess(reservation, slice, 10);
-    Slice other_slice{100};
+    Slice other_slice{100, nullptr};
     Slice::Reservation other_reservation = other_slice.reserve(10);
     expectReservationSuccess(other_reservation, other_slice, 10);
     EXPECT_FALSE(slice.commit(other_reservation));
@@ -265,7 +265,7 @@ TEST_F(OwnedSliceTest, ReserveCommit) {
 
 TEST_F(OwnedSliceTest, Drain) {
   // Create a slice and commit all the available space.
-  Slice slice{100};
+  Slice slice{100, nullptr};
   Slice::Reservation reservation = slice.reserve(slice.reservableSize());
   bool committed = slice.commit(reservation);
   EXPECT_TRUE(committed);

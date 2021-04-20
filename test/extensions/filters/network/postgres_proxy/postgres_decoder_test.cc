@@ -537,6 +537,7 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
 class FakeBuffer : public Buffer::Instance {
 public:
   MOCK_METHOD(void, addDrainTracker, (std::function<void()>), (override));
+  MOCK_METHOD(void, bindAccount, (Buffer::BufferMemoryAccountSharedPtr), (override));
   MOCK_METHOD(void, add, (const void*, uint64_t), (override));
   MOCK_METHOD(void, addBufferFragment, (Buffer::BufferFragment&), (override));
   MOCK_METHOD(void, add, (absl::string_view), (override));

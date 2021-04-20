@@ -28,7 +28,7 @@ MATCHER(IsInvalidAddress, "") {
 MATCHER(IsNotSupportedResult, "") { return arg.errno_ == SOCKET_ERROR_NOT_SUP; }
 
 ABSL_MUST_USE_RESULT std::pair<Buffer::Slice, Buffer::RawSlice> allocateOneSlice(uint64_t size) {
-  Buffer::Slice mutable_slice(size);
+  Buffer::Slice mutable_slice(size, nullptr);
   auto slice = mutable_slice.reserve(size);
   EXPECT_NE(nullptr, slice.mem_);
   EXPECT_EQ(size, slice.len_);
