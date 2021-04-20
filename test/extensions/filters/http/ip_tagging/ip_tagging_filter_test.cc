@@ -50,7 +50,11 @@ ip_tags:
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
-  ~IpTaggingFilterTest() override { filter_->onDestroy(); }
+  ~IpTaggingFilterTest() override {
+     if (filter_ != nullptr) {
+       filter_->onDestroy();
+     }
+  }
 
   NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
@@ -89,6 +93,35 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
   request_headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+}
+
+/**
+ * config with no path or ip_tags fields should be rejected.
+ */
+TEST_F(IpTaggingFilterTest, NoPathOrIPTags) {
+  const std::string request_yaml = R"EOF(
+request_type: external
+)EOF";
+
+  auto expected = "HTTP IP Tagging Filter requires one of ip_tags and path to be specified.";
+  EXPECT_THROW_WITH_MESSAGE(initializeFilter(request_yaml), EnvoyException, expected);
+}
+
+/**
+ * config with both path and ip_tags fields should be rejected.
+ */
+TEST_F(IpTaggingFilterTest, BothPathAndIPTags) {
+  const std::string request_yaml = R"EOF(
+request_type: external
+path: "/my/awesone/file.yaml"
+ip_tags:
+  - ip_tag_name: external_request
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+
+  auto expected = "Only one of path or ip_tags can be specified";
+  EXPECT_THROW_WITH_MESSAGE(initializeFilter(request_yaml), EnvoyException, expected);
 }
 
 TEST_F(IpTaggingFilterTest, ExternalRequest) {
