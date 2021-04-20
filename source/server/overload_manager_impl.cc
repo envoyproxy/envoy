@@ -39,11 +39,6 @@ public:
     return always_inactive_;
   }
 
-  void updateReactiveResource(const std::string& reactive_resource_name,
-                              uint64_t increment) override {
-    manager_.updateReactiveResource(reactive_resource_name, increment);
-  };
-
   void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
     actions_[action.index()] = state;
   }
@@ -285,12 +280,14 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
     // Check if it is a reactive resource.
-    if (OverloadReactiveResourceNames::get().reactive_resource_names_.find(name) !=
-        OverloadReactiveResourceNames::get().reactive_resource_names_.end()) {
+    auto reactive_resource_it =
+        OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.find(name);
+    if (reactive_resource_it !=
+        OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.end()) {
       ENVOY_LOG(debug, "Adding reactive resource monitor for {}", name);
       // TODO(nezdolik) Add factory for reactive resource monitors.
       // Invoke corresponding resource monitor factory here.
-      reactive_resources_.try_emplace(name, name,
+      reactive_resources_.try_emplace(reactive_resource_it->second, name,
                                       std::make_unique<Server::ActiveConnectionsResourceMonitor>(1),
                                       *this, stats_scope);
     } else {
@@ -332,9 +329,13 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
     for (const auto& trigger : action.triggers()) {
       const std::string& resource = trigger.name();
+      auto reactive_resource_it =
+          OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.find(resource);
 
       if (resources_.find(resource) == resources_.end() &&
-          reactive_resources_.find(resource) == reactive_resources_.end()) {
+          reactive_resource_it !=
+              OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.end() &&
+          reactive_resources_.find(reactive_resource_it->second) == reactive_resources_.end()) {
         throw EnvoyException(
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
       }
@@ -407,16 +408,25 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
   return true;
 }
 
-void OverloadManagerImpl::updateReactiveResource(std::string name, uint64_t increment) {
-  if (OverloadReactiveResourceNames::get().reactive_resource_names_.find(name) ==
-      OverloadReactiveResourceNames::get().reactive_resource_names_.end()) {
-    ENVOY_LOG(warn, " {Failed to update non-reactive resource {}}", name);
-    return;
+bool OverloadManagerImpl::tryAllocateResource(OverloadReactiveResourceName resource_name,
+                                              uint64_t increment) {
+  const auto reactive_resource = reactive_resources_.find(resource_name);
+  if (reactive_resource != reactive_resources_.end()) {
+    return reactive_resource->second.tryAllocateResource(increment);
   } else {
-    const auto reactive_resource = reactive_resources_.find(name);
-    if (reactive_resource != reactive_resources_.end()) {
-      reactive_resource->second.tryAllocateResource(increment);
-    }
+    ENVOY_LOG(warn, " {Failed to allocate unknown reactive resource }");
+    return false;
+  }
+}
+
+bool OverloadManagerImpl::tryDeallocateResource(OverloadReactiveResourceName resource_name,
+                                                uint64_t decrement) {
+  const auto reactive_resource = reactive_resources_.find(resource_name);
+  if (reactive_resource != reactive_resources_.end()) {
+    return reactive_resource->second.tryDeallocateResource(decrement);
+  } else {
+    ENVOY_LOG(warn, " {Failed to deallocate unknown reactive resource }");
+    return false;
   }
 }
 

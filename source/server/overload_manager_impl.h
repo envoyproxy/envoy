@@ -124,7 +124,8 @@ public:
   // about overload state changes.
   void stop();
 
-  void updateReactiveResource(std::string name, uint64_t increment);
+  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment);
+  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement);
 
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
@@ -197,7 +198,7 @@ private:
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
-  absl::node_hash_map<std::string, ReactiveResource> reactive_resources_;
+  absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource> reactive_resources_;
 
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 

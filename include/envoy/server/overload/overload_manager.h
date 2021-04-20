@@ -11,6 +11,23 @@
 
 namespace Envoy {
 namespace Server {
+
+enum class OverloadReactiveResourceName {
+  GlobalDownstreamMaxConnections,
+};
+
+class OverloadReactiveResourceNameValues {
+public:
+  // Overload action to stop accepting new HTTP requests.
+  const std::string GlobalDownstreamMaxConnections =
+      "envoy.resource_monitors.global_downstream_max_connections";
+
+  std::set<std::string> reactive_resource_names_{GlobalDownstreamMaxConnections};
+
+  absl::flat_hash_map<std::string, OverloadReactiveResourceName> reactive_action_name_to_resource_ =
+      {{GlobalDownstreamMaxConnections,
+        OverloadReactiveResourceName::GlobalDownstreamMaxConnections}};
+};
 /**
  * Well-known overload action names.
  */
@@ -39,15 +56,6 @@ public:
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
-
-class OverloadReactiveResourceNameValues {
-public:
-  // Overload action to stop accepting new HTTP requests.
-  const std::string GlobalDownstreamMaxConnections =
-      "envoy.resource_monitors.global_downstream_max_connections";
-
-  std::set<std::string> reactive_resource_names_{GlobalDownstreamMaxConnections};
-};
 
 using OverloadReactiveResourceNames = ConstSingleton<OverloadReactiveResourceNameValues>;
 
