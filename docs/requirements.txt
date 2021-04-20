@@ -107,9 +107,6 @@ sphinxcontrib-devhelp==1.0.2 \
 sphinxcontrib-htmlhelp==1.0.3 \
     --hash=sha256:3c0bc24a2c41e340ac37c85ced6dafc879ab485c095b1d65d2461ac2f7cca86f \
     --hash=sha256:e8f5bb7e31b2dbb25b9cc435c8ab7a79787ebf7f906155729338f3156d93659b
-sphinxcontrib-httpdomain==1.7.0 \
-    --hash=sha256:1fb5375007d70bf180cdd1c79e741082be7aa2d37ba99efe561e1c2e3f38191e \
-    --hash=sha256:ac40b4fba58c76b073b03931c7b8ead611066a6aebccafb34dc19694f4eb6335
 sphinxcontrib-jsmath==1.0.1 \
     --hash=sha256:2ec2eaebfb78f3f2078e73666b1415417a116cc848b72e5172e596c871103178 \
     --hash=sha256:a9925e4a4587247ed2191a22df5f6970656cb8ca2bd6284309578f2153e0c4b8
