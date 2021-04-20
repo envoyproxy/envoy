@@ -14,8 +14,8 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_config.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
-#include "extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
 #include "extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 #include "extensions/filters/network/mysql_proxy/route.h"
 

@@ -20,7 +20,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -43,7 +42,6 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )
 

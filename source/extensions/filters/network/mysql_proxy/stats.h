@@ -1,8 +1,8 @@
 #pragma once
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +47,6 @@ public:
 };
 
 using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
-
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

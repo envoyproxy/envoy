@@ -5,7 +5,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-
 #include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/buffer_impl.h"
