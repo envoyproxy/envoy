@@ -114,7 +114,8 @@ class BazelAdapter(object):
         """Run a bazel target and return the subprocess response"""
         args = (("--",) + args) if args else args
         bazel_args = ("bazel", "run", target) + args
-        resp = self.context.fork(bazel_args, capture_output=capture_output, cwd=cwd or self.context.path)
+        resp = self.context.fork(
+            bazel_args, capture_output=capture_output, cwd=cwd or self.context.path)
         if resp.returncode and raises:
             raise BazelRunError(f"Bazel run failed: {resp}")
         return resp
