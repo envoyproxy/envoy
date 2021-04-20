@@ -20,42 +20,65 @@ namespace JwtAuthn {
 namespace {
 
 class JwtCacheTest : public testing::Test {
-protected:
-  const std::string config = R"({
-      enable_jwt_cache: true,
-      jwt_cache_size: 20
-  })";
-  void SetUp() override {
-    jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
-    Status status = jwt_->parseFromString(GoodToken);
-    if (status == Status::Ok) {
-      setupCache(config);
-    }
+ public:
+  void setupCache(bool enable) {
+    cache_ = JwtCache::create(enable, 0, time_system_);
   }
 
-  void setupCache(const std::string& config_str) {
-    TestUtility::loadFromYaml(config_str, provider_);
-    cache_ =
-        JwtCache::create(provider_.enable_jwt_cache(), provider_.jwt_cache_size(), time_system_);
+  void loadJwt(const char* jwt_str) {
+    jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+    Status status = jwt_->parseFromString(jwt_str);
+    EXPECT_EQ(status, Status::Ok);
   }
 
   Event::SimulatedTimeSystem time_system_;
-  JwtProvider provider_;
   JwtCachePtr cache_;
   std::unique_ptr<::google::jwt_verify::Jwt> jwt_;
 };
 
-// Checking Cache is enable.
-TEST_F(JwtCacheTest, TestCacheEnable) { EXPECT_TRUE(provider_.enable_jwt_cache()); }
+TEST_F(JwtCacheTest, TestEnabledCache) {
+  // setup an enabled cache
+  setupCache(true);
+  loadJwt(GoodToken);
 
-// Checking jwt_cache_size
-TEST_F(JwtCacheTest, TestCacheSize) { EXPECT_EQ(provider_.jwt_cache_size(), 20); }
-
-// Inserting good Jwt and looking in cache.
-TEST_F(JwtCacheTest, TestInsertGoodJwt) {
+  auto* origin_jwt = jwt_.get();
   cache_->insert(GoodToken, std::move(jwt_));
-  auto jwt_cache = cache_->lookup(GoodToken);
-  EXPECT_TRUE(jwt_cache != nullptr);
+  // jwt ownership is moved into the cache.
+  EXPECT_FALSE(jwt_);
+
+  auto * jwt1 = cache_->lookup(GoodToken);
+  EXPECT_TRUE(jwt1 != nullptr);
+  EXPECT_EQ(jwt1, origin_jwt);
+
+  auto * jwt2 = cache_->lookup(ExpiredToken);
+  EXPECT_TRUE(jwt2 == nullptr);
+}
+
+TEST_F(JwtCacheTest, TestDisabledCache) {
+  // setup a disabled cache
+  setupCache(false);
+  loadJwt(GoodToken);
+
+  cache_->insert(GoodToken, std::move(jwt_));
+  // jwt ownership is not moved into the cache.
+  EXPECT_TRUE(jwt_);
+
+  auto * jwt = cache_->lookup(GoodToken);
+  // not found since cache is disabled.
+  EXPECT_TRUE(jwt == nullptr);
+}
+
+TEST_F(JwtCacheTest, TestExpiredToken) {
+  // setup an enabled cache
+  setupCache(true);
+  loadJwt(ExpiredToken);
+
+  cache_->insert(ExpiredToken, std::move(jwt_));
+
+  auto * jwt = cache_->lookup(ExpiredToken);
+  // not be found since it is expired.
+  EXPECT_TRUE(jwt == nullptr);
+
 }
 
 } // namespace
