@@ -10,6 +10,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -123,8 +124,11 @@ message PrivateKeyProvider {
   oneof config_type {
     google.protobuf.Any typed_config = 3 [(udpa.annotations.sensitive) = true];
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2
-        [deprecated = true, (udpa.annotations.sensitive) = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [
+      deprecated = true,
+      (udpa.annotations.sensitive) = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
   }
 }
 
@@ -378,5 +382,6 @@ message CertificateValidationContext {
   // [#extension-category: envoy.tls.cert_validator]
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
 
-  repeated string hidden_envoy_deprecated_verify_subject_alt_name = 4 [deprecated = true];
+  repeated string hidden_envoy_deprecated_verify_subject_alt_name = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }

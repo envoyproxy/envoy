@@ -691,7 +691,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   vhds_stream_->sendGrpcMessage(vhds_update);
 
   codec_client_->sendReset(encoder);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_TRUE(codec_client_->connected());
 
   cleanupUpstreamAndDownstream();

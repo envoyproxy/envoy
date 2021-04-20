@@ -18,6 +18,7 @@
 
 #include "envoy/network/listener.h"
 #include "server/connection_handler_impl.h"
+#include "server/active_listener_base.h"
 
 namespace Envoy {
 namespace Quic {
@@ -59,11 +60,12 @@ public:
                           quic::ConnectionCloseSource source) override;
 
 protected:
-  std::unique_ptr<quic::QuicSession>
-  CreateQuicSession(quic::QuicConnectionId server_connection_id,
-                    const quic::QuicSocketAddress& self_address,
-                    const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
-                    const quic::ParsedQuicVersion& version) override;
+  std::unique_ptr<quic::QuicSession> CreateQuicSession(quic::QuicConnectionId server_connection_id,
+                                                       const quic::QuicSocketAddress& self_address,
+                                                       const quic::QuicSocketAddress& peer_address,
+                                                       absl::string_view alpn,
+                                                       const quic::ParsedQuicVersion& version,
+                                                       absl::string_view sni) override;
 
 private:
   Network::ConnectionHandler& connection_handler_;

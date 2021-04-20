@@ -1,123 +1,29 @@
-1.18.0 (Pending)
+1.19.0 (Pending)
 ================
 
 Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* config: the v2 xDS API is no longer supported by the Envoy binary.
-* grpc_stats: the default value for :ref:`stats_for_all_methods <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>` is switched from true to false, in order to avoid possible memory exhaustion due to an untrusted downstream sending a large number of unique method names. The previous default value was deprecated in version 1.14.0. This only changes the behavior when the value is not set. The previous behavior can be used by setting the value to true. This behavior change by be overridden by setting runtime feature `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
-* http: fixing a standards compliance issue with :scheme. The :scheme header sent upstream is now based on the original URL scheme, rather than set based on the security of the upstream connection. This behavior can be temporarily reverted by setting `envoy.reloadable_features.preserve_downstream_scheme` to false.
-* http: http3 is now enabled/disabled via build option `--define http3=disabled` rather than the extension framework. Behavior is the same, but builds may be affected for platforms or build configurations where http3 is not supported.
-* http: resolving inconsistencies between :scheme and X-Forwarded-Proto. :scheme will now be set for all HTTP/1.1 requests. This changes the behavior of the gRPC access logger, Wasm filters, CSRF filter and oath2 filter for HTTP/1 traffic, where :scheme was previously not set. This change also validates that for front-line Envoys (Envoys configured with  :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` set to 0 and :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>` set to true) that HTTP/1.1 https schemed requests can not be sent over non-TLS connections. All behavioral changes listed here can be temporarily reverted by setting `envoy.reloadable_features.add_and_validate_scheme_header` to false.
-* http: when a protocol error is detected in response from upstream, Envoy sends 502 BadGateway downstream and access log entry contains UPE flag. This behavior change can be overwritten to use error code 503 by setting `envoy.reloadable_features.return_502_for_upstream_protocol_errors` to false.
-
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* access_logs: change command operator %UPSTREAM_CLUSTER% to resolve to :ref:`alt_stat_name <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` if provided. This behavior can be reverted by disabling the runtime feature `envoy.reloadable_features.use_observable_cluster_name`.
-* access_logs: fix substition formatter to recognize commands ending with an integer such as DOWNSTREAM_PEER_FINGERPRINT_256.
-* access_logs: set the error flag `NC` for `no cluster found` instead of `NR` if the route is found but the corresponding cluster is not available.
-* admin: added :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>` information to GET /clusters?format=json :ref:`cluster status <envoy_v3_api_msg_admin.v3.ClusterStatus>`.
-* dns: both the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and
-  :ref:`logical DNS <arch_overview_service_discovery_types_logical_dns>` cluster types now honor the
-  :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field if not empty.
-  Previously resolved hosts would have their hostname set to the configured DNS address for use with
-  logging, :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`, etc.
-  Setting the hostname manually allows overriding the internal hostname used for such features while
-  still allowing the original DNS resolution name to be used.
-* grpc_json_transcoder: filter now adheres to encoder and decoder buffer limits. Requests and responses
-  that require buffering over the limits will be directly rejected. The behavior can be reverted by
-  disabling runtime feature `envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits`.
-  To reduce or increase the buffer limits the filter adheres to, reference the :ref:`flow control documentation <faq_flow_control>`.
-* hds: support custom health check port via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
-* healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
-  :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
-  for all responses when Envoy is in the health check failed state. Additionally, receiving the
-  :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>`
-  header (either in response to normal traffic or in response to an HTTP :ref:`active health check <arch_overview_health_checking>`) will
-  cause Envoy to immediately :ref:`exclude <arch_overview_load_balancing_excluded>` the host from
-  load balancing calculations. This has the useful property that such hosts, which are being
-  explicitly told to disable traffic, will not be counted for panic routing calculations. See the
-  excluded documentation for more information. This behavior can be temporarily reverted by setting
-  the `envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster` feature flag
-  to false. Note that the runtime flag covers *both* the health check filter responding with
-  `x-envoy-immediate-health-check-fail` in all cases (versus just non-HC requests) as well as
-  whether receiving `x-envoy-immediate-health-check-fail` will cause exclusion or not. Thus,
-  depending on the Envoy deployment, the feature flag may need to be flipped on both downstream
-  and upstream instances, depending on the reason.
-* http: allow to use path canonicalizer from `googleurl <https://quiche.googlesource.com/googleurl>`_
-  instead of `//source/common/chromium_url`. The new path canonicalizer is enabled by default. To
-  revert to the legacy path canonicalizer, enable the runtime flag
-  `envoy.reloadable_features.remove_forked_chromium_url`.
-* http: increase the maximum allowed number of initial connection WINDOW_UPDATE frames sent by the peer from 1 to 5.
-* http: no longer adding content-length: 0 for requests which should not have bodies. This behavior can be temporarily reverted by setting `envoy.reloadable_features.dont_add_content_length_for_bodiless_requests` false.
-* http: upstream flood and abuse checks increment the count of opened HTTP/2 streams when Envoy sends
-  initial HEADERS frame for the new stream. Before the counter was incrementred when Envoy received
-  response HEADERS frame with the END_HEADERS flag set from upstream server.
-* lua: added function `timestamp` to provide millisecond resolution timestamps by passing in `EnvoyTimestampResolution.MILLISECOND`.
-* oauth filter: added the optional parameter :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. Enables this value to be overridden in the Authorization request to the OAuth provider.
-* perf: allow reading more bytes per operation from raw sockets to improve performance.
-* router: extended custom date formatting to DOWNSTREAM_PEER_CERT_V_START and DOWNSTREAM_PEER_CERT_V_END when using :ref:`custom request/response header formats <config_http_conn_man_headers_custom_request_headers>`.
-* router: made the path rewrite available without finalizing headers, so the filter could calculate the current value of the final url.
-* tracing: added `upstream_cluster.name` tag that resolves to resolve to :ref:`alt_stat_name <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` if provided (and otherwise the cluster name).
-* udp: configuration has been added for :ref:`GRO <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>`
-  which used to be force enabled if the OS supports it. The default is now disabled for server
-  sockets and enabled for client sockets (see the new features section for links).
-* upstream: host weight changes now cause a full load balancer rebuild as opposed to happening
-  atomically inline. This change has been made to support load balancer pre-computation of data
-  structures based on host weight, but may have performance implications if host weight changes
-  are very frequent. This change can be disabled by setting the `envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`
-  feature flag to false. If setting this flag to false is required in a deployment please open an
-  issue against the project.
+* http: replaced setting `envoy.reloadable_features.strict_1xx_and_204_response_headers` with settings
+  `envoy.reloadable_features.require_strict_1xx_and_204_response_headers`
+  (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
+  `envoy.reloadable_features.send_strict_1xx_and_204_response_headers`
+  (do not send 1xx or 204 responses with these headers). Both are true by default.
 
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* active http health checks: properly handles HTTP/2 GOAWAY frames from the upstream. Previously a GOAWAY frame due to a graceful listener drain could cause improper failed health checks due to streams being refused by the upstream on a connection that is going away. To revert to old GOAWAY handling behavior, set the runtime feature `envoy.reloadable_features.health_check.graceful_goaway_handling` to false.
-* adaptive concurrency: fixed a bug where concurrent requests on different worker threads could update minRTT back-to-back.
-* buffer: tighten network connection read and write buffer high watermarks in preparation to more careful enforcement of read limits. Buffer high-watermark is now set to the exact configured value; previously it was set to value + 1.
-* cdn_loop: check that the entirety of the :ref:`cdn_id <envoy_v3_api_field_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig.cdn_id>` field is a valid CDN identifier.
-* cds: fix blocking the update for a warming cluster when the update is the same as the active version.
-* ext_authz: emit :ref:`CheckResponse.dynamic_metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` when the external authorization response has "Denied" check status.
-* fault injection: stop counting as active fault after delay elapsed. Previously fault injection filter continues to count the injected delay as an active fault even after it has elapsed. This produces incorrect output statistics and impacts the max number of consecutive faults allowed (e.g., for long-lived streams). This change decreases the active fault count when the delay fault is the only active and has gone finished.
-* filter_chain: fix filter chain matching with the server name as the case-insensitive way.
-* grpc-web: fix local reply and non-proto-encoded gRPC response handling for small response bodies. This fix can be temporarily reverted by setting `envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling` to false.
-* grpc_http_bridge: the downstream HTTP status is now correctly set for trailers-only responses from the upstream.
-* header map: pick the right delimiter to append multiple header values to the same key. Previouly header with multiple values are coalesced with ",", after this fix cookie headers should be coalesced with " ;". This doesn't affect Http1 or Http2 requests because these 2 codecs coalesce cookie headers before adding it to header map. To revert to the old behavior, set the runtime feature `envoy.reloadable_features.header_map_correctly_coalesce_cookies` to false.
-* http: avoid grpc-status overwrite on Http::Utility::sendLocalReply() if that field has already been set.
-* http: disallowing "host:" in request_headers_to_add for behavioral consistency with rejecting :authority header. This behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_host_like_authority` to false.
-* http: fixed an issue where Enovy did not handle peer stream limits correctly, and queued streams in nghttp2 rather than establish new connections. This behavior can be temporarily reverted by setting `envoy.reloadable_features.improved_stream_limit_handling` to false.
-* http: fixed a bug where setting :ref:`MaxStreamDuration proto <envoy_v3_api_msg_config.route.v3.RouteAction.MaxStreamDuration>` did not disable legacy timeout defaults.
-* http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
-* jwt_authn: reject requests with a proper error if JWT has the wrong issuer when allow_missing is used. Before this change, the requests are accepted.
-* listener: prevent crashing when an unknown listener config proto is received and debug logging is enabled.
-* mysql_filter: improve the codec ability of mysql filter at connection phase, it can now decode MySQL5.7+ connection phase protocol packet.
-* overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
-* sni: as the server name in sni should be case-insensitive, envoy will convert the server name as lower case first before any other process inside envoy.
-* tls: fix the subject alternative name of the presented certificate matches the specified matchers as the case-insensitive way when it uses DNS name.
-* tls: fix issue where OCSP was inadvertently removed from SSL response in multi-context scenarios.
-* upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
-* upstream: retry budgets will now set default values for xDS configurations.
-* zipkin: fix 'verbose' mode to emit annotations for stream events. This was the documented behavior, but wasn't behaving as documented.
-
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
-* access_logs: removed legacy unbounded access logs and runtime guard `envoy.reloadable_features.disallow_unbounded_access_logs`.
-* dns: removed legacy buggy wildcard matching path and runtime guard `envoy.reloadable_features.fix_wildcard_matching`.
-* dynamic_forward_proxy: removed `envoy.reloadable_features.enable_dns_cache_circuit_breakers` and legacy code path.
-* http: removed legacy connection close behavior and runtime guard `envoy.reloadable_features.fixed_connection_close`.
-* http: removed legacy HTTP/1.1 error reporting path and runtime guard `envoy.reloadable_features.early_errors_via_hcm`.
-* http: removed legacy sanitization path for upgrade response headers and runtime guard `envoy.reloadable_features.fix_upgrade_response`.
-* http: removed legacy date header overwriting logic and runtime guard `envoy.reloadable_features.preserve_upstream_date deprecation`.
-* http: removed legacy ALPN handling and runtime guard `envoy.reloadable_features.http_default_alpn`.
-* listener: removed legacy runtime guard `envoy.reloadable_features.listener_in_place_filterchain_update`.
-* router: removed `envoy.reloadable_features.consume_all_retry_headers` and legacy code path.
-* router: removed `envoy.reloadable_features.preserve_query_string_in_path_redirects` and legacy code path.
+* tls: removed `envoy.reloadable_features.tls_use_io_handle_bio` runtime guard and legacy code path.
 
 New Features
 ------------
@@ -180,6 +86,3 @@ New Features
 
 Deprecated
 ----------
-
-* admin: :ref:`access_log_path <envoy_v3_api_field_config.bootstrap.v3.Admin.access_log_path>` is deprecated in favor for :ref:`access loggers <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`.
-

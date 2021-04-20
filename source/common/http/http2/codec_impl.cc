@@ -567,7 +567,13 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
-  decoder().decodeMetadata(std::move(metadata_map_ptr));
+  // Empty metadata maps should not be decoded.
+  if (metadata_map_ptr->empty()) {
+    ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);
+    parent_.stats_.metadata_empty_frames_.inc();
+  } else {
+    decoder().decodeMetadata(std::move(metadata_map_ptr));
+  }
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
@@ -647,14 +653,6 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
 }
 
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
@@ -1093,6 +1091,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
     return 0;
   }
 
+  // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
     stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);
@@ -1710,17 +1709,9 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  return ConnectionImpl::innerDispatch(data);
+  return ConnectionImpl::dispatch(data);
 }
 
 absl::optional<int>

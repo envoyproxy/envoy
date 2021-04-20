@@ -67,7 +67,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeV10EncDec) {
   mysql_greet_decode.decode(decode_data, GREETING_SEQ_NUM, decode_data.length());
   EXPECT_EQ(mysql_greet_decode.getAuthPluginData(), mysql_greet_encode.getAuthPluginData());
   EXPECT_EQ(mysql_greet_decode.getAuthPluginData1(), mysql_greet_encode.getAuthPluginData1());
-  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2(), "");
+  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2().size(), 0);
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
   EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());
@@ -153,7 +153,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteSalt) {
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());
-  EXPECT_EQ(mysql_greet_decode.getAuthPluginData(), "");
+  EXPECT_EQ(mysql_greet_decode.getAuthPluginData().size(), 0);
 }
 
 /*
@@ -356,7 +356,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteReserved
   ServerGreeting mysql_greet_decode{};
   mysql_greet_decode.decode(decode_data, GREETING_SEQ_NUM, decode_data.length());
   EXPECT_EQ(mysql_greet_decode.getAuthPluginData1(), mysql_greet_encode.getAuthPluginData1());
-  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2(), "");
+  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2().size(), 0);
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
   EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());
@@ -389,7 +389,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteAuthData
   ServerGreeting mysql_greet_decode{};
   mysql_greet_decode.decode(decode_data, GREETING_SEQ_NUM, decode_data.length());
   EXPECT_EQ(mysql_greet_decode.getAuthPluginData1(), mysql_greet_encode.getAuthPluginData1());
-  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2(), "");
+  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2().size(), 0);
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
   EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());
@@ -513,7 +513,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerSecurityConnectionInComplete
   ServerGreeting mysql_greet_decode{};
   mysql_greet_decode.decode(decode_data, GREETING_SEQ_NUM, decode_data.length());
   EXPECT_EQ(mysql_greet_decode.getAuthPluginData1(), mysql_greet_encode.getAuthPluginData1());
-  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2(), "");
+  EXPECT_EQ(mysql_greet_decode.getAuthPluginData2().size(), 0);
   EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
   EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
   EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());

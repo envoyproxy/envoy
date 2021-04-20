@@ -5,8 +5,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/http/http3/quic_codec_factory.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/quic/envoy_quic_client_session.h"
 #include "common/quic/envoy_quic_server_session.h"
 
@@ -19,8 +17,9 @@ namespace Quic {
 class QuicHttpConnectionImplBase : public virtual Http::Connection,
                                    protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicHttpConnectionImplBase(QuicFilterManagerConnectionImpl& quic_session)
-      : quic_session_(quic_session) {}
+  QuicHttpConnectionImplBase(QuicFilterManagerConnectionImpl& quic_session,
+                             Http::Http3::CodecStats& stats)
+      : quic_session_(quic_session), stats_(stats) {}
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& /*data*/) override {
@@ -34,13 +33,19 @@ public:
 
 protected:
   QuicFilterManagerConnectionImpl& quic_session_;
+  Http::Http3::CodecStats& stats_;
 };
 
 class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ServerConnection {
 public:
-  QuicHttpServerConnectionImpl(EnvoyQuicServerSession& quic_session,
-                               Http::ServerConnectionCallbacks& callbacks);
+  QuicHttpServerConnectionImpl(
+      EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
+      Http::Http3::CodecStats& stats,
+      const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+      const uint32_t max_request_headers_kb,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action);
 
   // Http::Connection
   void goAway() override;
@@ -56,7 +61,9 @@ class QuicHttpClientConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ClientConnection {
 public:
   QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                               Http::ConnectionCallbacks& callbacks);
+                               Http::ConnectionCallbacks& callbacks, Http::Http3::CodecStats& stats,
+                               const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+                               const uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;
@@ -70,29 +77,6 @@ public:
 private:
   EnvoyQuicClientSession& quic_client_session_;
 };
-
-// A factory to create QuicHttpClientConnection.
-class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectionFactory {
-public:
-  std::unique_ptr<Http::ClientConnection>
-  createQuicClientConnection(Network::Connection& connection,
-                             Http::ConnectionCallbacks& callbacks) override;
-
-  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
-};
-
-// A factory to create QuicHttpServerConnection.
-class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectionFactory {
-public:
-  std::unique_ptr<Http::ServerConnection>
-  createQuicServerConnection(Network::Connection& connection,
-                             Http::ConnectionCallbacks& callbacks) override;
-
-  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
-};
-
-DECLARE_FACTORY(QuicHttpClientConnectionFactoryImpl);
-DECLARE_FACTORY(QuicHttpServerConnectionFactoryImpl);
 
 } // namespace Quic
 } // namespace Envoy

@@ -30,11 +30,9 @@ namespace http2 {
 namespace {
 
 TEST(Http2PlatformTest, Http2BugTracker) {
-  EXPECT_DEBUG_DEATH(HTTP2_BUG << "Here is a bug,", " bug");
-  EXPECT_DEBUG_DEATH(HTTP2_BUG_IF(true) << "There is a bug,", " bug");
-  EXPECT_LOG_NOT_CONTAINS("error", "", HTTP2_BUG_IF(false) << "A feature is not a bug.");
-
-  EXPECT_EQ(true, FLAGS_http2_always_log_bugs_for_tests);
+  EXPECT_DEBUG_DEATH(HTTP2_BUG(bug_1) << "Here is a bug,", " bug");
+  EXPECT_DEBUG_DEATH(HTTP2_BUG_IF(bug_1, true) << "There is a bug,", " bug");
+  EXPECT_LOG_NOT_CONTAINS("error", "", HTTP2_BUG_IF(bug_1, false) << "A feature is not a bug.");
 }
 
 TEST(Http2PlatformTest, Http2Deque) {

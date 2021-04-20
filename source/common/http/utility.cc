@@ -34,31 +34,6 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
-namespace Http {
-namespace Utility {
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data) {
-  Http::Status status;
-  TRY_NEEDS_AUDIT {
-    status = dispatch(data);
-    // TODO(#10878): Remove this when exception removal is complete. It is currently in migration,
-    // so dispatch may either return an error status or throw an exception. Soon we won't need to
-    // catch these exceptions, as all codec errors will be migrated to using error statuses that are
-    // returned from dispatch.
-  }
-  catch (FrameFloodException& e) {
-    status = bufferFloodError(e.what());
-  }
-  catch (CodecProtocolException& e) {
-    status = codecProtocolError(e.what());
-  }
-  catch (PrematureResponseException& e) {
-    status = prematureResponseError(e.what(), e.responseCode());
-  }
-  return status;
-}
-} // namespace Utility
-} // namespace Http
 namespace Http2 {
 namespace Utility {
 
@@ -226,6 +201,29 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 } // namespace Utility
 } // namespace Http2
+namespace Http3 {
+namespace Utility {
+envoy::config::core::v3::Http3ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  if (options.has_override_stream_error_on_invalid_http_message()) {
+    return options;
+  }
+  envoy::config::core::v3::Http3ProtocolOptions options_clone(options);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      hcm_stream_error_set) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  } else {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
+  }
+  return options_clone;
+}
+
+} // namespace Utility
+} // namespace Http3
 
 namespace Http {
 

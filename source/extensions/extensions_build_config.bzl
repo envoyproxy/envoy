@@ -54,6 +54,12 @@ EXTENSIONS = {
     "envoy.matching.input_matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
 
     #
+    # Generic Inputs
+    #
+
+    "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
+
+    #
     # HTTP filters
     #
 
@@ -66,6 +72,7 @@ EXTENSIONS = {
     "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
     "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
+    "envoy.filters.http.composite":                     "//source/extensions/filters/http/composite:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
@@ -262,7 +269,7 @@ EXTENSIONS = {
     # HTTP header formatters
     #
 
-    "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter"
+    "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
