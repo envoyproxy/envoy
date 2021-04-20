@@ -28,6 +28,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/envoy_quic_utils.h"
+#endif
+
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -135,6 +139,40 @@ TEST_F(DiskLoaderImplTest, DoubleUintInteractionNegatives) {
   EXPECT_EQ(-4.2, loader_->snapshot().getDouble("file_with_negative_double", 1.1));
 }
 
+#ifdef ENVOY_ENABLE_QUIC
+TEST_F(DiskLoaderImplTest, QuicFlagOverride) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+  const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
+
+  // Test that QUIC flags have correct default values
+  EXPECT_EQ(
+      false,
+      runtimeFeatureEnabled(
+          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
+  EXPECT_EQ(true,
+            runtimeFeatureEnabled(
+                "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true"));
+
+  // Test that SetQuicReloadableFlag still works.
+  SetQuicReloadableFlag(quic_testonly_default_false, true);
+  EXPECT_EQ(
+      true,
+      runtimeFeatureEnabled(
+          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
+
+  // Test that envoy runtime override can override a flag no matter the flag has default value or
+  // not.
+  EXPECT_EQ(
+      false,
+      snapshot->runtimeFeatureEnabled(
+          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
+  EXPECT_EQ(false,
+            snapshot->runtimeFeatureEnabled(
+                "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true"));
+}
+#endif
+
 TEST_F(DiskLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
@@ -191,25 +229,6 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(true, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
   // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
-
-#ifdef ENVOY_ENABLE_QUIC
-  // Test that QUIC flags have correct default values
-  EXPECT_EQ(
-      false,
-      runtimeFeatureEnabled(
-          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
-  EXPECT_EQ(true,
-            runtimeFeatureEnabled(
-                "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true"));
-  // Test that QUIC flags can be overridden.
-  EXPECT_EQ(
-      true,
-      snapshot->runtimeFeatureEnabled(
-          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
-  EXPECT_EQ(false,
-            snapshot->runtimeFeatureEnabled(
-                "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true"));
-#endif
 
   // Deprecation
   EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(

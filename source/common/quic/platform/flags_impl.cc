@@ -9,6 +9,7 @@
 #include <set>
 
 #include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
 namespace quiche {
@@ -55,9 +56,9 @@ void FlagRegistry::resetFlags() const {
 }
 
 Flag* FlagRegistry::findFlag(absl::string_view name) const {
-  if (name.substr(0, QuicFlagPrefix.length()) == QuicFlagPrefix) {
+  if (absl::StartsWith(name, QuicFlagPrefix)) {
     // Convert the envoy reloadable flag to quiche flag.
-    name = name.substr(QuicFlagPrefix.length() - 10);
+    name = name.substr(EnvoyFeaturePrefix.length());
   }
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;

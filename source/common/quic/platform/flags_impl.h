@@ -9,7 +9,8 @@
 
 namespace quiche {
 
-const std::string QuicFlagPrefix = "envoy.reloadable_features.FLAGS_quic";
+const std::string QuicFlagPrefix = "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
+const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 
 class Flag;
 
@@ -116,7 +117,6 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_PROTOCOL_FLAG
 
 // Transform quic flag into envoy reloadable flag.
-#define EnvoyReloadableFeature(flag)                                                               \
-  absl::StrCat("envoy.reloadable_features.FLAGS_quic_reloadable_flag_", #flag)
+#define EnvoyReloadableFeature(flag) absl::StrCat(quiche::QuicFlagPrefix, #flag)
 
 } // namespace quiche
