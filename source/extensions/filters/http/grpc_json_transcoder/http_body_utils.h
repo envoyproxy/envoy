@@ -14,11 +14,11 @@ namespace GrpcJsonTranscoder {
 class HttpBodyUtils {
 public:
   static bool parseMessageByFieldPath(Protobuf::io::ZeroCopyInputStream* stream,
-                                      const std::vector<const Protobuf::Field*>& field_path,
+                                      const std::vector<const ProtobufWkt::Field*>& field_path,
                                       Protobuf::Message* message);
   static void
   appendHttpBodyEnvelope(Buffer::Instance& output,
-                         const std::vector<const Protobuf::Field*>& request_body_field_path,
+                         const std::vector<const ProtobufWkt::Field*>& request_body_field_path,
                          std::string content_type, uint64_t content_length);
 };
 
