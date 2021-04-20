@@ -96,11 +96,6 @@ public:
   virtual ~BufferMemoryAccount() = default;
 
   /**
-   * Returns the outstanding balance.
-   */
-  virtual uint64_t balance() const PURE;
-
-  /**
    * Charges the account for using the specified amount of memory.
    *
    * @param amount the amount to debit.

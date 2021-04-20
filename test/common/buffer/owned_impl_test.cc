@@ -1531,7 +1531,7 @@ TEST(BufferMemoryAccountTest, ReservationShouldNotChargeForExistingSlice) {
 
   // The account shouldn't be charged again at commit since the commit
   // uses memory from the slice already charged for.
-  auto reservation = buffer.reserveForReadWithLengthForTest(3000);
+  auto reservation = buffer.reserveForRead();
   reservation.commit(2000);
   EXPECT_EQ(buffer_account->balance(), 4096);
 }

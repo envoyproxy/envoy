@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
-#include <iterator>
 #include <memory>
 #include <string>
 
@@ -329,7 +328,7 @@ public:
    * - the slice owns backing memory
    */
   void maybeChargeAccount(const BufferMemoryAccountSharedPtr& account) {
-    if (account_ != nullptr || storage_ == nullptr || !account) {
+    if (account_ != nullptr || storage_ == nullptr || account == nullptr) {
       return;
     }
     account->charge(capacity_);
@@ -856,7 +855,7 @@ public:
   BufferMemoryAccountImpl(BufferMemoryAccountImpl&&) = delete;
   BufferMemoryAccountImpl& operator=(BufferMemoryAccountImpl&&) = delete;
 
-  uint64_t balance() const override { return buffer_memory_allocated_; }
+  uint64_t balance() const { return buffer_memory_allocated_; }
   void charge(uint64_t amount) override {
     // Check overflow
     ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
