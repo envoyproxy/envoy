@@ -65,14 +65,15 @@ message MySQLProxy {
   // Example:
   //
   // .. code-block:: yaml
-  //  database_routes:
+  //
+  //    database_routes:
   //      routes:
-  //      - database: "database_a"
-  //        cluster: "cluster_a"
-  //      - database: "database_b"
-  //        cluster: "cluster_b"
+  //        - database: "ab"
+  //          cluster: "cluster_a"
+  //        - database: "abc"
+  //          cluster: "cluster_b"
   //      catch_all_route:
-  //      - cluster: "catch_all_cluster"
+  //        - cluster: "catch_all_cluster"
   //
   // When using the above routes, the following connect data source names would be sent to:
   //
