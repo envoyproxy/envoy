@@ -2,7 +2,7 @@
 import importlib
 from unittest.mock import MagicMock, patch, PropertyMock
 
-import pytest
+import pytest  # type:ignore
 
 from tools.testing import plugin, python_pytest
 

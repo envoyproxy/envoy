@@ -6,7 +6,7 @@ from contextlib import contextmanager, ExitStack
 from typing import ContextManager, Iterator
 from unittest.mock import patch
 
-import pytest
+import pytest  # type:ignore
 
 
 @contextmanager
