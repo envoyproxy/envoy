@@ -25,6 +25,7 @@ envoy_py_binary(
     deps = [
         requirement("pytest"),
         requirement("pytest-cov"),
+        requirement("pytest-mypy"),
     ],
 )
 
