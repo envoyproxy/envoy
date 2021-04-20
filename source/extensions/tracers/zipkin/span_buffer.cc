@@ -133,7 +133,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
       auto* annotation_entry_fields = annotation_entry.mutable_fields();
       (*annotation_entry_fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(annotation.value());
       (*annotation_entry_fields)[ANNOTATION_TIMESTAMP] =
-          Util::uint64Value(annotation.timestamp(), annotation.value(), replacements);
+          Util::uint64Value(annotation.timestamp(), ANNOTATION_TIMESTAMP, replacements);
       annotation_entries.push_back(ValueUtil::structValue(annotation_entry));
       continue;
     }
