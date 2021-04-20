@@ -20,6 +20,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * cluster: fixed the :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>` histograms.
+* validation: fix an issue that causes TAP sockets to panic during config validation mode.
 * zipkin: fix timestamp serializaiton in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
 
 Removed Config or Runtime
