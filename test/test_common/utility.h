@@ -836,7 +836,7 @@ public:
     }
   }
 
-  absl::optional<absl::string_view> getTracingContext(const absl::string_view key) const {
+  absl::optional<absl::string_view> getTracingContext(const absl::string_view key) const override {
     auto iter = context_map_.find(std::string(key));
     if (iter == context_map_.end()) {
       return absl::nullopt;
@@ -844,7 +844,7 @@ public:
     return iter->second;
   }
 
-  void setTracingContext(const absl::string_view key, const absl::string_view value) {
+  void setTracingContext(const absl::string_view key, const absl::string_view value) override {
     context_map_[std::string(key)] = std::string(value);
   }
 
