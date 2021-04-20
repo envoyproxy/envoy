@@ -93,6 +93,10 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
+    EXPECT_CALL(mock_router_filter_, downstreamHeaders())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(&request_));
+    EXPECT_CALL(mock_router_filter_, cluster()).Times(AnyNumber());
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
         mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
@@ -103,15 +107,15 @@ public:
   ~TcpUpstreamTest() override { EXPECT_CALL(mock_router_filter_, config()).Times(AnyNumber()); }
 
 protected:
-  NiceMock<Network::MockClientConnection> connection_;
-  NiceMock<Router::MockRouterFilterInterface> mock_router_filter_;
-  Envoy::Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
-  std::unique_ptr<TcpUpstream> tcp_upstream_;
   TestRequestHeaderMapImpl request_{{":method", "CONNECT"},
                                     {":path", "/"},
                                     {":protocol", "bytestream"},
                                     {":scheme", "https"},
                                     {":authority", "host"}};
+  NiceMock<Network::MockClientConnection> connection_;
+  NiceMock<Router::MockRouterFilterInterface> mock_router_filter_;
+  Envoy::Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
+  std::unique_ptr<TcpUpstream> tcp_upstream_;
 };
 
 TEST_F(TcpUpstreamTest, Basic) {
