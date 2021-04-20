@@ -2,10 +2,10 @@
 
 #include <chrono>
 
-#include "common/common/logger.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 
+#include "common/common/logger.h"
 #include "common/event/deferred_task.h"
 #include "common/network/utility.h"
 

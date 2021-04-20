@@ -2,18 +2,18 @@
 
 #include <memory>
 
-#include "common/network/address_impl.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/network/address.h"
 
 #include "common/config/api_version.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
-#include "envoy/network/address.h"
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -106,7 +106,8 @@ TEST_P(InternalTcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   std::tie(io_handle_client, io_handle_server) =
       Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
 
-  auto server_address = std::make_shared<Network::Address::EnvoyInternalInstance>("test_internal_listener_foo");
+  auto server_address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("test_internal_listener_foo");
   auto client_address = std::make_shared<Network::Address::EnvoyInternalInstance>("client_bar");
 
   dispatcher->post([&]() mutable {

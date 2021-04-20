@@ -207,7 +207,7 @@ public:
    */
   virtual void
   registerInternalListenerManager(Network::InternalListenerManager& internal_listener_manager) PURE;
-  
+
   virtual Network::InternalListenerManagerOptRef getInternalListenerManagerForTest() PURE;
 
   /**

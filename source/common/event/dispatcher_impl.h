@@ -78,7 +78,7 @@ public:
   Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) override;
-  
+
   void registerInternalListenerManager(
       Network::InternalListenerManager& internal_listener_manager) override;
   Network::InternalListenerManagerOptRef getInternalListenerManagerForTest() override;
