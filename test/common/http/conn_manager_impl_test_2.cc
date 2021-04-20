@@ -1037,6 +1037,53 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Tests that a filter doing setRoute(nullptr) doesn't cause unexpected problems for filters down
+// the line. Also tests that setRoute(nullptr) is equivalent to attempting route resolution and
+// failing to find a route.
+TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
+  setup(false, "");
+
+  setupFilterChain(2, 1);
+  const std::string fake_cluster1_name = "fake_cluster1";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{fake_cluster1_name}))
+      .WillRepeatedly(Return(fake_cluster1.get()));
+
+  std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
+
+  // Only called once because setRoute(nullptr) means route resolution won't be attempted again
+  // (cached_route_.has_value() becomes true).
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .Times(1)
+      .WillOnce(Return(route1));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        decoder_filters_[0]->callbacks_->setRoute(nullptr);
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->route());
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -2140,21 +2187,9 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
 
-class DrainH2HttpConnectionManagerImplTest : public HttpConnectionManagerImplTest,
-                                             public testing::WithParamInterface<bool> {
-public:
-  DrainH2HttpConnectionManagerImplTest() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2", "true"}});
-  }
-
-private:
-  TestScopedRuntime runtime_;
-};
-
-// Verify that, if the runtime option is enabled, HTTP2 connections will receive
-// a GOAWAY message when the overload action is triggered.
-TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
+// Verify that HTTP2 connections will receive a GOAWAY message when the overload action is
+// triggered.
+TEST_F(HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
   Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::saturated();
   ON_CALL(overload_manager_.overload_state_,
           getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
@@ -2162,9 +2197,7 @@ TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded
 
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
-  if (GetParam()) {
-    EXPECT_CALL(*codec_, shutdownNotice);
-  }
+  EXPECT_CALL(*codec_, shutdownNotice);
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -2196,9 +2229,6 @@ TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded
   Mock::VerifyAndClearExpectations(codec_);
   EXPECT_EQ(1, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
-
-INSTANTIATE_TEST_SUITE_P(WithRuntimeOverride, DrainH2HttpConnectionManagerImplTest,
-                         testing::Bool());
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
   setup(false, "envoy-custom-server", false);

@@ -71,7 +71,7 @@ public:
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
-      response.waitForReset();
+      ASSERT_TRUE(response.waitForReset());
       codec_client_->close();
     }
     if (!stat_name.empty()) {

@@ -335,14 +335,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http2_integration_test",
+    name = "multiplexed_integration_test",
     srcs = [
-        "http2_integration_test.cc",
-        "http2_integration_test.h",
+        "multiplexed_integration_test.cc",
+        "multiplexed_integration_test.h",
     ],
     shard_count = 4,
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
@@ -900,6 +900,7 @@ envoy_cc_test(
         "//test/integration/filters:process_context_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:set_route_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -1096,6 +1097,8 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:set_is_terminal_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_is_terminal_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:utility_lib",

@@ -13,39 +13,93 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "proxy_lib",
+    name = "filter_lib",
+    srcs = [
+        "mysql_filter.cc",
+    ],
+    hdrs = [
+        "mysql_filter.h",
+    ],
+    deps = [
+        ":codec_lib",
+        ":decoder_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/network:filter_lib",
+        "//source/extensions/filters/network:well_known_names",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "codec_lib",
     srcs = [
         "mysql_codec_clogin.cc",
         "mysql_codec_clogin_resp.cc",
         "mysql_codec_command.cc",
         "mysql_codec_greeting.cc",
         "mysql_codec_switch_resp.cc",
-        "mysql_decoder.cc",
-        "mysql_filter.cc",
-        "mysql_utils.cc",
     ],
     hdrs = [
-        "mysql_codec.h",
         "mysql_codec_clogin.h",
         "mysql_codec_clogin_resp.h",
         "mysql_codec_command.h",
         "mysql_codec_greeting.h",
         "mysql_codec_switch_resp.h",
-        "mysql_decoder.h",
-        "mysql_filter.h",
         "mysql_session.h",
-        "mysql_utils.h",
     ],
     deps = [
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        ":codec_interface",
+        ":util_lib",
         "//source/common/buffer:buffer_lib",
-        "//source/common/network:filter_lib",
         "//source/extensions/common/sqlutils:sqlutils_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "decoder_interface",
+    hdrs = ["mysql_decoder.h"],
+    deps = [
+        ":codec_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "codec_interface",
+    hdrs = ["mysql_codec.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "util_lib",
+    srcs = ["mysql_utils.cc"],
+    hdrs = ["mysql_utils.h"],
+    deps = [
+        ":codec_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "config_interface",
+    hdrs = ["mysql_config.h"],
+    deps = [
         "//source/extensions/filters/network:well_known_names",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "decoder_lib",
+    srcs = ["mysql_decoder_impl.cc"],
+    hdrs = ["mysql_decoder_impl.h"],
+    deps = [
+        ":decoder_interface",
     ],
 )
 
@@ -57,7 +111,7 @@ envoy_cc_extension(
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "alpha",
     deps = [
-        ":proxy_lib",
+        ":filter_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
