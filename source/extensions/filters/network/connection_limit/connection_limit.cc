@@ -44,12 +44,12 @@ bool Config::decrementConnection() {
       return true;
     }
   }
-  ENVOY_LOG(warn, "should not decrement connections_ that already equals 0.");
+  ENVOY_LOG(warn, "connection_limit: should not decrement connections_ that already equals 0.");
   return false;
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
-  if (is_rejected_.load()) {
+  if (is_rejected_) {
     return Network::FilterStatus::StopIteration;
   }
   return Network::FilterStatus::Continue;
@@ -69,7 +69,7 @@ Network::FilterStatus Filter::onNewConnection() {
                    read_callbacks_->connection());
 
     // Set is_rejected_ is true, so that onData() will return StopIteration during the delay time.
-    is_rejected_.store(true);
+    is_rejected_ = true;
     // The close() will trigger onEvent() with close event, increment the active connections count.
     config_->incrementConnection();
 

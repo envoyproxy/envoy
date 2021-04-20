@@ -86,9 +86,7 @@ private:
   const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Event::TimerPtr delay_timer_;
-  // Use atomic here because not sure timer callbacks are guaranteed to happen on the same worker
-  // thread.
-  std::atomic<bool> is_rejected_;
+  bool is_rejected_;
 };
 
 } // namespace ConnectionLimitFilter
