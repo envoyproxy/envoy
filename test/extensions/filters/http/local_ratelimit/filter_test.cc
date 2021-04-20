@@ -34,12 +34,7 @@ response_headers_to_add:
     header:
       key: x-test-rate-limit
       value: 'true'
-request_headers_to_add_when_not_enforced:
-  - append: false
-    header:
-      key: x-local-ratelimited
-      value: 'true'
-local_rate_limit_per_downstream_connection: {}
+per_connection: true
   )";
 
 class FilterTest : public testing::Test {
@@ -71,6 +66,9 @@ public:
 
     filter_2_ = std::make_shared<Filter>(config_);
     filter_2_->setDecoderFilterCallbacks(decoder_callbacks_2_);
+
+    filter_3_ = std::make_shared<Filter>(config_);
+    filter_3_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
     setupPerRoute(yaml, enabled, enforced);
@@ -92,6 +90,7 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
   std::shared_ptr<Filter> filter_2_;
+  std::shared_ptr<Filter> filter_3_;
 };
 
 TEST_F(FilterTest, Runtime) {
@@ -114,17 +113,6 @@ TEST_F(FilterTest, Disabled) {
 
 TEST_F(FilterTest, RequestOk) {
   setup(fmt::format(config_yaml, "1", "false"));
-  auto headers = Http::TestRequestHeaderMapImpl();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_2_->decodeHeaders(headers, false));
-  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
-}
-
-TEST_F(FilterTest, RequestOkPerConnection) {
-  setup(fmt::format(config_yaml, "1", "true"));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(headers, false));
@@ -242,7 +230,7 @@ response_headers_to_add:
     header:
       key: x-test-rate-limit
       value: 'true'
-local_rate_limit_per_downstream_connection: true
+per_connection: true
 descriptors:
 - entries:
    - key: hello
