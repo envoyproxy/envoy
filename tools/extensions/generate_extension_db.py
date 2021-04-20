@@ -95,6 +95,7 @@ def get_extension_metadata(target):
         'categories': categories,
     }
 
+
 def validate_unknowns(unknown_extensions, extensions):
     for extension, data in extensions.items():
         if data['security_posture'] == 'unknown':
