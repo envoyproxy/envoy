@@ -10,6 +10,7 @@ attrs==20.3.0 \
     # via
     #   -r tools/testing/requirements.txt
     #   pytest
+    #   pytest-mypy
 coverage==5.5 \
     --hash=sha256:004d1880bed2d97151facef49f08e255a20ceb6f9432df75f4eef018fdd5a78c \
     --hash=sha256:01d84219b5cdbfc8122223b39a954820929497a1cb1422824bb86b07b74594b6 \
@@ -63,13 +64,53 @@ coverage==5.5 \
     --hash=sha256:f030f8873312a16414c0d8e1a1ddff2d3235655a2174e3648b4fa66b3f2f1079 \
     --hash=sha256:f0b278ce10936db1a37e6954e15a3730bea96a0997c26d7fee88e6c396c2086d \
     --hash=sha256:f11642dddbb0253cc8853254301b51390ba0081750a8ac03f20ea8103f0c56b6
-    # via pytest-cov
+    # via
+    #   -r tools/testing/requirements.txt
+    #   pytest-cov
+filelock==3.0.12 \
+    --hash=sha256:18d82244ee114f543149c66a6e0c14e9c4f8a1044b5cdaadd0f82159d6a6ff59 \
+    --hash=sha256:929b7d63ec5b7d6b71b0fa5ac14e030b3f70b75747cef1b10da9b879fef15836
+    # via
+    #   -r tools/testing/requirements.txt
+    #   pytest-mypy
 iniconfig==1.1.1 \
     --hash=sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3 \
     --hash=sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32
     # via
     #   -r tools/testing/requirements.txt
     #   pytest
+mypy-extensions==0.4.3 \
+    --hash=sha256:090fedd75945a69ae91ce1303b5824f428daf5a028d2f6ab8a299250a846f15d \
+    --hash=sha256:2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8
+    # via
+    #   -r tools/testing/requirements.txt
+    #   mypy
+mypy==0.812 \
+    --hash=sha256:0d0a87c0e7e3a9becdfbe936c981d32e5ee0ccda3e0f07e1ef2c3d1a817cf73e \
+    --hash=sha256:25adde9b862f8f9aac9d2d11971f226bd4c8fbaa89fb76bdadb267ef22d10064 \
+    --hash=sha256:28fb5479c494b1bab244620685e2eb3c3f988d71fd5d64cc753195e8ed53df7c \
+    --hash=sha256:2f9b3407c58347a452fc0736861593e105139b905cca7d097e413453a1d650b4 \
+    --hash=sha256:33f159443db0829d16f0a8d83d94df3109bb6dd801975fe86bacb9bf71628e97 \
+    --hash=sha256:3f2aca7f68580dc2508289c729bd49ee929a436208d2b2b6aab15745a70a57df \
+    --hash=sha256:499c798053cdebcaa916eef8cd733e5584b5909f789de856b482cd7d069bdad8 \
+    --hash=sha256:4eec37370483331d13514c3f55f446fc5248d6373e7029a29ecb7b7494851e7a \
+    --hash=sha256:552a815579aa1e995f39fd05dde6cd378e191b063f031f2acfe73ce9fb7f9e56 \
+    --hash=sha256:5873888fff1c7cf5b71efbe80e0e73153fe9212fafdf8e44adfe4c20ec9f82d7 \
+    --hash=sha256:61a3d5b97955422964be6b3baf05ff2ce7f26f52c85dd88db11d5e03e146a3a6 \
+    --hash=sha256:674e822aa665b9fd75130c6c5f5ed9564a38c6cea6a6432ce47eafb68ee578c5 \
+    --hash=sha256:7ce3175801d0ae5fdfa79b4f0cfed08807af4d075b402b7e294e6aa72af9aa2a \
+    --hash=sha256:9743c91088d396c1a5a3c9978354b61b0382b4e3c440ce83cf77994a43e8c521 \
+    --hash=sha256:9f94aac67a2045ec719ffe6111df543bac7874cee01f41928f6969756e030564 \
+    --hash=sha256:a26f8ec704e5a7423c8824d425086705e381b4f1dfdef6e3a1edab7ba174ec49 \
+    --hash=sha256:abf7e0c3cf117c44d9285cc6128856106183938c68fd4944763003decdcfeb66 \
+    --hash=sha256:b09669bcda124e83708f34a94606e01b614fa71931d356c1f1a5297ba11f110a \
+    --hash=sha256:cd07039aa5df222037005b08fbbfd69b3ab0b0bd7a07d7906de75ae52c4e3119 \
+    --hash=sha256:d23e0ea196702d918b60c8288561e722bf437d82cb7ef2edcd98cfa38905d506 \
+    --hash=sha256:d65cc1df038ef55a99e617431f0553cd77763869eebdf9042403e16089fe746c \
+    --hash=sha256:d7da2e1d5f558c37d6e8c1246f1aec1e7349e4913d8fb3cb289a35de573fe2eb
+    # via
+    #   -r tools/testing/requirements.txt
+    #   pytest-mypy
 packaging==20.9 \
     --hash=sha256:5b327ac1320dc863dca72f4514ecc086f31186744b84a230374cc1fd776feae5 \
     --hash=sha256:67714da7f7bc052e064859c05c595155bd1ee9f69f76557e21f051443c20947a
@@ -98,15 +139,61 @@ pytest-cov==2.11.1 \
     --hash=sha256:359952d9d39b9f822d9d29324483e7ba04a3a17dd7d05aa6beb7ea01e359e5f7 \
     --hash=sha256:bdb9fdb0b85a7cc825269a4c56b48ccaa5c7e365054b6038772c32ddcdc969da
     # via -r tools/testing/requirements.txt
+pytest-mypy==0.8.1 \
+    --hash=sha256:1fa55723a4bf1d054fcba1c3bd694215a2a65cc95ab10164f5808afd893f3b11 \
+    --hash=sha256:6e68e8eb7ceeb7d1c83a1590912f784879f037b51adfb9c17b95c6b2fc57466b
+    # via -r tools/testing/requirements.txt
 pytest==6.2.3 \
     --hash=sha256:671238a46e4df0f3498d1c3270e5deb9b32d25134c99b7d75370a68cfbe9b634 \
     --hash=sha256:6ad9c7bdf517a808242b998ac20063c41532a570d088d77eec1ee12b0b5574bc
     # via
     #   -r tools/testing/requirements.txt
     #   pytest-cov
+    #   pytest-mypy
 toml==0.10.2 \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f
     # via
     #   -r tools/testing/requirements.txt
     #   pytest
+typed-ast==1.4.3 \
+    --hash=sha256:01ae5f73431d21eead5015997ab41afa53aa1fbe252f9da060be5dad2c730ace \
+    --hash=sha256:067a74454df670dcaa4e59349a2e5c81e567d8d65458d480a5b3dfecec08c5ff \
+    --hash=sha256:0fb71b8c643187d7492c1f8352f2c15b4c4af3f6338f21681d3681b3dc31a266 \
+    --hash=sha256:1b3ead4a96c9101bef08f9f7d1217c096f31667617b58de957f690c92378b528 \
+    --hash=sha256:2068531575a125b87a41802130fa7e29f26c09a2833fea68d9a40cf33902eba6 \
+    --hash=sha256:209596a4ec71d990d71d5e0d312ac935d86930e6eecff6ccc7007fe54d703808 \
+    --hash=sha256:2c726c276d09fc5c414693a2de063f521052d9ea7c240ce553316f70656c84d4 \
+    --hash=sha256:398e44cd480f4d2b7ee8d98385ca104e35c81525dd98c519acff1b79bdaac363 \
+    --hash=sha256:52b1eb8c83f178ab787f3a4283f68258525f8d70f778a2f6dd54d3b5e5fb4341 \
+    --hash=sha256:5feca99c17af94057417d744607b82dd0a664fd5e4ca98061480fd8b14b18d04 \
+    --hash=sha256:7538e495704e2ccda9b234b82423a4038f324f3a10c43bc088a1636180f11a41 \
+    --hash=sha256:760ad187b1041a154f0e4d0f6aae3e40fdb51d6de16e5c99aedadd9246450e9e \
+    --hash=sha256:777a26c84bea6cd934422ac2e3b78863a37017618b6e5c08f92ef69853e765d3 \
+    --hash=sha256:95431a26309a21874005845c21118c83991c63ea800dd44843e42a916aec5899 \
+    --hash=sha256:9ad2c92ec681e02baf81fdfa056fe0d818645efa9af1f1cd5fd6f1bd2bdfd805 \
+    --hash=sha256:9c6d1a54552b5330bc657b7ef0eae25d00ba7ffe85d9ea8ae6540d2197a3788c \
+    --hash=sha256:aee0c1256be6c07bd3e1263ff920c325b59849dc95392a05f258bb9b259cf39c \
+    --hash=sha256:af3d4a73793725138d6b334d9d247ce7e5f084d96284ed23f22ee626a7b88e39 \
+    --hash=sha256:b36b4f3920103a25e1d5d024d155c504080959582b928e91cb608a65c3a49e1a \
+    --hash=sha256:b9574c6f03f685070d859e75c7f9eeca02d6933273b5e69572e5ff9d5e3931c3 \
+    --hash=sha256:bff6ad71c81b3bba8fa35f0f1921fb24ff4476235a6e94a26ada2e54370e6da7 \
+    --hash=sha256:c190f0899e9f9f8b6b7863debfb739abcb21a5c054f911ca3596d12b8a4c4c7f \
+    --hash=sha256:c907f561b1e83e93fad565bac5ba9c22d96a54e7ea0267c708bffe863cbe4075 \
+    --hash=sha256:cae53c389825d3b46fb37538441f75d6aecc4174f615d048321b716df2757fb0 \
+    --hash=sha256:dd4a21253f42b8d2b48410cb31fe501d32f8b9fbeb1f55063ad102fe9c425e40 \
+    --hash=sha256:dde816ca9dac1d9c01dd504ea5967821606f02e510438120091b84e852367428 \
+    --hash=sha256:f2362f3cb0f3172c42938946dbc5b7843c2a28aec307c49100c8b38764eb6927 \
+    --hash=sha256:f328adcfebed9f11301eaedfa48e15bdece9b519fb27e6a8c01aa52a17ec31b3 \
+    --hash=sha256:f8afcf15cc511ada719a88e013cec87c11aff7b91f019295eb4530f96fe5ef2f \
+    --hash=sha256:fb1bbeac803adea29cedd70781399c99138358c26d05fcbd23c13016b7f5ec65
+    # via
+    #   -r tools/testing/requirements.txt
+    #   mypy
+typing-extensions==3.7.4.3 \
+    --hash=sha256:7cb407020f00f7bfc3cb3e7881628838e69d8f3fcab2f64742a5e76b2f841918 \
+    --hash=sha256:99d4073b617d30288f569d3f13d2bd7548c3a7e4c8de87db09a9d29bb3a4a60c \
+    --hash=sha256:dafc7639cde7f1b6e1acc0f457842a83e722ccca8eef5270af2d74792619a89f
+    # via
+    #   -r tools/testing/requirements.txt
+    #   mypy
