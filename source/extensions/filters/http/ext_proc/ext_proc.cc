@@ -82,7 +82,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state, Http::HeaderMap& he
   ENVOY_LOG(debug, "Sending headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
-  return FilterHeadersStatus::StopAllIterationAndWatermark;
+  return FilterHeadersStatus::StopIteration;
 }
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
@@ -100,6 +100,21 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
 Http::FilterDataStatus Filter::onData(ProcessorState& state, ProcessingMode::BodySendMode body_mode,
                                       Buffer::Instance& data, bool end_stream) {
+  if (state.callbackState() == ProcessorState::CallbackState::Headers) {
+    ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
+    // We don't know what to do with the body until the response comes back.
+    // We must buffer it in case we need it when that happens.
+    if (end_stream) {
+      // Indicate to continue processing when the response returns.
+      state.setBodySendDeferred(true);
+      return FilterDataStatus::StopIterationAndBuffer;
+    } else {
+      // Raise a watermark to prevent a buffer overflow until the response comes back.
+      state.requestWatermark();
+      return FilterDataStatus::StopIterationAndWatermark;
+    }
+  }
+
   switch (body_mode) {
   case ProcessingMode::BUFFERED:
     if (end_stream) {
@@ -115,15 +130,20 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, ProcessingMode::Bod
       }
 
       // The body has been buffered and we need to send the buffer
+      ENVOY_LOG(debug, "Sending request body message");
       state.addBufferedData(data);
       state.setCallbackState(ProcessorState::CallbackState::BufferedBody);
       state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this),
                               config_->messageTimeout());
       sendBodyChunk(state, *state.bufferedData(), true);
-    } else {
-      ENVOY_LOG(trace, "onData: Buffering");
+      // Since we just just moved the data into the buffer, return NoBuffer
+      // so that we do not buffer this chunk twice.
+      return FilterDataStatus::StopIterationNoBuffer;
     }
+
+    ENVOY_LOG(trace, "onData: Buffering");
     return FilterDataStatus::StopIterationAndBuffer;
+
   case ProcessingMode::BUFFERED_PARTIAL:
   case ProcessingMode::STREAMED:
     ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
@@ -203,10 +223,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
-    message_handled = decoding_state_.handleHeadersResponse(response->request_headers());
+    message_handled = decoding_state_.handleHeadersResponse(response->request_headers(),
+                                                            processing_mode_.request_body_mode());
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    message_handled = encoding_state_.handleHeadersResponse(response->response_headers());
+    message_handled = encoding_state_.handleHeadersResponse(response->response_headers(),
+                                                            processing_mode_.response_body_mode());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     message_handled = decoding_state_.handleBodyResponse(response->request_body());

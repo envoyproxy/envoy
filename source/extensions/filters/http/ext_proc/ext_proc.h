@@ -91,7 +91,10 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
 public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        processing_mode_(config->processingMode()) {}
+        decoding_state_(*this), encoding_state_(*this), processing_mode_(config->processingMode()) {
+  }
+
+  const FilterConfig& config() const { return *config_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -114,12 +117,19 @@ public:
 
   void onGrpcClose() override;
 
+  void onMessageTimeout();
+
+  void sendBufferedData(const ProcessorState& state, bool end_stream) {
+    sendBodyChunk(state, *state.bufferedData(), end_stream);
+  }
+
 private:
   StreamOpenState openStream();
-  void onMessageTimeout();
+
   void cleanUpTimers();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+  void sendBodyChunk(const ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state, Http::HeaderMap& headers,
                                       bool end_stream);
@@ -127,8 +137,6 @@ private:
       ProcessorState& state,
       envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode::BodySendMode body_mode,
       Buffer::Instance& data, bool end_stream);
-
-  void sendBodyChunk(const ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
