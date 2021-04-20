@@ -138,9 +138,6 @@ function generate_api_rst() {
   done
 }
 
-# TODO(htuch): remove v2 support once we have a good story for version history RST links that refer
-# to v2 APIs.
-generate_api_rst v2
 generate_api_rst v3
 
 # Fixup anchors and references in v3 so they form a distinct namespace.
