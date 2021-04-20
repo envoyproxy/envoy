@@ -34,6 +34,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
+// Check that the subscription is started on the first (initial) request.
 TEST_F(OdCdsApiImplTest, FirstUpdateStarts) {
   InSequence s;
 
@@ -41,6 +42,8 @@ TEST_F(OdCdsApiImplTest, FirstUpdateStarts) {
   odcds_->updateOnDemand("fake_cluster");
 }
 
+// Check that the cluster names are added to the awaiting list, when we still wait for the response
+// for the initial request.
 TEST_F(OdCdsApiImplTest, FollowingClusterNamesHitAwaitingList) {
   InSequence s;
 
@@ -50,6 +53,8 @@ TEST_F(OdCdsApiImplTest, FollowingClusterNamesHitAwaitingList) {
   odcds_->updateOnDemand("another_cluster");
 }
 
+// Check that the awaiting list is processed when we receive a successful response for the initial
+// request.
 TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdate) {
   InSequence s;
 
@@ -66,6 +71,8 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdate) {
   odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0");
 }
 
+// Check that the awaiting list is processed when we receive a failure response for the initial
+// request.
 TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdateFailed) {
   InSequence s;
 
@@ -80,6 +87,8 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdateFailed) {
                                          nullptr);
 }
 
+// Check that the awaiting list is processed only once, so on the first config update or config
+// update failed.
 TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnceOnly) {
   InSequence s;
 
@@ -96,6 +105,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnceOnly) {
                                          nullptr);
 }
 
+// Check that we don't do extra request if there's nothing on the awaiting list.
 TEST_F(OdCdsApiImplTest, NothingIsRequestedOnEmptyAwaitingList) {
   InSequence s;
 
@@ -106,6 +116,8 @@ TEST_F(OdCdsApiImplTest, NothingIsRequestedOnEmptyAwaitingList) {
                                          nullptr);
 }
 
+// Check that we send the requests for clusters after receiving the initial response instead of
+// putting the names into the awaiting list.
 TEST_F(OdCdsApiImplTest, OnDemandUpdateIsRequestedAfterInitialFetch) {
   InSequence s;
 
@@ -119,6 +131,7 @@ TEST_F(OdCdsApiImplTest, OnDemandUpdateIsRequestedAfterInitialFetch) {
   odcds_->updateOnDemand("another_cluster");
 }
 
+// Check that we report an error when we received a duplicated cluster.
 TEST_F(OdCdsApiImplTest, ValidateDuplicateClusters) {
   InSequence s;
 
