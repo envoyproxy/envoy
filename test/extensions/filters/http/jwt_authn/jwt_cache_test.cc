@@ -10,7 +10,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using ::google::jwt_verify::Status;
 
 namespace Envoy {
