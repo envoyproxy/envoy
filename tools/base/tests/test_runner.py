@@ -19,6 +19,12 @@ class DummyRunner(runner.Runner):
         self.args = PropertyMock()
 
 
+class DummyForkingRunner(runner.ForkingRunner):
+
+    def __init__(self):
+        self.args = PropertyMock()
+
+
 def test_runner_constructor():
     run = runner.Runner("path1", "path2", "path3")
     assert run._args == ("path1", "path2", "path3")
@@ -177,6 +183,95 @@ def test_bazeladapter_constructor():
     assert adapter.context == _runner
 
 
+@pytest.mark.parametrize("query_returns", [0, 1])
+def test_bazeladapter_query(query_returns):
+    _runner = DummyForkingRunner()
+    adapter = runner.BazelAdapter(_runner)
+    fork_mock = patch("tools.base.runner.ForkingAdapter.fork")
+
+    with fork_mock as m_fork:
+        m_fork.return_value.returncode = query_returns
+        if query_returns:
+            with pytest.raises(runner.BazelRunError) as result:
+                adapter.query("BAZEL QUERY")
+        else:
+            result = adapter.query("BAZEL QUERY")
+
+    assert (
+        list(m_fork.call_args)
+        == [(['bazel', 'query', "'BAZEL QUERY'"],), {}])
+
+    if query_returns:
+        assert result.errisinstance(runner.BazelRunError)
+        assert (
+            result.value.args
+            == (f"Bazel query failed: {m_fork.return_value}",))
+        assert not m_fork.return_value.stdout.decode.called
+    else:
+        assert (
+            result
+            == m_fork.return_value.stdout.decode.return_value.split.return_value)
+        assert (
+            list(m_fork.return_value.stdout.decode.call_args)
+            == [('utf-8',), {}])
+        assert (
+            list(m_fork.return_value.stdout.decode.return_value.split.call_args)
+            == [('\n',), {}])
+
+
+@pytest.mark.parametrize("cwd", [None, "", "SOMEPATH"])
+@pytest.mark.parametrize("raises", [None, True, False])
+@pytest.mark.parametrize("capture_output", [None, True, False])
+@pytest.mark.parametrize("run_returns", [0, 1])
+@pytest.mark.parametrize("args", [(), ("foo",), ("foo", "bar")])
+def test_bazeladapter_run(patches, run_returns, cwd, raises, args, capture_output):
+    _runner = DummyForkingRunner()
+    adapter = runner.BazelAdapter(_runner)
+    patched = patches(
+        "ForkingAdapter.fork",
+        ("ForkingRunner.path", dict(new_callable=PropertyMock)),
+        prefix="tools.base.runner")
+
+    _args = ("BAZEL RUN",) + args
+    kwargs = {}
+    if raises is not None:
+        kwargs["raises"] = raises
+    if cwd is not None:
+        kwargs["cwd"] = cwd
+    if capture_output is not None:
+        kwargs["capture_output"] = capture_output
+
+    with patched as (m_fork, m_path):
+        m_fork.return_value.returncode = run_returns
+        if run_returns and (raises is not False):
+            with pytest.raises(runner.BazelRunError) as result:
+                adapter.run(*_args, **kwargs)
+        else:
+            result = adapter.run(*_args, **kwargs)
+
+    call_args = (("--",) + args) if args else args
+    bazel_args = ("bazel", "run", "BAZEL RUN") + call_args
+    bazel_kwargs = {}
+    bazel_kwargs["capture_output"] = (
+        True
+        if capture_output is True
+        else False)
+    bazel_kwargs["cwd"] = (
+        cwd
+        if cwd
+        else m_path.return_value)
+    assert (
+        list(m_fork.call_args)
+        == [(bazel_args,), bazel_kwargs])
+    if run_returns and (raises is not False):
+        assert result.errisinstance(runner.BazelRunError)
+        assert (
+            result.value.args
+            == (f"Bazel run failed: {m_fork.return_value}",))
+    else:
+        assert result == m_fork.return_value
+
+
 # ForkingAdapter tests
 
 def test_forkingadapter_constructor():
@@ -230,3 +325,31 @@ def test_forkingadapter_fork(patches, args, cwd, capture_output):
     assert (
         list(m_run.call_args)
         == [args, expected])
+
+
+# ForkingRunner tests
+
+def test_forkingrunner_fork():
+    run = runner.ForkingRunner("path1", "path2", "path3")
+    forking_mock = patch("tools.base.runner.ForkingAdapter")
+
+    with forking_mock as m_fork:
+        assert run.fork == m_fork.return_value
+    assert (
+        list(m_fork.call_args)
+        == [(run,), {}])
+    assert "fork" in run.__dict__
+
+
+# BazelRunner tests
+
+def test_bazelrunner_bazel():
+    run = runner.BazelRunner("path1", "path2", "path3")
+    bazel_mock = patch("tools.base.runner.BazelAdapter")
+
+    with bazel_mock as m_bazel:
+        assert run.bazel == m_bazel.return_value
+    assert (
+        list(m_bazel.call_args)
+        == [(run,), {}])
+    assert "bazel" in run.__dict__
