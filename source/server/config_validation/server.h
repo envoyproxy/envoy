@@ -69,7 +69,7 @@ public:
                      Filesystem::Instance& file_system);
 
   // Server::Instance
-  Admin& admin() override { return admin_; }
+  Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
@@ -192,7 +192,7 @@ private:
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Server::ValidationAdmin admin_;
+  std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Random::RandomGeneratorImpl random_generator_;

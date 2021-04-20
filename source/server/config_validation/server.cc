@@ -92,8 +92,9 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   Configuration::InitialImpl initial_config(bootstrap, options, *this);
+  admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
