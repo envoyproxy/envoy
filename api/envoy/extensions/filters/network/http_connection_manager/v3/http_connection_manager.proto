@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -272,7 +272,7 @@ message HttpConnectionManager {
     type.http.v3.PathTransformation http_filter_transformation = 2;
   }
 
-  reserved 27, 11;
+  reserved 27, 11, 45;
 
   reserved "idle_timeout";
 
@@ -515,7 +515,7 @@ message HttpConnectionManager {
   // succeeds, the HCM will fallback to using the remote address.
   //
   // [#extension-category: envoy.http.original_ip_detection]
-  repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 45;
+  repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 46;
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
