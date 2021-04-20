@@ -11,7 +11,7 @@ load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 
 # go version for rules_go
-GO_VERSION = "1.16.3"
+GO_VERSION = "1.15.5"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     rules_foreign_cc_dependencies()
