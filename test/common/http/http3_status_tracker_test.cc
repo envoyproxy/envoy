@@ -40,7 +40,6 @@ TEST_F(Http3StatusTrackerTest, MarkBroken) {
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
-
 TEST_F(Http3StatusTrackerTest, MarkBrokenRepeatedly) {
   EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
