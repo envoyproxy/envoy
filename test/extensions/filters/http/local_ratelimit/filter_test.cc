@@ -34,6 +34,7 @@ response_headers_to_add:
     header:
       key: x-test-rate-limit
       value: 'true'
+per_connection: true
   )";
 
 class FilterTest : public testing::Test {
@@ -59,6 +60,12 @@ public:
                                              per_route);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+    filter_2_ = std::make_shared<Filter>(config_);
+    filter_2_->setDecoderFilterCallbacks(decoder_callbacks_2_);
+
+    filter_3_ = std::make_shared<Filter>(config_);
+    filter_3_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
     setupPerRoute(yaml, enabled, enforced);
@@ -73,11 +80,14 @@ public:
 
   Stats::IsolatedStoreImpl stats_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
+  std::shared_ptr<Filter> filter_2_;
+  std::shared_ptr<Filter> filter_3_;
 };
 
 TEST_F(FilterTest, Runtime) {
@@ -102,9 +112,11 @@ TEST_F(FilterTest, RequestOk) {
   setup(fmt::format(config_yaml, "1"));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(headers, false));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
 TEST_F(FilterTest, RequestRateLimited) {
@@ -168,6 +180,7 @@ response_headers_to_add:
     header:
       key: x-test-rate-limit
       value: 'true'
+per_connection: true
 descriptors:
 - entries:
    - key: hello
