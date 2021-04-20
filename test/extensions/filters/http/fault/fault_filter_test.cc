@@ -1362,40 +1362,40 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   // Advance time by 1s which should refill all tokens.
   time_system_.advanceTimeWait(std::chrono::seconds(1));
 
-  // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
+  // Send 1126 bytes of data which is 1s + 2 refill cycles of data.
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
-  Buffer::OwnedImpl data2(std::string(1152, 'a'));
+  Buffer::OwnedImpl data2(std::string(1126, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
 
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time.
-  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
 
   // Get new data with current data buffered, not end_stream.
-  Buffer::OwnedImpl data3(std::string(64, 'b'));
+  Buffer::OwnedImpl data3(std::string(51, 'b'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data3, false));
 
   // Fire timer, also advance time.
-  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time. No time enable because there is nothing buffered.
-  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'b')), false));
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
   token_timer->invokeCallback();
 
   // Advance time by 1s for a full refill.
