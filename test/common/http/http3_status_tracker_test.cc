@@ -40,6 +40,20 @@ TEST_F(Http3StatusTrackerTest, MarkBroken) {
   EXPECT_FALSE(tracker_.isHttp3Confirmed());
 }
 
+
+TEST_F(Http3StatusTrackerTest, MarkBrokenRepeatedly) {
+  EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
+  tracker_.markHttp3Broken();
+  EXPECT_TRUE(tracker_.isHttp3Broken());
+  EXPECT_FALSE(tracker_.isHttp3Confirmed());
+
+  EXPECT_CALL(*timer_, enabled()).WillOnce(Return(true));
+  tracker_.markHttp3Broken();
+  EXPECT_TRUE(tracker_.isHttp3Broken());
+  EXPECT_FALSE(tracker_.isHttp3Confirmed());
+}
+
 TEST_F(Http3StatusTrackerTest, MarkBrokenThenExpires) {
   EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
@@ -159,7 +173,7 @@ TEST_F(Http3StatusTrackerTest, MarkBrokenThenConfirmed) {
 
   timer_->invokeCallback();
 
-  EXPECT_CALL(*timer_, enabled()).WillRepeatedly(Return(false));
+  EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
   tracker_.markHttp3Confirmed();
   EXPECT_FALSE(tracker_.isHttp3Broken());
   EXPECT_TRUE(tracker_.isHttp3Confirmed());

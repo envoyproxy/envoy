@@ -19,7 +19,6 @@ bool Http3StatusTracker::isHttp3Broken() const { return state_ == State::Broken;
 bool Http3StatusTracker::isHttp3Confirmed() const { return state_ == State::Confirmed; }
 
 void Http3StatusTracker::markHttp3Broken() {
-  ASSERT(state_ != State::Broken);
   state_ = State::Broken;
   if (!expiration_timer_->enabled()) {
     expiration_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -31,14 +30,17 @@ void Http3StatusTracker::markHttp3Broken() {
 }
 
 void Http3StatusTracker::markHttp3Confirmed() {
-  ASSERT(state_ == State::Pending);
-  ASSERT(!expiration_timer_->enabled());
   state_ = State::Confirmed;
   consecutive_broken_count_ = 0;
+  if (expiration_timer_->enabled()) {
+    expiration_timer_->disableTimer();
+  }
 }
 
 void Http3StatusTracker::onExpirationTimeout() {
-  ASSERT(state_ == State::Broken);
+  if (state_ != State::Broken) {
+    return;
+  }
 
   state_ = State::Pending;
 }
