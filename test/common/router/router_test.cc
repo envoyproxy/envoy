@@ -113,7 +113,6 @@ public:
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 5ull));
     Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-    callbacks_.stream_info_.addBytesReceived(5);
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               router_.decodeData(*body_data, !with_trailers));
 
@@ -132,9 +131,8 @@ public:
 
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
-        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 10ull));
-    callbacks_.stream_info_.addBytesSent(10);
-    Buffer::OwnedImpl response_data("1234567890");
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 5ull));
+    Buffer::OwnedImpl response_data("hello");
     // NOLINTNEXTLINE: Silence null pointer access warning
     response_decoder->decodeData(response_data, !with_trailers);
 

@@ -94,6 +94,20 @@ UpstreamRequest::~UpstreamRequest() {
         FilterUtility::percentageOfTimeout(response_time, parent_.timeout().per_try_timeout_));
   }
 
+  // Ditto for request/response size histograms.
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+      parent_.cluster()->requestResponseSizeStats();
+  if (req_resp_stats.has_value()) {
+    req_resp_stats->get().upstream_rq_headers_size_.recordValue(
+        parent_.downstreamHeaders()->byteSize());
+    req_resp_stats->get().upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
+
+    if (response_headers_size_.has_value()) {
+      req_resp_stats->get().upstream_rs_headers_size_.recordValue(response_headers_size_.value());
+      req_resp_stats->get().upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
+    }
+  }
+
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
@@ -117,6 +131,8 @@ void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& head
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+
+  response_headers_size_ = headers->byteSize();
 
   // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
   // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.

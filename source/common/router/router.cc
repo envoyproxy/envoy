@@ -633,12 +633,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      cluster_->requestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rq_headers_size_.recordValue(headers.byteSize());
-  }
-
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
@@ -744,12 +738,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   if (end_stream) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        cluster_->requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rq_body_size_.recordValue(
-          callbacks_->streamInfo().bytesReceived());
-    }
     onRequestComplete();
   }
 
@@ -758,13 +746,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
-
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      cluster_->requestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rq_body_size_.recordValue(
-        callbacks_->streamInfo().bytesReceived());
-  }
 
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
@@ -1262,12 +1243,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      cluster_->requestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers->byteSize());
-  }
-
   modify_headers_(*headers);
   // When grpc-status appears in response headers, convert grpc-status to HTTP status code
   // for outlier detection. This does not currently change any stats or logging and does not
@@ -1405,13 +1380,6 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   // streams.
   ASSERT(upstream_requests_.size() == 1);
   if (end_stream) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        cluster_->requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rs_body_size_.recordValue(
-          callbacks_->streamInfo().bytesSent());
-    }
-
     // gRPC request termination without trailers is an error.
     if (upstream_request.grpcRqSuccessDeferred()) {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
@@ -1437,12 +1405,6 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
     } else {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
-  }
-
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-      cluster_->requestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rs_body_size_.recordValue(callbacks_->streamInfo().bytesSent());
   }
 
   onUpstreamComplete(upstream_request);

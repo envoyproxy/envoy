@@ -141,6 +141,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   StreamInfo::UpstreamTiming upstream_timing_;
   const MonotonicTime start_time_;
+  absl::optional<uint64_t> response_headers_size_{};
   // Copies of upstream headers/trailers. These are only set if upstream
   // access logging is configured.
   Http::ResponseHeaderMapPtr upstream_headers_;
