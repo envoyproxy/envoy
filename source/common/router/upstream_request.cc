@@ -95,16 +95,16 @@ UpstreamRequest::~UpstreamRequest() {
   }
 
   // Ditto for request/response size histograms.
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats_opt =
       parent_.cluster()->requestResponseSizeStats();
-  if (req_resp_stats.has_value()) {
-    req_resp_stats->get().upstream_rq_headers_size_.recordValue(
-        parent_.downstreamHeaders()->byteSize());
-    req_resp_stats->get().upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
+  if (req_resp_stats_opt.has_value()) {
+    auto& req_resp_stats = req_resp_stats_opt->get();
+    req_resp_stats.upstream_rq_headers_size_.recordValue(parent_.downstreamHeaders()->byteSize());
+    req_resp_stats.upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
 
     if (response_headers_size_.has_value()) {
-      req_resp_stats->get().upstream_rs_headers_size_.recordValue(response_headers_size_.value());
-      req_resp_stats->get().upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
+      req_resp_stats.upstream_rs_headers_size_.recordValue(response_headers_size_.value());
+      req_resp_stats.upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
     }
   }
 
