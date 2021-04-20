@@ -270,6 +270,7 @@ private:
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
     absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
     Tracing::Span& activeSpan() override;
@@ -279,6 +280,10 @@ private:
     void onLocalReply(Code code) override;
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
+
+    bool enableInternalRedirectsWithBody() const override {
+      return connection_manager_.enable_internal_redirects_with_body_;
+    }
 
     void traceRequest();
 
@@ -445,6 +450,7 @@ private:
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
   bool remote_close_{};
+  bool enable_internal_redirects_with_body_{};
 };
 
 } // namespace Http
