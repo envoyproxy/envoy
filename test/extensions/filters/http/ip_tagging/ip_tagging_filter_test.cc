@@ -12,6 +12,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -44,7 +45,7 @@ ip_tags:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", stats_, runtime_);
+    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", stats_, runtime_, factory_context);
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -57,6 +58,7 @@ ip_tags:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Buffer::OwnedImpl data_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
 };
 
 TEST_F(IpTaggingFilterTest, InternalRequest) {
