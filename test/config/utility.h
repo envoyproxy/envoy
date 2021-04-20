@@ -116,7 +116,7 @@ public:
   static std::string baseConfig();
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static std::string baseUdpListenerConfig();
+  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
   static std::string tlsInspectorFilter();
@@ -228,6 +228,12 @@ public:
   // Sets the client codec to the specified type.
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                           HttpConnectionManager::CodecType type);
+
+  // Add TLS configuration for either SSL or QUIC transport socket according to listener config.
+  void configDownstreamTransportSocketWithTls(
+      envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+          configure_tls_context);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);

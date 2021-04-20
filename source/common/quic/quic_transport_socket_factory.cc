@@ -16,7 +16,10 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   auto server_config = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       quic_transport.downstream_tls_context(), context);
-  return std::make_unique<QuicServerTransportSocketFactory>(std::move(server_config));
+  auto factory =
+      std::make_unique<QuicServerTransportSocketFactory>(context.scope(), std::move(server_config));
+  factory->initialize();
+  return factory;
 }
 
 ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyConfigProto() {
@@ -33,13 +36,17 @@ QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   auto client_config = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
       quic_transport.upstream_tls_context(), context);
-  return std::make_unique<QuicClientTransportSocketFactory>(std::move(client_config), context);
+  auto factory =
+      std::make_unique<QuicClientTransportSocketFactory>(std::move(client_config), context);
+  factory->initialize();
+  return factory;
 }
 
 QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     Ssl::ClientContextConfigPtr config,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
+    : QuicTransportSocketFactoryBase(factory_context.scope(), "client"),
+      fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
           std::move(config), factory_context.sslContextManager(), factory_context.scope())) {}
 
 ProtobufTypes::MessagePtr QuicClientTransportSocketConfigFactory::createEmptyConfigProto() {

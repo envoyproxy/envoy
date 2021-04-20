@@ -24,7 +24,6 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
       res.cert_config_;
   if (!cert_config_ref.has_value()) {
-    ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     return nullptr;
   }
   auto& cert_config = cert_config_ref.value().get();
@@ -95,17 +94,16 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
       filter_chain_manager_.findFilterChain(connection_socket);
   if (filter_chain == nullptr) {
     listener_stats_.no_filter_chain_match_.inc();
+    ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     return {absl::nullopt, absl::nullopt};
   }
-  const Network::TransportSocketFactory& transport_socket_factory =
-      filter_chain->transportSocketFactory();
+  auto& transport_socket_factory =
+      dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory());
 
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs =
-      dynamic_cast<const QuicServerTransportSocketFactory&>(transport_socket_factory)
-          .serverContextConfig()
-          .tlsCertificates();
-
+      transport_socket_factory.getTlsCertificates();
   if (tls_cert_configs.empty()) {
+    ENVOY_LOG(warn, "No certificate is configured in transport socket config.");
     return {absl::nullopt, absl::nullopt};
   }
   // Only return the first TLS cert config.

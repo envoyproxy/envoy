@@ -254,6 +254,14 @@ Server::Options& TestEnvironment::getOptions() {
   return *options;
 }
 
+std::vector<Grpc::ClientType> TestEnvironment::getsGrpcVersionsForTest() {
+#ifdef ENVOY_GOOGLE_GRPC
+  return {Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc};
+#else
+  return {Grpc::ClientType::EnvoyGrpc};
+#endif
+}
+
 const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
