@@ -328,7 +328,7 @@ TEST_F(ODCDTest, TestDroppingHandles) {
 }
 
 // Checks that dropping discovery handles will result in callbacks not being invoked.
-TEST_F(ODCDTEST, TestHandles) {
+TEST_F(ODCDTest, TestHandles) {
   auto cb1 = createCallback(ClusterDiscoveryStatus::Available);
   auto cb2 = std::make_shared<ClusterDiscoveryCallback>(
       [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 2 should not be called"; });
