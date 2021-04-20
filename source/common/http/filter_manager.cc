@@ -207,7 +207,10 @@ bool ActiveStreamFilterBase::commonHandleAfterTrailersCallback(FilterTrailersSta
     } else {
       ASSERT(headers_continued_);
     }
-  } else {
+  } else if (status == FilterTrailersStatus::StopIteration) {
+    if (canIterate()) {
+      iteration_state_ = IterationState::StopSingleIteration;
+    }
     return false;
   }
 

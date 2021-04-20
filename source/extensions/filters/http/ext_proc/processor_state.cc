@@ -9,10 +9,10 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode;
 
 using envoy::service::ext_proc::v3alpha::BodyResponse;
 using envoy::service::ext_proc::v3alpha::HeadersResponse;
+using envoy::service::ext_proc::v3alpha::TrailersResponse;
 
 void ProcessorState::startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout) {
   if (!message_timer_) {
@@ -21,24 +21,20 @@ void ProcessorState::startMessageTimer(Event::TimerCb cb, std::chrono::milliseco
   message_timer_->enableTimer(timeout);
 }
 
-bool ProcessorState::handleHeadersResponse(const HeadersResponse& response,
-                                           ProcessingMode_BodySendMode body_mode) {
-  if (callback_state_ == CallbackState::Headers) {
+bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
+  if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response");
     MutationUtils::applyCommonHeaderResponse(response, *headers_);
-    callback_state_ = CallbackState::Idle;
+    callback_state_ = CallbackState::HeadersComplete;
     clearWatermark();
     message_timer_->disableTimer();
 
-    if (body_mode == ProcessingMode::BUFFERED) {
-      if (body_send_deferred_) {
+    if (body_mode_ == ProcessingMode::BUFFERED) {
+      if (filter_state_ >= FilterState::BodyComplete) {
         // If we get here, then all the body data came in before the header message
         // was complete, and the server wants the body. So, don't continue filter
         // processing, but send the buffered request body now.
         ENVOY_LOG(debug, "Sending buffered request body message");
-        callback_state_ = CallbackState::BufferedBody;
-        startMessageTimer(std::bind(&Filter::onMessageTimeout, &filter_),
-                          filter_.config().messageTimeout());
         filter_.sendBufferedData(*this, true);
       }
 
@@ -48,7 +44,15 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response,
       return true;
     }
 
-    // If we got here, then the processor doesn't care about the body, so we can just continue.
+    if (send_trailers_ && filter_state_ >= FilterState::Trailers) {
+      // Trailers came in while we were waiting for this response, and the server
+      // is not interested in the body, so send them now.
+      filter_.sendTrailers(*this, *trailers_);
+      return true;
+    }
+
+    // If we got here, then the processor doesn't care about the body or is not ready for
+    // trailers, so we can just continue.
     headers_ = nullptr;
     continueProcessing();
     return true;
@@ -57,12 +61,35 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response,
 }
 
 bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
-  if (callback_state_ == CallbackState::BufferedBody) {
+  if (callback_state_ == CallbackState::BufferedBodyCallback) {
     ENVOY_LOG(debug, "Applying body response to buffered data");
     modifyBufferedData([this, &response](Buffer::Instance& data) {
       MutationUtils::applyCommonBodyResponse(response, headers_, data);
     });
     headers_ = nullptr;
+    callback_state_ = CallbackState::BodyComplete;
+    message_timer_->disableTimer();
+
+    if (send_trailers_ && filter_state_ >= FilterState::Trailers) {
+      // Trailers came in while we were waiting for this response, and the server
+      // asked to see them -- send them now.
+      filter_.sendTrailers(*this, *trailers_);
+      return true;
+    }
+
+    continueProcessing();
+    return true;
+  }
+  return false;
+}
+
+bool ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
+  if (callback_state_ == CallbackState::TrailersCallback) {
+    ENVOY_LOG(debug, "Applying response to buffered trailers");
+    if (response.has_header_mutation()) {
+      MutationUtils::applyHeaderMutations(response.header_mutation(), *trailers_);
+    }
+    trailers_ = nullptr;
     callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
     continueProcessing();
@@ -73,9 +100,16 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
 
 void ProcessorState::clearAsyncState() {
   cleanUpTimer();
-  if (callback_state_ != CallbackState::Idle) {
+  switch (callback_state_) {
+  case CallbackState::HeadersCallback:
+  case CallbackState::BufferedBodyCallback:
+  case CallbackState::TrailersCallback:
     callback_state_ = CallbackState::Idle;
     continueProcessing();
+    break;
+  default:
+    // No need to do anything
+    break;
   }
 }
 
@@ -83,6 +117,14 @@ void ProcessorState::cleanUpTimer() const {
   if (message_timer_ && message_timer_->enabled()) {
     message_timer_->disableTimer();
   }
+}
+
+void DecodingProcessorState::setProcessingMode(const ProcessingMode& mode) {
+  // Account for the different default behaviors of headers and trailers --
+  // headers are sent by default and trailers are not.
+  send_headers_ = mode.request_header_mode() != ProcessingMode::SKIP;
+  send_trailers_ = mode.request_trailer_mode() == ProcessingMode::SEND;
+  body_mode_ = mode.request_body_mode();
 }
 
 void DecodingProcessorState::requestWatermark() {
@@ -99,6 +141,14 @@ void DecodingProcessorState::clearWatermark() {
     watermark_requested_ = false;
     decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   }
+}
+
+void EncodingProcessorState::setProcessingMode(const ProcessingMode& mode) {
+  // Account for the different default behaviors of headers and trailers --
+  // headers are sent by default and trailers are not.
+  send_headers_ = mode.response_header_mode() != ProcessingMode::SKIP;
+  send_trailers_ = mode.response_trailer_mode() == ProcessingMode::SEND;
+  body_mode_ = mode.response_body_mode();
 }
 
 void EncodingProcessorState::requestWatermark() {
