@@ -136,7 +136,8 @@ TEST_F(FilterTest, RequestRateLimited) {
   auto request_headers = Http::TestRequestHeaderMapImpl();
   auto expected_headers = Http::TestRequestHeaderMapImpl();
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(request_headers, expected_headers);
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
@@ -152,7 +153,7 @@ TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
   Http::TestRequestHeaderMapImpl expected_headers{
       {"x-local-ratelimited", "true"},
   };
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(request_headers, expected_headers);
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
