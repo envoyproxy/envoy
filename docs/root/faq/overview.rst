@@ -93,3 +93,4 @@ Windows
   windows/win_fips_support
   windows/win_security
   windows/win_run_as_service
+  windows/win_not_supported_features
