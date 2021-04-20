@@ -497,34 +497,6 @@ def test_checker_succeed(patches, log, success):
         assert not m_log.return_value.info.called
 
 
-# BazelChecker tests
-
-def test_bazelchecker_fork():
-    checker = BazelChecker("path1", "path2", "path3")
-    bazel_mock = patch("tools.base.checker.runner.BazelAdapter")
-
-    with bazel_mock as m_bazel:
-        assert checker.bazel == m_bazel.return_value
-    assert (
-        list(m_bazel.call_args)
-        == [(checker,), {}])
-    assert "bazel" in checker.__dict__
-
-
-# ForkingChecker tests
-
-def test_forkingchecker_fork():
-    checker = ForkingChecker("path1", "path2", "path3")
-    forking_mock = patch("tools.base.checker.runner.ForkingAdapter")
-
-    with forking_mock as m_fork:
-        assert checker.fork == m_fork.return_value
-    assert (
-        list(m_fork.call_args)
-        == [(checker,), {}])
-    assert "fork" in checker.__dict__
-
-
 # CheckerSummary tests
 
 def test_checker_summary_constructor():
