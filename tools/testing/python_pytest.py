@@ -14,7 +14,7 @@
 import argparse
 import sys
 
-import pytest
+import pytest  # type:ignore
 
 from tools.base import runner, utils
 
