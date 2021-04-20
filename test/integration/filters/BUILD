@@ -266,6 +266,25 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "set_is_terminal_filter_lib",
+    srcs = [
+        "set_is_terminal_filter.cc",
+    ],
+    deps = [
+        ":set_is_terminal_filter_config_proto_cc_proto",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "set_is_terminal_filter_config_proto",
+    srcs = [":set_is_terminal_filter_config.proto"],
+)
+
+envoy_cc_test_library(
     name = "stop_iteration_and_continue",
     srcs = [
         "stop_iteration_and_continue_filter.cc",

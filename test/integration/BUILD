@@ -1097,6 +1097,8 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:set_is_terminal_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_is_terminal_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:utility_lib",
@@ -1174,6 +1176,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
