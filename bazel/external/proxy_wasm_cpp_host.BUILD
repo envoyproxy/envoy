@@ -62,12 +62,9 @@ cc_library(
         "src/wamr/*.h",
         "src/wamr/*.cc",
     ]),
-    defines = [
-        "ENVOY_WASM_WAMR",
-    ],
     deps = [
         ":common_lib",
-        "@com_github_wamr//:libiwasm",
+        "@envoy//bazel/foreign_cc:wamr",
     ],
 )
 

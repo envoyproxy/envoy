@@ -941,7 +941,11 @@ def _com_github_wavm_wavm():
 def _com_github_wamr():
     external_http_archive(
         name = "com_github_wamr",
-        build_file = "@envoy//bazel/external:wamr.BUILD",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "wamr",
+        actual = "@envoy//bazel/foreign_cc:wamr",
     )
 
 def _com_github_wasmtime():
