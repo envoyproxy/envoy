@@ -495,7 +495,10 @@ address:
 filter_chains:
 - filters:
   - name: envoy.filters.network.tcp_proxy
-    typed_config: {}
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+      stat_prefix: tcp
+      cluster: cluster
   - name: unknown_but_will_not_be_processed
     typed_config: {}
   )EOF";
@@ -539,7 +542,11 @@ public:
   }
 
   std::string name() const override { return "stats_test"; }
-  bool isTerminalFilter() override { return true; }
+
+  bool isTerminalFilterByProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return true;
+  }
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
