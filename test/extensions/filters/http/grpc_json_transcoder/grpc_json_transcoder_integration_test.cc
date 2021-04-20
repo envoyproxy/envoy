@@ -163,8 +163,15 @@ protected:
           return Http::HeaderMap::Iterate::Continue;
         });
     if (!expected_response_body.empty()) {
-      if (full_response) {
-        EXPECT_EQ(expected_response_body, response->body());
+      const bool isJsonResponse = response->headers().getContentTypeValue() == "application/json";
+      if (full_response && isJsonResponse) {
+        const bool isStreamingResponse = response->body()[0] == '[';
+        EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_response_body,
+                                                 isStreamingResponse))
+            << "Response mismatch. \nGot : " << response->body()
+            << "\nWant: " << expected_response_body;
+      } else if (full_response) {
+        EXPECT_EQ(response->body(), expected_response_body);
       } else {
         EXPECT_TRUE(absl::StartsWith(response->body(), expected_response_body));
       }
@@ -1191,7 +1198,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       Status(),
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       // Incomplete response, not valid JSON.
-      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", true, false, "", true,
+      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
       /*expect_response_complete=*/false);
 }
 
