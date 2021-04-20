@@ -1,5 +1,10 @@
 #pragma once
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include "fmt/format.h"
 
@@ -22,7 +27,6 @@ constexpr uint32_t MYSQL_SERVER_SECURE_CONNECTION = 0x00008000;
 constexpr uint16_t MYSQL_ERROR_CODE = MYSQL_CR_AUTH_PLUGIN_ERR;
 
 class MySQLTestUtils {
-
 public:
   static std::vector<uint8_t> getAuthPluginData8() { return getAuthResp8(); }
   static std::vector<uint8_t> getAuthPluginData20() { return getAuthResp20(); }
@@ -31,6 +35,7 @@ public:
   static std::string getVersion() {
     return fmt::format("{0}.{1}.{2}", MYSQL_VER_MAJOR, MYSQL_VER_MINOR, MYSQL_VER_VAR);
   }
+  static std::string getUsername() { return "username"; }
   static std::string getSqlState() { return "HY000"; }
   static std::string getErrorMessage() { return "auth failed"; }
   static std::string getAuthPluginName() { return "mysql_native_password"; }
@@ -43,8 +48,37 @@ public:
   std::string encodeClientLogin(uint16_t client_cap, std::string user, uint8_t seq);
   std::string encodeClientLoginResp(uint8_t srv_resp, uint8_t it = 0, uint8_t seq_force = 0);
   std::string encodeAuthSwitchResp();
-
   std::string encodeMessage(uint32_t packet_len, uint8_t it = 0, uint8_t seq_force = 0);
+};
+
+/**
+ * Message helper of MySQL, generate MySQL packs.
+ */
+class MessageHelper {
+public:
+  static ClientLogin encodeClientLogin(const std::string& username, const std::string& db,
+                                       const std::vector<uint8_t>& auth_resp);
+  static ClientLogin encodeSslUpgrade();
+  static ServerGreeting encodeGreeting(const std::vector<uint8_t>& seed) {
+    return encodeGreeting(seed, "mysql_native_password");
+  }
+  static ServerGreeting encodeGreeting(const std::vector<uint8_t>& seed,
+                                       const std::string& auth_plugin_name);
+  static OkMessage encodeOk();
+  static AuthSwitchMessage encodeAuthSwitch(const std::vector<uint8_t>& seed);
+  static AuthSwitchMessage encodeAuthSwitch(const std::vector<uint8_t>& seed,
+                                            const std::string& auth_plugin_name);
+  static AuthMoreMessage encodeAuthMore(const std::vector<uint8_t>& seed);
+  static ErrMessage encodeErr(uint16_t error_code, uint8_t sql_marker, std::string&& sql_state,
+                              std::string&& error_message);
+  static ErrMessage passwordLengthError(int len);
+  static ErrMessage authError(const std::string& username, const std::string& destination,
+                              bool using_password);
+  static ErrMessage dbError(const std::string& db);
+  static ClientSwitchResponse encodeSwithResponse(const std::vector<uint8_t>& auth_resp);
+  static Command encodeCommand(Command::Cmd cmd, const std::string& data, const std::string db,
+                               bool is_query);
+  static CommandResponse encodeCommandResponse(const std::string& data);
 };
 } // namespace MySQLProxy
 } // namespace NetworkFilters

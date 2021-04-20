@@ -1,12 +1,14 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
-#include "envoy/stats/stats_macros.h"
 
+#include "envoy/tcp/conn_pool.h"
+
+#include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
@@ -17,53 +19,13 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "extensions/filters/network/mysql_proxy/route.h"
+#include "extensions/filters/network/mysql_proxy/stats.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
-
-/**
- * All MySQL proxy stats. @see stats_macros.h
- */
-#define ALL_MYSQL_PROXY_STATS(COUNTER)                                                             \
-  COUNTER(sessions)                                                                                \
-  COUNTER(login_attempts)                                                                          \
-  COUNTER(login_failures)                                                                          \
-  COUNTER(decoder_errors)                                                                          \
-  COUNTER(protocol_errors)                                                                         \
-  COUNTER(upgraded_to_ssl)                                                                         \
-  COUNTER(auth_switch_request)                                                                     \
-  COUNTER(queries_parsed)                                                                          \
-  COUNTER(queries_parse_error)
-
-/**
- * Struct definition for all MySQL proxy stats. @see stats_macros.h
- */
-struct MySQLProxyStats {
-  ALL_MYSQL_PROXY_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-/**
- * Configuration for the MySQL proxy filter.
- */
-class MySQLFilterConfig {
-public:
-  MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope);
-
-  const MySQLProxyStats& stats() { return stats_; }
-
-  Stats::Scope& scope_;
-  MySQLProxyStats stats_;
-
-private:
-  MySQLProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return MySQLProxyStats{ALL_MYSQL_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
-  }
-};
-
-using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
-
 /**
  * Implementation of MySQL proxy filter.
  */

@@ -136,10 +136,10 @@ DecodeStatus BufferHelper::readLengthEncodedInteger(Buffer::Instance& buffer, ui
 DecodeStatus BufferHelper::skipBytes(Buffer::Instance& buffer, size_t skip_bytes) {
   if (buffer.length() < skip_bytes) {
     return DecodeStatus::Failure;
-  }
+  } // namespace MySQLProxy
   buffer.drain(skip_bytes);
   return DecodeStatus::Success;
-}
+} // namespace NetworkFilters
 
 DecodeStatus BufferHelper::readString(Buffer::Instance& buffer, std::string& str) {
   char end = MYSQL_STR_END;

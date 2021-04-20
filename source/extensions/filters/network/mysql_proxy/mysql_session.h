@@ -24,7 +24,6 @@ public:
     NotHandled = 12,
     Error = 13,
   };
-
   void setState(MySQLSession::State state) { state_ = state; }
   MySQLSession::State getState() { return state_; }
   uint8_t getExpectedSeq() { return expected_seq_; }
