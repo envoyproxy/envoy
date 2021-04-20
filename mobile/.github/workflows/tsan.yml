@@ -20,6 +20,16 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: echo $PATH
+      - id: check_context
+        name: 'Check whether to run'
+        run: |
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -q common/ ; then
+            echo "Tests will run."
+            echo "::set-output name=run_tests::true"
+          else
+            echo "Skipping tests."
+            echo "::set-output name=run_tests::false"
+          fi
       - name: 'Run tests'
+        if: steps.check_context.outputs.run_tests == 'true'
         run: bazel test --config=clang-tsan --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only //test/common/...
