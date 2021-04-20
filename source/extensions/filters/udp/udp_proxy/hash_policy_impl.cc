@@ -34,7 +34,7 @@ public:
   }
 
 private:
-  uint64_t hash_;
+  const uint64_t hash_;
 };
 
 HashPolicyImpl::HashPolicyImpl(
