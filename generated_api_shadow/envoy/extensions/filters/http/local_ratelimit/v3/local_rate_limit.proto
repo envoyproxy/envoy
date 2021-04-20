@@ -91,4 +91,10 @@ message LocalRateLimit {
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
   uint32 stage = 9 [(validate.rules).uint32 = {lte: 10}];
+
+  // Specifies a list of HTTP headers that should be added to each requests that
+  // have been rate limited and are forwarded upstream. This can only occur when the
+  // filter is enabled but not enforced.
+  repeated config.core.v3.HeaderValueOption request_headers_to_add = 10
+      [(validate.rules).repeated = {max_items: 10}];
 }
