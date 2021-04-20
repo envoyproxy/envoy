@@ -370,7 +370,6 @@ TEST_F(AppleDnsImplFakeApiTest, SynchronousErrorInGetAddrInfo) {
                                  // This callback should never be executed.
                                  FAIL();
                                }));
-
 }
 
 TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
