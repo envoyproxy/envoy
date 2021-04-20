@@ -110,8 +110,11 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
             host->hostname());
   if (!grid_.isPoolHttp3(attempt->pool())) {
     tcp_attempt_succeeded_ = true;
+    maybeMarkHttp3Broken();
+  } else {
+    ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", grid_.host_->hostname());
+    grid_.markHttp3Confirmed();
   }
-  maybeMarkHttp3Broken();
 
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
@@ -310,6 +313,8 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
 bool ConnectivityGrid::isHttp3Broken() const { return http3_status_tracker_.isHttp3Broken(); }
 
 void ConnectivityGrid::markHttp3Broken() { http3_status_tracker_.markHttp3Broken(); }
+
+void ConnectivityGrid::markHttp3Confirmed() { http3_status_tracker_.markHttp3Confirmed(); }
 
 void ConnectivityGrid::onDrainReceived() {
   // Don't do any work under the stack of ~ConnectivityGrid()

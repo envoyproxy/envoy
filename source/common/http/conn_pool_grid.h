@@ -153,6 +153,7 @@ public:
 
   bool isHttp3Broken() const;
   void markHttp3Broken();
+  void markHttp3Confirmed();
 
 private:
   friend class ConnectivityGridForTest;

@@ -7,7 +7,8 @@ namespace {
 
 // Initially, HTTP/3 is be marked broken for 5 minutes.
 const std::chrono::minutes DefaultExpirationTime{5};
-
+// Cap the broken period at just under 1 day.
+const int MaxConsecutiveBrokenCount = 8;
 } // namespace
 
 Http3StatusTracker::Http3StatusTracker(Event::Dispatcher& dispatcher)
@@ -18,26 +19,26 @@ bool Http3StatusTracker::isHttp3Broken() const { return state_ == State::Broken;
 bool Http3StatusTracker::isHttp3Confirmed() const { return state_ == State::Confirmed; }
 
 void Http3StatusTracker::markHttp3Broken() {
+  ASSERT(state_ != State::Broken);
   state_ = State::Broken;
   if (!expiration_timer_->enabled()) {
     expiration_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
         DefaultExpirationTime * (1 << consecutive_broken_count_)));
-    ++consecutive_broken_count_;
+    if (consecutive_broken_count_ < MaxConsecutiveBrokenCount) {
+      ++consecutive_broken_count_;
+    }
   }
 }
 
 void Http3StatusTracker::markHttp3Confirmed() {
-  consecutive_broken_count_ = 0;
-  if (expiration_timer_->enabled()) {
-    expiration_timer_->disableTimer();
-  }
+  ASSERT(state_ == State::Pending);
+  ASSERT(!expiration_timer_->enabled());
   state_ = State::Confirmed;
+  consecutive_broken_count_ = 0;
 }
 
 void Http3StatusTracker::onExpirationTimeout() {
-  if (state_ != State::Broken) {
-    return;
-  }
+  ASSERT(state_ == State::Broken);
 
   state_ = State::Pending;
 }
