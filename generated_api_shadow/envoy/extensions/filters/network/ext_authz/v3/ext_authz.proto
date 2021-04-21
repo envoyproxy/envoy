@@ -62,5 +62,5 @@ message ExtAuthz {
   //
   // When this field is true, Envoy will send an HTTP response code appropriate to
   // the response seen
-  bool http_status_for_grpc_deny = 7;
+  bool retain_http_status_on_grpc_deny = 7;
 }

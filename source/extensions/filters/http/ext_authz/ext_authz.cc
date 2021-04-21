@@ -303,11 +303,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
 
     // Pass requirement for response code override as a header
-    if (config_->httpStatusForGrpcDeny()) {
-      response->headers_to_set.push_back(
-          std::pair(Http::Headers::get().ExtAuthzGrpcHttpDeny, std::string("true")));
-      ENVOY_STREAM_LOG(trace, "ext_authz filter set response-code config header",
-                       *decoder_callbacks_);
+    if (config_->retainHttpStatusOnGrpcDeny()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter set response-code (SOON)", *decoder_callbacks_);
     }
 
     // If configured, add flag so that Utility::sendLocalReply will pass the server's HTTP status
@@ -330,7 +327,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             response_headers.addCopy(header.first, header.second);
           }
         },
-        absl::nullopt, RcDetails::get().AuthzDenied);
+        absl::nullopt, RcDetails::get().AuthzDenied, config_->retainHttpStatusOnGrpcDeny());
     decoder_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UnauthorizedExternalService);
     break;

@@ -386,7 +386,8 @@ private:
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details) override {
+                      absl::string_view details,
+                      bool retain_http_status_for_grpc = false) override {
     if (encoded_response_headers_) {
       resetStream();
       return;
@@ -404,7 +405,8 @@ private:
                                  [this](Buffer::Instance& data, bool end_stream) -> void {
                                    encodeData(data, end_stream);
                                  }},
-        Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
+        Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_,
+                                retain_http_status_for_grpc});
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.

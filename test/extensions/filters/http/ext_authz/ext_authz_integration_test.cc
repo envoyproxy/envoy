@@ -795,7 +795,7 @@ body_format:
   cleanup();
 }
 
-// If http_status_for_grpc_deny is true, rejected authz requests send an HTTP
+// If retain_http_status_on_grpc_deny is true, rejected authz requests send an HTTP
 // code that reflects the rejection. If false (or unset) then the caller must
 // check the GRPC code explicitly, as the HTTP code will reflect the fact that
 // the call was made successfully regardless of auth result.
@@ -813,7 +813,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedStatusPropagationPositiveTest) {
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 300s
-  http_status_for_grpc_deny: true
+  retain_http_status_on_grpc_deny: true
   )EOF";
     TestUtility::loadFromYaml(ext_authz_config, proto_config);
 
@@ -853,9 +853,6 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedStatusPropagationPositiveTest) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
-  auto code_header = response->headers().get(Http::Headers::get().ExtAuthzGrpcHttpDeny);
-  EXPECT_TRUE(code_header.empty()); // should be removed before caller sees it
-
   EXPECT_EQ(response->headers().getGrpcStatusValue(),
             std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::PermissionDenied)));
   EXPECT_EQ(response->headers().getStatusValue(), "403");
@@ -876,7 +873,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedStatusPropagationNegativeTest) {
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 300s
-  http_status_for_grpc_deny: false
+  retain_http_status_on_grpc_deny: false
   )EOF";
     TestUtility::loadFromYaml(ext_authz_config, proto_config);
 
@@ -916,8 +913,6 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedStatusPropagationNegativeTest) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
-  auto code_header = response->headers().get(Http::Headers::get().ExtAuthzGrpcHttpDeny);
-  ASSERT_TRUE(code_header.empty()); // should be removed before caller sees it
   EXPECT_EQ(response->headers().getGrpcStatusValue(),
             std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::PermissionDenied)));
   EXPECT_EQ(response->headers().getStatusValue(),

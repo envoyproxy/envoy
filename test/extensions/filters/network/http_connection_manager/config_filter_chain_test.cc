@@ -97,7 +97,7 @@ http_filters:
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
-  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _))
+  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _, _))
       .WillRepeatedly(Return());
   Http::TestRequestHeaderMapImpl headers;
   missing_config_filter->setDecoderFilterCallbacks(decoder_callbacks);

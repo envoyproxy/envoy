@@ -253,7 +253,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details) override;
+                      absl::string_view details, bool retain_http_status_for_grpc = false) override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
   ResponseHeaderMapOptRef continueHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
@@ -344,7 +344,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details) override;
+                      absl::string_view details, bool retain_http_status_for_grpc = false) override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   void responseDataTooLarge();
@@ -832,7 +832,7 @@ public:
   void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details);
+                      absl::string_view details, bool retain_http_status_for_grpc = false);
   /**
    * Sends a local reply by constructing a response and passing it through all the encoder
    * filters. The resulting response will be passed out via the FilterManagerCallbacks.
@@ -840,7 +840,8 @@ public:
   void sendLocalReplyViaFilterChain(
       bool is_grpc_request, Code code, absl::string_view body,
       const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
+      bool retain_http_status_for_grpc = false);
 
   /**
    * Sends a local reply by constructing a response and skipping the encoder filters. The
@@ -849,7 +850,8 @@ public:
   void sendDirectLocalReply(Code code, absl::string_view body,
                             const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                             bool is_head_request,
-                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                            bool retain_http_status_for_grpc = false);
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);

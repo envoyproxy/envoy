@@ -110,11 +110,11 @@ TEST_F(FilterTest, RequestOk) {
 TEST_F(FilterTest, RequestRateLimited) {
   setup(fmt::format(config_yaml, "0"));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
+                          absl::string_view details, int32_t retain_http_status_for_grpc) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
 
@@ -126,6 +126,7 @@ TEST_F(FilterTest, RequestRateLimited) {
 
         EXPECT_EQ(grpc_status, absl::nullopt);
         EXPECT_EQ(details, "local_rate_limited");
+        EXPECT_EQ(retain_http_status_for_grpc, 0);
       }));
 
   auto headers = Http::TestRequestHeaderMapImpl();
@@ -138,7 +139,8 @@ TEST_F(FilterTest, RequestRateLimited) {
 TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
   setup(fmt::format(config_yaml, "0"), true, false);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _, _))
+      .Times(0);
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

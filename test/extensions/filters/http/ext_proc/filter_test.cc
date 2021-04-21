@@ -354,11 +354,11 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got a bad request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+                                                 Eq(absl::nullopt), "Got a bad request", _))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused, std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -430,11 +430,11 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got a bad request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+                                                 Eq(absl::nullopt), "Got a bad request", _))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused, std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp2 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp2->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -749,11 +749,11 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::OK, "", _, Eq(absl::nullopt), ""))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::OK, "", _, Eq(absl::nullopt), "", _))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused, std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   resp1->mutable_immediate_response();
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -787,11 +787,11 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::Forbidden, "", _, Eq(999), ""))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::Forbidden, "", _, Eq(999), "", _))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused, std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::Forbidden);
@@ -831,11 +831,11 @@ TEST_F(HttpFilterTest, PostAndFail) {
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
-                             "ext_proc error: gRPC error 13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+                             "ext_proc error: gRPC error 13", _))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused, std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
 
@@ -892,11 +892,11 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
-                             "ext_proc error: gRPC error 13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+                             "ext_proc error: gRPC error 13", _))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused, std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
 

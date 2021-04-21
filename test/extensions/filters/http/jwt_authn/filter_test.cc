@@ -175,7 +175,7 @@ TEST_F(FilterTest, InlineUnauthorizedFailure) {
   setupMockConfig();
   // A failed authentication completed inline: callback is called inside verify().
 
-  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _, _));
   EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::JwtBadFormat);
   }));
@@ -197,7 +197,7 @@ TEST_F(FilterTest, InlineForbiddenFailure) {
   setupMockConfig();
   // A failed authentication completed inline: callback is called inside verify().
 
-  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _, _));
   EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::JwtAudienceNotAllowed);
   }));
@@ -255,7 +255,7 @@ TEST_F(FilterTest, OutBoundUnauthorizedFailure) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers_));
 
   // Callback is called now with a failure status.
-  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _, _));
   m_cb->onComplete(Status::JwtBadFormat);
 
   EXPECT_EQ(1U, mock_config_->stats().denied_.value());
@@ -284,7 +284,7 @@ TEST_F(FilterTest, OutBoundForbiddenFailure) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers_));
 
   // Callback is called now with a failure status.
-  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+  EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _, _));
   m_cb->onComplete(Status::JwtAudienceNotAllowed);
 
   EXPECT_EQ(1U, mock_config_->stats().denied_.value());

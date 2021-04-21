@@ -227,7 +227,7 @@ public:
   void sendLocalReply_(Code code, absl::string_view body,
                        std::function<void(ResponseHeaderMap& headers)> modify_headers,
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                       absl::string_view details);
+                       absl::string_view details, bool retain_http_status_for_grpc = false);
 
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
@@ -267,7 +267,7 @@ public:
               (Code code, absl::string_view body,
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-               absl::string_view details));
+               absl::string_view details, bool retain_http_status_for_grpc));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -318,7 +318,7 @@ public:
               (Code code, absl::string_view body,
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-               absl::string_view details));
+               absl::string_view details, bool retain_http_status_for_grpc));
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   Buffer::InstancePtr buffer_;

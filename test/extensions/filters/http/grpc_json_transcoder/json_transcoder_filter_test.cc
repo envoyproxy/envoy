@@ -669,7 +669,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, RequestBodyExceedsBufferLimit) {
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _, _));
 
   Buffer::OwnedImpl request_data{"{\"theme\": \"123456789\"}"};
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
@@ -705,7 +705,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ResponseBodyExceedsBufferLimit) {
   // Serialization of string field will maintain all 9 bytes.
   response.set_theme("123456789");
 
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _, _));
 
   auto response_data = Grpc::Common::serializeToGrpcFrame(response);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,

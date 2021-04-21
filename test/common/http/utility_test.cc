@@ -639,6 +639,9 @@ TEST(HttpUtility, SendLocalGrpcReplyPropagateResponseTrue) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
+  // XXX
+  // raise(SIGTRAP);
+
   auto encode_functions = Utility::EncodeFunctions{
       [&](ResponseHeaderMap& headers) -> void {
         // set header used as config conduit, will be cleared after check
@@ -661,7 +664,7 @@ TEST(HttpUtility, SendLocalGrpcReplyPropagateResponseTrue) {
       }));
   Utility::sendLocalReply(
       is_reset, encode_functions,
-      Utility::LocalReplyData{true, Http::Code::Forbidden, "large", absl::nullopt, false});
+      Utility::LocalReplyData{true, Http::Code::Forbidden, "large", absl::nullopt, false, true});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyPropagateResponseFalse) {
@@ -690,7 +693,7 @@ TEST(HttpUtility, SendLocalGrpcReplyPropagateResponseFalse) {
       }));
   Utility::sendLocalReply(
       is_reset, encode_functions,
-      Utility::LocalReplyData{true, Http::Code::Forbidden, "large", absl::nullopt, false});
+      Utility::LocalReplyData{true, Http::Code::Forbidden, "large", absl::nullopt, false, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {

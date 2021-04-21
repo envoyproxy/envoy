@@ -414,11 +414,14 @@ public:
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    * @param details a string detailing why this local reply was sent.
+   * @param retain_http_status_for_grpc int, which if nonzero is used as the HTTP response
+   *                code for gRPC clients. No effect for HTTP clients.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                              absl::string_view details) PURE;
+                              absl::string_view details,
+                              bool retain_http_status_for_grpc = false) PURE;
 
   /**
    * Adds decoded metadata. This function can only be called in
@@ -829,11 +832,14 @@ public:
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    * @param details a string detailing why this local reply was sent.
+   * @param retain_http_status_for_grpc int, which if nonzero is used as the HTTP response
+   *                code for gRPC clients. No effect for HTTP clients.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                              absl::string_view details) PURE;
+                              absl::string_view details,
+                              bool retain_http_status_for_grpc = false) PURE;
   /**
    * Adds new metadata to be encoded.
    *

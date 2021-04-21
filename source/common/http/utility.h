@@ -313,6 +313,9 @@ struct LocalReplyData {
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
   // Tells if this is a response to a HEAD request.
   bool is_head_request_ = false;
+  // Tells whether the localReply HTTP status code should reflect the called
+  // service's response.
+  bool retain_http_status_for_grpc = false;
 };
 
 /**
@@ -337,14 +340,6 @@ void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callback
  */
 void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
-
-/**
- * Check configuration for how to handle GRPC response codes
- *
- * @param response_headers Headers in which config is passed from ext_authz
- *                         layer
- */
-bool httpCodeForGrpcDeny(ResponseHeaderMapPtr& response_headers);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.

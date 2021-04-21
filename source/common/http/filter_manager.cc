@@ -363,8 +363,10 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
 void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details);
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
+    bool retain_http_status_for_grpc) {
+  parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details,
+                         retain_http_status_for_grpc);
 }
 
 void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
@@ -832,7 +834,8 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
 void FilterManager::sendLocalReply(
     bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
+    bool retain_http_status_for_grpc) {
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   bool is_grpc_request = old_was_grpc_request;
@@ -854,7 +857,7 @@ void FilterManager::sendLocalReply(
   if (!filter_manager_callbacks_.responseHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
     sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
-                                 grpc_status, details);
+                                 grpc_status, details, retain_http_status_for_grpc);
   } else if (!state_.non_100_response_headers_encoded_) {
     ENVOY_STREAM_LOG(debug, "Sending local reply with details {} directly to the encoder", *this,
                      details);
@@ -864,7 +867,8 @@ void FilterManager::sendLocalReply(
     // state machine screwed up, bypass the filter chain and send the local
     // reply directly to the codec.
     //
-    sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_, grpc_status);
+    sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_, grpc_status,
+                         retain_http_status_for_grpc);
   } else {
     // If we land in this branch, response headers have already been sent to the client.
     // All we can do at this point is reset the stream.
@@ -879,7 +883,8 @@ void FilterManager::sendLocalReply(
 void FilterManager::sendLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
+    bool retain_http_status_for_grpc) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
   // For early error handling, do a best-effort attempt to create a filter chain
@@ -919,13 +924,14 @@ void FilterManager::sendLocalReplyViaFilterChain(
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
-      Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
+      Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request,
+                              retain_http_status_for_grpc});
 }
 
 void FilterManager::sendDirectLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap&)>& modify_headers, bool is_head_request,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool retain_http_status_for_grpc) {
   // Make sure we won't end up with nested watermark calls from the body buffer.
   state_.encoder_filters_streaming_ = true;
   Http::Utility::sendLocalReply(
@@ -961,7 +967,8 @@ void FilterManager::sendDirectLocalReply(
             filter_manager_callbacks_.encodeData(data, end_stream);
             maybeEndEncode(end_stream);
           }},
-      Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
+      Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request,
+                              retain_http_status_for_grpc});
 }
 
 void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
@@ -1525,9 +1532,10 @@ void ActiveStreamEncoderFilter::modifyEncodingBuffer(
 void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
+    bool retain_http_status_for_grpc) {
   parent_.sendLocalReply(parent_.state_.is_grpc_request_, code, body, modify_headers, grpc_status,
-                         details);
+                         details, retain_http_status_for_grpc);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
