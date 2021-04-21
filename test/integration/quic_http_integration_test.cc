@@ -36,6 +36,7 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_transport_socket_factory.h"
 #include "test/common/quic/test_utils.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
@@ -223,24 +224,24 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
     if (GetParam().first == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (GetParam().first == Network::Address::IpVersion::v4) {
         test_server_->waitForGaugeEq(
-            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u,
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
         test_server_->waitForCounterEq(
-            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i), 1u,
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 1u,
             timeout_subsequent);
       } else {
         test_server_->waitForGaugeEq(
-            fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i), 1u,
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
         test_server_->waitForCounterEq(
-            fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u,
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 1u,
             timeout_subsequent);
       }
     }
@@ -544,7 +545,7 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
 }
@@ -558,7 +559,7 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());

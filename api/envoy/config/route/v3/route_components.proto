@@ -455,7 +455,7 @@ message RouteMatch {
     // where Extended CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
     // Note that CONNECT support is currently considered alpha in Envoy.
-    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
+    // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectMatcher connect_matcher = 12;
   }
 
@@ -770,7 +770,7 @@ message RouteAction {
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
     // Note that CONNECT support is currently considered alpha in Envoy.
-    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
+    // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectConfig connect_config = 3;
   }
 

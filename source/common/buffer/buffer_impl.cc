@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "common/common/assert.h"
@@ -25,7 +26,7 @@ void OwnedImpl::addImpl(const void* data, uint64_t size) {
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplace_back(size);
+      slices_.emplace_back(Slice(size, account_));
     }
     uint64_t copy_size = slices_.back().append(src, size);
     src += copy_size;
@@ -38,6 +39,13 @@ void OwnedImpl::addImpl(const void* data, uint64_t size) {
 void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
   ASSERT(!slices_.empty());
   slices_.back().addDrainTracker(std::move(drain_tracker));
+}
+
+void OwnedImpl::bindAccount(BufferMemoryAccountSharedPtr account) {
+  ASSERT(slices_.empty());
+  // We don't yet have an account bound.
+  ASSERT(!account_);
+  account_ = std::move(account);
 }
 
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
@@ -81,7 +89,7 @@ void OwnedImpl::prepend(absl::string_view data) {
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplace_front(size);
+      slices_.emplace_front(Slice(size, account_));
     }
     uint64_t copy_size = slices_.front().prepend(data.data(), size);
     size -= copy_size;
@@ -97,6 +105,7 @@ void OwnedImpl::prepend(Instance& data) {
     uint64_t slice_size = other.slices_.back().dataSize();
     length_ += slice_size;
     slices_.emplace_front(std::move(other.slices_.back()));
+    slices_.front().maybeChargeAccount(account_);
     other.slices_.pop_back();
     other.length_ -= slice_size;
   }
@@ -227,7 +236,7 @@ SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   slices_.pop_front();
   if (!slice.isMutable()) {
     // Create a mutable copy of the immutable slice data.
-    Slice mutable_slice{size};
+    Slice mutable_slice{size, nullptr};
     auto copy_size = mutable_slice.append(slice.data(), size);
     ASSERT(copy_size == size);
     // Drain trackers for the immutable slice will be called as part of the slice destructor.
@@ -235,7 +244,7 @@ SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   } else {
     // Make sure drain trackers are called before ownership of the slice is transferred from
     // the buffer to the caller.
-    slice.callAndClearDrainTrackers();
+    slice.callAndClearDrainTrackersAndCharges();
     return std::make_unique<SliceDataImpl>(std::move(slice));
   }
 }
@@ -260,7 +269,7 @@ void* OwnedImpl::linearize(uint32_t size) {
     return nullptr;
   }
   if (slices_[0].dataSize() < size) {
-    Slice new_slice{size};
+    Slice new_slice{size, account_};
     Slice::Reservation reservation = new_slice.reserve(size);
     ASSERT(reservation.mem_ != nullptr);
     ASSERT(reservation.len_ == size);
@@ -293,6 +302,7 @@ void OwnedImpl::coalesceOrAddSlice(Slice&& other_slice) {
     other_slice.transferDrainTrackersTo(slices_.back());
   } else {
     // Take ownership of the slice.
+    other_slice.maybeChargeAccount(account_);
     slices_.emplace_back(std::move(other_slice));
     length_ += slice_size;
   }
@@ -381,7 +391,9 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
       break;
     }
 
-    Slice slice(size, slices_owner->free_list_);
+    // We will tag the reservation slices on commit. This avoids unnecessary
+    // work in the case that the entire reservation isn't used.
+    Slice slice(size, nullptr, slices_owner->free_list_);
     const auto raw_slice = slice.reserve(size);
     reservation_slices.push_back(raw_slice);
     slices_owner->owned_slices_.emplace_back(std::move(slice));
@@ -416,7 +428,7 @@ ReservationSingleSlice OwnedImpl::reserveSingleSlice(uint64_t length, bool separ
   if (reservable_size >= length) {
     reservation_slice = slices_.back().reserve(length);
   } else {
-    Slice slice(length);
+    Slice slice(length, account_);
     reservation_slice = slice.reserve(length);
     slice_owner->owned_slice_ = std::move(slice);
   }
@@ -443,6 +455,7 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
   for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
     Slice& owned_slice = owned_slices[i];
     if (owned_slice.data() != nullptr) {
+      owned_slice.maybeChargeAccount(account_);
       slices_.emplace_back(std::move(owned_slice));
     }
     slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
@@ -641,6 +654,8 @@ OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 
+OwnedImpl::OwnedImpl(BufferMemoryAccountSharedPtr account) : account_(std::move(account)) {}
+
 std::string OwnedImpl::toString() const {
   std::string output;
   output.reserve(length());
@@ -654,7 +669,7 @@ std::string OwnedImpl::toString() const {
 void OwnedImpl::postProcess() {}
 
 void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
-  slices_.emplace_back(size);
+  slices_.emplace_back(Slice(size, account_));
   slices_.back().append(data, size);
   length_ += size;
 }
