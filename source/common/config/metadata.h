@@ -116,11 +116,18 @@ protected:
    */
   void populateFrom(const envoy::config::core::v3::Metadata& metadata) {
     auto& data_by_key = metadata.filter_metadata();
+    auto& typed_data_by_key = metadata.typed_filter_metadata();
     for (const auto& [factory_name, factory] :
          Registry::FactoryRegistry<factoryClass>::factories()) {
-      const auto& meta_iter = data_by_key.find(factory_name);
-      if (meta_iter != data_by_key.end()) {
-        data_[factory->name()] = factory->parse(meta_iter->second);
+      const auto& typed_meta_iter = typed_data_by_key.find(factory_name);
+      // Struct is deprecated in favor of Any.
+      if (typed_meta_iter != typed_data_by_key.end()) {
+        data_[factory->name()] = factory->parse(typed_meta_iter->second);
+      } else {
+        const auto& meta_iter = data_by_key.find(factory_name);
+        if (meta_iter != data_by_key.end()) {
+          data_[factory->name()] = factory->parse(meta_iter->second);
+        }
       }
     }
   }

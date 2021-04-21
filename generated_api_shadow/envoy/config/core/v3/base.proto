@@ -224,6 +224,8 @@ message Metadata {
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.
   map<string, google.protobuf.Struct> filter_metadata = 1;
+
+  map<string, google.protobuf.Any> typed_filter_metadata = 2;
 }
 
 // Runtime derived uint32 with a default when not specified.
