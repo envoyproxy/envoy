@@ -11,16 +11,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-FilterConfigImpl::FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-                                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-    : proto_config_(std::move(proto_config)),
-      stats_(generateStats(stats_prefix, context.scope())),
-      cm_(context.clusterManager()),
-      time_source_(context.dispatcher().timeSource())) {
+FilterConfigImpl::FilterConfigImpl(
+    envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
+    : proto_config_(std::move(proto_config)), stats_(generateStats(stats_prefix, context.scope())),
+      cm_(context.clusterManager()), time_source_(context.dispatcher().timeSource()) {
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
-  jwks_cache_ = JwksCache::create(proto_config_, time_source_, context.api(), context.threadLocal());
+  jwks_cache_ =
+      JwksCache::create(proto_config_, time_source_, context.api(), context.threadLocal());
 
   std::vector<std::string> names;
   for (const auto& it : proto_config_.requirement_map()) {

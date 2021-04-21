@@ -30,7 +30,8 @@ using JwksSharedPtr = std::shared_ptr<::google::jwt_verify::Jwks>;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
-  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api, ThreadLocal::SlotAllocator& tls) :
+  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api,
+               ThreadLocal::SlotAllocator& tls)
       : jwt_provider_(jwt_provider), time_source_(time_source), tls_(tls) {
 
     std::vector<std::string> audiences;
@@ -39,17 +40,17 @@ public:
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
 
-    tls_.set(
-      [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
+    tls_.set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
 
     const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true, api);
     if (!inline_jwks.empty()) {
-      auto jwks = ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);
+      auto jwks =
+          ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);
       if (jwks->getStatus() != Status::Ok) {
         ENVOY_LOG(warn, "Invalid inline jwks for issuer: {}, jwks: {}", jwt_provider_.issuer(),
                   inline_jwks);
       } else {
-        setJwksToAllThreads(jwks, std::chrono::steady_clock::time_point::max());
+        setJwksToAllThreads(std::move(jwks), std::chrono::steady_clock::time_point::max());
       }
     }
   }
@@ -75,13 +76,14 @@ public:
 private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     // The jwks object.
-    JwksSharedPtr  jwks_;
+    JwksSharedPtr jwks_;
     // The pubkey expiration time.
     MonotonicTime expire_;
   };
 
   // Set jwks shared_ptr to all threads.
-  const void setJwksToAllThreads(::google::jwt_verify::JwksPtr&& jwks, std::chrono::steady_clock::time_point expire) {
+  void setJwksToAllThreads(::google::jwt_verify::JwksPtr&& jwks,
+                           std::chrono::steady_clock::time_point expire) {
     JwksSharedPtr shared_jwks(jwks.release());
     tls_.runOnAllThreads([shared_jwks, expire](OptRef<ThreadLocalCache> obj) {
       obj->jwks_ = shared_jwks;
@@ -111,17 +113,20 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
 };
 
+using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
 
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source, Api::Api& api, ThreadLocal::SlotAllocator& tls) {
+  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source, Api::Api& api,
+                ThreadLocal::SlotAllocator& tls) {
     for (const auto& it : config.providers()) {
       const auto& provider = it.second;
-      jwks_data_map_.emplace(it.first, JwksDataImpl(provider, time_source, api, tls));
+      auto jwks_data = std::make_unique<JwksDataImpl>(provider, time_source, api, tls);
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
-        issuer_ptr_map_.emplace(provider.issuer(), findByProvider(it.first));
+        issuer_ptr_map_.emplace(provider.issuer(), jwks_data.get());
       }
+      jwks_data_map_.emplace(it.first, std::move(jwks_data));
     }
   }
 
@@ -137,7 +142,7 @@ public:
   JwksData* findByProvider(const std::string& provider) override {
     const auto& it = jwks_data_map_.find(provider);
     if (it != jwks_data_map_.end()) {
-      return &it->second;
+      return it->second.get();
     }
     // Verifier::innerCreate function makes sure that all provider names are defined.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -153,7 +158,7 @@ private:
   }
 
   // The Jwks data map indexed by provider.
-  absl::node_hash_map<std::string, JwksDataImpl> jwks_data_map_;
+  absl::node_hash_map<std::string, JwksDataImplPtr> jwks_data_map_;
   // The Jwks data pointer map indexed by issuer.
   absl::node_hash_map<std::string, JwksData*> issuer_ptr_map_;
 };

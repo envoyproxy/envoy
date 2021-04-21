@@ -84,7 +84,7 @@ public:
   ~FilterConfigImpl() override = default;
 
   // Get the JwksCache object.
-  JwksCache& getJwksCache() { return *jwks_cache_; }
+  JwksCache& getJwksCache() const { return *jwks_cache_; }
 
   Upstream::ClusterManager& cm() const { return cm_; }
   TimeSource& timeSource() const { return time_source_; }
@@ -122,11 +122,10 @@ public:
                           const absl::optional<std::string>& provider, bool allow_failed,
                           bool allow_missing) const override {
     return Authenticator::create(check_audience, provider, allow_failed, allow_missing,
-                                 getJwksCache(), cm(), Common::JwksFetcher::create,
-                                 timeSource());
+                                 getJwksCache(), cm(), Common::JwksFetcher::create, timeSource());
   }
 
- private:
+private:
   JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     const std::string final_prefix = prefix + "jwt_authn.";
     return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -138,7 +137,6 @@ public:
     MatcherConstPtr matcher_;
     VerifierConstPtr verifier_;
   };
-
 
   // The proto config.
   envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config_;
