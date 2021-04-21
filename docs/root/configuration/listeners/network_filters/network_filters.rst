@@ -17,6 +17,7 @@ filters.
   ext_authz_filter
   kafka_broker_filter
   local_rate_limit_filter
+  connection_limit_filter
   mongo_proxy_filter
   mysql_proxy_filter
   postgres_proxy_filter
