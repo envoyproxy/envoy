@@ -104,6 +104,12 @@ public:
   virtual bool operator!=(const Iterator& rhs) PURE;
 };
 
+/**
+ * Equals can be used to override the default uint8_t equals comparison performed by
+ * Instance::search, for example to a case insensitive ascii comparison
+ */
+using Equals = std::function<bool(const uint8_t lhs, const uint8_t rhs)>;
+
 using IteratorPtr = std::unique_ptr<Iterator>;
 /**
  * A basic buffer abstraction.
@@ -273,6 +279,22 @@ public:
   ssize_t search(const void* data, uint64_t size, size_t start) const {
     return search(data, size, start, 0);
   }
+
+  /**
+   * Search for an occurrence of data within the buffer.
+   * @param data supplies the data to search for.
+   * @param size supplies the length of the data to search for.
+   * @param start supplies the starting index to search from.
+   * @param length limits the search to specified number of bytes starting from start index.
+   * When length value is zero, entire length of data from starting index to the end is searched.
+   * @param partial_match_at_end when set to true, partial match at the end of the buffer will be
+   * considered to be a match and Iterator to the match start location is returned
+   * @param equals function to override default uint8_t comparison
+   * @return IteratorPtr to the location where the match starts or to the end of buffer when the
+   * match fail.
+   */
+  virtual IteratorPtr search(const void* data, uint64_t size, size_t start, size_t length,
+                             bool partial_match_at_end, Equals equals) PURE;
 
   /**
    * Search for an occurrence of data at the start of a buffer.

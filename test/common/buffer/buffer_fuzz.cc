@@ -235,6 +235,36 @@ public:
     return asStringView().find({static_cast<const char*>(data), size}, start);
   }
 
+  Buffer::IteratorPtr search(const void* data, uint64_t size, size_t start, size_t length,
+                             bool partial_match_at_end, Buffer::Equals equals) override {
+    if (data == nullptr || size <= 0 || start >= size_) {
+      return std::make_unique<StringBuffer::StringBufferIterator>(*this, size_);
+    }
+
+    if (equals == nullptr) {
+      equals = [](const uint8_t lhs, const uint8_t rhs) -> bool { return lhs == rhs; };
+    }
+
+    const uint8_t* haystack = reinterpret_cast<const uint8_t*>(this->start());
+    const uint8_t* needle = static_cast<const uint8_t*>(data);
+
+    for (size_t i = 0; i < size_; i++) {
+      if (equals(needle[0], haystack[i])) {
+        size_t k = 1;
+        for (size_t j = i + 1; k < length && j < size_; k++, j++) {
+          if (!equals(needle[k], haystack[j])) {
+            continue;
+          }
+        }
+        if (partial_match_at_end || k == length) {
+          return std::make_unique<StringBuffer::StringBufferIterator>(*this, i);
+        }
+      }
+    }
+
+    return std::make_unique<StringBuffer::StringBufferIterator>(*this, size_);
+  }
+
   bool startsWith(absl::string_view data) const override {
     return absl::StartsWith(asStringView(), data);
   }

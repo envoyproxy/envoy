@@ -718,6 +718,8 @@ public:
   Reservation reserveForRead() override;
   ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
+  IteratorPtr search(const void* data, uint64_t size, size_t start, size_t length,
+                     bool partial_match_at_end, Equals equals) override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;
 
@@ -726,6 +728,12 @@ public:
    */
   class OwnendImplIterator : public Iterator {
   public:
+    struct Location {
+      size_t slice_index_;
+      uint64_t slice_offset_;
+      absl::optional<size_t> offset_;
+    };
+
     uint8_t& operator*() override;
     Iterator& operator++() override;
     Iterator& operator--() override;
@@ -735,14 +743,16 @@ public:
     friend class OwnedImpl;
 
   private:
-    OwnendImplIterator(OwnedImpl& owned_impl, size_t slice_index, uint64_t offset)
-        : owned_impl_{owned_impl}, slice_index_{slice_index}, offset_{offset} {}
-
+    OwnendImplIterator(OwnedImpl& owned_impl, const Location& location)
+        : owned_impl_{owned_impl}, slice_index_{location.slice_index_},
+          slice_offset_{location.slice_offset_} {}
+    OwnendImplIterator(OwnedImpl& owned_impl, size_t slice_index, uint64_t slice_offset)
+        : owned_impl_{owned_impl}, slice_index_{slice_index}, slice_offset_{slice_offset} {}
     /**
      * Return first readable slice index and offset from start of the buffer or 0,0 when all slices
      * are empty
      */
-    static std::pair<size_t, uint64_t> firstReadbleOffset(const OwnedImpl& owned_impl) {
+    static Location firstReadbleOffset(const OwnedImpl& owned_impl) {
       size_t slice_index = 0;
 
       // Skip empty slices in the beginning of the buffer
@@ -752,21 +762,21 @@ public:
       }
       // At the end of buffer
       if (slice_index == owned_impl.slices_.size()) {
-        return {0, 0};
+        return {owned_impl.slices_.size(), 0, 0};
       }
 
-      return {slice_index, 0};
+      return {slice_index, 0, 0};
     }
 
     OwnedImpl& owned_impl_;
     size_t slice_index_;
-    uint64_t offset_;
+    uint64_t slice_offset_;
   };
 
   IteratorPtr begin() noexcept override {
     auto loc = OwnedImpl::OwnendImplIterator::firstReadbleOffset(*this);
     return std::unique_ptr<OwnedImpl::OwnendImplIterator>{
-        new OwnedImpl::OwnendImplIterator{*this, loc.first, loc.second}};
+        new OwnedImpl::OwnendImplIterator{*this, loc.slice_index_, loc.slice_offset_}};
   }
 
   IteratorPtr end() noexcept override {
@@ -824,6 +834,9 @@ protected:
               ReservationSlicesOwnerPtr slices_owner) override;
 
 private:
+  OwnedImpl::OwnendImplIterator::Location find(const void* data, uint64_t size, size_t start,
+                                               size_t length, bool partial_match_at_end,
+                                               Equals equals) const;
   /**
    * @param rhs another buffer
    * @return whether the rhs buffer is also an instance of OwnedImpl (or a subclass) that

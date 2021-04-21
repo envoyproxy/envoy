@@ -453,13 +453,61 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
   }
 }
 
+const uint8_t* memchr(const uint8_t* data, const uint8_t ch, size_t count, Equals equals) {
+  if (equals == nullptr) {
+    return static_cast<const uint8_t*>(std::memchr(data, ch, count));
+  }
+
+  if (data == nullptr || count == 0) {
+    return nullptr;
+  }
+
+  for (size_t i = 0; i < count; i++) {
+    if (equals(data[i], ch)) {
+      return data + i;
+    }
+  }
+  return nullptr;
+}
+
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t length) const {
+  if (size == 0 && start <= length_) {
+    return start;
+  }
+
+  return find(data, size, start, length, false, nullptr).offset_.value();
+}
+
+IteratorPtr OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t length,
+                              bool partial_match_at_end, Equals equals) {
+
+  if (size == 0) {
+    if (start == length_) {
+      return end();
+    }
+
+    auto itr = begin();
+    auto itrend = end();
+    for (uint64_t i = 0; i < start && (*itr) != (*itrend); i++) {
+      ++(*itr);
+    }
+    return itr;
+  }
+
+  return std::unique_ptr<OwnedImpl::OwnendImplIterator>{new OwnedImpl::OwnendImplIterator{
+      *this, find(data, size, start, length, partial_match_at_end, equals)}};
+}
+
+OwnedImpl::OwnendImplIterator::Location OwnedImpl::find(const void* data, uint64_t size,
+                                                        size_t start, size_t length,
+                                                        bool partial_match_at_end,
+                                                        Equals equals) const {
   // This implementation uses the same search algorithm as evbuffer_search(), a naive
   // scan that requires O(M*N) comparisons in the worst case.
   // TODO(brian-pane): replace this with a more efficient search if it shows up
   // prominently in CPU profiling.
-  if (size == 0) {
-    return (start <= length_) ? start : -1;
+  if (size == 0 && start > length_) {
+    return OwnedImpl::OwnendImplIterator::Location{slices_.size(), 0, -1};
   }
 
   // length equal to zero means that entire buffer must be searched.
@@ -488,7 +536,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
           std::min(static_cast<size_t>(haystack_end - haystack), left_to_search);
       // Search within this slice for the first byte of the needle.
       const uint8_t* first_byte_match =
-          static_cast<const uint8_t*>(memchr(haystack, needle[0], slice_search_limit));
+          static_cast<const uint8_t*>(memchr(haystack, needle[0], slice_search_limit, equals));
       if (first_byte_match == nullptr) {
         left_to_search -= slice_search_limit;
         break;
@@ -502,6 +550,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
       // and left_to_search value must be restored.
       const size_t saved_left_to_search = left_to_search;
       size_t i = 1;
+      bool match = true;
       size_t match_index = slice_index;
       const uint8_t* match_next = first_byte_match + 1;
       const uint8_t* match_end = haystack_end;
@@ -519,14 +568,24 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
           continue;
         }
         left_to_search--;
-        if (*match_next++ != needle[i]) {
+        match = (equals == nullptr ? *match_next++ == needle[i] : equals(*match_next++, needle[i]));
+        if (!match) {
           break;
         }
         i++;
       }
       if (i == size) {
         // Successful match of the entire needle.
-        return offset + (first_byte_match - slice_start);
+        return OwnedImpl::OwnendImplIterator::Location{
+            slice_index, static_cast<uint64_t>(first_byte_match - slice_start),
+            offset + (first_byte_match - slice_start)};
+      }
+
+      if (partial_match_at_end && match && left_to_search == 0) {
+        // Successful partial match at end
+        return OwnedImpl::OwnendImplIterator::Location{
+            slice_index, static_cast<uint64_t>(first_byte_match - slice_start),
+            offset + (first_byte_match - slice_start)};
       }
       // If this wasn't a successful match, start scanning again at the next byte.
       haystack = first_byte_match + 1;
@@ -535,7 +594,8 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
     start = 0;
     offset += slice_size;
   }
-  return -1;
+
+  return OwnedImpl::OwnendImplIterator::Location{slices_.size(), 0, -1};
 }
 
 bool OwnedImpl::startsWith(absl::string_view data) const {
@@ -614,7 +674,7 @@ std::vector<Slice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const
 /**
  * Invariant:
  *    slice_index_ >= first non empty slice or 0 and slice_index_ <= owned_impl_.slices_.size()
- *    offset_ >= first readable offset or 0 and offset_ <=
+ *    slice_offset_ >= first readable offset or 0 and slice_offset_ <=
  * ownned_impl_.slices_[slice_index_].dataSize()
  */
 
@@ -627,7 +687,7 @@ Iterator& OwnedImpl::OwnendImplIterator::operator++() {
   const auto& slice = owned_impl_.slices_[slice_index_];
 
   // Successful increment
-  if (++offset_ < slice.dataSize()) {
+  if (++slice_offset_ < slice.dataSize()) {
     return *this;
   }
 
@@ -637,23 +697,23 @@ Iterator& OwnedImpl::OwnendImplIterator::operator++() {
   } while (slice_index_ < owned_impl_.slices_.size() &&
            owned_impl_.slices_[slice_index_].dataSize() == 0);
 
-  offset_ = 0;
+  slice_offset_ = 0;
   return *this;
 }
 
 /**
  * Invariant:
  *    slice_index_ >= 0 and slice_index_ <= owned_impl_.slices_.size()
- *    offset_ >= 0 and offset_ <= ownned_impl_.slices_[slice_index_].dataSize()
+ *    slice_offset_ >= 0 and slice_offset_ <= ownned_impl_.slices_[slice_index_].dataSize()
  */
 Iterator& OwnedImpl::OwnendImplIterator::operator--() {
   // At the begining of buffer
-  if (slice_index_ == 0 && offset_ == 0) {
+  if (slice_index_ == 0 && slice_offset_ == 0) {
     return *this;
   }
 
-  if (offset_ > 0) { // Guard against underflow
-    offset_--;
+  if (slice_offset_ > 0) { // Guard against underflow
+    slice_offset_--;
     return *this;
   }
 
@@ -663,9 +723,9 @@ Iterator& OwnedImpl::OwnendImplIterator::operator--() {
     slice_index_--;
   } while (slice_index_ > 0 && owned_impl_.slices_[slice_index_].dataSize() == 0);
 
-  offset_ = owned_impl_.slices_[slice_index_].dataSize() > 0
-                ? owned_impl_.slices_[slice_index_].dataSize() - 1
-                : 0;
+  slice_offset_ = owned_impl_.slices_[slice_index_].dataSize() > 0
+                      ? owned_impl_.slices_[slice_index_].dataSize() - 1
+                      : 0;
   return *this;
 }
 
@@ -674,13 +734,14 @@ bool OwnedImpl::OwnendImplIterator::operator==(const Iterator& rhs) {
       dynamic_cast<const OwnedImpl::OwnendImplIterator*>(&rhs);
 
   return rhs_owned_impl_itr != nullptr && &owned_impl_ == &(rhs_owned_impl_itr->owned_impl_) &&
-         slice_index_ == rhs_owned_impl_itr->slice_index_ && offset_ == rhs_owned_impl_itr->offset_;
+         slice_index_ == rhs_owned_impl_itr->slice_index_ &&
+         slice_offset_ == rhs_owned_impl_itr->slice_offset_;
 }
 
 bool OwnedImpl::OwnendImplIterator::operator!=(const Iterator& rhs) { return !(*this == rhs); }
 
 uint8_t& OwnedImpl::OwnendImplIterator::operator*() {
-  return *(owned_impl_.slices_[slice_index_].data() + offset_);
+  return *(owned_impl_.slices_[slice_index_].data() + slice_offset_);
 }
 
 } // namespace Buffer

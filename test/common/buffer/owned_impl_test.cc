@@ -1009,6 +1009,103 @@ TEST_F(OwnedImplTest, Search) {
   EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0, 0));
 }
 
+Iterator& move(Iterator& itr, int steps) {
+  if (steps < 0) {
+    for (int i = steps; i < 0; i++) {
+      --itr;
+    }
+    return itr;
+  }
+
+  for (int i = 0; i < steps; i++) {
+    ++itr;
+  }
+
+  return itr;
+}
+
+TEST_F(OwnedImplTest, SearchItr) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the search implementation.
+  static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
+  Buffer::OwnedImpl buffer;
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
+
+  EXPECT_TRUE(*buffer.end() == *buffer.search("c", 1, 0, 0, false, nullptr));
+  EXPECT_TRUE(*buffer.begin() == *buffer.search("", 0, 0, 0, false, nullptr));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("", 0, buffer.length(), 0, false, nullptr));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("", 0, buffer.length() + 1, 0, false, nullptr));
+
+  auto itr = buffer.begin();
+  EXPECT_TRUE(*itr == *buffer.search("a", 1, 0, 0, false, nullptr));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("b", 1, 1, 0, false, nullptr));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("a", 1, 1, 0, false, nullptr));
+
+  itr = buffer.begin();
+  EXPECT_TRUE(*itr == *buffer.search("abaa", 4, 0, 0, false, nullptr));
+  EXPECT_TRUE(move(*itr, 2) == *buffer.search("aaaa", 4, 0, 0, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("aaaa", 4, 1, 0, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("aaaa", 4, 2, 0, false, nullptr));
+  EXPECT_TRUE(move(*itr, 5) == *buffer.search("aaaaab", 6, 0, 0, false, nullptr));
+  EXPECT_TRUE(move(*itr, -1) == *buffer.search("baaaaabaxyz", 11, 0, 0, true, nullptr));
+  EXPECT_TRUE(move(*itr, 6) == *buffer.search("baxyz", 5, 0, 0, true, nullptr));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("axyz", 4, 5, 0, true, nullptr));
+  EXPECT_TRUE(*buffer.begin() == *buffer.search("abaaaabaaaaabaxyz", 17, 0, 0, true, nullptr));
+
+  itr = buffer.begin();
+  EXPECT_TRUE(*itr == *buffer.search("abaaaabaaaaaba", 14, 0, 0, false, nullptr));
+  EXPECT_TRUE(move(*itr, 12) == *buffer.search("ba", 2, 10, 0, false, nullptr));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("abaaaabaaaaabaa", 15, 0, 0, false, nullptr));
+}
+
+TEST_F(OwnedImplTest, SearchItrCustomComparator) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the search implementation.
+  static const char* Inputs[] = {"aB", "A", "", "aAa", "B", "A", "AaA", "Ab", "a"};
+  Buffer::OwnedImpl buffer;
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  EXPECT_STREQ("aBAaAaBAAaAAba", buffer.toString().c_str());
+
+  Equals ic = [](const uint8_t lhs, const uint8_t rhs) {
+    if (std::isalpha(lhs) && std::isalpha(rhs)) {
+      return std::tolower(lhs) == rhs;
+    }
+
+    return lhs == rhs;
+  };
+
+  EXPECT_TRUE(*buffer.end() == *buffer.search("c", 1, 0, 0, false, ic));
+  EXPECT_TRUE(*buffer.begin() == *buffer.search("", 0, 0, 0, false, ic));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("", 0, buffer.length(), 0, false, ic));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("", 0, buffer.length() + 1, 0, false, ic));
+
+  auto itr = buffer.begin();
+  EXPECT_TRUE(*itr == *buffer.search("a", 1, 0, 0, false, ic));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("b", 1, 1, 0, false, ic));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("a", 1, 1, 0, false, ic));
+
+  itr = buffer.begin();
+  EXPECT_TRUE(*itr == *buffer.search("abaa", 4, 0, 0, false, ic));
+  EXPECT_TRUE(move(*itr, 2) == *buffer.search("aaaa", 4, 0, 0, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("aaaa", 4, 1, 0, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("aaaa", 4, 2, 0, false, ic));
+  EXPECT_TRUE(move(*itr, 5) == *buffer.search("aaaaab", 6, 0, 0, false, ic));
+  EXPECT_TRUE(move(*itr, -1) == *buffer.search("baaaaabaxyz", 11, 0, 0, true, ic));
+  EXPECT_TRUE(move(*itr, 6) == *buffer.search("baxyz", 5, 0, 0, true, ic));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("axyz", 4, 5, 0, true, ic));
+  EXPECT_TRUE(*buffer.begin() == *buffer.search("abaaaabaaaaabaxyz", 17, 0, 0, true, ic));
+
+  itr = buffer.begin();
+  EXPECT_TRUE(*itr == *buffer.search("abaaaabaaaaaba", 14, 0, 0, false, ic));
+  EXPECT_TRUE(move(*itr, 12) == *buffer.search("ba", 2, 10, 0, false, ic));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("abaaaabaaaaabaa", 15, 0, 0, false, ic));
+}
+
 TEST_F(OwnedImplTest, SearchWithLengthLimit) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the search implementation.
@@ -1042,6 +1139,104 @@ TEST_F(OwnedImplTest, SearchWithLengthLimit) {
   EXPECT_EQ(-1, buffer.search("ba", 2, 11, 2));
   // Test cases when length to search is larger than buffer
   EXPECT_EQ(12, buffer.search("ba", 2, 11, 10e6));
+}
+
+TEST_F(OwnedImplTest, SearchItrWithLengthLimit) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the search implementation.
+  static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
+  Buffer::OwnedImpl buffer;
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
+
+  // The string is there, but the search is limited to 1 byte.
+  EXPECT_TRUE(*buffer.end() == *buffer.search("b", 1, 0, 1, false, nullptr));
+  // The string is there, but the search is limited to 1 byte.
+  EXPECT_TRUE(*buffer.end() == *buffer.search("ab", 2, 0, 1, false, nullptr));
+  // The string is there, but spans over 2 slices. The search length is enough
+  // to find it.
+  auto itr = buffer.begin();
+  move(*itr, 1);
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 0, 3, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 0, 5, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 1, 2, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 1, 5, false, nullptr));
+  // The string spans over 3 slices. test different variations of search length
+  // and starting position.
+  itr = buffer.begin();
+  move(*itr, 2);
+  EXPECT_TRUE(*itr == *buffer.search("aaaab", 5, 2, 5, false, nullptr));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("aaaab", 5, 2, 3, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("aaaab", 5, 2, 6, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("aaaab", 5, 0, 8, false, nullptr));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("aaaab", 5, 0, 6, false, nullptr));
+  // Test searching for the string which in in the last slice.
+  itr = buffer.begin();
+  move(*itr, 12);
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 12, 2, false, nullptr));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 11, 3, false, nullptr));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("ba", 2, 11, 2, false, nullptr));
+  // Test cases when length to search is larger than buffer
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 11, 10e6, false, nullptr));
+
+  itr = buffer.begin();
+  EXPECT_TRUE(move(*itr, 6) == *buffer.search("baxyz", 5, 0, 8, true, nullptr));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("axyz", 4, 5, 3, true, nullptr));
+}
+
+TEST_F(OwnedImplTest, SearchItrWithLengthLimitCustomComparator) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the search implementation.
+  static const char* Inputs[] = {"aB", "A", "", "aAa", "B", "A", "AaA", "Ab", "a"};
+  Buffer::OwnedImpl buffer;
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  EXPECT_STREQ("aBAaAaBAAaAAba", buffer.toString().c_str());
+
+  Equals ic = [](const uint8_t lhs, const uint8_t rhs) {
+    if (std::isalpha(lhs) && std::isalpha(rhs)) {
+      return std::tolower(lhs) == rhs;
+    }
+
+    return lhs == rhs;
+  };
+
+  // The string is there, but the search is limited to 1 byte.
+  EXPECT_TRUE(*buffer.end() == *buffer.search("b", 1, 0, 1, false, ic));
+  // The string is there, but the search is limited to 1 byte.
+  EXPECT_TRUE(*buffer.end() == *buffer.search("ab", 2, 0, 1, false, ic));
+  // The string is there, but spans over 2 slices. The search length is enough
+  // to find it.
+  auto itr = buffer.begin();
+  move(*itr, 1);
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 0, 3, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 0, 5, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 1, 2, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 1, 5, false, ic));
+  // The string spans over 3 slices. test different variations of search length
+  // and starting position.
+  itr = buffer.begin();
+  move(*itr, 2);
+  EXPECT_TRUE(*itr == *buffer.search("aaaab", 5, 2, 5, false, ic));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("aaaab", 5, 2, 3, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("aaaab", 5, 2, 6, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("aaaab", 5, 0, 8, false, ic));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("aaaab", 5, 0, 6, false, ic));
+  // Test searching for the string which in in the last slice.
+  itr = buffer.begin();
+  move(*itr, 12);
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 12, 2, false, ic));
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 11, 3, false, ic));
+  EXPECT_TRUE(*buffer.end() == *buffer.search("ba", 2, 11, 2, false, ic));
+  // Test cases when length to search is larger than buffer
+  EXPECT_TRUE(*itr == *buffer.search("ba", 2, 11, 10e6, false, ic));
+
+  itr = buffer.begin();
+  EXPECT_TRUE(move(*itr, 6) == *buffer.search("baxyz", 5, 0, 8, true, ic));
+  EXPECT_TRUE(move(*itr, 1) == *buffer.search("axyz", 4, 5, 3, true, ic));
 }
 
 TEST_F(OwnedImplTest, StartsWith) {
