@@ -267,6 +267,28 @@ public:
   }
 
   /**
+   * Get a Factory from the registry with a particular name (and templated type) with error checking
+   * to ensure the name and factory are valid.
+   * @param name string identifier for the particular implementation.
+   * @param is_optional exception will be throwed when the value is false and no factory found.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory> static Factory* getAndCheckFactoryByName(const std::string& name, bool is_optional) {
+    if (name.empty()) {
+      ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
+    }
+
+    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
+
+    if (factory == nullptr && !is_optional) {
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Didn't find a registered implementation for name: '{}'", name));
+    }
+
+    return factory;
+  }
+
+  /**
    * Get a Factory from the registry with a particular name or return nullptr.
    * @param name string identifier for the particular implementation.
    */
@@ -305,6 +327,29 @@ public:
     }
 
     return Utility::getAndCheckFactoryByName<Factory>(message.name());
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid. And a flag to control return nullptr or throw an exception.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   * @param is_optional an exception will be throwed when the value is true and no factory found.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return factory;
+    }
+
+    factory = Utility::getFactoryByName<Factory>(message.name());
+  
+    if (factory == nullptr && !is_optional) {
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Didn't find a registered implementation for name: '{}'", message.name()));
+    }
+    return factory;
   }
 
   /**
