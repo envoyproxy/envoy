@@ -1523,6 +1523,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
 #ifdef ENVOY_ENABLE_QUIC
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
+    ASSERT(false);
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
         state, source, std::chrono::milliseconds(300), coptions);
