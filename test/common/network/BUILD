@@ -394,6 +394,30 @@ envoy_cc_test(
 )
 
 envoy_cc_fuzz_test(
+    name = "udp_fuzz",
+    srcs = ["udp_fuzz.cc"],
+    corpus = "udp_corpus",
+    deps = [
+        "udp_listener_impl_test_base_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:listener_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//test/common/network:listener_impl_test_base_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
     name = "utility_fuzz_test",
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
