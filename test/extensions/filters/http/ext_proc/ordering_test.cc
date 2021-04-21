@@ -512,7 +512,8 @@ TEST_F(OrderingTest, AddRequestTrailers) {
   // Expect the trailers callback to be sent in line with decodeData
   EXPECT_CALL(stream_delegate_, send(_, false));
   EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(response_trailers));
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body_1, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body_1, true));
+  req_buffer.add(req_body_1);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   sendRequestTrailersReply();
 

@@ -190,7 +190,7 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& d
     }
 
     sendTrailers(state, *newTrailers);
-    return FilterDataStatus::StopIterationNoBuffer;
+    return FilterDataStatus::StopIterationAndBuffer;
   }
   return result;
 }
