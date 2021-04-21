@@ -121,7 +121,7 @@ public:
       Filter& filter,
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode)
       : ProcessorState(filter) {
-    setProcessingMode(mode);
+    setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
   DecodingProcessorState& operator=(const DecodingProcessorState&) = delete;
@@ -166,11 +166,17 @@ public:
   }
 
   void setProcessingMode(
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) override;
+      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) override {
+    setProcessingModeInternal(mode);
+  }
+
   void requestWatermark() override;
   void clearWatermark() override;
 
 private:
+  void setProcessingModeInternal(
+      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode);
+
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
 };
 
@@ -180,7 +186,7 @@ public:
       Filter& filter,
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode)
       : ProcessorState(filter) {
-    setProcessingMode(mode);
+    setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
   EncodingProcessorState& operator=(const EncodingProcessorState&) = delete;
@@ -225,11 +231,17 @@ public:
   }
 
   void setProcessingMode(
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) override;
+      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) override {
+    setProcessingModeInternal(mode);
+  }
+
   void requestWatermark() override;
   void clearWatermark() override;
 
 private:
+  void setProcessingModeInternal(
+      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode);
+
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };
 

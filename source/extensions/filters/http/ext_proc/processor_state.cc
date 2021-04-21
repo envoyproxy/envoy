@@ -119,7 +119,7 @@ void ProcessorState::cleanUpTimer() const {
   }
 }
 
-void DecodingProcessorState::setProcessingMode(const ProcessingMode& mode) {
+void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
   // Account for the different default behaviors of headers and trailers --
   // headers are sent by default and trailers are not.
   send_headers_ = mode.request_header_mode() != ProcessingMode::SKIP;
@@ -143,7 +143,7 @@ void DecodingProcessorState::clearWatermark() {
   }
 }
 
-void EncodingProcessorState::setProcessingMode(const ProcessingMode& mode) {
+void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
   // Account for the different default behaviors of headers and trailers --
   // headers are sent by default and trailers are not.
   send_headers_ = mode.response_header_mode() != ProcessingMode::SKIP;

@@ -1021,8 +1021,6 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartAddResponseTrailers) {
   sendRequestHeadersGet(false);
   sendResponseHeaders(false);
   Buffer::OwnedImpl resp_body("Hello!");
-  // Buffer::OwnedImpl resp_buf;
-  // expectBufferedResponse(resp_buf, false);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(response_trailers));
@@ -1042,8 +1040,6 @@ TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartAddResponseTrailers) {
   sendRequestHeadersGet(false);
   sendResponseHeaders(false);
   Buffer::OwnedImpl resp_body("Hello!");
-  // Buffer::OwnedImpl resp_buf;
-  // expectBufferedResponse(resp_buf, false);
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(response_trailers));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
