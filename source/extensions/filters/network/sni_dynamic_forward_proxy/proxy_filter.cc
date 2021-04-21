@@ -47,8 +47,8 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   // differentiate DNS cache entries for the same hostname on different ports. This is not necessary
   // when using the HTTP dynamic forward proxy since the port is embeded by the client
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host
-  absl::string_view host = sni
-  if (default_port == 0 && !absl::StrContains(host, ":")) {
+  absl::string_view host = sni;
+  if (default_port == 0) {
     host = absl::StrAppend(sni, ":",
       read_callbacks_->connection().addressProvider().localAddress()->ip()->port());
   }
