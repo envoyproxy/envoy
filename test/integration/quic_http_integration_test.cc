@@ -36,6 +36,7 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_transport_socket_factory.h"
 #include "test/common/quic/test_utils.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
@@ -223,24 +224,24 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
     if (GetParam().first == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (GetParam().first == Network::Address::IpVersion::v4) {
         test_server_->waitForGaugeEq(
-            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u,
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
         test_server_->waitForCounterEq(
-            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i), 1u,
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 1u,
             timeout_subsequent);
       } else {
         test_server_->waitForGaugeEq(
-            fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i), 1u,
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
         test_server_->waitForCounterEq(
-            fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u,
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 1u,
             timeout_subsequent);
       }
     }
