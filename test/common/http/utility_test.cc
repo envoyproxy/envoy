@@ -639,9 +639,6 @@ TEST(HttpUtility, SendLocalGrpcReplyPropagateResponseTrue) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
-  // XXX
-  // raise(SIGTRAP);
-
   auto encode_functions = Utility::EncodeFunctions{
       [&](ResponseHeaderMap& headers) -> void {
         // set header used as config conduit, will be cleared after check
