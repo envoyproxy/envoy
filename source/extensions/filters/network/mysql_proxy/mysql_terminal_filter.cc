@@ -67,8 +67,8 @@ void MySQLTerminalFilter::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionData
                                       Upstream::HostDescriptionConstSharedPtr) {
   canceler_ = nullptr;
   upstream_conn_data_ = std::move(conn);
-  upstream_event_hanlder_ = std::make_unique<UpstreamEventHandler>(*this);
-  upstream_conn_data_->addUpstreamCallbacks(*upstream_event_hanlder_);
+  upstream_event_handler_ = std::make_unique<UpstreamEventHandler>(*this);
+  upstream_conn_data_->addUpstreamCallbacks(*upstream_event_handler_);
 
   read_callbacks_->continueReading();
 }

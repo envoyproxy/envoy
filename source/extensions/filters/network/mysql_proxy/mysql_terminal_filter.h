@@ -72,7 +72,7 @@ public:
   friend class MySQLFilterTest;
 
 private:
-  UpstreamEventHandlerPtr upstream_event_hanlder_;
+  UpstreamEventHandlerPtr upstream_event_handler_;
   RouterSharedPtr router_;
   Envoy::ConnectionPool::Cancellable* canceler_{nullptr};
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
