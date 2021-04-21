@@ -19,6 +19,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
+#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 #include "extensions/filters/network/mysql_proxy/mysql_session.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -28,34 +29,30 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-MySQLTerminalFilter::MySQLTerminalFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router,
-                                         DecoderFactory& decoder_factory)
-    : config_(std::move(config)), router_(router), decoder_factory_(decoder_factory),
-      upstream_conn_data_(nullptr) {
-  downstream_decoder_ = std::make_unique<DownstreamDecoder>(*this);
-}
+MySQLTerminalFilter::MySQLTerminalFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router)
+    : MySQLMoniterFilter(config), router_(router), upstream_conn_data_(nullptr) {}
 
 void MySQLTerminalFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  read_callbacks_->connection().addConnectionCallbacks(*downstream_decoder_);
+  read_callbacks_->connection().addConnectionCallbacks(*this);
 }
 
-void MySQLTerminalFilter::DownstreamDecoder::onEvent(Network::ConnectionEvent event) {
+void MySQLTerminalFilter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_LOG(debug, "downstream connection closed");
-    if (parent_.canceler_) {
-      parent_.canceler_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
-      parent_.canceler_ = nullptr;
+    if (canceler_) {
+      canceler_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+      canceler_ = nullptr;
     }
-    if (parent_.upstream_conn_data_) {
-      parent_.upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    if (upstream_conn_data_) {
+      upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
     }
-    parent_.read_callbacks_ = nullptr;
+    read_callbacks_ = nullptr;
   }
 }
 
-void MySQLTerminalFilter::UpstreamDecoder::onEvent(Network::ConnectionEvent event) {
+void MySQLTerminalFilter::UpstreamEventHandler::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_LOG(debug, "upstream connection closed");
@@ -66,18 +63,12 @@ void MySQLTerminalFilter::UpstreamDecoder::onEvent(Network::ConnectionEvent even
   }
 }
 
-Network::FilterStatus MySQLTerminalFilter::onData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "downstream data sent, len {}", data.length());
-  downstream_decoder_->onData(data, end_stream);
-  return Network::FilterStatus::Continue;
-}
-
 void MySQLTerminalFilter::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                                       Upstream::HostDescriptionConstSharedPtr) {
   canceler_ = nullptr;
   upstream_conn_data_ = std::move(conn);
-  upstream_decoder_ = std::make_unique<UpstreamDecoder>(*this);
-  upstream_conn_data_->addUpstreamCallbacks(*upstream_decoder_);
+  upstream_event_hanlder_ = std::make_unique<UpstreamEventHandler>(*this);
+  upstream_conn_data_->addUpstreamCallbacks(*upstream_event_hanlder_);
 
   read_callbacks_->continueReading();
 }
@@ -114,172 +105,76 @@ void MySQLTerminalFilter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason r
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-MySQLTerminalFilter::DownstreamDecoder::DownstreamDecoder(MySQLTerminalFilter& filter)
-    : parent_(filter) {
-  decoder_ = filter.decoder_factory_.create(*this);
+MySQLTerminalFilter::UpstreamEventHandler::UpstreamEventHandler(MySQLTerminalFilter& filter)
+    : parent_(filter) {}
+
+void MySQLTerminalFilter::onProtocolError() {
+  MySQLMoniterFilter::onProtocolError();
+  ENVOY_LOG(info, "communication failure due to protocol error");
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-MySQLTerminalFilter::UpstreamDecoder::UpstreamDecoder(MySQLTerminalFilter& filter)
-    : parent_(filter) {
-  decoder_ = filter.decoder_factory_.create(*this);
-}
-
-void MySQLTerminalFilter::DownstreamDecoder::onProtocolError() {
-  ENVOY_LOG(info, "communication failure due to client protocol error");
-  parent_.config_->stats_.protocol_errors_.inc();
-  parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-}
-
-void MySQLTerminalFilter::UpstreamDecoder::onProtocolError() {
-  ENVOY_LOG(info, "communication failure due to server protocol error");
-  parent_.config_->stats_.protocol_errors_.inc();
-  parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-}
-
-void MySQLTerminalFilter::DownstreamDecoder::onNewMessage(MySQLSession::State state) {
+void MySQLTerminalFilter::onNewMessage(MySQLSession::State state) {
+  MySQLMoniterFilter::onNewMessage(state);
   // close connection when received message on state NotHandled.
   if (state == MySQLSession::State::NotHandled || state == MySQLSession::State::Error) {
-    ENVOY_LOG(info,
-              "connection closed due to unexpected state occurs on client -> proxy communication");
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    ENVOY_LOG(info, "connection closed due to unexpected state occurs on communication");
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 }
 
-void MySQLTerminalFilter::UpstreamDecoder::onNewMessage(MySQLSession::State state) {
-  // close connection when received message on state NotHandled.
-  if (state == MySQLSession::State::NotHandled || state == MySQLSession::State::Error) {
-    ENVOY_LOG(
-        info,
-        "connection closed due to unexpected state occurs on proxy -> database communication");
-    parent_.upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-  }
-}
-
-void MySQLTerminalFilter::UpstreamDecoder::onServerGreeting(ServerGreeting& greet) {
+void MySQLTerminalFilter::onServerGreeting(ServerGreeting& greet) {
+  MySQLMoniterFilter::onServerGreeting(greet);
   ENVOY_LOG(debug, "server {} send challenge", greet.getVersion());
-  send(greet);
-  parent_.stepClientSession(greet.getSeq() + 1, MySQLSession::State::ChallengeReq);
+  sendLocal(greet);
 }
 
-void MySQLTerminalFilter::DownstreamDecoder::onClientLogin(ClientLogin& client_login) {
+void MySQLTerminalFilter::onClientLogin(ClientLogin& client_login) {
+  MySQLMoniterFilter::onClientLogin(client_login);
+  if (client_login.isSSLRequest()) {
+    ENVOY_LOG(info, "communication failure due to proxy not support ssl upgrade");
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return;
+  }
   ENVOY_LOG(debug, "user {} try to login into database {}", client_login.getUsername(),
             client_login.getDb());
-  parent_.config_->stats_.login_attempts_.inc();
-  if (client_login.isSSLRequest()) {
-    parent_.config_->stats().upgraded_to_ssl_.inc();
-    ENVOY_LOG(info, "communication failure due to proxy not support ssl upgrade");
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return;
-  }
-  send(client_login);
-  parent_.stepServerSession(client_login.getSeq() + 1, MySQLSession::State::ChallengeResp41);
+  sendRemote(client_login);
 }
 
-void MySQLTerminalFilter::UpstreamDecoder::onClientLoginResponse(
-    ClientLoginResponse& client_login_resp) {
-  // auth passed, step into command phase
-  switch (client_login_resp.getRespCode()) {
-  case MYSQL_RESP_OK:
-    send(client_login_resp);
-    ENVOY_LOG(debug, "login success");
-    parent_.gotoCommandPhase();
-    break;
-  case MYSQL_RESP_AUTH_SWITCH:
-    send(client_login_resp);
-    parent_.config_->stats().auth_switch_request_.inc();
-    parent_.stepClientSession(client_login_resp.getSeq() + 1, MySQLSession::State::AuthSwitchResp);
-    break;
-  // When resp code is MYSQL_RESP_ERR or MYSQL_RESP_MORE, client should close connection.
-  case MYSQL_RESP_ERR:
-    send(client_login_resp);
-    parent_.config_->stats().login_failures_.inc();
-    parent_.stepClientSession(client_login_resp.getSeq() + 1, MySQLSession::State::Error);
-    break;
-  case MYSQL_RESP_MORE:
-  default:
-    send(client_login_resp);
-    parent_.stepClientSession(client_login_resp.getSeq() + 1, MySQLSession::State::NotHandled);
-    break;
-  }
+void MySQLTerminalFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
+  MySQLMoniterFilter::onClientLoginResponse(client_login_resp);
+  sendLocal(client_login_resp);
 }
 
-void MySQLTerminalFilter::DownstreamDecoder::onClientSwitchResponse(
-    ClientSwitchResponse& switch_resp) {
-  send(switch_resp);
-  parent_.stepServerSession(switch_resp.getSeq() + 1, MySQLSession::State::AuthSwitchMore);
+void MySQLTerminalFilter::onClientSwitchResponse(ClientSwitchResponse& switch_resp) {
+  MySQLMoniterFilter::onClientSwitchResponse(switch_resp);
+  sendRemote(switch_resp);
 }
 
-void MySQLTerminalFilter::UpstreamDecoder::onMoreClientLoginResponse(
-    ClientLoginResponse& client_login_resp) {
-  switch (client_login_resp.getRespCode()) {
-  case MYSQL_RESP_OK:
-    send(client_login_resp);
-    parent_.gotoCommandPhase();
-    break;
-  case MYSQL_RESP_MORE:
-    send(client_login_resp);
-    parent_.stepClientSession(client_login_resp.getSeq() + 1, MySQLSession::State::AuthSwitchResp);
-    break;
-    // When resp code is MYSQL_RESP_AUTH_SWITCH or MYSQL_RESP_ERR or others, client should close
-    // connection.
-  case MYSQL_RESP_ERR:
-    send(client_login_resp);
-    parent_.config_->stats().login_failures_.inc();
-    parent_.stepClientSession(client_login_resp.getSeq() + 1, MySQLSession::State::Error);
-    break;
-  default:
-    send(client_login_resp);
-    parent_.stepClientSession(client_login_resp.getSeq() + 1, MySQLSession::State::NotHandled);
-    break;
-  }
+void MySQLTerminalFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
+  MySQLMoniterFilter::onMoreClientLoginResponse(client_login_resp);
+  sendLocal(client_login_resp);
 }
 
-void MySQLTerminalFilter::DownstreamDecoder::onCommand(Command& command) {
-  if (command.isQuery()) {
-    envoy::config::core::v3::Metadata& dynamic_metadata =
-        parent_.read_callbacks_->connection().streamInfo().dynamicMetadata();
-    ProtobufWkt::Struct metadata(
-        (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
-
-    auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(),
-                                                          decoder_->getAttributes(), metadata);
-
-    ENVOY_CONN_LOG(debug, "mysql_proxy: query processed {}", parent_.read_callbacks_->connection(),
-                   command.getData());
-
-    if (!result) {
-      parent_.config_->stats_.queries_parse_error_.inc();
-    } else {
-      parent_.config_->stats_.queries_parsed_.inc();
-      parent_.read_callbacks_->connection().streamInfo().setDynamicMetadata(
-          NetworkFilterNames::get().MySQLProxy, metadata);
-    }
-  }
+void MySQLTerminalFilter::onCommand(Command& command) {
+  MySQLMoniterFilter::onCommand(command);
   if (command.getCmd() == Command::Cmd::Quit) {
-    send(command);
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    sendRemote(command);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
-  send(command);
-  // client request will reset seq id
-  parent_.gotoCommandPhase();
+  sendRemote(command);
 }
 
-void MySQLTerminalFilter::UpstreamDecoder::onCommandResponse(CommandResponse& resp) {
-  send(resp);
-  // server response might contain more than one packets, so seq id expect to be seq + 1, wait for
-  // client command request to reset server seq id.
-  parent_.stepServerSession(resp.getSeq() + 1, MySQLSession::State::ReqResp);
-}
-
-void MySQLTerminalFilter::gotoCommandPhase() {
-  // go to command phase, reset seq id
-  stepServerSession(MYSQL_RESPONSE_PKT_NUM, MySQLSession::State::ReqResp);
-  stepClientSession(MYSQL_REQUEST_PKT_NUM, MySQLSession::State::Req);
+void MySQLTerminalFilter::onCommandResponse(CommandResponse& resp) {
+  MySQLMoniterFilter::onCommandResponse(resp);
+  sendLocal(resp);
+  // server response might contain more than one packets, so seq id expect to be seq + 1.
+  stepSession(resp.getSeq() + 1, MySQLSession::State::ReqResp);
 }
 
 Network::FilterStatus MySQLTerminalFilter::onNewConnection() {
-  config_->stats_.sessions_.inc();
+  MySQLMoniterFilter::onNewConnection();
   // we can not know the database name before connect to real backend database, so just connect to
   // catch all cluster backend. TODO(qinggniq) remove it in next pull request.
   auto primary_route = router_->defaultPool();
@@ -306,52 +201,35 @@ Network::FilterStatus MySQLTerminalFilter::onNewConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-Network::FilterStatus MySQLTerminalFilter::DownstreamDecoder::onData(Buffer::Instance& buffer,
-                                                                     bool) {
-  // Clear dynamic metadata.
-  envoy::config::core::v3::Metadata& dynamic_metadata =
-      parent_.read_callbacks_->connection().streamInfo().dynamicMetadata();
-  auto& metadata =
-      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
-  metadata.mutable_fields()->clear();
+Network::FilterStatus MySQLTerminalFilter::onData(Buffer::Instance& buffer, bool) {
+  MySQLMoniterFilter::clearDynamicData();
 
-  buffer_.move(buffer);
-  decoder_->onData(buffer_);
+  read_buffer_.move(buffer);
+  decoder_->onData(read_buffer_);
   return Network::FilterStatus::Continue;
 }
 
-void MySQLTerminalFilter::UpstreamDecoder::send(MySQLCodec& message) {
+void MySQLTerminalFilter::sendLocal(MySQLCodec& message) {
   auto buffer = message.encodePacket();
   ENVOY_LOG(debug, "send data to client, len {}", buffer.length());
-  parent_.read_callbacks_->connection().write(buffer, false);
+  read_callbacks_->connection().write(buffer, false);
 }
 
-void MySQLTerminalFilter::DownstreamDecoder::send(MySQLCodec& message) {
+void MySQLTerminalFilter::sendRemote(MySQLCodec& message) {
   auto buffer = message.encodePacket();
   ENVOY_LOG(debug, "send data to server, len {}", buffer.length());
-  parent_.upstream_conn_data_->connection().write(buffer, false);
+  upstream_conn_data_->connection().write(buffer, false);
 }
 
-void MySQLTerminalFilter::UpstreamDecoder::onUpstreamData(Buffer::Instance& buffer, bool) {
+void MySQLTerminalFilter::UpstreamEventHandler::onUpstreamData(Buffer::Instance& buffer, bool) {
   ENVOY_LOG(debug, "upstream data sent, len {}", buffer.length());
-  buffer_.move(buffer);
-  decoder_->onData(buffer_);
+  parent_.write_buffer_.move(buffer);
+  parent_.decoder_->onData(parent_.write_buffer_);
 }
 
-void MySQLTerminalFilter::stepSession(MySQLSession& session, uint8_t expected_seq,
-                                      MySQLSession::State expected_state) {
-  session.setExpectedSeq(expected_seq);
-  session.setState(expected_state);
-}
-
-void MySQLTerminalFilter::stepClientSession(uint8_t expected_seq,
-                                            MySQLSession::State expected_state) {
-  stepSession(downstream_decoder_->decoder_->getSession(), expected_seq, expected_state);
-}
-
-void MySQLTerminalFilter::stepServerSession(uint8_t expected_seq,
-                                            MySQLSession::State expected_state) {
-  stepSession(upstream_decoder_->decoder_->getSession(), expected_seq, expected_state);
+void MySQLTerminalFilter::stepSession(uint8_t expected_seq, MySQLSession::State expected_state) {
+  decoder_->getSession().setExpectedSeq(expected_seq);
+  decoder_->getSession().setState(expected_state);
 }
 
 } // namespace MySQLProxy

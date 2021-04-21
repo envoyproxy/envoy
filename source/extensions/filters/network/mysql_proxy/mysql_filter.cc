@@ -16,13 +16,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-MySQLFilter::MySQLFilter(MySQLFilterConfigSharedPtr config) : config_(std::move(config)) {}
+MySQLMoniterFilter::MySQLMoniterFilter(MySQLFilterConfigSharedPtr config)
+    : decoder_(std::make_unique<DecoderImpl>(*this)), config_(std::move(config)) {}
 
-void MySQLFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+void MySQLMoniterFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
 }
 
-Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool) {
+Network::FilterStatus MySQLMoniterFilter::onData(Buffer::Instance& data, bool) {
   // Safety measure just to make sure that if we have a decoding error we keep going and lose stats.
   // This can be removed once we are more confident of this code.
   if (sniffing_) {
@@ -32,7 +33,7 @@ Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool) {
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
+Network::FilterStatus MySQLMoniterFilter::onWrite(Buffer::Instance& data, bool) {
   // Safety measure just to make sure that if we have a decoding error we keep going and lose stats.
   // This can be removed once we are more confident of this code.
   if (sniffing_) {
@@ -42,17 +43,17 @@ Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
   return Network::FilterStatus::Continue;
 }
 
-void MySQLFilter::doDecode(Buffer::Instance& buffer) {
+void MySQLMoniterFilter::clearDynamicData() {
   // Clear dynamic metadata.
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
   metadata.mutable_fields()->clear();
+}
 
-  if (!decoder_) {
-    decoder_ = createDecoder(*this);
-  }
+void MySQLMoniterFilter::doDecode(Buffer::Instance& buffer) {
+  clearDynamicData();
 
   try {
     decoder_->onData(buffer);
@@ -65,25 +66,21 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   }
 }
 
-DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<DecoderImpl>(callbacks);
-}
+void MySQLMoniterFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
 
-void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
-
-void MySQLFilter::onNewMessage(MySQLSession::State state) {
+void MySQLMoniterFilter::onNewMessage(MySQLSession::State state) {
   if (state == MySQLSession::State::ChallengeReq) {
     config_->stats_.login_attempts_.inc();
   }
 }
 
-void MySQLFilter::onClientLogin(ClientLogin& client_login) {
+void MySQLMoniterFilter::onClientLogin(ClientLogin& client_login) {
   if (client_login.isSSLRequest()) {
     config_->stats_.upgraded_to_ssl_.inc();
   }
 }
 
-void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
+void MySQLMoniterFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
   if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
     config_->stats_.auth_switch_request_.inc();
   } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
@@ -91,13 +88,13 @@ void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) 
   }
 }
 
-void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
+void MySQLMoniterFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
   if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
     config_->stats_.login_failures_.inc();
   }
 }
 
-void MySQLFilter::onCommand(Command& command) {
+void MySQLMoniterFilter::onCommand(Command& command) {
   if (!command.isQuery()) {
     return;
   }
@@ -124,7 +121,7 @@ void MySQLFilter::onCommand(Command& command) {
       NetworkFilterNames::get().MySQLProxy, metadata);
 }
 
-Network::FilterStatus MySQLFilter::onNewConnection() {
+Network::FilterStatus MySQLMoniterFilter::onNewConnection() {
   config_->stats_.sessions_.inc();
   return Network::FilterStatus::Continue;
 }

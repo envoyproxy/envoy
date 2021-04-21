@@ -3,8 +3,6 @@
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.validate.h"
 
-#include "common/config/datasource.h"
-
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
 

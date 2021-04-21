@@ -25,13 +25,16 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
+
 /**
- * Implementation of MySQL proxy filter.
+ * Implementation of MySQL monitor filter, just decode message and collect stats.
  */
-class MySQLFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
+class MySQLMoniterFilter : public Network::Filter,
+                           public DecoderCallbacks,
+                           public Logger::Loggable<Logger::Id::filter> {
 public:
-  MySQLFilter(MySQLFilterConfigSharedPtr config);
-  ~MySQLFilter() override = default;
+  MySQLMoniterFilter(MySQLFilterConfigSharedPtr config);
+  ~MySQLMoniterFilter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -53,15 +56,18 @@ public:
   void onCommandResponse(CommandResponse&) override{};
 
   void doDecode(Buffer::Instance& buffer);
+  void clearDynamicData();
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
   MySQLSession& getSession() { return decoder_->getSession(); }
 
-private:
-  Network::ReadFilterCallbacks* read_callbacks_{};
-  MySQLFilterConfigSharedPtr config_;
+protected:
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
-  std::unique_ptr<Decoder> decoder_;
+  DecoderPtr decoder_;
+  MySQLFilterConfigSharedPtr config_;
+  Network::ReadFilterCallbacks* read_callbacks_{};
+
+private:
   bool sniffing_{true};
 };
 
