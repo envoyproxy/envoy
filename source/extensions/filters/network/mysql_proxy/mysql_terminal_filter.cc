@@ -125,12 +125,17 @@ void MySQLTerminalFilter::onNewMessage(MySQLSession::State state) {
 
 void MySQLTerminalFilter::onServerGreeting(ServerGreeting& greet) {
   MySQLMoniterFilter::onServerGreeting(greet);
+  // use client username and password to auth it server.
+  // step session to client login response
   ENVOY_LOG(debug, "server {} send challenge", greet.getVersion());
   sendLocal(greet);
 }
 
 void MySQLTerminalFilter::onClientLogin(ClientLogin& client_login) {
   MySQLMoniterFilter::onClientLogin(client_login);
+
+  // get database name, and route, step session to greet.
+
   if (client_login.isSSLRequest()) {
     ENVOY_LOG(info, "communication failure due to proxy not support ssl upgrade");
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -175,6 +180,9 @@ void MySQLTerminalFilter::onCommandResponse(CommandResponse& resp) {
 
 Network::FilterStatus MySQLTerminalFilter::onNewConnection() {
   MySQLMoniterFilter::onNewConnection();
+  // send greet;
+  // step session
+
   // we can not know the database name before connect to real backend database, so just connect to
   // catch all cluster backend. TODO(qinggniq) remove it in next pull request.
   auto primary_route = router_->defaultPool();
