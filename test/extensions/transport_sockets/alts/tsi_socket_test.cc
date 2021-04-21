@@ -22,8 +22,9 @@ using testing::ReturnRef;
 static const std::string ClientToServerData = "hello from client";
 static const std::string ClientToServerDataFirstHalf = "hello fro";
 static const std::string ClientToServerDataSecondHalf = "m client";
+static const std::string ServerToClientData = "hello from server";
 static const uint32_t LargeFrameSize = 100;
-static const uint32_t SmallFrameSize = 9;
+static const uint32_t SmallFrameSize = 13;
 
 class TsiSocketTest : public testing::Test {
 protected:
@@ -101,6 +102,9 @@ protected:
 
     EXPECT_CALL(*server_.raw_socket_, setTransportSocketCallbacks(_));
     server_.tsi_socket_->setTransportSocketCallbacks(server_.callbacks_);
+
+    server_.tsi_socket_->setFrameOverheadSize(4);
+    client_.tsi_socket_->setFrameOverheadSize(4);
   }
 
   void expectIoResult(Network::IoResult expected, Network::IoResult actual) {
@@ -187,7 +191,7 @@ protected:
 
     EXPECT_EQ("", client_.tsi_socket_->protocol());
 
-    client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+    client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
     EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
     expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
@@ -462,7 +466,7 @@ TEST_F(TsiSocketTest, DoReadEndOfStream) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
@@ -489,7 +493,7 @@ TEST_F(TsiSocketTest, DoReadNoData) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
@@ -521,7 +525,7 @@ TEST_F(TsiSocketTest, DoReadTwiceError) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
@@ -553,7 +557,7 @@ TEST_F(TsiSocketTest, DoReadOnceError) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
@@ -580,7 +584,7 @@ TEST_F(TsiSocketTest, DoReadDrainBuffer) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
@@ -606,7 +610,7 @@ TEST_F(TsiSocketTest, DoReadDrainBufferTwice) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
@@ -659,7 +663,7 @@ TEST_F(TsiSocketTest, DoWriteSmallFrameSize) {
   EXPECT_EQ(0L, client_.read_buffer_.length());
 
   EXPECT_EQ("", client_.tsi_socket_->protocol());
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(SmallFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(SmallFrameSize);
   // Since we use a small frame size, original data is divided into two parts,
   // and written to network in two iterations.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -700,7 +704,7 @@ TEST_F(TsiSocketTest, DoWriteSingleShortWrite) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   // Write the whole data except for the last byte.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -733,7 +737,7 @@ TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(LargeFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
 
   // Write the whole data except for the last byte.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -777,7 +781,7 @@ TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
 
   doHandshakeAndExpectSuccess();
 
-  client_.tsi_socket_->setMaxUnprotectedFrameSize(SmallFrameSize);
+  client_.tsi_socket_->setActualFrameSizeToUse(SmallFrameSize);
 
   // Short write occurred when writing the first half of data.
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false))
@@ -820,6 +824,76 @@ TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
   expectIoResult({Network::PostIoAction::Close, 17UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+}
+
+TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
+  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  initialize(validator, validator);
+
+  InSequence s;
+  doFakeInitHandshake();
+
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+  EXPECT_EQ(makeFakeTsiFrame("CLIENT_FINISHED"), client_to_server_.toString());
+  EXPECT_EQ(0L, client_.read_buffer_.length());
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+
+  // Write the first part of handshake data (14 bytes).
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
+        Network::IoResult result = {Network::PostIoAction::KeepOpen, buffer.length() - 5, false};
+        server_to_client_.add(buffer.linearize(0), buffer.length() - 5);
+        buffer.drain(buffer.length() - 5);
+        return result;
+      }));
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+
+  EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED").length(), 19);
+  EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED").substr(0, 14), server_to_client_.toString());
+
+  server_.write_buffer_.add(ServerToClientData);
+  server_.tsi_socket_->setActualFrameSizeToUse(LargeFrameSize);
+
+  // Write the second part of handshake data (4 bytes).
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
+        Network::IoResult result = {Network::PostIoAction::KeepOpen, 4, false};
+        server_to_client_.add(buffer.linearize(0), 4);
+        buffer.drain(4);
+        return result;
+      }));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doWrite(server_.write_buffer_, false));
+  EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED").substr(0, 18), server_to_client_.toString());
+
+  // Write the last part of handshake data (1 byte) and frame data.
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
+        Network::IoResult result = {Network::PostIoAction::KeepOpen, 1, false};
+        server_to_client_.add(buffer.linearize(0), 1);
+        buffer.drain(1);
+        return result;
+      }));
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
+                 server_.tsi_socket_->doWrite(server_.write_buffer_, false));
+  EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED") + makeFakeTsiFrame(ServerToClientData),
+            server_to_client_.toString());
+
+  // Check client side (handshake completes + receive unused data).
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
+  EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+  EXPECT_EQ(ServerToClientData, client_.read_buffer_.toString());
 }
 
 class TsiSocketFactoryTest : public testing::Test {

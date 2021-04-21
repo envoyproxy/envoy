@@ -74,8 +74,10 @@ public:
 
   // This API should be called only after ALTS handshake finishes successfully.
   size_t actualFrameSizeToUse() { return actual_frame_size_to_use_; }
-  // Set max_unprotected_frame_size_. Exposed for testing purpose.
-  void setMaxUnprotectedFrameSize(size_t frame_size) { max_unprotected_frame_size_ = frame_size; }
+  // Set actual_frame_size_to_use_. Exposed for testing purpose.
+  void setActualFrameSizeToUse(size_t frame_size) { actual_frame_size_to_use_ = frame_size; }
+  // Set frame_overhead_size_. Exposed for testing purpose.
+  void setFrameOverheadSize(size_t overhead_size) { frame_overhead_size_ = overhead_size; }
 
 private:
   Network::PostIoAction doHandshake();
@@ -101,8 +103,11 @@ private:
   // actual_frame_size_to_use_ is the actual frame size used by
   // frame protector, which is the result of frame size negotiation.
   size_t actual_frame_size_to_use_{0};
-  // maximum size of data that can be protected for a single frame.
-  size_t max_unprotected_frame_size_{0};
+  // frame_overhead_size_ includes 4 bytes frame message type and 16 bytes tag length.
+  // It is consistent with gRPC ALTS zero copy frame protector implementation.
+  // The maximum size of data that can be protected for each frame is equal to
+  // actual_frame_size_to_use_ - frame_overhead_size_.
+  size_t frame_overhead_size_{20};
 
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
   std::unique_ptr<TsiTransportSocketCallbacks> tsi_callbacks_;
@@ -114,6 +119,7 @@ private:
   bool end_stream_read_{};
   bool read_error_{};
   uint64_t prev_bytes_to_drain_{};
+  uint64_t prev_handshake_bytes_to_drain_{};
 };
 
 /**

@@ -9,11 +9,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
-namespace {
-// Include 4 bytes frame message type and 16 bytes tag length.
-// It is consistent with gRPC ALTS zero copy frame protector implementation.
-static constexpr int FrameOverheadSize = 20;
-} // namespace
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
                      Network::TransportSocketPtr&& raw_socket)
@@ -149,7 +144,6 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     // TODO(yihuazhang): Check the return value once fake TSI frame protector
     // used in tsi_socket_test.cc implements the interface returning the max frame size.
     tsi_zero_copy_grpc_protector_max_frame_size(frame_protector, &actual_frame_size_to_use_);
-    max_unprotected_frame_size_ = actual_frame_size_to_use_ - FrameOverheadSize;
 
     // Reset the watermarks with actual negotiated max frame size.
     raw_read_buffer_.setWatermarks(
@@ -172,7 +166,11 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
 
   // Try to write raw buffer when next call is done, even this is not in do[Read|Write] stack.
   if (raw_write_buffer_.length() > 0) {
-    return raw_buffer_socket_->doWrite(raw_write_buffer_, false).action_;
+    Network::IoResult result = raw_buffer_socket_->doWrite(raw_write_buffer_, false);
+    if (handshake_complete_ && raw_write_buffer_.length() > 0) {
+      prev_handshake_bytes_to_drain_ = raw_write_buffer_.length();
+    }
+    return result.action_;
   }
 
   return Network::PostIoAction::KeepOpen;
@@ -271,8 +269,11 @@ Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, boo
 
   while (true) {
     uint64_t bytes_to_drain_this_iteration =
-        prev_bytes_to_drain_ > 0 ? prev_bytes_to_drain_
-                                 : std::min(buffer.length(), max_unprotected_frame_size_);
+        prev_handshake_bytes_to_drain_ > 0
+            ? prev_handshake_bytes_to_drain_
+            : (prev_bytes_to_drain_ > 0
+                   ? prev_bytes_to_drain_
+                   : std::min(buffer.length(), actual_frame_size_to_use_ - frame_overhead_size_));
     // Consumed all data. Exit.
     if (bytes_to_drain_this_iteration == 0) {
       break;
@@ -293,10 +294,23 @@ Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, boo
                      bytes_to_drain_this_iteration, tsi_result_to_string(status));
     }
 
-    // Write raw_write_buffer_ to nework.
+    // Write raw_write_buffer_ to network.
     ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
                    raw_write_buffer_.length(), end_stream);
     result = raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
+
+    // Check if we wrote outstanding handshake data to network.
+    if (prev_handshake_bytes_to_drain_ > 0) {
+      // Short write on handshake data.
+      if (raw_write_buffer_.length() > 0) {
+        prev_handshake_bytes_to_drain_ = raw_write_buffer_.length();
+        return {result.action_, 0, false};
+      } else {
+        // Finished writing handshake data. Start writing frame data.
+        prev_handshake_bytes_to_drain_ = 0;
+        continue;
+      }
+    }
 
     // Short write. Exit.
     if (raw_write_buffer_.length() > 0) {
@@ -317,19 +331,16 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
     Network::PostIoAction action = doHandshake();
     ASSERT(action == Network::PostIoAction::KeepOpen);
     // TODO(lizan): Handle synchronous handshake when TsiHandshaker supports it.
-  }
-
-  if (handshake_complete_) {
+    if (raw_write_buffer_.length() > 0) {
+      ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
+                     raw_write_buffer_.length(), end_stream);
+      return raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
+    }
+    return {Network::PostIoAction::KeepOpen, 0, false};
+  } else {
     ASSERT(frame_protector_);
     return repeatProtectAndWrite(buffer, end_stream);
   }
-
-  if (raw_write_buffer_.length() > 0) {
-    ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
-                   raw_write_buffer_.length(), end_stream);
-    return raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
-  }
-  return {Network::PostIoAction::KeepOpen, 0, false};
 }
 
 void TsiSocket::closeSocket(Network::ConnectionEvent) {
