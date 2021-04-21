@@ -168,7 +168,7 @@ private:
 JwksCachePtr
 JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
                   TimeSource& time_source, Api::Api& api, ThreadLocal::SlotAllocator& tls) {
-  return JwksCachePtr(new JwksCacheImpl(config, time_source, api, tls));
+  return std::make_unique<JwksCacheImpl>(config, time_source, api, tls);
 }
 
 } // namespace JwtAuthn
