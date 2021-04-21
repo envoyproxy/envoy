@@ -68,33 +68,6 @@ ip_tags:
       std::make_unique<Filesystem::MockWatcher>();
 };
 
-TEST_F(IpTaggingFilterTest, InternalRequest) {
-  initializeFilter(internal_request_yaml);
-  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
-  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
-
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
-  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
-      .WillOnce(ReturnRef(remote_address));
-#if 0 // TODO: enable this later
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
-#endif
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
-
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  Http::TestRequestTrailerMapImpl request_trailers;
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
-
-  // Check external requests don't get a tag.
-  request_headers = Http::TestRequestHeaderMapImpl{};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
-}
-
 /**
  * config with no path or ip_tags fields should be rejected.
  */
@@ -123,6 +96,61 @@ ip_tags:
   auto expected = "Only one of path or ip_tags can be specified";
   EXPECT_THROW_WITH_MESSAGE(initializeFilter(request_yaml), EnvoyException, expected);
 }
+
+TEST_F(IpTaggingFilterTest, InternalRequest) {
+  initializeFilter(internal_request_yaml);
+  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("1.2.3.5");
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
+      .WillOnce(ReturnRef(remote_address));
+#if 0 // TODO: enable this later
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
+#endif
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  // Check external requests don't get a tag.
+  request_headers = Http::TestRequestHeaderMapImpl{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+}
+
+/**
+ * read internal request type from the file
+ */
+TEST_F(IpTaggingFilterTest, InternalRequestsFromFile) {
+  const std::string internal_request_yaml = R"EOF(
+request_type: internal
+path: "/my/awesone/file.yaml"
+)EOF";
+  initializeFilter(internal_request_yaml);
+
+  EXPECT_CALL(*watcher_ptr_, addWatch("/my/awesome/", _, _));
+  EXPECT_CALL(factory_context, api()).Times(1);
+  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher_));
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce([this]() -> Filesystem::Watcher* {
+    return watcher_ptr_.release();
+  });
+  EXPECT_CALL(factory_context.api_.file_system_, splitPathFromFilename("/my/awesome/file.txt"))
+      .WillRepeatedly(testing::Return(Filesystem::PathSplitResult{"/my/awesome", "file.txt"}));
+
+  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+}
+
 
 TEST_F(IpTaggingFilterTest, ExternalRequest) {
   const std::string external_request_yaml = R"EOF(
