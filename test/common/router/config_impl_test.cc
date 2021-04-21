@@ -321,9 +321,6 @@ most_specific_header_mutations_wins: {0}
     return fmt::format(yaml, most_specific_wins);
   }
 
-  // TODO(asraa) remove this when flipping fuzzers on.
-  Filesystem::ScopedUseMemfiles use_memfiles_{true};
-
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;

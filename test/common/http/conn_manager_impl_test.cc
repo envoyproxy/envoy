@@ -383,6 +383,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("404", headers.getStatusValue());
@@ -424,6 +425,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
@@ -453,6 +455,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
         EXPECT_EQ(normalized_path, header_map.getPathValue());
@@ -1026,6 +1029,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
         EXPECT_EQ(normalized_host, header_map.getHostValue());
@@ -2039,6 +2043,7 @@ public:
     // codec stream error
     EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
         .WillOnce(Return(stream_error_on_invalid_http_message));
+    EXPECT_CALL(*filter, encodeComplete());
     EXPECT_CALL(*filter, encodeHeaders(_, true));
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -2524,6 +2529,19 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With an invalid gRPC timeout, refreshing cached route will not use header and use stream
+  // duration.
+  latched_headers->setGrpcTimeout("6666666666666H");
+  {
+    // 25ms used already from previous case so timer is set to be 5ms.
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(5), _));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(2)
+        .WillRepeatedly(Return(std::chrono::milliseconds(30)));
     decoder_filters_[0]->callbacks_->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }

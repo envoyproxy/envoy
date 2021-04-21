@@ -22,9 +22,11 @@ class RouterFilterConfig
 public:
   RouterFilterConfig() : FactoryBase(HttpFilterNames::get().Router) {}
 
-  bool isTerminalFilter() override { return true; }
-
 private:
+  bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::router::v3::Router&,
+                                    Server::Configuration::FactoryContext&) override {
+    return true;
+  }
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::router::v3::Router& proto_config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;

@@ -15,6 +15,7 @@ exports_files(["example_configs_test_setup.sh"])
 
 envoy_cc_test(
     name = "example_configs_test",
+    size = "large",
     srcs = [
         "example_configs_test.cc",
     ],

@@ -5,19 +5,14 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                             public HttpIntegrationTest {
+class Http2IntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  Http2IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
-
-  void SetUp() override { setDownstreamProtocol(Http::CodecClient::Type::HTTP2); }
-
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
 
 protected:
@@ -47,8 +42,7 @@ public:
 class Http2MetadataIntegrationTest : public Http2IntegrationTest {
 public:
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpProtocolIntegrationTest::SetUp();
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
