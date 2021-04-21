@@ -1,5 +1,13 @@
-1.18.2 (April 15, 2021)
-=======================
+1.18.3 (Pending)
+================
+
+Incompatible Behavior Changes
+-----------------------------
+*Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+Minor Behavior Changes
+----------------------
+*Changes that may cause incompatibilities for some users, but should not for most*
 
 Bug Fixes
 ---------
@@ -16,4 +24,5 @@ Removed Config or Runtime
 New Features
 ------------
 
-code: fixed more build issues on our path to a glorious release.
+Deprecated
+----------
