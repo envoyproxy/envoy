@@ -43,13 +43,13 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
 
   uint32_t default_port = config_->port();
 
-  absl::string_view host = sni;
+  std::string host = std::string(sni).c_str();
   if (default_port == 0) {
     // Emded downstream TCP connection destination port into SNI hostname. This is necessary to
-    // differentiate DNS cache entries for the same hostname on different ports. This is not necessary
-    // when using the HTTP dynamic forward proxy since the port is embeded by the client
+    // differentiate DNS cache entries for the same hostname on different ports. This is not
+    // necessary when using the HTTP dynamic forward proxy since the port is embedded by the client
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host
-    host = absl::StrCat(sni, ":",
+    absl::StrAppend(&host, ":",
       read_callbacks_->connection().addressProvider().localAddress()->ip()->port());
   }
 
