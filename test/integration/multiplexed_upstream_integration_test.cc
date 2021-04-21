@@ -69,17 +69,14 @@ TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete
 }
 
 TEST_P(Http2UpstreamIntegrationTest, Retry) {
-  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
   testRetry();
 }
 
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) {
-  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
   testGrpcRetry();
 }
 
 TEST_P(Http2UpstreamIntegrationTest, Trailers) {
-  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
   testTrailers(1024, 2048, true, true);
 }
 
