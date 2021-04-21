@@ -7,8 +7,6 @@
 #include "gtest/gtest.h"
 
 using Envoy::Event::MockTimer;
-using testing::_;
-using testing::AnyNumber;
 using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
