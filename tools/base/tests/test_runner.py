@@ -77,8 +77,8 @@ def test_runner_log(patches):
         prefix="tools.base.runner")
 
     with patched as (m_logger, m_stream, m_filter, m_level, m_name):
-        _loggers = (MagicMock(), MagicMock())
-        m_stream.side_effect = _loggers
+        loggers = (MagicMock(), MagicMock())
+        m_stream.side_effect = loggers
         assert run.log == m_logger.return_value
     assert (
         list(m_logger.return_value.setLevel.call_args)
@@ -88,17 +88,17 @@ def test_runner_log(patches):
         == [[(sys.stdout,), {}],
             [(sys.stderr,), {}]])
     assert (
-        list(_loggers[0].setLevel.call_args)
+        list(loggers[0].setLevel.call_args)
         == [(logging.DEBUG,), {}])
     assert (
-        list(_loggers[0].addFilter.call_args)
+        list(loggers[0].addFilter.call_args)
         == [(m_filter.return_value,), {}])
     assert (
-        list(_loggers[1].setLevel.call_args)
+        list(loggers[1].setLevel.call_args)
         == [(logging.WARN,), {}])
     assert (
         list(list(c) for c in m_logger.return_value.addHandler.call_args_list)
-        == [[(_loggers[0],), {}], [(_loggers[1],), {}]])
+        == [[(loggers[0],), {}], [(loggers[1],), {}]])
     assert "log" in run.__dict__
 
 
@@ -178,15 +178,15 @@ def test_runner_log_filter(level):
 # BazelAdapter tests
 
 def test_bazeladapter_constructor():
-    _runner = DummyRunner()
-    adapter = runner.BazelAdapter(_runner)
-    assert adapter.context == _runner
+    run = DummyRunner()
+    adapter = runner.BazelAdapter(run)
+    assert adapter.context == run
 
 
 @pytest.mark.parametrize("query_returns", [0, 1])
 def test_bazeladapter_query(query_returns):
-    _runner = DummyForkingRunner()
-    adapter = runner.BazelAdapter(_runner)
+    run = DummyForkingRunner()
+    adapter = runner.BazelAdapter(run)
     fork_mock = patch("tools.base.runner.ForkingAdapter.subproc_run")
 
     with fork_mock as m_fork:
@@ -225,14 +225,14 @@ def test_bazeladapter_query(query_returns):
 @pytest.mark.parametrize("run_returns", [0, 1])
 @pytest.mark.parametrize("args", [(), ("foo",), ("foo", "bar")])
 def test_bazeladapter_run(patches, run_returns, cwd, raises, args, capture_output):
-    _runner = DummyForkingRunner()
-    adapter = runner.BazelAdapter(_runner)
+    run = DummyForkingRunner()
+    adapter = runner.BazelAdapter(run)
     patched = patches(
         "ForkingAdapter.subproc_run",
         ("ForkingRunner.path", dict(new_callable=PropertyMock)),
         prefix="tools.base.runner")
 
-    _args = ("BAZEL RUN",) + args
+    adapter_args = ("BAZEL RUN",) + args
     kwargs = {}
     if raises is not None:
         kwargs["raises"] = raises
@@ -245,9 +245,9 @@ def test_bazeladapter_run(patches, run_returns, cwd, raises, args, capture_outpu
         m_fork.return_value.returncode = run_returns
         if run_returns and (raises is not False):
             with pytest.raises(runner.BazelRunError) as result:
-                adapter.run(*_args, **kwargs)
+                adapter.run(*adapter_args, **kwargs)
         else:
-            result = adapter.run(*_args, **kwargs)
+            result = adapter.run(*adapter_args, **kwargs)
 
     call_args = (("--",) + args) if args else args
     bazel_args = ("bazel", "run", "BAZEL RUN") + call_args
@@ -275,14 +275,14 @@ def test_bazeladapter_run(patches, run_returns, cwd, raises, args, capture_outpu
 # ForkingAdapter tests
 
 def test_forkingadapter_constructor():
-    _runner = DummyRunner()
-    adapter = runner.ForkingAdapter(_runner)
-    assert adapter.context == _runner
+    run = DummyRunner()
+    adapter = runner.ForkingAdapter(run)
+    assert adapter.context == run
 
 
 def test_forkingadapter_call():
-    _runner = DummyRunner()
-    adapter = runner.ForkingAdapter(_runner)
+    run = DummyRunner()
+    adapter = runner.ForkingAdapter(run)
     fork_mock = patch("tools.base.runner.ForkingAdapter.subproc_run")
 
     with fork_mock as m_fork:
