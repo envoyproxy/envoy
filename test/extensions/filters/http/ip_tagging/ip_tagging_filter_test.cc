@@ -125,10 +125,15 @@ ip_tags:
   initializeFilter(internal_request_yaml);
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.4");
   EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
 }
 
 TEST_F(IpTaggingFilterTest, InternalRequest) {
