@@ -302,19 +302,17 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
                                                   std::string& main_header,
                                                   std::string& alternative_header,
                                                   absl::optional<size_t>& max_length) {
+  // subs is used only to check if there are more than 2 tokens separated by '?'.
   std::vector<std::string> subs;
-  parseCommand(token, start, "?", main_header, subs, max_length);
-  if (subs.size() > 1) {
+  alternative_header = "";
+  parseCommand(token, start, '?', max_length, main_header, alternative_header, subs);
+  if (!subs.empty()) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
         // docs/root/configuration/access_log.rst#format-rules
         absl::StrCat("More than 1 alternative header specified in token: ", token));
   }
-  if (subs.size() == 1) {
-    alternative_header = subs.front();
-  } else {
-    alternative_header = "";
-  }
+
   // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
   if (std::regex_search(main_header, getNewlinePattern()) ||
       std::regex_search(alternative_header, getNewlinePattern())) {
@@ -322,25 +320,24 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
   }
 }
 
-void SubstitutionFormatParser::parseCommand(const std::string& token, const size_t start,
-                                            const std::string& separator, std::string& main,
-                                            std::vector<std::string>& sub_items,
-                                            absl::optional<size_t>& max_length) {
-  // TODO(dnoe): Convert this to use string_view throughout.
-  const size_t end_request = token.find(')', start);
-  sub_items.clear();
-  if (end_request != token.length() - 1) {
+void SubstitutionFormatParser::tokenizeCommand(const std::string& command, const size_t start,
+                                               const char separator,
+                                               std::vector<absl::string_view>& tokens,
+                                               absl::optional<size_t>& max_length) {
+  const size_t end_request = command.find(')', start);
+  tokens.clear();
+  if (end_request != command.length() - 1) {
     // Closing bracket is not found.
     if (end_request == std::string::npos) {
-      throw EnvoyException(absl::StrCat("Closing bracket is missing in token: ", token));
+      throw EnvoyException(absl::StrCat("Closing bracket is missing in token: ", command));
     }
 
     // Closing bracket should be either last one or followed by ':' to denote limitation.
-    if (token[end_request + 1] != ':') {
-      throw EnvoyException(absl::StrCat("Incorrect position of ')' in token: ", token));
+    if (command[end_request + 1] != ':') {
+      throw EnvoyException(absl::StrCat("Incorrect position of ')' in token: ", command));
     }
 
-    const auto length_str = absl::string_view(token).substr(end_request + 2);
+    const auto length_str = absl::string_view(command).substr(end_request + 2);
     uint64_t length_value;
 
     if (!absl::SimpleAtoi(length_str, &length_value)) {
@@ -350,20 +347,10 @@ void SubstitutionFormatParser::parseCommand(const std::string& token, const size
     max_length = length_value;
   }
 
-  const std::string name_data = token.substr(start, end_request - start);
-  if (!separator.empty()) {
-    const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
-    if (!keys.empty()) {
-      // The main value is the first key
-      main = keys.at(0);
-      if (keys.size() > 1) {
-        // Sub items contain additional keys
-        sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
-      }
-    }
-  } else {
-    main = name_data;
-  }
+  absl::string_view name_data(command);
+  name_data.remove_prefix(start);
+  name_data.remove_suffix(command.length() - end_request);
+  tokens = absl::StrSplit(name_data, separator);
 }
 
 std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
@@ -406,7 +393,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     std::vector<std::string> path;
     const size_t start = DYNAMIC_META_TOKEN.size();
 
-    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    parseCommand(token, start, ':', max_length, filter_namespace, path);
     return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
   } else if (absl::StartsWith(token, CLUSTER_META_TOKEN)) {
     std::string filter_namespace;
@@ -414,22 +401,22 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     std::vector<std::string> path;
     const size_t start = CLUSTER_META_TOKEN.size();
 
-    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    parseCommand(token, start, ':', max_length, filter_namespace, path);
     return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
   } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
-    std::string key;
+    std::string key, serialize_type;
     absl::optional<size_t> max_length;
-    std::vector<std::string> path;
+    std::string path;
     const size_t start = FILTER_STATE_TOKEN.size();
 
-    parseCommand(token, start, ":", key, path, max_length);
+    parseCommand(token, start, ':', max_length, key, serialize_type);
     if (key.empty()) {
       throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
     }
 
-    const absl::string_view serialize_type =
-        !path.empty() ? path[path.size() - 1] : TYPED_SERIALIZATION;
-
+    if (serialize_type.empty()) {
+      serialize_type = TYPED_SERIALIZATION;
+    }
     if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
       throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
     }
