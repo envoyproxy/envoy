@@ -151,8 +151,16 @@ public:
   // Returns true if pool is the grid's HTTP/3 connection pool.
   bool isPoolHttp3(const ConnectionPool::Instance& pool);
 
+  // Returns true if HTTP/3 is currently broken. While HTTP/3 is broken the grid will not
+  // attempt to make new HTTP/3 connections.
   bool isHttp3Broken() const;
+
+  // Marks HTTP/3 broken for a period of time subject to exponential backoff. While HTTP/3
+  // is broken the grid will not attempt to make new HTTP/3 connections.
   void markHttp3Broken();
+
+  // Marks that HTTP/3 is working, which resets the exponential backoff counter in the
+  // event that HTTP/3 is marked broken again.
   void markHttp3Confirmed();
 
 private:
