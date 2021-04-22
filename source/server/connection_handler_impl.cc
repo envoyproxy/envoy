@@ -93,7 +93,8 @@ void ConnectionHandlerImpl::removeFilterChains(
       return;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  // Reach here if the target listener was removed by a full listener update.
+  completion();
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
