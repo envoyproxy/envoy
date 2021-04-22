@@ -97,6 +97,40 @@ ip_tags:
   EXPECT_THROW_WITH_MESSAGE(initializeFilter(request_yaml), EnvoyException, expected);
 }
 
+/**
+ * read internal request type from the file
+ */
+TEST_F(IpTaggingFilterTest, InternalRequestFromFile) {
+  const std::string internal_request_yaml = R"EOF(
+request_type: internal
+path: "/my/awesome/file.yaml"
+)EOF";
+  const std::string file_content = R"EOF(
+---
+ip_tags:
+  - ip_tag_name: internal_request
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+  EXPECT_CALL(*watcher_ptr_, addWatch("/my/awesome/", _, _));
+  EXPECT_CALL(factory_context, api()).Times(1);
+  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher_));
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce([this]() -> Filesystem::Watcher* {
+    return watcher_ptr_.release();
+  });
+  EXPECT_CALL(factory_context.api_.file_system_, fileReadToEnd("/my/awesome/file.yaml"))
+      .WillRepeatedly(testing::Return(file_content));
+  EXPECT_CALL(factory_context.api_.file_system_, splitPathFromFilename("/my/awesome/file.yaml"))
+      .WillRepeatedly(testing::Return(Filesystem::PathSplitResult{"/my/awesome", "file.yaml"}));
+  initializeFilter(internal_request_yaml);
+  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("1.2.3.4");
+  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
+      .WillOnce(ReturnRef(remote_address));
+}
+
 TEST_F(IpTaggingFilterTest, InternalRequest) {
   initializeFilter(internal_request_yaml);
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
@@ -123,34 +157,6 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 }
-
-/**
- * read internal request type from the file
- */
-TEST_F(IpTaggingFilterTest, InternalRequestsFromFile) {
-  const std::string internal_request_yaml = R"EOF(
-request_type: internal
-path: "/my/awesone/file.yaml"
-)EOF";
-  initializeFilter(internal_request_yaml);
-
-  EXPECT_CALL(*watcher_ptr_, addWatch("/my/awesome/", _, _));
-  EXPECT_CALL(factory_context, api()).Times(1);
-  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher_));
-  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce([this]() -> Filesystem::Watcher* {
-    return watcher_ptr_.release();
-  });
-  EXPECT_CALL(factory_context.api_.file_system_, splitPathFromFilename("/my/awesome/file.txt"))
-      .WillRepeatedly(testing::Return(Filesystem::PathSplitResult{"/my/awesome", "file.txt"}));
-
-  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
-  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
-
-}
-
 
 TEST_F(IpTaggingFilterTest, ExternalRequest) {
   const std::string external_request_yaml = R"EOF(
