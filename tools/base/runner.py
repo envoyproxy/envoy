@@ -86,7 +86,8 @@ class ForkingAdapter(object):
     def __call__(self, *args, **kwargs) -> subprocess.CompletedProcess:
         return self.subproc_run(*args, **kwargs)
 
-    def subproc_run(self, *args, capture_output: bool = True, **kwargs) -> subprocess.CompletedProcess:
+    def subproc_run(
+            self, *args, capture_output: bool = True, **kwargs) -> subprocess.CompletedProcess:
         """Fork a subprocess, using self.context.path as the cwd by default"""
         kwargs["cwd"] = kwargs.get("cwd", self.context.path)
         return subprocess.run(*args, capture_output=capture_output, **kwargs)
