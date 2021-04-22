@@ -31,6 +31,7 @@ public:
       read_callbacks_->connection().write(buf, false);
     } else {
       read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
+        std::cout << "TerminalServerTlsFilter flushed " << bytes << " bytes." << std::endl;
         // Wait until 6 bytes long "usetls" has been sent.
         if (bytes >= 6) {
           ASSERT(read_callbacks_->connection().startSecureTransport());
