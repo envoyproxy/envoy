@@ -116,8 +116,9 @@ public:
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         persistent_info.server_id_, persistent_info.crypto_config_.get(), &push_promise_index_,
         *dispatcher_,
-        /*send_buffer_limit=*/2 *
-            Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+        // Use smaller window then the configured one to have test coverage of client codec buffer
+        // exceeding high watermark.
+        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     session->Initialize();
     return session;
   }
