@@ -149,9 +149,8 @@ public:
    * Add or update a listener. Listeners are referenced by a unique name. If no name is provided,
    * the manager will allocate a UUID. Listeners that expect to be dynamically updated should
    * provide a unique name. The manager will search by name to find the existing listener that
-   * should be updated. The new listener must have the same configured address. The old listener
-   * will be gracefully drained once the new listener is ready to take traffic (e.g. when RDS has
-   * been initialized).
+   * should be updated. The old listener will be gracefully drained once the new listener is ready
+   * to take traffic (e.g. when RDS has been initialized).
    * @param config supplies the configuration proto.
    * @param version_info supplies the xDS version of the listener.
    * @param modifiable supplies whether the added listener can be updated or removed. If the

@@ -34,5 +34,7 @@ Removed Config or Runtime
 New Features
 ------------
 
+* listener: added ability to change an existing listener's address.
+
 Deprecated
 ----------
