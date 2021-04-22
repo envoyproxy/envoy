@@ -102,10 +102,18 @@ static void addGrpcRequestTags(Span& span, const Http::RequestHeaderMap& headers
 template <class T> static void addGrpcResponseTags(Span& span, const T& headers) {
   addTagIfNotNull(span, Tracing::Tags::get().GrpcStatusCode, headers.GrpcStatus());
   addTagIfNotNull(span, Tracing::Tags::get().GrpcMessage, headers.GrpcMessage());
-  // Set error tag when status is not OK.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
-  if (grpc_status_code &&
-      Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status_code.value()))) {
+
+  if (!grpc_status_code) {
+    return;
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.add_error_tag_when_grpc_status_is_5xx")) {
+      if (Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status_code.value()))) {
+        span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      }
+    } else if (grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
 }
