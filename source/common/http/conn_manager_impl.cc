@@ -1312,9 +1312,7 @@ absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
   // The BadRequest error code indicates there has been a messaging error.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
+  if (code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !response_encoder_->streamErrorOnInvalidHttpMessage()) {
     state_.saw_connection_close_ = true;
   }
@@ -1362,11 +1360,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_disable_keepalive_ref_.value())) {
     ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
-    if (connection_manager_.codec_->protocol() < Protocol::Http2 ||
-        Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2")) {
-      drain_connection_due_to_overload = true;
-    }
+    drain_connection_due_to_overload = true;
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
