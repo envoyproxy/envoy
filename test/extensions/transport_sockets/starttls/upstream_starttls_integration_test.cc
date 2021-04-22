@@ -95,7 +95,7 @@ public:
     UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
 
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
-      std::cout << "TerminalServerTlsFilter received from backend: " << data.toString()
+      std::cout << "StartTlsSwitchFilter received from backend: " << data.toString()
                 << std::endl;
 
       if (auto parent = parent_.lock()) {
@@ -154,6 +154,7 @@ void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream)
     ASSERT(upstream_connection_->startSecureTransport());
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "switch" has been sent.
+      std::cout << "StartTlsSwitchFilter flushed " << bytes << " bytes." << std::endl;
       if (bytes >= 6) {
         ASSERT(read_callbacks_->connection().startSecureTransport());
         // Unsubscribe the callback.

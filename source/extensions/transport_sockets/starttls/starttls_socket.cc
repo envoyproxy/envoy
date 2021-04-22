@@ -10,6 +10,7 @@ namespace StartTls {
 // Switch clear-text to secure transport.
 bool StartTlsSocket::startSecureTransport() {
   if (!using_tls_) {
+    std::cout << "Starting secure transport." << std::endl;
     tls_socket_->setTransportSocketCallbacks(*callbacks_);
     tls_socket_->onConnected();
     // TODO(cpakulski): deleting active_socket_ assumes
