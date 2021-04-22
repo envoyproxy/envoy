@@ -57,6 +57,8 @@ build:tsan-dev --copt -fsanitize=thread
 build:tsan-dev --linkopt -fsanitize=thread
 build:tsan-dev --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:tsan-dev --platform_suffix=-tsan
+# Needed due to https://github.com/libevent/libevent/issues/777
+build:tsan-dev --copt -DEVENT__DISABLE_DEBUG_MODE
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
