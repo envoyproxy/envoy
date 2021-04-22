@@ -10,7 +10,7 @@ namespace Http {
 // subject to exponential backoff.
 class Http3StatusTracker {
 public:
-  Http3StatusTracker(Event::Dispatcher& dispatcher);
+  explicit Http3StatusTracker(Event::Dispatcher& dispatcher);
 
   // Returns true if HTTP/3 is broken.
   bool isHttp3Broken() const;

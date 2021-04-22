@@ -9,7 +9,6 @@
 using Envoy::Event::MockTimer;
 using testing::NiceMock;
 using testing::Return;
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
@@ -17,11 +16,10 @@ namespace Http {
 namespace {
 class Http3StatusTrackerTest : public testing::Test {
 public:
-  Http3StatusTrackerTest()
-      : timer_(new StrictMock<MockTimer>(&dispatcher_)), tracker_(dispatcher_) {}
+  Http3StatusTrackerTest() : timer_(new MockTimer(&dispatcher_)), tracker_(dispatcher_) {}
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  StrictMock<MockTimer>* timer_; // Owned by tracker_;
+  MockTimer* timer_; // Owned by tracker_;
   Http3StatusTracker tracker_;
 };
 
@@ -62,7 +60,7 @@ TEST_F(Http3StatusTrackerTest, MarkBrokenThenExpires) {
 }
 
 TEST_F(Http3StatusTrackerTest, MarkBrokenWithBackoff) {
-  // markBroken will only be called when the time is not enabled.
+  // markBroken will only be called when the timer is not enabled.
   EXPECT_CALL(*timer_, enabled()).WillRepeatedly(Return(false));
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
