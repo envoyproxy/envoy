@@ -122,7 +122,9 @@ ip_tags:
       .WillRepeatedly(testing::Return(file_content));
   EXPECT_CALL(factory_context.api_.file_system_, splitPathFromFilename("/my/awesome/file.yaml"))
       .WillRepeatedly(testing::Return(Filesystem::PathSplitResult{"/my/awesome", "file.yaml"}));
+
   initializeFilter(internal_request_yaml);
+
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 

@@ -122,7 +122,14 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
-  const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
+
+  const Network::LcTrie::LcTrie<std::string>& trie() const {
+    if (watcher_ != nullptr) {
+      return watcher_->get();
+    } else {
+      return *trie_;
+    }
+  }
 
   void incHit(absl::string_view tag) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
@@ -184,7 +191,6 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  std::shared_ptr<const TagSetWatcher> watcher_;
   IpTaggingFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
