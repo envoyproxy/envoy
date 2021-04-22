@@ -222,6 +222,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
 
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram->name_ = "full-histogram-name";
+  histogram->used_ = true;
   histogram->setTagExtractedName("tag-histogram-name");
   histogram->setTags({{"a", "b"}});
   snapshot_.histograms_.push_back({*histogram});
