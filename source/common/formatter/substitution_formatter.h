@@ -157,7 +157,7 @@ private:
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
 template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
-template <class... Ts> StructFormatMapVisitorHelper(Ts...)->StructFormatMapVisitorHelper<Ts...>;
+template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
 
 /**
  * An formatter for structured log formats, which returns a Struct proto that
