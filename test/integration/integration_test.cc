@@ -964,9 +964,9 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // an inline sendLocalReply to make sure the "kick" works under the call stack
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
-  // When deprecating this flag, set hcm.mutable_stream_error_on_invalid_http_message true.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.hcm_stream_error_on_invalid_message",
-                                    "false");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
 
   autonomous_upstream_ = true;
   initialize();
