@@ -187,7 +187,7 @@ def test_bazeladapter_constructor():
 def test_bazeladapter_query(query_returns):
     _runner = DummyForkingRunner()
     adapter = runner.BazelAdapter(_runner)
-    fork_mock = patch("tools.base.runner.ForkingAdapter.fork")
+    fork_mock = patch("tools.base.runner.ForkingAdapter.subproc_run")
 
     with fork_mock as m_fork:
         m_fork.return_value.returncode = query_returns
@@ -228,7 +228,7 @@ def test_bazeladapter_run(patches, run_returns, cwd, raises, args, capture_outpu
     _runner = DummyForkingRunner()
     adapter = runner.BazelAdapter(_runner)
     patched = patches(
-        "ForkingAdapter.fork",
+        "ForkingAdapter.subproc_run",
         ("ForkingRunner.path", dict(new_callable=PropertyMock)),
         prefix="tools.base.runner")
 
@@ -283,7 +283,7 @@ def test_forkingadapter_constructor():
 def test_forkingadapter_call():
     _runner = DummyRunner()
     adapter = runner.ForkingAdapter(_runner)
-    fork_mock = patch("tools.base.runner.ForkingAdapter.fork")
+    fork_mock = patch("tools.base.runner.ForkingAdapter.subproc_run")
 
     with fork_mock as m_fork:
         assert (
@@ -302,7 +302,7 @@ def test_forkingadapter_call():
 @pytest.mark.parametrize("args", [(), ("a", "b")])
 @pytest.mark.parametrize("cwd", [None, "NONE", "PATH"])
 @pytest.mark.parametrize("capture_output", ["NONE", True, False])
-def test_forkingadapter_fork(patches, args, cwd, capture_output):
+def test_forkingadapter_subproc_run(patches, args, cwd, capture_output):
     adapter = runner.ForkingAdapter(DummyRunner())
     patched = patches(
         "subprocess.run",
@@ -315,7 +315,7 @@ def test_forkingadapter_fork(patches, args, cwd, capture_output):
             kwargs["cwd"] = cwd
         if capture_output != "NONE":
             kwargs["capture_output"] = capture_output
-        assert adapter.fork(*args, **kwargs) == m_run.return_value
+        assert adapter.subproc_run(*args, **kwargs) == m_run.return_value
 
     expected = {'capture_output': True, 'cwd': cwd}
     if capture_output is False:
@@ -334,11 +334,11 @@ def test_forkingrunner_fork():
     forking_mock = patch("tools.base.runner.ForkingAdapter")
 
     with forking_mock as m_fork:
-        assert run.fork == m_fork.return_value
+        assert run.subproc_run == m_fork.return_value
     assert (
         list(m_fork.call_args)
         == [(run,), {}])
-    assert "fork" in run.__dict__
+    assert "subproc_run" in run.__dict__
 
 
 # BazelRunner tests
