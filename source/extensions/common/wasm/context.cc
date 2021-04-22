@@ -1686,7 +1686,6 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, absl::string_view 
 
 Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   onCreate();
-  http_request_started_ = true;
   request_headers_ = &headers;
   end_of_stream_ = end_stream;
   auto result = convertFilterHeadersStatus(onRequestHeaders(headerSize(&headers), end_stream));
@@ -1697,7 +1696,7 @@ Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers
 }
 
 Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
   request_body_buffer_ = &data;
@@ -1721,7 +1720,7 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trailers) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterTrailersStatus::Continue;
   }
   request_trailers_ = &trailers;
@@ -1733,7 +1732,7 @@ Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trai
 }
 
 Http::FilterMetadataStatus Context::decodeMetadata(Http::MetadataMap& request_metadata) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterMetadataStatus::Continue;
   }
   request_metadata_ = &request_metadata;
@@ -1754,7 +1753,7 @@ Http::FilterHeadersStatus Context::encode100ContinueHeaders(Http::ResponseHeader
 
 Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                  bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterHeadersStatus::Continue;
   }
   response_headers_ = &headers;
@@ -1767,7 +1766,7 @@ Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
   response_body_buffer_ = &data;
@@ -1791,7 +1790,7 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterTrailersStatus::Continue;
   }
   response_trailers_ = &trailers;
@@ -1803,7 +1802,7 @@ Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& tra
 }
 
 Http::FilterMetadataStatus Context::encodeMetadata(Http::MetadataMap& response_metadata) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterMetadataStatus::Continue;
   }
   response_metadata_ = &response_metadata;

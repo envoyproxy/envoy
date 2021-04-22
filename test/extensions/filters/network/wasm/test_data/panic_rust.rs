@@ -3,7 +3,6 @@ use proxy_wasm::types::*;
 
 #[no_mangle]
 pub fn _start() {
-    proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_stream_context(|_, _| -> Box<dyn StreamContext> {
         Box::new(TestStream {})
     });

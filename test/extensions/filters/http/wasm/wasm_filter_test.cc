@@ -1820,6 +1820,130 @@ TEST_P(WasmHttpFilterTest, RootId2) {
             filter().decodeHeaders(request_headers, true));
 }
 
+TEST_P(WasmHttpFilterTest, PanicOnRequestHeaders) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+
+  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
+  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnRequestBody) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+
+  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
+  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create context without calling OnRequestHeaders.
+  filter().onCreate();
+  Buffer::OwnedImpl data("data");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter().decodeData(data, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnRequestTrailers) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+
+  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
+  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create context without calling OnRequestHeaders.
+  filter().onCreate();
+  Http::TestRequestTrailerMapImpl request_trailers{};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter().decodeTrailers(request_trailers));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnResponseHeaders) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create context without calling OnRequestHeaders.
+  filter().onCreate();
+  Http::TestResponseHeaderMapImpl response_headers{};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().encodeHeaders(response_headers, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnResponseBody) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create context without calling OnRequestHeaders.
+  filter().onCreate();
+  Buffer::OwnedImpl data("data");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter().encodeData(data, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnResponseTrailers) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create context without calling OnRequestHeaders.
+  filter().onCreate();
+  Buffer::OwnedImpl data("data");
+  Http::TestResponseTrailerMapImpl response_trailers{};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter().encodeTrailers(response_trailers));
+}
+
 } // namespace Wasm
 } // namespace HttpFilters
 } // namespace Extensions

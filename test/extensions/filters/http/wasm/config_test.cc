@@ -837,8 +837,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
 
   context->setDecoderFilterCallbacks(decoder_callbacks);
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
-  auto h = Http::TestResponseHeaderMapImpl{{":status", "503"}};
-  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&h), true));
+  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
+  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
   EXPECT_CALL(decoder_callbacks,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
