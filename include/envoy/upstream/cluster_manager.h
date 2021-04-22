@@ -92,8 +92,7 @@ enum class ClusterDiscoveryStatus {
  * process. The status of the discovery is sent as a parameter.
  */
 using ClusterDiscoveryCallback = std::function<void(ClusterDiscoveryStatus)>;
-using ClusterDiscoveryCallbackWeakPtr = std::weak_ptr<ClusterDiscoveryCallback>;
-using ClusterDiscoveryCallbackSharedPtr = std::shared_ptr<ClusterDiscoveryCallback>;
+using ClusterDiscoveryCallbackPtr = std::unique_ptr<ClusterDiscoveryCallback>;
 
 /**
  * ClusterDiscoveryCallbackHandle is a RAII wrapper for a ClusterDiscoveryCallback. Deleting the
@@ -116,9 +115,14 @@ public:
   /**
    * Request an on-demand discovery of a cluster with a passed name. This ODCDS may be used to
    * perform the discovery process in the main thread if there is no discovery going on for this
-   * cluster. The passed callback will be invoked when the cluster is added and warmed up. It is
-   * expected that the callback will be destroyed when it is invoked. To cancel the discovery,
-   * destroy the returned handle and the callback.
+   * cluster. When the requested cluster is added and warmed up, the passed callback will be invoked
+   * in the same thread that invoked this function.
+   *
+   * The returned handle can be destroyed to prevent the callback to be invoked. Note that the
+   * handle can only be destroyed in the same thread that invoked the function. Destroying the
+   * handle might not stop the discovery process, though. As soon as the callback is invoked,
+   * destroying the handle does nothing. It is a responsibility of the caller to make sure that the
+   * objects captured in the callback outlive the callback.
    *
    * This function is thread-safe.
    *
@@ -128,8 +132,7 @@ public:
    * @return ClusterDiscoveryCallbackHandlePtr the discovery process handle.
    */
   virtual ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(const std::string& name,
-                                  ClusterDiscoveryCallbackSharedPtr callback,
+  requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout) PURE;
 };
 

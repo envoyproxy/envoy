@@ -30,6 +30,7 @@
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/upstream/cluster_discovery_manager.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/od_cds_api_impl.h"
 #include "common/upstream/priority_conn_pool_map.h"
@@ -356,8 +357,7 @@ protected:
     }
 
     ClusterDiscoveryCallbackHandlePtr
-    requestOnDemandClusterDiscovery(const std::string& name,
-                                    ClusterDiscoveryCallbackSharedPtr callback,
+    requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                     std::chrono::milliseconds timeout) override {
       return parent_.requestOnDemandClusterDiscovery(odcds_, name, std::move(callback), timeout);
     }
@@ -378,81 +378,13 @@ protected:
   void notifyExpiredDiscovery(const std::string& name);
 
 private:
-  struct ThreadLocalClusterManagerImpl;
-
-  /** A thread-local on-demand cluster discovery manager. It takes care of invoking the discovery
-   *  callbacks in the event of a finished discovery. It does it by installing a cluster lifecycle
-   *  callback that invokes the discovery callbacks when a matching cluster just got added.
-   */
-  class ClusterDiscoveryManager : Logger::Loggable<Logger::Id::upstream> {
-  public:
-    ClusterDiscoveryManager(ThreadLocalClusterManagerImpl& parent);
-
-    /**
-     * Invoke the callbacks for the given cluster name. The discovery status is passed to the
-     * callbacks. After invoking the callbacks, they are dropped from the manager.
-     */
-    void processClusterName(const std::string& name, ClusterDiscoveryStatus cluster_status);
-
-    /**
-     * A pair containing a discovery handle and information whether a discovery for a given cluster
-     * was already requested in this thread.
-     */
-    struct Pair {
-      ClusterDiscoveryCallbackHandlePtr handle_ptr_;
-      bool discovery_in_progress_;
-    };
-
-    /**
-     * Adds the discovery callback. Returns a handle and a boolean indicating whether this worker
-     * thread has already requested the discovery of a cluster with a given name.
-     */
-    Pair addCallback(const std::string& name, const ClusterDiscoveryCallbackSharedPtr& callback);
-
-  private:
-    using CallbackList = std::list<ClusterDiscoveryCallbackWeakPtr>;
-    using CallbackListIterator = CallbackList::iterator;
-
-    /**
-     * An implementation of discovery handle. Destroy it to drop the callback from the discovery
-     * manager. It won't stop the discovery process, though.
-     */
-    class ClusterDiscoveryCallbackHandleImpl : public ClusterDiscoveryCallbackHandle {
-    public:
-      ClusterDiscoveryCallbackHandleImpl(ClusterDiscoveryManager& parent, std::string name,
-                                         CallbackListIterator it)
-          : parent_(parent), name_(std::move(name)), it_(std::move(it)) {}
-
-      ~ClusterDiscoveryCallbackHandleImpl() override { parent_.erase(name_, std::move(it_)); }
-
-    private:
-      ClusterDiscoveryManager& parent_;
-      const std::string name_;
-      CallbackListIterator it_;
-    };
-
-    /**
-     * Drops a callback from under the iterator from the manager without invoking the callback.
-     */
-    void erase(const std::string& name, CallbackListIterator it);
-    /**
-     * Try to erase a callback from under the given iterator. It returns a boolean value indicating
-     * whether the dropped callback was a last one for the given cluster.
-     */
-    bool eraseFromList(const std::string& name, CallbackListIterator it);
-
-    ThreadLocalClusterManagerImpl& parent_;
-    absl::flat_hash_map<std::string, CallbackList> pending_clusters_;
-    ClusterUpdateCallbacksHandlePtr callbacks_handle_;
-    std::unique_ptr<ClusterUpdateCallbacks> callbacks_;
-  };
-
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
    * central dynamic cluster (if applicable). It maintains load balancer state and any created
    * connection pools.
    */
-  struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
+  struct ThreadLocalClusterManagerImpl final : public ThreadLocal::ThreadLocalObject,
+                                               public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
           : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
@@ -560,7 +492,9 @@ private:
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
                                                   bool allocate = false);
-    ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb);
+
+    // Upstream::ClusterLifecycleCallbackHandler
+    ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) override;
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
@@ -699,8 +633,8 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, const std::string& name,
-                                  ClusterDiscoveryCallbackSharedPtr callback,
+  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, absl::string_view name,
+                                  ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout);
 
 private:

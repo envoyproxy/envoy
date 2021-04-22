@@ -64,11 +64,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cluster_discovery_manager_lib",
+    srcs = ["cluster_discovery_manager.cc"],
+    hdrs = ["cluster_discovery_manager.h"],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
         ":cds_api_lib",
+        ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":od_cds_api_lib",
