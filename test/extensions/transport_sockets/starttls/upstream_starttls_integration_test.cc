@@ -25,17 +25,14 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& buf, bool) override {
     auto message = buf.toString();
-    std::cout << "TerminalServerTlsFilter received: " << message << std::endl;
     if (message != "usetls") {
       // Just echo anything other than the 'usetls' command.
       read_callbacks_->connection().write(buf, false);
     } else {
       read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
-        std::cout << "TerminalServerTlsFilter flushed " << bytes << " bytes." << std::endl;
         // Wait until 6 bytes long "usetls" has been sent.
         if (bytes >= 6) {
-          std::cout << "TerminalServerTlsFilter startSecureTransport(): "
-                    << read_callbacks_->connection().startSecureTransport() << std::endl;
+          read_callbacks_->connection().startSecureTransport();
           // Unsubscribe the callback.
           // Switch to tls has been completed.
           return false;
@@ -70,7 +67,7 @@ private:
 // messages.
 class StartTlsSwitchFilter : public Network::ReadFilter {
 public:
-  ~StartTlsSwitchFilter() {
+  ~StartTlsSwitchFilter() override {
     if (upstream_connection_) {
       upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -97,7 +94,6 @@ public:
     UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
 
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
-      std::cout << "StartTlsSwitchFilter received from backend: " << data.toString() << std::endl;
       if (auto parent = parent_.lock()) {
         parent->upstreamWrite(data, end_stream);
         return Network::FilterStatus::Continue;
@@ -138,7 +134,6 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
 }
 
 Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool end_stream) {
-  std::cout << "StartTlsSwitchFilter received from frontend " << data.toString() << std::endl;
   if (end_stream) {
     upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
@@ -154,10 +149,8 @@ void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream)
     ASSERT_TRUE(upstream_connection_->startSecureTransport());
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "switch" has been sent.
-      std::cout << "StartTlsSwitchFilter flushed " << bytes << " bytes." << std::endl;
       if (bytes >= 6) {
-        std::cout << "StartTlsSwitchFilter startSecureTransport(): "
-                  << read_callbacks_->connection().startSecureTransport() << std::endl;
+        read_callbacks_->connection().startSecureTransport();
         // Unsubscribe the callback.
         // Switch to tls has been completed.
         return false;
@@ -401,8 +394,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  std::cout << "Waiting for 'hola' to echo" << std::endl;
-
   // Make sure we get our echo back
   ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(1000)));
   ASSERT_EQ("hola", payload_reader_->data());
@@ -410,7 +401,6 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   server_connection_->close(Network::ConnectionCloseType::FlushWrite);
-  std::cout << "Test finished." << std::endl;
 }
 
 INSTANTIATE_TEST_SUITE_P(StartTlsIntegrationTestSuite, StartTlsIntegrationTest,
