@@ -34,7 +34,7 @@ response_headers_to_add:
     header:
       key: x-test-rate-limit
       value: 'true'
-per_connection: true
+per_connection: {}
   )";
 
 class FilterTest : public testing::Test {
@@ -63,9 +63,6 @@ public:
 
     filter_2_ = std::make_shared<Filter>(config_);
     filter_2_->setDecoderFilterCallbacks(decoder_callbacks_2_);
-
-    filter_3_ = std::make_shared<Filter>(config_);
-    filter_3_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
     setupPerRoute(yaml, enabled, enforced);
@@ -87,21 +84,20 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
   std::shared_ptr<Filter> filter_2_;
-  std::shared_ptr<Filter> filter_3_;
 };
 
 TEST_F(FilterTest, Runtime) {
-  setup(fmt::format(config_yaml, "1"), false, false);
+  setup(fmt::format(config_yaml, "1", "false"), false, false);
   EXPECT_EQ(&runtime_, &(config_->runtime()));
 }
 
 TEST_F(FilterTest, ToErrorCode) {
-  setup(fmt::format(config_yaml, "1"), false, false);
+  setup(fmt::format(config_yaml, "1", "false"), false, false);
   EXPECT_EQ(Http::Code::BadRequest, toErrorCode(400));
 }
 
 TEST_F(FilterTest, Disabled) {
-  setup(fmt::format(config_yaml, "1"), false, false);
+  setup(fmt::format(config_yaml, "1", "false"), false, false);
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enabled"));
@@ -109,7 +105,18 @@ TEST_F(FilterTest, Disabled) {
 }
 
 TEST_F(FilterTest, RequestOk) {
-  setup(fmt::format(config_yaml, "1"));
+  setup(fmt::format(config_yaml, "1", "false"));
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_2_->decodeHeaders(headers, false));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(FilterTest, RequestOkPerConnection) {
+  setup(fmt::format(config_yaml, "1", "true"));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(headers, false));
@@ -120,7 +127,37 @@ TEST_F(FilterTest, RequestOk) {
 }
 
 TEST_F(FilterTest, RequestRateLimited) {
-  setup(fmt::format(config_yaml, "0"));
+  setup(fmt::format(config_yaml, "1", "false"));
+
+  EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
+      .WillOnce(Invoke([](Http::Code code, absl::string_view body,
+                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                          absl::string_view details) {
+        EXPECT_EQ(Http::Code::TooManyRequests, code);
+        EXPECT_EQ("local_rate_limited", body);
+
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+        modify_headers(response_headers);
+        EXPECT_EQ("true", response_headers.get(Http::LowerCaseString("x-test-rate-limit"))[0]
+                              ->value()
+                              .getStringView());
+
+        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(details, "local_rate_limited");
+      }));
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_2_->decodeHeaders(headers, false));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(FilterTest, RequestRateLimitedPerConnection) {
+  setup(fmt::format(config_yaml, "1", "true"));
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
@@ -141,14 +178,18 @@ TEST_F(FilterTest, RequestRateLimited) {
       }));
 
   auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_2_->decodeHeaders(headers, false));
+  EXPECT_EQ(4U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
 TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
-  setup(fmt::format(config_yaml, "0"), true, false);
+  setup(fmt::format(config_yaml, "0", "false"), true, false);
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _)).Times(0);
 
