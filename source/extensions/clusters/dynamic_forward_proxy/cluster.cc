@@ -170,8 +170,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     // when using the Host header since the port is embedded by the client
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host
     sni = std::string(context->downstreamConnection()->requestedServerName()).c_str();
-    absl::StrAppend(&sni, ":",
-      context->downstreamConnection()->addressProvider().localAddress()->ip()->port());
+    absl::StrAppend(
+        &sni, ":", context->downstreamConnection()->addressProvider().localAddress()->ip()->port());
     host = sni;
   }
 
