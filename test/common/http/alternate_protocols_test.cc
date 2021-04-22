@@ -59,6 +59,7 @@ TEST_F(AlternateProtocolsTest, FindAlternativesAfterReplacement) {
       protocols_.findAlternatives(origin1_);
   ASSERT_NE(nullptr, protocols);
   EXPECT_EQ(protocols2_, *protocols);
+  EXPECT_NE(protocols1_, *protocols);
 }
 
 TEST_F(AlternateProtocolsTest, FindAlternativesForMultipleOrigins) {

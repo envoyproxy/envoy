@@ -7,6 +7,8 @@
 
 #include "envoy/common/time.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -16,7 +18,7 @@ public:
   // Represents an HTTP origin to be connected too.
   struct Origin {
   public:
-    Origin(std::string scheme, std::string hostname, int port);
+    Origin(absl::string_view scheme, absl::string_view hostname, int port);
 
     bool operator==(const Origin& other) const {
       return std::tie(scheme_, hostname_, port_) ==
@@ -30,6 +32,21 @@ public:
              std::tie(other.scheme_, other.hostname_, other.port_);
     }
 
+    bool operator>(const Origin& other) const {
+      return std::tie(scheme_, hostname_, port_) >
+             std::tie(other.scheme_, other.hostname_, other.port_);
+    }
+
+    bool operator<=(const Origin& other) const {
+      return std::tie(scheme_, hostname_, port_) <=
+             std::tie(other.scheme_, other.hostname_, other.port_);
+    }
+
+    bool operator>=(const Origin& other) const {
+      return std::tie(scheme_, hostname_, port_) >=
+             std::tie(other.scheme_, other.hostname_, other.port_);
+    }
+
     std::string scheme_;
     std::string hostname_;
     int port_{};
@@ -38,19 +55,21 @@ public:
   // Represents an alternative protocol that can be used to connect to an origin.
   struct AlternateProtocol {
   public:
-    AlternateProtocol(std::string alpn, std::string hostname, int port);
+    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, int port);
 
     bool operator==(const AlternateProtocol& other) const {
       return std::tie(alpn_, hostname_, port_) ==
              std::tie(other.alpn_, other.hostname_, other.port_);
     }
 
+    bool operator!=(const AlternateProtocol& other) const { return !this->operator==(other); }
+
     std::string alpn_;
     std::string hostname_;
     int port_;
   };
 
-  AlternateProtocols(TimeSource& time_source);
+  explicit AlternateProtocols(TimeSource& time_source);
 
   // Sets the possible alternative protocols which can be used to connect to the
   // specified origin. Expires after the specified expiration time.
@@ -58,7 +77,9 @@ public:
                        const MonotonicTime& expiration);
 
   // Returns the possible alternative protocols which can be used to connect to the
-  // specified origin, or nullptr if not alternatives are found.
+  // specified origin, or nullptr if not alternatives are found. The returned pointer
+  // is owned by the AlternateProtocols and is valid until the next operation on
+  // AlternateProtocols.
   const std::vector<AlternateProtocol>* findAlternatives(const Origin& origin);
 
   // Returns the number of entries in the map.
@@ -66,7 +87,6 @@ public:
 
 private:
   struct Entry {
-  public:
     std::vector<AlternateProtocol> protocols_;
     MonotonicTime expiration_;
   };
@@ -75,7 +95,7 @@ private:
   TimeSource& time_source_;
 
   // Map from hostname to list of alternate protocols.
-  // TODO(RyanTheOptimist): Add a limit to size of this map and evict based on usage.
+  // TODO(RyanTheOptimist): Add a limit to the size of this map and evict based on usage.
   std::map<Origin, Entry> protocols_;
 };
 
