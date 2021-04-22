@@ -1350,6 +1350,17 @@ void ConfigHelper::setLocalReply(
   storeHttpConnectionManager(hcm_config);
 }
 
+void ConfigHelper::adjustUpstreamTimeoutForTsan(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
+  auto* route =
+      hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+  uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
+  auto* timeout = route->mutable_timeout();
+  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
+  // upstream_response_timeout.
+  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+}
+
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}
 
 void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& clusters) {
