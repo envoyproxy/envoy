@@ -1,6 +1,7 @@
 # 1. Fix linking with unbundled toolchain on macOS.
 # 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix MSAN linking.
+# 4. Fix "thread_in_wasm flag was not set" crash in debug builds (https://chromium-review.googlesource.com/c/v8/v8/+/2817598).
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -53,3 +54,58 @@
 
  if (use_libfuzzer && (is_linux || is_chromeos)) {
    if (is_asan) {
+--- wee8/src/execution/isolate.cc
++++ wee8/src/execution/isolate.cc
+@@ -1672,10 +1672,36 @@ Object Isolate::ReThrow(Object exception) {
+   return ReadOnlyRoots(heap()).exception();
+ }
+
++namespace {
++// This scope will set the thread-in-wasm flag after the execution of all
++// destructors. The thread-in-wasm flag is only set when the scope gets enabled.
++class SetThreadInWasmFlagScope {
++ public:
++  SetThreadInWasmFlagScope() {
++    DCHECK_IMPLIES(trap_handler::IsTrapHandlerEnabled(),
++                   !trap_handler::IsThreadInWasm());
++  }
++
++  ~SetThreadInWasmFlagScope() {
++    if (enabled_) trap_handler::SetThreadInWasm();
++  }
++
++  void Enable() { enabled_ = true; }
++
++ private:
++  bool enabled_ = false;
++};
++}  // namespace
++
+ Object Isolate::UnwindAndFindHandler() {
++  // Create the {SetThreadInWasmFlagScope} first in this function so that its
++  // destructor gets called after all the other destructors. It is important
++  // that the destructor sets the thread-in-wasm flag after all other
++  // destructors. The other destructors may cause exceptions, e.g. ASan on
++  // Windows, which would invalidate the thread-in-wasm flag when the wasm trap
++  // handler handles such non-wasm exceptions.
++  SetThreadInWasmFlagScope set_thread_in_wasm_flag_scope;
+   Object exception = pending_exception();
+-  DCHECK_IMPLIES(trap_handler::IsTrapHandlerEnabled(),
+-                 !trap_handler::IsThreadInWasm());
+
+   auto FoundHandler = [&](Context context, Address instruction_start,
+                           intptr_t handler_offset,
+@@ -1768,9 +1794,10 @@ Object Isolate::UnwindAndFindHandler() {
+                             StandardFrameConstants::kFixedFrameSizeAboveFp -
+                             wasm_code->stack_slots() * kSystemPointerSize;
+
+-        // This is going to be handled by Wasm, so we need to set the TLS flag.
+-        trap_handler::SetThreadInWasm();
+-
++        // This is going to be handled by WebAssembly, so we need to set the TLS
++        // flag. The {SetThreadInWasmFlagScope} will set the flag after all
++        // destructors have been executed.
++        set_thread_in_wasm_flag_scope.Enable();
+         return FoundHandler(Context(), wasm_code->instruction_start(), offset,
+                             wasm_code->constant_pool(), return_sp, frame->fp());
+       }
