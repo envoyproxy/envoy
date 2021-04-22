@@ -39,7 +39,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   try {
     TestUtility::validate(input);
-    ConfigImpl config(cleanRouteConfig(input.config()), factory_context,
+    ConfigImpl config(cleanRouteConfig(input.config()), OptionalHttpFilters(), factory_context,
                       ProtobufMessage::getNullValidationVisitor(), true);
     auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
     auto route = config.route(headers, stream_info, input.random_value());

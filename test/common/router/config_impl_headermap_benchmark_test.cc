@@ -56,7 +56,7 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
   Api::ApiPtr api(Api::createApiForTest());
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
-  ConfigImpl config(proto_config, factory_context, ProtobufMessage::getNullValidationVisitor(),
+  ConfigImpl config(proto_config, OptionalHttpFilters(), factory_context, ProtobufMessage::getNullValidationVisitor(),
                     true);
 
   const auto stream_info = NiceMock<Envoy::StreamInfo::MockStreamInfo>();

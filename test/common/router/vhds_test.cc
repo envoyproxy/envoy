@@ -76,7 +76,7 @@ vhds:
   RouteConfigUpdatePtr
   makeRouteConfigUpdate(const envoy::config::route::v3::RouteConfiguration& rc) {
     RouteConfigUpdatePtr config_update_info =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_);
+        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_, OptionalHttpFilters());
     config_update_info->onRdsUpdate(rc, "1");
     return config_update_info;
   }
