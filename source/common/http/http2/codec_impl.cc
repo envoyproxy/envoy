@@ -567,7 +567,13 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
-  decoder().decodeMetadata(std::move(metadata_map_ptr));
+  // Empty metadata maps should not be decoded.
+  if (metadata_map_ptr->empty()) {
+    ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);
+    parent_.stats_.metadata_empty_frames_.inc();
+  } else {
+    decoder().decodeMetadata(std::move(metadata_map_ptr));
+  }
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,

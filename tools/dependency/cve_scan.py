@@ -47,12 +47,20 @@ IGNORES_CVES = set([
     'CVE-2020-8169',
     'CVE-2020-8177',
     'CVE-2020-8284',
-    # Node.js issue unrelated to http-parse (Node TLS).
+    # Node.js issue unrelated to http-parser (Node TLS).
     'CVE-2020-8265',
     # Node.js request smuggling.
     # https://github.com/envoyproxy/envoy/pull/14686 validates that this does
     # not apply to Envoy.
     'CVE-2020-8287',
+    # Envoy is operating post Brotli 1.0.9 release, so not affected by this.
+    'CVE-2020-8927',
+    # Node.js issue unrelated to http-parser (*).
+    'CVE-2021-22883',
+    'CVE-2021-22884',
+    # False positive on the match heuristic, fixed in Curl 7.76.0.
+    'CVE-2021-22876',
+    'CVE-2021-22890',
 ])
 
 # Subset of CVE fields that are useful below.

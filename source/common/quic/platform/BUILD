@@ -63,9 +63,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
-        "http2_bug_tracker_impl.h",
         "http2_containers_impl.h",
-        "http2_estimate_memory_usage_impl.h",
         "http2_logging_impl.h",
         "http2_macros_impl.h",
         "http2_string_utils_impl.h",
@@ -93,8 +91,8 @@ envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
     hdrs = [
-        "quic_bug_tracker_impl.h",
         "quic_logging_impl.h",
+        "quiche_bug_tracker_impl.h",
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
@@ -114,19 +112,16 @@ envoy_cc_library(
         "quic_client_stats_impl.h",
         "quic_containers_impl.h",
         "quic_error_code_wrappers_impl.h",
-        "quic_estimate_memory_usage_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
         "quic_map_util_impl.h",
         "quic_mem_slice_impl.h",
         "quic_prefetch_impl.h",
-        "quic_ptr_util_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
         "quic_stack_trace_impl.h",
         "quic_stream_buffer_allocator_impl.h",
         "quic_testvalue_impl.h",
-        "quic_uint128_impl.h",
     ],
     external_deps = [
         "abseil_base",
@@ -247,8 +242,6 @@ envoy_cc_library(
     hdrs = [
         "quiche_flag_utils_impl.h",
         "quiche_logging_impl.h",
-        "quiche_map_util_impl.h",
-        "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
     ],
     external_deps = [
@@ -268,9 +261,7 @@ envoy_cc_library(
     hdrs = [
         "spdy_bug_tracker_impl.h",
         "spdy_containers_impl.h",
-        "spdy_estimate_memory_usage_impl.h",
         "spdy_logging_impl.h",
-        "spdy_mem_slice_impl.h",
         "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
@@ -290,13 +281,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "@com_googlesource_quiche//:quiche_common_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "spdy_platform_unsafe_arena_impl_lib",
-    hdrs = ["spdy_unsafe_arena_impl.h"],
-    visibility = ["//visibility:public"],
-    deps = ["@com_googlesource_quiche//:spdy_simple_arena_lib"],
 )
 
 envoy_cc_library(

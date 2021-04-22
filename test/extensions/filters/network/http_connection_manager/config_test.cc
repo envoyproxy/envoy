@@ -1278,7 +1278,7 @@ http_filters:
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -1850,6 +1850,7 @@ http_filters:
     config_source: { resource_api_version: V3, ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+      pass_through_mode: false
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
   )EOF";
