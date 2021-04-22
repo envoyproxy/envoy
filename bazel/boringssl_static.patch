@@ -1,5 +1,5 @@
 # 1. Fix linking on Windows.
-# 2. Use assembly optimizations on Linux-aarch64 (cherry-pick of https://boringssl.googlesource.com/boringssl/+/16c76acc78ef03dacbf2f65de178a2c382e14ca8).
+# 2. Use assembly optimizations on Linux-aarch64 (https://boringssl-review.googlesource.com/c/boringssl/+/47084).
 --- a/BUILD
 +++ b/BUILD
 @@ -18,6 +18,7 @@ load(
