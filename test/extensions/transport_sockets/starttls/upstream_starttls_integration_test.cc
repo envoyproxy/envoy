@@ -96,9 +96,7 @@ public:
     UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
 
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
-      std::cout << "StartTlsSwitchFilter received from backend: " << data.toString()
-                << std::endl;
-
+      std::cout << "StartTlsSwitchFilter received from backend: " << data.toString() << std::endl;
       if (auto parent = parent_.lock()) {
         parent->upstreamWrite(data, end_stream);
         return Network::FilterStatus::Continue;
