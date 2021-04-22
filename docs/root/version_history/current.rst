@@ -27,6 +27,9 @@ Removed Config or Runtime
 
 New Features
 ------------
-
+* http: a new field `is_optional` is added to `extensions.filters.network.http_connection_manager.v3.HttpFilter`. When
+  value is `true`, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter
+  in the typed per filter config. For more information, please reference
+  :ref:`HttpFilter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>`
 Deprecated
 ----------
