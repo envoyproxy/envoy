@@ -34,7 +34,8 @@ public:
         std::cout << "TerminalServerTlsFilter flushed " << bytes << " bytes." << std::endl;
         // Wait until 6 bytes long "usetls" has been sent.
         if (bytes >= 6) {
-          ASSERT(read_callbacks_->connection().startSecureTransport());
+          std::cout << "TerminalServerTlsFilter startSecureTransport(): "
+                    << read_callbacks_->connection().startSecureTransport() << std::endl;
           // Unsubscribe the callback.
           // Switch to tls has been completed.
           return false;
@@ -150,12 +151,13 @@ Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool 
 void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream) {
   const std::string message = buf.toString();
   if (message == "switch") {
-    ASSERT(upstream_connection_->startSecureTransport());
+    ASSERT_TRUE(upstream_connection_->startSecureTransport());
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "switch" has been sent.
       std::cout << "StartTlsSwitchFilter flushed " << bytes << " bytes." << std::endl;
       if (bytes >= 6) {
-        ASSERT(read_callbacks_->connection().startSecureTransport());
+        std::cout << "StartTlsSwitchFilter startSecureTransport(): "
+                  << read_callbacks_->connection().startSecureTransport() << std::endl;
         // Unsubscribe the callback.
         // Switch to tls has been completed.
         return false;
