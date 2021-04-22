@@ -113,11 +113,10 @@ void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
   Reset(envoyResetReasonToQuicRstError(reason));
 }
 
-void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
-  if (should_block) {
+void EnvoyQuicClientStream::switchStreamBlockState() {
+  if (read_disable_counter_ > 0) {
     sequencer()->SetBlockedUntilFlush();
   } else {
-    ASSERT(read_disable_counter_ == 0, "readDisable called in between.");
     sequencer()->SetUnblocked();
   }
 }
@@ -176,12 +175,9 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
 void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
-  ASSERT(read_disable_counter_ == 0);
-  ASSERT(!in_decode_data_callstack_);
   if (read_side_closed()) {
     return;
   }
-  in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
@@ -210,12 +206,6 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
-    in_decode_data_callstack_ = false;
-    if (read_disable_counter_ > 0) {
-      // If readDisable() was ever called during decodeData() and it meant to disable
-      // reading from downstream, the call must have been deferred. Call it now.
-      switchStreamBlockState(true);
-    }
     return;
   }
 
@@ -224,7 +214,6 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   maybeDecodeTrailers();
 
   OnFinRead();
-  in_decode_data_callstack_ = false;
 }
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,

@@ -47,7 +47,7 @@ public:
       : stats_(stats), http3_options_(http3_options),
         send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark), ENVOY_LOGGER()),
-        filter_manager_connection_(filter_manager_connection) {}
+        unblock_posted_(new bool{false}), filter_manager_connection_(filter_manager_connection) {}
 
   ~EnvoyQuicStream() override = default;
 
@@ -70,31 +70,22 @@ public:
       }
     }
 
-    if (status_changed && !in_decode_data_callstack_) {
-      // Avoid calling this while decoding data because transient disabling and
-      // enabling reading may trigger another decoding data inside the
-      // callstack which messes up stream state.
-      if (disable) {
-        // Block QUIC stream right away. And if there are queued switching
-        // state callback, update the desired state as well.
-        switchStreamBlockState(true);
-        if (unblock_posted_) {
-          should_block_ = true;
-        }
-      } else {
-        should_block_ = false;
-        if (!unblock_posted_) {
-          // If this is the first time unblocking stream is desired, post a
-          // callback to do it in next loop. This is because unblocking QUIC
-          // stream can lead to immediate upstream encoding.
-          unblock_posted_ = true;
-          connection()->dispatcher().post([this] {
-            unblock_posted_ = false;
-            switchStreamBlockState(should_block_);
-          });
-        }
-      }
+    if (!status_changed || *unblock_posted_) {
+      return;
     }
+    // If this is the first time blocking or unblocking stream is desired, post a
+    // callback to do it in the end of the event loop. This is because unblocking a quic
+    // stream can trigger another decoding inside the callstack which messes up stream state, and
+    // blocking a quic stream in a QUICHE callstack is not expected by QUICHE.
+    *unblock_posted_ = true;
+    connection()->dispatcher().post(
+        [this, still_alive_guard = std::weak_ptr<bool>(unblock_posted_)] {
+          if (still_alive_guard.expired()) {
+            return;
+          }
+          *unblock_posted_ = false;
+          switchStreamBlockState();
+        });
   }
 
   void addCallbacks(Http::StreamCallbacks& callbacks) override {
@@ -139,7 +130,7 @@ public:
   absl::string_view responseDetails() override { return details_; }
 
 protected:
-  virtual void switchStreamBlockState(bool should_block) PURE;
+  virtual void switchStreamBlockState() PURE;
 
   // Needed for ENVOY_STREAM_LOG.
   virtual uint32_t streamId() PURE;
@@ -149,10 +140,12 @@ protected:
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
   bool end_stream_decoded_{false};
+  // The latest state a QUIC stream blockage state change callback should look at. As
+  // more readDisable() calls may happen between the callback is posted and it's
+  // executed, the stream might be unblocked and blocked several times. If this
+  // counter is 0, the callback should unblock the stream. Otherwise it should
+  // block the stream.
   uint32_t read_disable_counter_{0u};
-  // If true, switchStreamBlockState() should be deferred till this variable
-  // becomes false.
-  bool in_decode_data_callstack_{false};
 
   Http::Http3::CodecStats& stats_;
   const envoy::config::core::v3::Http3ProtocolOptions& http3_options_;
@@ -171,12 +164,7 @@ private:
 
   // True if there is posted unblocking QUIC stream callback. There should be
   // only one such callback no matter how many times readDisable() is called.
-  bool unblock_posted_{false};
-  // The latest state an unblocking QUIC stream callback should look at. As
-  // more readDisable() calls may happen between the callback is posted and it's
-  // executed, the stream might be unblocked and blocked several times. Only the
-  // latest desired state should be considered by the callback.
-  bool should_block_{false};
+  std::shared_ptr<bool> unblock_posted_;
 
   QuicFilterManagerConnectionImpl& filter_manager_connection_;
 };

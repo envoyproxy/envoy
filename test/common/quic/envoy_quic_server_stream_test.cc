@@ -152,19 +152,19 @@ public:
 
   void receiveTrailers(size_t offset) {
     if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    spdy_trailers_["key1"] = "value1";
-    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
-    quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
-    quic_stream_->OnStreamFrame(frame);
-  } else {
+      spdy_trailers_["key1"] = "value1";
+      std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
+      quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
+      quic_stream_->OnStreamFrame(frame);
+    } else {
       trailers_.OnHeaderBlockStart();
-    trailers_.OnHeader("key1", "value1");
-    // ":final-offset" is required and stripped off by quic.
-    trailers_.OnHeader(":final-offset", absl::StrCat("", offset));
-    trailers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
-    quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(),
-                                     trailers_);
-  }
+      trailers_.OnHeader("key1", "value1");
+      // ":final-offset" is required and stripped off by quic.
+      trailers_.OnHeader(":final-offset", absl::StrCat("", offset));
+      trailers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
+      quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(),
+                                       trailers_);
+    }
   }
 
 protected:
@@ -334,10 +334,14 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   // Disable reading one more time.
   quic_stream_->readDisable(true);
   std::string second_part_request = bodyToStreamPayload("bbb");
-  // Receiving more data shouldn't push the receiving pipe line as the stream
-  // should have been marked blocked.
+  // Receiving more data in the same event loop will push the receiving pipe line.
+  EXPECT_CALL(stream_decoder_, decodeData(_, _))
+      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
+        EXPECT_EQ(3u, buffer.length());
+        EXPECT_EQ("bbb", buffer.toString());
+        EXPECT_FALSE(finished_reading);
+      }));
   quic::QuicStreamFrame frame(stream_id_, false, payload_offset, second_part_request);
-  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
   quic_stream_->OnStreamFrame(frame);
   payload_offset += second_part_request.length();
 
@@ -347,8 +351,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 
   // This data frame should also be buffered.
   std::string last_part_request = bodyToStreamPayload("ccc");
-  quic::QuicStreamFrame frame2(stream_id_, false, payload_offset,
-                               last_part_request);
+  quic::QuicStreamFrame frame2(stream_id_, false, payload_offset, last_part_request);
   quic_stream_->OnStreamFrame(frame2);
   payload_offset += last_part_request.length();
 
@@ -360,9 +363,8 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   // pushed to upstream.
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
       .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
-        std::string rest_request = "bbbccc";
-        EXPECT_EQ(rest_request.size(), buffer.length());
-        EXPECT_EQ(rest_request, buffer.toString());
+        EXPECT_EQ(3u, buffer.length());
+        EXPECT_EQ("ccc", buffer.toString());
         EXPECT_FALSE(finished_reading);
       }));
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_));
@@ -372,7 +374,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-// Tests that ReadDisable() doesn't cause re-entry of OnBodyAvailable().
+// Tests that readDisable() doesn't cause re-entry of OnBodyAvailable().
 TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
@@ -396,7 +398,9 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   std::string data = bodyToStreamPayload(payload);
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);
   quic_stream_->OnStreamFrame(frame);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
+  // The stream shouldn't be blocked in the next event loop.
   std::string last_part_request = bodyToStreamPayload("bbb");
   quic::QuicStreamFrame frame2(stream_id_, true, data.length(), last_part_request);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
@@ -404,47 +408,60 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         EXPECT_EQ("bbb", buffer.toString());
         EXPECT_TRUE(finished_reading);
       }));
-  
+
   quic_stream_->OnStreamFrame(frame2);
   // The posted unblock callback shouldn't trigger another decodeData.
- dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   std::string payload(1024, 'a');
-    EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& , bool) {
-          quic_stream_->readDisable(true);
-        }));
-    EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
-    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-      std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
-                                      bodyToStreamPayload(payload));
-      quic::QuicStreamFrame frame(stream_id_, false, 0, data);
-      quic_stream_->OnStreamFrame(frame);
-      EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-    } else {
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(Invoke(
+          [this](const Http::RequestHeaderMapPtr&, bool) { quic_stream_->readDisable(true); }));
+  EXPECT_CALL(stream_decoder_, decodeData(_, _));
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
+                                    bodyToStreamPayload(payload));
+    quic::QuicStreamFrame frame(stream_id_, false, 0, data);
+    quic_stream_->OnStreamFrame(frame);
+    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+  } else {
     quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
                                      request_headers_);
     EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
     quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
     quic_stream_->OnStreamFrame(frame);
-    }
-     EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  }
+  // Stream should be blocked in the next event loop.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // Receiving more date shouldn't trigger decoding.
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    std::string data = bodyToStreamPayload(payload);
+    quic::QuicStreamFrame frame(stream_id_, false, 0, data);
+    quic_stream_->OnStreamFrame(frame);
+  } else {
+    quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+  }
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponTrailers) {
   size_t payload_offset = receiveRequest(request_body_, false, request_body_.length() * 2);
   EXPECT_FALSE(quic_stream_->HasBytesToRead());
-  
-  EXPECT_CALL(stream_decoder_, decodeTrailers_(_)).WillOnce(Invoke([this](const Http::RequestTrailerMapPtr&){
-    quic_stream_->readDisable(true);
-  }));
+
+  EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
+      .WillOnce(
+          Invoke([this](const Http::RequestTrailerMapPtr&) { quic_stream_->readDisable(true); }));
   receiveTrailers(payload_offset);
 
-   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  EXPECT_TRUE(quic_stream_->IsDoneReading());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 // Tests that the stream with a send buffer whose high limit is 16k and low
