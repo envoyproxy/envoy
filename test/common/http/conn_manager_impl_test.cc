@@ -2612,6 +2612,57 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeoutUsesRouteTimeout) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that verifies route timeout is not used used if if grpc timeout header is not set and
+// max stream duration is not at route and HCM level when the runtime flag is set to false.
+TEST_F(HttpConnectionManagerImplTest, DurationTimeoutUsesRouteTimeoutLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.use_route_timeout_for_stream_timeout", "false"}});
+
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  setupFilterChain(1, 0);
+  RequestHeaderMap* latched_headers = nullptr;
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Create the stream.
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+            .WillByDefault(Return(std::chrono::milliseconds(0)));
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        latched_headers = headers.get();
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+  decoder_filters_[0]->callbacks_->clearRouteCache();
+  decoder_filters_[0]->callbacks_->clusterInfo();
+
+  // Since no max_stream_duration is specified and we should not enable any timers.
+  max_stream_duration_ = absl::nullopt;
+  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+      .Times(1)
+      .WillRepeatedly(Return(absl::nullopt));
+  decoder_filters_[0]->callbacks_->clearRouteCache();
+  decoder_filters_[0]->callbacks_->clusterInfo();
+  max_stream_duration_ = absl::nullopt;
+
+  // Cleanup.
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Per-route timeouts override the global stream idle timeout.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);

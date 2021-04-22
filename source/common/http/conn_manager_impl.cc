@@ -1190,7 +1190,9 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
       const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
       if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
         timeout = max_stream_duration.value();
-      } else if (route->timeout().count() != 0) {
+      } else if (Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.use_route_timeout_for_stream_timeout") &&
+                 route->timeout().count() != 0) {
         // If max stream duration is not set either at route/HCM level, use the route timeout.
         timeout = route->timeout();
       } else {
