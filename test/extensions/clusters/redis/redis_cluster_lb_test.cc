@@ -350,6 +350,9 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
   Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime())};
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
@@ -373,9 +376,9 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
 
   // Calling cluster slot update without change should not change assignment.
   std::vector<ClusterSlot> updated_slot{
-      ClusterSlot(0, 1000, hosts[0]->address()),
-      ClusterSlot(1001, 2000, hosts[1]->address()),
-      ClusterSlot(2001, 16383, hosts[2]->address()),
+      ClusterSlot(0, 1000, hosts[3]->address()),
+      ClusterSlot(1001, 2000, hosts[4]->address()),
+      ClusterSlot(2001, 16383, hosts[5]->address()),
   };
   EXPECT_EQ(false, factory_->onClusterSlotUpdate(
                        std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts));
