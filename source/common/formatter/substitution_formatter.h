@@ -76,17 +76,17 @@ public:
     tokenizeCommand(command, start, separator, tokens, max_length);
     std::vector<absl::string_view>::iterator it = tokens.begin();
     (
-        [&](auto& token) {
+        [&](auto& param) {
           if (it != tokens.end()) {
-            if constexpr (std::is_same_v<typename std::remove_reference<decltype(token)>::type,
+            if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
                                          std::string>) {
               // Compile time handler for std::string.
-              token = *it;
+              param = *it;
               it++;
             } else {
               // Compile time handler for container type. It will catch all remaining tokens and
               // move iterator to the end.
-              token.insert(token.begin(), it, tokens.end());
+              param.insert(param.begin(), it, tokens.end());
               it = tokens.end();
             }
           }
