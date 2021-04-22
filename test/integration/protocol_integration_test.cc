@@ -2348,7 +2348,7 @@ TEST_P(ProtocolIntegrationTest, EnableStripTrailingHostDot) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -2375,7 +2375,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
                                      {":scheme", "http"},
                                      {":authority", "host."}});
   // Expect local reply as request host fails to match configured domains.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
