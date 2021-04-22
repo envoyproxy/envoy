@@ -1,3 +1,4 @@
+#include "envoy/network/transport_socket.h"
 #include "envoy/server/lifecycle_notifier.h"
 
 #include "extensions/common/wasm/wasm.h"
@@ -373,6 +374,61 @@ TEST_P(WasmNetworkFilterTest, StopAndResumeUpstreamViaAsyncCall) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onWrite(fake_upstream_data, false));
 
   EXPECT_NE(callbacks, nullptr);
+}
+
+TEST_P(WasmNetworkFilterTest, PanicOnNewConnection) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupConfig("", "panic");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::critical, _))
+      .Times(testing::AtMost(1)); // Rust logs on panic.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onNewConnection());
+
+  // Should close both up and down streams.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+}
+
+TEST_P(WasmNetworkFilterTest, PanicOnDownstreamData) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupConfig("", "panic");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::critical, _))
+      .Times(testing::AtMost(1)); // Rust logs on panic.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_downstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onData(fake_downstream_data, false));
+
+  // Should close downstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+}
+
+TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupConfig("", "panic");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::critical, _))
+      .Times(testing::AtMost(1)); // Rust logs on panic.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_downstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onWrite(fake_downstream_data, false));
+
+  // Should close upstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
 }
 
 } // namespace Wasm
