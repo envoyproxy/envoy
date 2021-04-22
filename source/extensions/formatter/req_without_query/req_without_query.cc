@@ -2,16 +2,12 @@
 
 #include <string>
 
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Formatter {
-
-void stripQueryString(std::string& path) {
-  const size_t query_pos = path.find('?');
-  path = std::string(path.data(), query_pos != path.npos ? query_pos : path.size());
-}
 
 void truncate(std::string& str, absl::optional<uint32_t> max_length) {
   if (!max_length) {
@@ -36,8 +32,7 @@ absl::optional<std::string> ReqWithoutQuery::format(const Http::RequestHeaderMap
     return absl::nullopt;
   }
 
-  std::string val = std::string(header->value().getStringView());
-  stripQueryString(val);
+  std::string val = Http::Utility::stripQueryString(header->value());
   truncate(val, max_length_);
 
   return val;
@@ -53,8 +48,7 @@ ProtobufWkt::Value ReqWithoutQuery::formatValue(const Http::RequestHeaderMap& re
     return ValueUtil::nullValue();
   }
 
-  std::string val = std::string(header->value().getStringView());
-  stripQueryString(val);
+  std::string val = Http::Utility::stripQueryString(header->value());
   truncate(val, max_length_);
   return ValueUtil::stringValue(val);
 }
