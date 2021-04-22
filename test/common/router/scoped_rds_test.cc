@@ -177,10 +177,9 @@ scope_key_builder:
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
-        ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
-                                                scoped_routes_config.rds_config_source(),
-                                                scoped_routes_config.scope_key_builder(),
-                                                optional_http_filters));
+        ScopedRoutesConfigProviderManagerOptArg(
+            scoped_routes_config.name(), scoped_routes_config.rds_config_source(),
+            scoped_routes_config.scope_key_builder(), optional_http_filters));
     srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -197,8 +196,7 @@ scope_key_builder:
 
   // Helper function which pushes an update to given RDS subscription, the start(_) of the
   // subscription must have been called.
-  void pushRdsConfig(const std::vector<std::string>& route_config_names,
-                     const std::string& version,
+  void pushRdsConfig(const std::vector<std::string>& route_config_names, const std::string& version,
                      const std::string& override_config_tmpl = "") {
     std::string route_config_tmpl = R"EOF(
       name: {}
@@ -250,7 +248,7 @@ scope_key_builder:
       "foo.scoped_rds.foo_scoped_routes.on_demand_scopes", Stats::Gauge::ImportMode::Accumulate)};
 };
 
-// Test an exception will be throwed when unknown factory in the per-virtualhost typed config.
+// Test an exception will be throw when unknown factory in the per-virtualhost typed config.
 TEST_F(ScopedRdsTest, UnknownFactoryForPerVirtualHostTypedConfig) {
   setup();
   init_watcher_.expectReady().Times(0); // The onConfigUpdate will simply throw an exception.
@@ -281,10 +279,8 @@ key:
             "@type": type.googleapis.com/google.protobuf.Struct
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-    pushRdsConfig({"foo_routes"}, "111", route_config_tmpl),
-    EnvoyException,
-    "Didn't find a registered implementation for name: 'filter.unknown'");
+  EXPECT_THROW_WITH_MESSAGE(pushRdsConfig({"foo_routes"}, "111", route_config_tmpl), EnvoyException,
+                            "Didn't find a registered implementation for name: 'filter.unknown'");
 }
 
 // Test ignoring the optional unknown factory in the per-virtualhost typed config.
@@ -320,7 +316,7 @@ key:
             "@type": type.googleapis.com/google.protobuf.Struct
 )EOF";
 
-    pushRdsConfig({"foo_routes"}, "111", route_config_tmpl);
+  pushRdsConfig({"foo_routes"}, "111", route_config_tmpl);
 }
 
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.

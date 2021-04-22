@@ -165,12 +165,10 @@ http_filters:
     )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-    RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                    server_factory_context_, validation_visitor_,
-                                    outer_init_manager_, "foo.",
-                                    *route_config_provider_manager_),
-    EnvoyException,
-    "Didn't find a registered implementation for name: 'filter.unknown'");
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
+                                      server_factory_context_, validation_visitor_,
+                                      outer_init_manager_, "foo.", *route_config_provider_manager_),
+      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
 }
 
 TEST_F(RdsImplTest, RdsAndStaticWithOptionalUnknownFilterPerVirtualHostConfig) {
@@ -194,9 +192,8 @@ http_filters:
     )EOF";
 
   RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                  server_factory_context_, validation_visitor_,
-                                  outer_init_manager_, "foo.",
-                                  *route_config_provider_manager_);
+                                  server_factory_context_, validation_visitor_, outer_init_manager_,
+                                  "foo.", *route_config_provider_manager_);
 }
 
 TEST_F(RdsImplTest, DestroyDuringInitialize) {
@@ -296,7 +293,8 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
 }
 
-// validate there will be exception throwed when unknown factory found for per virtualhost typed config.
+// validate there will be exception throw when unknown factory found for per virtualhost typed
+// config.
 TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
   InSequence s;
 
@@ -344,8 +342,7 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException,
-      "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
 }
 
 // validate the optional unknown factory will be ignored for per virtualhost typed config.
@@ -412,7 +409,7 @@ http_filters:
   rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 }
 
-// validate there will be exception throwed when unknown factory found for per route typed config.
+// validate there will be exception throw when unknown factory found for per route typed config.
 TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
   InSequence s;
 
@@ -460,8 +457,7 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException,
-      "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
 }
 
 // validate the optional unknown factory will be ignored for per route typed config.
@@ -787,8 +783,8 @@ virtual_hosts:
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
-          parseRouteConfigurationFromV3Yaml(config_yaml), OptionalHttpFilters(), server_factory_context_,
-          validation_visitor_);
+          parseRouteConfigurationFromV3Yaml(config_yaml), OptionalHttpFilters(),
+          server_factory_context_, validation_visitor_);
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
@@ -948,8 +944,8 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
   Init::ManagerImpl real_init_manager("real");
 
   RouteConfigProviderSharedPtr provider2 =
-      route_config_provider_manager_->createRdsRouteConfigProvider(rds_, OptionalHttpFilters(), mock_factory_context2,
-                                                                   "foo_prefix", real_init_manager);
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds_, OptionalHttpFilters(), mock_factory_context2, "foo_prefix", real_init_manager);
 
   EXPECT_FALSE(provider2->configInfo().has_value());
 

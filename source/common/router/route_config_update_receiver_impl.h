@@ -25,8 +25,7 @@ public:
         last_config_hash_(0ull), last_vhds_config_hash_(0ul),
         vhds_virtual_hosts_(
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
-        vhds_configuration_changed_(true),
-        optional_http_filters_(optional_http_filters) {}
+        vhds_configuration_changed_(true), optional_http_filters_(optional_http_filters) {}
 
   void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,

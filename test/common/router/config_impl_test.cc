@@ -61,8 +61,8 @@ public:
                  Server::Configuration::ServerFactoryContext& factory_context,
                  bool validate_clusters_default,
                  const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters())
-      : ConfigImpl(config, optional_http_filters, factory_context, ProtobufMessage::getNullValidationVisitor(),
-                   validate_clusters_default),
+      : ConfigImpl(config, optional_http_filters, factory_context,
+                   ProtobufMessage::getNullValidationVisitor(), validate_clusters_default),
         config_(config) {}
 
   void setupRouteConfig(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
@@ -7831,7 +7831,9 @@ public:
         << "config value does not match expected for source: " << source;
   }
 
-  void checkNoPerFilterConfig(const std::string& yaml, const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters()) {
+  void
+  checkNoPerFilterConfig(const std::string& yaml,
+                         const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters()) {
     const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                                 optional_http_filters);
 
@@ -8112,8 +8114,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
 }
 
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
@@ -8154,8 +8155,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Didn't find a registered implementation for name: 'filter.unknown'");
+      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {

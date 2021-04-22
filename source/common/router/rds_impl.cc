@@ -72,8 +72,7 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
-    const std::string& stat_prefix,
-    const OptionalHttpFilters& optional_http_filters,
+    const std::string& stat_prefix, const OptionalHttpFilters& optional_http_filters,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::RouteConfiguration>(
           rds.config_source().resource_api_version(),
@@ -91,15 +90,15 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       local_init_manager_(fmt::format("RDS local-init-manager {}", route_config_name_)),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier),
-      optional_http_filters_(optional_http_filters) {
+      manager_identifier_(manager_identifier), optional_http_filters_(optional_http_filters) {
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
           resource_decoder_, {});
   local_init_manager_.add(local_init_target_);
-  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context, optional_http_filters_);
+  config_update_info_ =
+      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context, optional_http_filters_);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -239,13 +238,12 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     : subscription_(std::move(subscription)),
       config_update_info_(subscription_->routeConfigUpdate()), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
-      tls_(factory_context.threadLocal()),
-      optional_http_filters_(optional_http_filters) {
+      tls_(factory_context.threadLocal()), optional_http_filters_(optional_http_filters) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
-    initial_config = std::make_shared<ConfigImpl>(config_update_info_->protobufConfiguration(),
-                                                  optional_http_filters_,
-                                                  factory_context_, validator_, false);
+    initial_config =
+        std::make_shared<ConfigImpl>(config_update_info_->protobufConfiguration(),
+                                     optional_http_filters_, factory_context_, validator_, false);
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }
@@ -350,8 +348,8 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         rds, manager_identifier, factory_context, stat_prefix, optional_http_filters, *this));
     init_manager.add(subscription->parent_init_target_);
-    RdsRouteConfigProviderImplSharedPtr new_provider{
-        new RdsRouteConfigProviderImpl(std::move(subscription), factory_context, optional_http_filters)};
+    RdsRouteConfigProviderImplSharedPtr new_provider{new RdsRouteConfigProviderImpl(
+        std::move(subscription), factory_context, optional_http_filters)};
     dynamic_route_config_providers_.insert(
         {manager_identifier, std::weak_ptr<RdsRouteConfigProviderImpl>(new_provider)});
     return new_provider;
@@ -372,9 +370,8 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  auto provider = std::make_unique<StaticRouteConfigProviderImpl>(route_config, optional_http_filters,
-                                                                  factory_context,
-                                                                  validator, *this);
+  auto provider = std::make_unique<StaticRouteConfigProviderImpl>(
+      route_config, optional_http_filters, factory_context, validator, *this);
   static_route_config_providers_.insert(provider.get());
   return provider;
 }

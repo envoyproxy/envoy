@@ -548,16 +548,15 @@ key:
   };
 
   config_helper_.addConfigModifier(
-    [](
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-            http_connection_manager) {
-      auto* filter = http_connection_manager.mutable_http_filters()->Add();
-      filter->set_name("filter.unknown");
-      filter->set_is_optional("true");
-      // keep router the last
-      auto size = http_connection_manager.http_filters_size();
-      http_connection_manager.mutable_http_filters()->SwapElements(size - 2, size - 1);
-    });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             http_connection_manager) {
+        auto* filter = http_connection_manager.mutable_http_filters()->Add();
+        filter->set_name("filter.unknown");
+        filter->set_is_optional("true");
+        // keep router the last
+        auto size = http_connection_manager.http_filters_size();
+        http_connection_manager.mutable_http_filters()->SwapElements(size - 2, size - 1);
+      });
 
   initialize();
   registerTestServerPorts({"http"});

@@ -174,8 +174,7 @@ class VirtualHostImpl : public VirtualHost {
 public:
   VirtualHostImpl(
       const envoy::config::route::v3::VirtualHost& virtual_host,
-      const OptionalHttpFilters& optional_http_filters,
-      const ConfigImpl& global_route_config,
+      const OptionalHttpFilters& optional_http_filters, const ConfigImpl& global_route_config,
       Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
       ProtobufMessage::ValidationVisitor& validator,
       const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);

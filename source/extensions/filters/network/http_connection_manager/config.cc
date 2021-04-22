@@ -522,7 +522,8 @@ void HttpConnectionManagerConfig::processFilter(
           proto_config, proto_config.is_optional());
   // null pointer returned only when the filter is optional, then skip all the processes.
   if (factory == nullptr) {
-    ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}", proto_config.name());
+    ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}",
+              proto_config.name());
     return;
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(

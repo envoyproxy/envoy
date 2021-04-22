@@ -1739,8 +1739,9 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownHttpFilterWithException) {
   - name: envoy.filters.http.unknown
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                          "Didn't find a registered implementation for name: 'envoy.filters.http.unknown");
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOptionalHttpFilterWithIgnore) {

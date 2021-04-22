@@ -110,8 +110,8 @@ public:
 
   ScopedRdsConfigSubscription(
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
-      const OptionalHttpFilters& optional_http_filters,
-      const uint64_t manager_identifier, const std::string& name,
+      const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
+      const std::string& name,
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
