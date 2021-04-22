@@ -536,11 +536,6 @@ public:
   virtual Stats::StatName statName() const PURE;
 
   /**
-   * @return the name of the virtual host.
-   */
-  virtual const std::string& name() const PURE;
-
-  /**
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;

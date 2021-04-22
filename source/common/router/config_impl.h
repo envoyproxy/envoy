@@ -181,7 +181,6 @@ public:
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
-  const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
@@ -236,7 +235,6 @@ private:
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   const Stats::StatNameManagedStorage stat_name_storage_;
-  const std::string name_;
   Stats::ScopePtr vcluster_scope_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;

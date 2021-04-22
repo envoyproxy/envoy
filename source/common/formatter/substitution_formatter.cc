@@ -907,16 +907,6 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           }
           return absl::nullopt;
         });
-  } else if (field_name == "VHOST") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
-          std::string vhost_name;
-          const Router::RouteEntry* route = stream_info.routeEntry();
-          if (route != nullptr) {
-            vhost_name = route->virtualHost().name();
-          }
-          return vhost_name.empty() ? absl::nullopt : absl::make_optional<std::string>(vhost_name);
-        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
