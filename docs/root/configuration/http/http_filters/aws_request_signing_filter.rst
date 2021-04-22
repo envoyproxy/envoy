@@ -51,5 +51,7 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  signing_added, Counter, Total authentication headers added to requests
-  signing_failed, Counter, Total requests for which a signature was not added
+  signing_added, Counter, Total requests for which signing succeeded (includes payload_signing_added)
+  signing_failed, Counter, Total requests for which signing failed (includes payload_signing_failed)
+  payload_signing_added, Counter, Total requests for which the payload was buffered signing succeeded
+  payload_signing_failed, Counter, Total requests for which the payload was buffered but signing failed
