@@ -17,6 +17,8 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+  ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(store_));
 }
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;

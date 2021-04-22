@@ -520,7 +520,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
-    int i, absl::string_view prefix, const char* filter_chain_type,
+    int i, const std::string& prefix, const std::string& filter_chain_type,
     bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
     DependencyManager& dependency_manager) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
@@ -541,7 +541,7 @@ void HttpConnectionManagerConfig::processFilter(
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   dependency_manager.registerFilter(factory.name(), *factory.dependencies());
-  bool is_terminal = factory.isTerminalFilter();
+  bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
   Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
@@ -559,7 +559,7 @@ void HttpConnectionManagerConfig::processFilter(
 
 void HttpConnectionManagerConfig::processDynamicFilterConfig(
     const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-    FilterFactoriesList& filter_factories, const char* filter_chain_type,
+    FilterFactoriesList& filter_factories, const std::string& filter_chain_type,
     bool last_filter_in_current_config) {
   ENVOY_LOG(debug, "      dynamic filter name: {}", name);
   if (config_discovery.apply_default_config_without_warming() &&
@@ -575,13 +575,11 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
       throw EnvoyException(
           fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
     }
-    Config::Utility::validateTerminalFilters(name, factory->name(), filter_chain_type,
-                                             factory->isTerminalFilter(),
-                                             last_filter_in_current_config);
   }
 
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery, name, context_, stats_prefix_);
+      config_discovery, name, context_, stats_prefix_, last_filter_in_current_config,
+      filter_chain_type);
   filter_factories.push_back(std::move(filter_config_provider));
 }
 
