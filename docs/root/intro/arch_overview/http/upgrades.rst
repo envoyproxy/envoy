@@ -14,7 +14,11 @@ pass through the default HTTP filter chain. To avoid the use of HTTP-only filter
 one can set up custom
 :ref:`filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.filters>`
 for the given upgrade type, up to and including only using the router filter to send the HTTP
-data upstream.
+data upstream. Note that buffering is generally not compatible with upgrades, so if the
+:ref:`Buffer filter <envoy_v3_api_msg_extensions.filters.http.buffer.v3.Buffer>` is configured in
+the default HTTP filter chain it should probably be excluded for upgrades by using
+:ref:`upgrade filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.filters>`
+and not including the buffer filter in that list.
 
 Upgrades can be enabled or disabled on a :ref:`per-route <envoy_v3_api_field_config.route.v3.RouteAction.upgrade_configs>` basis.
 Any per-route enabling/disabling automatically overrides HttpConnectionManager configuration as
@@ -93,6 +97,11 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
 
 For an example of proxying connect, please see :repo:`configs/proxy_connect.yaml <configs/proxy_connect.yaml>`
 For an example of terminating connect, please see :repo:`configs/terminate_connect.yaml <configs/terminate_connect.yaml>`
+
+Note that for CONNECT-over-tls, Envoy can not currently be configured to do the CONNECT request in the clear
+and encrypt previously unencrypted payload in one hop. To send CONNECT in plaintext and encrypt the payload,
+one must first forward the HTTP payload over an "upstream" TLS loopback connection to encrypt it, then have
+a TCP listener take the encrypted payload and send the CONNECT upstream.
 
 .. _tunneling-tcp-over-http:
 

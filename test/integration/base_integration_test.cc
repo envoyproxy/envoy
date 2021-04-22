@@ -17,6 +17,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/config/api_version.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
@@ -66,6 +67,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -93,6 +95,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
 }
 
 void BaseIntegrationTest::initialize() {
+  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;

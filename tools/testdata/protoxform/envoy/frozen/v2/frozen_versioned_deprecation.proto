@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package envoy.frozen.v2;
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+
+option (udpa.annotations.file_status).package_version_status = FROZEN;
+
+message FrozenVersionedDeprecation {
+  int32 foo = 1;
+  int32 bar = 2 [deprecated = true];
+  int32 baz = 3 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.5"];
+}

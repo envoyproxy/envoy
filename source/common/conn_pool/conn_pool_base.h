@@ -84,16 +84,32 @@ public:
     CLOSED // Connection is closed and object is queued for destruction.
   };
 
+  State state() const { return state_; }
+
+  void setState(State state) {
+    // If the client is transitioning to draining, update the remaining
+    // streams and pool and cluster capacity.
+    if (state == State::DRAINING) {
+      drain();
+    }
+    state_ = state;
+  }
+
+  // Sets the remaining streams to 0, and updates pool and cluster capacity.
+  virtual void drain();
+
   ConnPoolImplBase& parent_;
   uint32_t remaining_streams_;
   uint32_t concurrent_stream_limit_;
-  State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
   Event::TimerPtr connect_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
+
+private:
+  State state_{State::CONNECTING};
 };
 
 // PendingStream is the base class tracking streams for which a connection has been created but not
@@ -204,7 +220,9 @@ public:
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
-  void decrClusterStreamCapacity(uint32_t delta) { state_.decrConnectingStreamCapacity(delta); }
+  void decrClusterStreamCapacity(uint32_t delta) {
+    state_.decrConnectingAndConnectedStreamCapacity(delta);
+  }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
@@ -217,6 +235,13 @@ public:
   friend std::ostream& operator<<(std::ostream& os, const ConnPoolImplBase& s) {
     s.dumpState(os);
     return os;
+  }
+  Upstream::ClusterConnectivityState& state() { return state_; }
+
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.decrConnectingAndConnectedStreamCapacity(delta);
+    ASSERT(connecting_stream_capacity_ >= delta);
+    connecting_stream_capacity_ -= delta;
   }
 
 protected:
@@ -258,14 +283,9 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void incrConnectingStreamCapacity(uint32_t delta) {
-    state_.incrConnectingStreamCapacity(delta);
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
     connecting_stream_capacity_ += delta;
-  }
-  void decrConnectingStreamCapacity(uint32_t delta) {
-    state_.decrConnectingStreamCapacity(delta);
-    ASSERT(connecting_stream_capacity_ > delta);
-    connecting_stream_capacity_ -= delta;
   }
 
   Upstream::ClusterConnectivityState& state_;

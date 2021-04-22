@@ -176,6 +176,40 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, Http3Configured) {
+  const std::string yaml_string = R"EOF(
+codec_type: http3
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+#ifdef ENVOY_ENABLE_QUIC
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException, "HTTP3 configured but not enabled in the build.");
+#endif
+}
+
 TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -1244,7 +1278,7 @@ http_filters:
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -1816,6 +1850,7 @@ http_filters:
     config_source: { resource_api_version: V3, ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+      pass_through_mode: false
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
   )EOF";

@@ -67,6 +67,12 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
+  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3::DeltaDiscoveryResponse>&
+  grpcStreamForTest() {
+    return grpc_stream_;
+  }
+
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher)

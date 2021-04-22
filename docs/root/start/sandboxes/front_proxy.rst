@@ -8,7 +8,7 @@ Front proxy
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
 `docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front Envoy and a

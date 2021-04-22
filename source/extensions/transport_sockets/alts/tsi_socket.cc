@@ -17,7 +17,9 @@ TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator ha
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator)
     : TsiSocket(handshaker_factory, handshake_validator,
-                std::make_unique<Network::RawBufferSocket>()) {}
+                std::make_unique<Network::RawBufferSocket>()) {
+  raw_read_buffer_.setWatermarks(default_max_frame_size_);
+}
 
 TsiSocket::~TsiSocket() { ASSERT(!handshaker_); }
 
@@ -25,8 +27,8 @@ void TsiSocket::setTransportSocketCallbacks(Envoy::Network::TransportSocketCallb
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
-  noop_callbacks_ = std::make_unique<NoOpTransportSocketCallbacks>(callbacks);
-  raw_buffer_socket_->setTransportSocketCallbacks(*noop_callbacks_);
+  tsi_callbacks_ = std::make_unique<TsiTransportSocketCallbacks>(callbacks, raw_read_buffer_);
+  raw_buffer_socket_->setTransportSocketCallbacks(*tsi_callbacks_);
 }
 
 std::string TsiSocket::protocol() const {
@@ -124,6 +126,8 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
         tsi_handshaker_result_get_unused_bytes(handshaker_result, &unused_bytes, &unused_byte_size);
     ASSERT(status == TSI_OK);
     if (unused_byte_size > 0) {
+      // All handshake data is consumed.
+      ASSERT(raw_read_buffer_.length() == 0);
       raw_read_buffer_.prepend(
           absl::string_view{reinterpret_cast<const char*>(unused_bytes), unused_byte_size});
     }
@@ -141,6 +145,9 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     // used in tsi_socket_test.cc implements the interface returning the max frame size.
     tsi_zero_copy_grpc_protector_max_frame_size(frame_protector, &actual_frame_size_to_use_);
 
+    // Reset the watermarks with actual negotiated max frame size.
+    raw_read_buffer_.setWatermarks(
+        std::max<size_t>(actual_frame_size_to_use_, callbacks_->connection().bufferLimit()));
     frame_protector_ = std::make_unique<TsiFrameProtector>(frame_protector);
 
     handshake_complete_ = true;
@@ -165,48 +172,91 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
   return Network::PostIoAction::KeepOpen;
 }
 
+Network::IoResult TsiSocket::repeatReadAndUnprotect(Buffer::Instance& buffer,
+                                                    Network::IoResult prev_result) {
+  Network::IoResult result = prev_result;
+  uint64_t total_bytes_processed = 0;
+
+  while (true) {
+    // Do unprotect.
+    if (raw_read_buffer_.length() > 0) {
+      uint64_t prev_size = buffer.length();
+      ENVOY_CONN_LOG(debug, "TSI: unprotecting buffer size: {}", callbacks_->connection(),
+                     raw_read_buffer_.length());
+      tsi_result status = frame_protector_->unprotect(raw_read_buffer_, buffer);
+      if (status != TSI_OK) {
+        ENVOY_CONN_LOG(debug, "TSI: unprotect failed: status: {}", callbacks_->connection(),
+                       status);
+        result.action_ = Network::PostIoAction::Close;
+        break;
+      }
+      ASSERT(raw_read_buffer_.length() == 0);
+      ENVOY_CONN_LOG(debug, "TSI: unprotected buffer left: {} result: {}", callbacks_->connection(),
+                     raw_read_buffer_.length(), tsi_result_to_string(status));
+      total_bytes_processed += buffer.length() - prev_size;
+
+      // Check if buffer needs to be drained.
+      if (callbacks_->shouldDrainReadBuffer()) {
+        callbacks_->setTransportSocketIsReadable();
+        break;
+      }
+    }
+
+    if (result.action_ == Network::PostIoAction::Close) {
+      break;
+    }
+
+    // End of stream is reached in the previous read.
+    if (end_stream_read_) {
+      result.end_stream_read_ = true;
+      break;
+    }
+    // Do another read.
+    result = readFromRawSocket();
+    // No data is read.
+    if (result.bytes_processed_ == 0) {
+      break;
+    }
+  };
+  result.bytes_processed_ = total_bytes_processed;
+  ENVOY_CONN_LOG(debug, "TSI: do read result action {} bytes {} end_stream {}",
+                 callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
+                 result.end_stream_read_);
+  return result;
+}
+
+Network::IoResult TsiSocket::readFromRawSocket() {
+  Network::IoResult result = raw_buffer_socket_->doRead(raw_read_buffer_);
+  end_stream_read_ = result.end_stream_read_;
+  read_error_ = result.action_ == Network::PostIoAction::Close;
+  return result;
+}
+
 Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
   Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false};
-  if (!end_stream_read_ && !read_error_) {
-    result = raw_buffer_socket_->doRead(raw_read_buffer_);
-    ENVOY_CONN_LOG(debug, "TSI: raw read result action {} bytes {} end_stream {}",
-                   callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
-                   result.end_stream_read_);
-    if (result.action_ == Network::PostIoAction::Close && result.bytes_processed_ == 0) {
-      return result;
-    }
-
-    if (!handshake_complete_ && result.end_stream_read_ && result.bytes_processed_ == 0) {
-      return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_};
-    }
-
-    end_stream_read_ = result.end_stream_read_;
-    read_error_ = result.action_ == Network::PostIoAction::Close;
-  }
-
   if (!handshake_complete_) {
+    if (!end_stream_read_ && !read_error_) {
+      result = readFromRawSocket();
+      ENVOY_CONN_LOG(debug, "TSI: raw read result action {} bytes {} end_stream {}",
+                     callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
+                     result.end_stream_read_);
+      if (result.action_ == Network::PostIoAction::Close && result.bytes_processed_ == 0) {
+        return result;
+      }
+
+      if (result.end_stream_read_ && result.bytes_processed_ == 0) {
+        return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_};
+      }
+    }
     Network::PostIoAction action = doHandshake();
     if (action == Network::PostIoAction::Close || !handshake_complete_) {
       return {action, 0, false};
     }
   }
-
-  if (handshake_complete_) {
-    ASSERT(frame_protector_);
-
-    uint64_t read_size = raw_read_buffer_.length();
-    ENVOY_CONN_LOG(debug, "TSI: unprotecting buffer size: {}", callbacks_->connection(),
-                   raw_read_buffer_.length());
-    tsi_result status = frame_protector_->unprotect(raw_read_buffer_, buffer);
-    ENVOY_CONN_LOG(debug, "TSI: unprotected buffer left: {} result: {}", callbacks_->connection(),
-                   raw_read_buffer_.length(), tsi_result_to_string(status));
-    result.bytes_processed_ = read_size - raw_read_buffer_.length();
-  }
-
-  ENVOY_CONN_LOG(debug, "TSI: do read result action {} bytes {} end_stream {}",
-                 callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
-                 result.end_stream_read_);
-  return result;
+  // Handshake finishes.
+  ASSERT(handshake_complete_);
+  ASSERT(frame_protector_);
+  return repeatReadAndUnprotect(buffer, result);
 }
 
 Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {

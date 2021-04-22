@@ -7,14 +7,14 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
-        "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
-  build_setup_args="-nofetch"
+          "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
+          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+    build_setup_args="-nofetch"
 fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
-export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}" 
+export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
 if [[ -z "$NO_BUILD_SETUP" ]]; then
@@ -302,18 +302,17 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
-  # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS=(
     "--define" "signal_trace=disabled"
     "--define" "hot_restart=disabled"
     "--define" "google_grpc=disabled"
     "--define" "boringssl=fips"
     "--define" "log_debug_assert_in_release=enabled"
-    "--define" "quiche=enabled"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng"
+    "--@envoy//bazel:http3=False"
     "--@envoy//source/extensions/filters/http/kill_request:enabled"
     "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
 
@@ -408,7 +407,6 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
 
   echo "fix_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
@@ -419,7 +417,6 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
@@ -459,11 +456,26 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   # Validate repository metadata.
   "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+
+  # Run pip requirements tests
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check "${ENVOY_SRCDIR}"
+
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
+  exit 0
+elif [[ "$CI_TARGET" == "tooling" ]]; then
+  echo "Run pytest tooling tests..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_pytest -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_coverage -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_checker -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_runner -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_utils -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:pytest_python_check -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pytest_pip_check -- --cov-collect  /tmp/.coverage-envoy
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:python_coverage -- --fail-under=95 /tmp/.coverage-envoy /source/generated/tooling
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" wasm-cc
