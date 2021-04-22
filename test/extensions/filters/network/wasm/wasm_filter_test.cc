@@ -263,8 +263,13 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
   // Do not expect this call, because proxy_log is not allowed
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))))
       .Times(0);
-  EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
-
+  if (std::get<1>(GetParam()) == "rust") {
+    // Rust code panics on WasmResult::InternalFailure returned by restricted calls, and
+    // that eventually results in calling failStream on post VM failure check after onNewConnection.
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onNewConnection());
+  } else {
+    EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
+  }
   // Do not expect this call, because proxy_log is not allowed
   EXPECT_CALL(filter(),
               log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))))

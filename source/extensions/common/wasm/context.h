@@ -217,6 +217,7 @@ public:
       decoder_callbacks_->clearRouteCache();
     }
   }
+  void failStream(WasmStreamType stream_type) override;
 
   // Header/Trailer/Metadata Maps
   WasmResult addHeaderMapValue(WasmHeaderMapType type, absl::string_view key,
