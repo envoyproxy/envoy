@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <string>
 
 #if defined(__GNUC__)
@@ -97,13 +98,6 @@ public:
     spdy_request_headers_[":authority"] = host_;
     spdy_request_headers_[":method"] = "POST";
     spdy_request_headers_[":path"] = "/";
-
-    trailers_.OnHeaderBlockStart();
-    trailers_.OnHeader("key1", "value1");
-    // ":final-offset" is required and stripped off by quic.
-    trailers_.OnHeader(":final-offset", absl::StrCat("", request_body_.length()));
-    trailers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
-    spdy_trailers_["key1"] = "value1";
   }
 
   void TearDown() override {
@@ -154,6 +148,23 @@ public:
     quic_stream_->OnStreamFrame(frame);
     EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
     return payload.length();
+  }
+
+  void receiveTrailers(size_t offset) {
+    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    spdy_trailers_["key1"] = "value1";
+    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
+    quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
+    quic_stream_->OnStreamFrame(frame);
+  } else {
+      trailers_.OnHeaderBlockStart();
+    trailers_.OnHeader("key1", "value1");
+    // ":final-offset" is required and stripped off by quic.
+    trailers_.OnHeader(":final-offset", absl::StrCat("", offset));
+    trailers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
+    quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(),
+                                     trailers_);
+  }
   }
 
 protected:
@@ -249,14 +260,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
         EXPECT_EQ("value1", headers->get(key1)[0]->value().getStringView());
         EXPECT_TRUE(headers->get(key2).empty());
       }));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
-    quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
-    quic_stream_->OnStreamFrame(frame);
-  } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(),
-                                     trailers_);
-  }
+  receiveTrailers(offset);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
@@ -276,7 +280,7 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   // Trailer should be delivered to HCM later after body arrives.
-  quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
+  receiveTrailers(request_body_.length());
 
   quic::QuicStreamFrame frame(stream_id_, false, 0, request_body_);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
@@ -335,6 +339,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   quic::QuicStreamFrame frame(stream_id_, false, payload_offset, second_part_request);
   EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
   quic_stream_->OnStreamFrame(frame);
+  payload_offset += second_part_request.length();
 
   // Re-enable reading just once shouldn't unblock stream.
   quic_stream_->readDisable(false);
@@ -342,9 +347,14 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 
   // This data frame should also be buffered.
   std::string last_part_request = bodyToStreamPayload("ccc");
-  quic::QuicStreamFrame frame2(stream_id_, true, payload_offset + second_part_request.length(),
+  quic::QuicStreamFrame frame2(stream_id_, false, payload_offset,
                                last_part_request);
   quic_stream_->OnStreamFrame(frame2);
+  payload_offset += last_part_request.length();
+
+  // Trailers should also be buffered.
+  EXPECT_CALL(stream_decoder_, decodeTrailers_(_)).Times(0);
+  receiveTrailers(payload_offset);
 
   // Unblock stream now. The remaining data in the receiving buffer should be
   // pushed to upstream.
@@ -353,8 +363,9 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
         std::string rest_request = "bbbccc";
         EXPECT_EQ(rest_request.size(), buffer.length());
         EXPECT_EQ(rest_request, buffer.toString());
-        EXPECT_TRUE(finished_reading);
+        EXPECT_FALSE(finished_reading);
       }));
+  EXPECT_CALL(stream_decoder_, decodeTrailers_(_));
   quic_stream_->readDisable(false);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -393,9 +404,47 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         EXPECT_EQ("bbb", buffer.toString());
         EXPECT_TRUE(finished_reading);
       }));
-
+  
   quic_stream_->OnStreamFrame(frame2);
+  // The posted unblock callback shouldn't trigger another decodeData.
+ dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
+TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
+  std::string payload(1024, 'a');
+    EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& , bool) {
+          quic_stream_->readDisable(true);
+        }));
+    EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+      std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
+                                      bodyToStreamPayload(payload));
+      quic::QuicStreamFrame frame(stream_id_, false, 0, data);
+      quic_stream_->OnStreamFrame(frame);
+      EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+    } else {
+    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                     request_headers_);
+    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+
+    quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+    }
+     EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
+TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponTrailers) {
+  size_t payload_offset = receiveRequest(request_body_, false, request_body_.length() * 2);
+  EXPECT_FALSE(quic_stream_->HasBytesToRead());
+  
+  EXPECT_CALL(stream_decoder_, decodeTrailers_(_)).WillOnce(Invoke([this](const Http::RequestTrailerMapPtr&){
+    quic_stream_->readDisable(true);
+  }));
+  receiveTrailers(payload_offset);
+
+   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 // Tests that the stream with a send buffer whose high limit is 16k and low
