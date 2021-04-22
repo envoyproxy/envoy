@@ -80,11 +80,11 @@ public:
           if (it != tokens.end()) {
             if constexpr (std::is_same_v<typename std::remove_reference<decltype(token)>::type,
                                          std::string>) {
-              // compile time handler for std::string
+              // Compile time handler for std::string.
               token = *it;
               it++;
             } else {
-              // Compile time for container type. It will catch all remaining tokens and
+              // Compile time handler for container type. It will catch all remaining tokens and
               // move iterator to the end.
               token.insert(token.begin(), it, tokens.end());
               it = tokens.end();
