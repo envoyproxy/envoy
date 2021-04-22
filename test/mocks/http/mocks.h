@@ -225,9 +225,9 @@ public:
 
   // Http::StreamDecoderFilterCallbacks
   void sendLocalReply_mock(Code code, absl::string_view body,
-                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                       absl::string_view details, bool retain_http_status_for_grpc = false);
+                           std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details, bool retain_http_status_for_grpc = false);
 
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);

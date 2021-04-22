@@ -82,7 +82,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    absl::string_view details, bool retain_http_status_for_grpc) {
         sendLocalReply_mock(code, body, modify_headers, grpc_status, details,
-                        retain_http_status_for_grpc);
+                            retain_http_status_for_grpc);
       }));
   ON_CALL(*this, routeConfig())
       .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
