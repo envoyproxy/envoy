@@ -98,7 +98,7 @@ class PythonChecker(checker.ForkingChecker):
 
     def on_checks_complete(self) -> int:
         if self.diff_file_path and self.has_failed:
-            result = self.fork(["git", "diff", "HEAD"])
+            result = self.subproc_run(["git", "diff", "HEAD"])
             with open(self.diff_file_path, "wb") as f:
                 f.write(result.stdout)
         return super().on_checks_complete()

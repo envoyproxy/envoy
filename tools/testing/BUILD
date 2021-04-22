@@ -40,3 +40,11 @@ envoy_py_binary(
         requirement("coverage"),
     ],
 )
+
+envoy_py_binary(
+    name = "tools.testing.all_pytests",
+    deps = [
+        "//tools/base:checker",
+        "//tools/base:utils",
+    ],
+)

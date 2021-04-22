@@ -222,11 +222,12 @@ class Checker(runner.Runner):
             self.log.warning("\n".join(warnings))
 
 
-class ForkingChecker(Checker):
+class ForkingChecker(runner.ForkingRunner, Checker):
+    pass
 
-    @cached_property
-    def fork(self):
-        return runner.ForkingAdapter(self)
+
+class BazelChecker(runner.BazelRunner, Checker):
+    pass
 
 
 class CheckerSummary(object):
