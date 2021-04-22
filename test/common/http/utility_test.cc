@@ -641,8 +641,6 @@ TEST(HttpUtility, SendLocalGrpcReplyPropagateResponseTrue) {
 
   auto encode_functions = Utility::EncodeFunctions{
       [&](ResponseHeaderMap& headers) -> void {
-        // set header used as config conduit, will be cleared after check
-        headers.addCopy(Http::Headers::get().ExtAuthzGrpcHttpDeny, "true");
         headers.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
       },
       nullptr,
@@ -670,8 +668,6 @@ TEST(HttpUtility, SendLocalGrpcReplyPropagateResponseFalse) {
 
   auto encode_functions = Utility::EncodeFunctions{
       [&](ResponseHeaderMap& headers) -> void {
-        // set header used as config conduit, will be cleared after check
-        headers.addCopy(Http::Headers::get().ExtAuthzGrpcHttpDeny, "not-true");
         headers.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
       },
       nullptr,

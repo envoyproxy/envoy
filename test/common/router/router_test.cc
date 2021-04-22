@@ -172,9 +172,9 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
         return Http::HeaderUtility::checkRequiredHeaders(headers);
       }));
   EXPECT_CALL(callbacks_,
-              sendLocalReply(Http::Code::ServiceUnavailable,
-                             testing::Eq("missing required header: :method"), _, _,
-                             "filter_removed_required_headers{missing required header: :method}"))
+              sendLocalReply(
+                  Http::Code::ServiceUnavailable, testing::Eq("missing required header: :method"),
+                  _, _, "filter_removed_required_headers{missing required header: :method}", _))
       .WillOnce(testing::InvokeWithoutArgs([] {}));
   router_.decodeHeaders(headers, true);
   router_.onDestroy();
@@ -3441,7 +3441,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   // Normally, sendLocalReply will actually send the reply, but in this case the
   // HCM will detect the headers have already been sent and not route through
   // the encoder again.
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).WillOnce(testing::InvokeWithoutArgs([] {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _, _)).WillOnce(testing::InvokeWithoutArgs([] {
   }));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
