@@ -251,25 +251,33 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
     sink.flush(snapshot_);
   }
 
+  io::prometheus::client::LabelPair expected_label_pair;
+  expected_label_pair.set_name("a");
+  expected_label_pair.set_value("b");
+
   // When the emit_tags flag is true, we emit the tags as labels and use the tag extracted name.
   MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, true, true);
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([&expected_label_pair](MetricsPtr&& metrics) {
     EXPECT_EQ(4, metrics->size());
 
     EXPECT_EQ("tag-counter-name", (*metrics)[0].name());
     EXPECT_EQ(1, (*metrics)[0].metric(0).label().size());
+    EXPECT_TRUE(TestUtility::protoEqual(expected_label_pair, (*metrics)[0].metric(0).label()[0]));
 
     EXPECT_EQ("tag-gauge-name", (*metrics)[1].name());
     EXPECT_EQ(1, (*metrics)[1].metric(0).label().size());
+    EXPECT_TRUE(TestUtility::protoEqual(expected_label_pair, (*metrics)[0].metric(0).label()[0]));
 
     EXPECT_EQ("tag-histogram-name", (*metrics)[2].name());
     EXPECT_EQ(1, (*metrics)[2].metric(0).label().size());
+    EXPECT_TRUE(TestUtility::protoEqual(expected_label_pair, (*metrics)[0].metric(0).label()[0]));
 
     EXPECT_EQ("tag-histogram-name", (*metrics)[3].name());
     EXPECT_EQ(1, (*metrics)[3].metric(0).label().size());
+    EXPECT_TRUE(TestUtility::protoEqual(expected_label_pair, (*metrics)[0].metric(0).label()[0]));
   }));
   sink.flush(snapshot_);
 }

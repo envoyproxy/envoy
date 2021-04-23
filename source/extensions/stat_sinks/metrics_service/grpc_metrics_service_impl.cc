@@ -143,6 +143,9 @@ MetricsFlusher::populateMetricsFamily(io::prometheus::client::MetricFamily& metr
   prometheus_metric->set_timestamp_ms(snapshot_time_ms);
 
   if (emit_labels_) {
+    // TODO(snowp): Look into the perf implication of this. We need to take a lock on the symbol
+    // table to stringify the StatNames, which could result in some lock contention. Consider caching
+    // the conversion between stat handle to extracted tags.
     metrics_family.set_name(metric.tagExtractedName());
     for (const auto& tag : metric.tags()) {
       auto* label = prometheus_metric->add_label();
