@@ -34,6 +34,8 @@ absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
+  // TODO(danzh) Re-enable TLS resumption after #15912 is checked in.
+  FLAGS_quic_disable_server_tls_resumption->setValue(true);
   return flags;
 }
 
