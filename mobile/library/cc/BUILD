@@ -5,7 +5,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "envoy_engine_cc_lib",
+    name = "envoy_engine_cc_lib_no_stamp",
     srcs = [
         "bridge_utility.cc",
         "engine.cc",
@@ -59,7 +59,16 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        "//library/common:envoy_main_interface_lib",
+        "//library/common:envoy_main_interface_lib_no_stamp",
         "//library/common/data:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_engine_cc_lib",
+    repository = "@envoy",
+    deps = [
+        ":envoy_engine_cc_lib_no_stamp",
+        "//library/common:envoy_mobile_main_common_lib_stamped",
     ],
 )

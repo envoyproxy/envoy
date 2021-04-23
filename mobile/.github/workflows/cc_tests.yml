@@ -1,0 +1,21 @@
+name: cc_tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  cctests:
+    name: cc_tests
+    runs-on: ubuntu-18.04
+    timeout-minutes: 90
+    container:
+      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Run tests'
+        run: bazel test --action_env=LD_LIBRARY_PATH --test_output=all //test/cc/...
