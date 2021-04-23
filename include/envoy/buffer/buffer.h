@@ -86,6 +86,34 @@ public:
 using ReservationSlicesOwnerPtr = std::unique_ptr<ReservationSlicesOwner>;
 
 /**
+ * An interface for accounting for the usage for byte tracking in buffers.
+ *
+ * Currently this is only used by L7 streams to track the amount of memory
+ * allocated in buffers by the stream.
+ */
+class BufferMemoryAccount {
+public:
+  virtual ~BufferMemoryAccount() = default;
+
+  /**
+   * Charges the account for using the specified amount of memory.
+   *
+   * @param amount the amount to debit.
+   */
+  virtual void charge(uint64_t amount) PURE;
+
+  /**
+   * Called to credit the account for an amount of memory
+   * is no longer used.
+   *
+   * @param amount the amount to credit.
+   */
+  virtual void credit(uint64_t amount) PURE;
+};
+
+using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;
+
+/**
  * A basic buffer abstraction.
  */
 class Instance {
@@ -100,6 +128,14 @@ public:
    * from all buffers.
    */
   virtual void addDrainTracker(std::function<void()> drain_tracker) PURE;
+
+  /**
+   * Binds the account to be charged for resources used by the buffer. This
+   * should only be called once.
+   *
+   * @param account a shared_ptr to the account to charge.
+   */
+  virtual void bindAccount(BufferMemoryAccountSharedPtr account) PURE;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant
