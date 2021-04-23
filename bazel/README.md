@@ -255,6 +255,8 @@ On Linux, run:
 From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
 MSYS2 or Git bash), run:
 
+**Note: the command below executes the whole Windows CI and unlike Linux you are not able to set specific build targets. You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well as set environment variables to adjust your container build environment.**
+
 ```
 ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
