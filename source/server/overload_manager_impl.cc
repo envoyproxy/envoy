@@ -563,15 +563,24 @@ OverloadManagerImpl::ReactiveResource::ReactiveResource(const std::string& name,
                                                         OverloadManagerImpl& manager,
                                                         Stats::Scope& stats_scope)
     : name_(name), monitor_(std::move(monitor)), manager_(manager),
-      failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),
-      skipped_updates_counter_(makeCounter(stats_scope, name, "skipped_updates")) {}
+      failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")) {}
 
 bool OverloadManagerImpl::ReactiveResource::tryAllocateResource(uint64_t increment) {
-  return monitor_->tryAllocateResource(increment);
+  if (monitor_->tryAllocateResource(increment)) {
+    return true;
+  } else {
+    failed_updates_counter_.inc();
+    return false;
+  }
 }
 
 bool OverloadManagerImpl::ReactiveResource::tryDeallocateResource(uint64_t decrement) {
-  return monitor_->tryDeallocateResource(decrement);
+  if (monitor_->tryDeallocateResource(decrement)) {
+    return true;
+  } else {
+    failed_updates_counter_.inc();
+    return false;
+  }
 }
 
 uint64_t OverloadManagerImpl::ReactiveResource::currentResourceUsage() {

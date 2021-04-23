@@ -173,7 +173,6 @@ private:
     ReactiveResourceMonitorPtr monitor_;
     OverloadManagerImpl& manager_;
     Stats::Counter& failed_updates_counter_;
-    Stats::Counter& skipped_updates_counter_;
   };
 
   struct ActionCallback {
