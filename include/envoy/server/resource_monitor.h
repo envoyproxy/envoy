@@ -94,7 +94,7 @@ public:
 
   bool tryAllocateResource(uint64_t increment) {
     auto curr_capacity = current_.load();
-    if (curr_capacity + increment < curr_capacity) {
+    if (std::numeric_limits<uint64_t>::max() - increment < curr_capacity) {
       // uint64_t overflow, cannot allocate resource.
       return false;
     } else {
