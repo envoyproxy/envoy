@@ -122,6 +122,9 @@ sphinxext-rediraffe==0.2.7 \
 sphinxcontrib-serializinghtml==1.1.4 \
     --hash=sha256:eaa0eccc86e982a9b939b2b82d12cc5d013385ba5eadcc7e4fed23f4405f77bc \
     --hash=sha256:f242a81d423f59617a8e5cf16f5d4d74e28ee9a66f9e5b637a18082991db5a9a
+readthedocs-sphinx-search==0.1.0 \
+    --hash=sha256:5c0a90068c9c0ca639aa3a1c14a7fe8587b0332f2349bc3fd86b968ca82db238 \
+    --hash=sha256:7ed45d83b11af9681d5439529c7fbd4289c5be3f9ac4688436e28cb669da87a2
 urllib3==1.26.4 \
     --hash=sha256:2f4da4594db7e1e110a944bb1b551fdf4e6c136ad42e4234131391e21eb5b0df \
     --hash=sha256:e7b021f7241115872f92f43c6508082facffbd1c048e3c6e2bb9c2a157e28937
