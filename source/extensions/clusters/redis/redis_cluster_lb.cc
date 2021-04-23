@@ -9,15 +9,14 @@ bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSl
   if (start_ != rhs.start_ || end_ != rhs.end_ || *primary_ != *rhs.primary_ ||
       replicas_.size() != rhs.replicas_.size()) {
     return false;
-  } else {
-    for (auto it1 = replicas_.begin(), it2 = rhs.replicas_.begin(); it1 != replicas_.end();
-         it1++, it2++) {
-      if (**it1 != **it2) {
-        return false;
-      }
-    }
-    return true;
   }
+  for (auto it1 = replicas_.begin(), it2 = rhs.replicas_.begin(); it1 != replicas_.end();
+       it1++, it2++) {
+    if (**it1 != **it2) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // RedisClusterLoadBalancerFactory
