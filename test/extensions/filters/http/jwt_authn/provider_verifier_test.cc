@@ -37,7 +37,7 @@ public:
   }
 
   void createVerifier() {
-    filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
+    filter_config_ = std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
                                  *filter_config_);
   }
@@ -181,7 +181,7 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   proto_config_.mutable_rules(0)->mutable_requires()->set_provider_name("nosuchprovider");
 
-  EXPECT_THROW(FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_), EnvoyException);
+  EXPECT_THROW(FilterConfigImpl(proto_config_, "", mock_factory_ctx_), EnvoyException);
 }
 
 } // namespace

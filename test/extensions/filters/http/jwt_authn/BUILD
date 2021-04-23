@@ -89,6 +89,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//source/extensions/filters/http/jwt_authn:jwks_cache_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",

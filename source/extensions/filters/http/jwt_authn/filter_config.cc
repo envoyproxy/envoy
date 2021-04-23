@@ -11,17 +11,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-void FilterConfigImpl::init() {
+FilterConfigImpl::FilterConfigImpl(
+    envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
+    : proto_config_(std::move(proto_config)), stats_(generateStats(stats_prefix, context.scope())),
+      cm_(context.clusterManager()), time_source_(context.dispatcher().timeSource()) {
+
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
-  // Note: `this` and `context` have a a lifetime of the listener.
-  // That may be shorter of the tls callback if the listener is torn shortly after it is created.
-  // We use a shared pointer to make sure this object outlives the tls callbacks.
-  auto shared_this = shared_from_this();
-  tls_->set([shared_this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalCache>(shared_this->proto_config_, shared_this->time_source_,
-                                              shared_this->api_);
-  });
+  jwks_cache_ =
+      JwksCache::create(proto_config_, time_source_, context.api(), context.threadLocal());
 
   std::vector<std::string> names;
   for (const auto& it : proto_config_.requirement_map()) {

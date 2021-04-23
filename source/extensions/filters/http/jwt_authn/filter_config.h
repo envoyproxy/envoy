@@ -19,27 +19,6 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
- * Making cache as a thread local object, its read/write operations don't need to be protected.
- * Now it only has jwks_cache, but in the future, it will have token cache: to cache the tokens
- * with their verification results.
- */
-class ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
-public:
-  // Load the config from envoy config.
-  ThreadLocalCache(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-                   TimeSource& time_source, Api::Api& api) {
-    jwks_cache_ = JwksCache::create(config, time_source, api);
-  }
-
-  // Get the JwksCache object.
-  JwksCache& getJwksCache() { return *jwks_cache_; }
-
-private:
-  // The JwksCache object.
-  JwksCachePtr jwks_cache_;
-};
-
-/**
  * All stats for the Jwt Authn filter. @see stats_macros.h
  */
 #define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
@@ -97,24 +76,15 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public Logger::Loggable<Logger::Id::jwt>,
                          public FilterConfig,
-                         public AuthFactory,
-                         public std::enable_shared_from_this<FilterConfigImpl> {
+                         public AuthFactory {
 public:
+  FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
+
   ~FilterConfigImpl() override = default;
 
-  // Finds the matcher that matched the header
-  static std::shared_ptr<FilterConfigImpl>
-  create(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-         const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-    // We can't use make_shared here because the constructor of this class is private.
-    std::shared_ptr<FilterConfigImpl> ptr(
-        new FilterConfigImpl(proto_config, stats_prefix, context));
-    ptr->init();
-    return ptr;
-  }
-
-  // Get per-thread cache object.
-  ThreadLocalCache& getCache() const { return tls_->getTyped<ThreadLocalCache>(); }
+  // Get the JwksCache object.
+  JwksCache& getJwksCache() const { return *jwks_cache_; }
 
   Upstream::ClusterManager& cm() const { return cm_; }
   TimeSource& timeSource() const { return time_source_; }
@@ -152,20 +122,10 @@ public:
                           const absl::optional<std::string>& provider, bool allow_failed,
                           bool allow_missing) const override {
     return Authenticator::create(check_audience, provider, allow_failed, allow_missing,
-                                 getCache().getJwksCache(), cm(), Common::JwksFetcher::create,
-                                 timeSource());
+                                 getJwksCache(), cm(), Common::JwksFetcher::create, timeSource());
   }
 
 private:
-  FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-      : proto_config_(std::move(proto_config)),
-        stats_(generateStats(stats_prefix, context.scope())),
-        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
-        time_source_(context.dispatcher().timeSource()), api_(context.api()) {}
-
-  void init();
-
   JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     const std::string final_prefix = prefix + "jwt_authn.";
     return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -182,8 +142,8 @@ private:
   envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config_;
   // The stats for the filter.
   JwtAuthnFilterStats stats_;
-  // Thread local slot to store per-thread auth store
-  ThreadLocal::SlotPtr tls_;
+  // JwksCache
+  JwksCachePtr jwks_cache_;
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
   // The list of rule matchers.
@@ -197,7 +157,6 @@ private:
   // all requirement_names for debug
   std::string all_requirement_names_;
   TimeSource& time_source_;
-  Api::Api& api_;
 };
 
 } // namespace JwtAuthn
