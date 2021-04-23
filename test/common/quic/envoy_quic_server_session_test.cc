@@ -140,8 +140,7 @@ public:
                             std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
-                            listener_config_),
+                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {

@@ -44,9 +44,15 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->noDelay(true);
 }
 
-CodecClient::~CodecClient() = default;
+CodecClient::~CodecClient() {
+  ASSERT(connect_called_, "CodecClient::connect() is not called through out the life time.");
+}
 
 void CodecClient::connect() {
+#ifndef NDEBUG
+  connect_called_ = true;
+#endif
+  ASSERT(codec_ != nullptr);
   // In general, codecs are handed new not-yet-connected connections, but in the
   // case of ALPN, the codec may be handed an already connected connection.
   if (!connection_->connecting()) {
@@ -170,7 +176,6 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
-
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
@@ -201,6 +206,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
 #endif
   }
   }
+  connect();
 }
 
 } // namespace Http

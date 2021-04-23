@@ -39,8 +39,7 @@ public:
                          quic::QuicCryptoServerStreamBase::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         Network::ListenerConfig& listener_config);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
   ~EnvoyQuicServerSession() override;
 

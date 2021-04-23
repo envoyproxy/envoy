@@ -60,11 +60,6 @@ public:
   ~CodecClient() override;
 
   /**
-   * Connect to the host.
-   */
-  void connect();
-
-  /**
    * Add a connection callback to the underlying network connection.
    */
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
@@ -144,6 +139,12 @@ protected:
    */
   CodecClient(Type type, Network::ClientConnectionPtr&& connection,
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+
+  /**
+   * Connect to the host.
+   * Needs to be called after codec_ is instantiated.
+   */
+  void connect();
 
   // Http::ConnectionCallbacks
   void onGoAway(GoAwayErrorCode error_code) override {
@@ -262,6 +263,9 @@ private:
   bool connected_{};
   bool remote_closed_{};
   bool protocol_error_{false};
+#ifndef NDEBUG
+  bool connect_called_{false};
+#endif
 };
 
 using CodecClientPtr = std::unique_ptr<CodecClient>;

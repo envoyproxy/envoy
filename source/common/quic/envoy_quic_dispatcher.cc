@@ -69,11 +69,12 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
-      listener_config_.perConnectionBufferLimitBytes(), listener_config_);
+      listener_config_.perConnectionBufferLimitBytes());
   if (filter_chain != nullptr) {
     const bool has_filter_initialized =
         listener_config_.filterChainFactory().createNetworkFilterChain(
             *quic_session, filter_chain->networkFilterFactories());
+    // QUIC listener must have HCM filter configured. Otherwise, stream creation later will fail.
     ASSERT(has_filter_initialized);
   }
   quic_session->Initialize();
