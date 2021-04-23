@@ -30,7 +30,7 @@ cat <<EOF >sed_commands
 /^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/common/quic/platform/quic_test_output_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/common/quic/platform/quic_thread_impl.h!
 /^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/common/quic/platform/quiche_test_impl.h!
-/^#include/ s!net/spdy/platform/impl/spdy_test_helpers_impl.h!test/common/quic/platform/spdy_test_helpers_impl.h!
+/^#include/ s!net/quiche/common/platform/impl/quiche_test_helpers_impl.h!test/common/quic/platform/quiche_test_helpers_impl.h!
 /^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/common/quic/platform/spdy_test_impl.h!
 
 # Rewrite include directives for platform impl files.
