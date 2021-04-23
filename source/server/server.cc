@@ -399,7 +399,7 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
   server_stats_->version_.set(version_int);
-  if (!VersionInfo::fipsMode().empty() && VersionInfo::fipsMode() == "1") {
+  if (VersionInfo::fipsMode()) {
     server_compilation_settings_stats_->fips_mode_.set(1);
   }
 
