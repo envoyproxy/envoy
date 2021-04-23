@@ -40,9 +40,14 @@ message LightstepConfig {
   // The cluster manager cluster that hosts the LightStep collectors.
   string collector_cluster = 1 [(validate.rules).string = {min_len: 1}];
 
-  // File containing the access token to the `LightStep
-  // <https://lightstep.com/>`_ API.
-  string access_token_file = 2 [(validate.rules).string = {min_len: 1}];
+  oneof access_token_setting {
+    // File containing the access token to the `LightStep
+    // <https://lightstep.com/>`_ API.
+    string access_token_file = 2 [(validate.rules).string = {min_len: 1}];
+
+    // Access token to the `LightStep <https://lightstep.com/>`_ API.
+    string access_token = 4 [(validate.rules).string = {min_len: 1}];
+  }
 
   // Propagation modes to use by LightStep's tracer.
   repeated PropagationMode propagation_modes = 3
