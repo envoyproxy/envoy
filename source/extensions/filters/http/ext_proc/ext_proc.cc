@@ -88,14 +88,11 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state, Http::HeaderMap& he
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   if (end_stream) {
-    decoding_state_.setFilterState(ProcessorState::FilterState::Done);
-  } else {
-    decoding_state_.setFilterState(ProcessorState::FilterState::Headers);
+    decoding_state_.setCompleteBodyDelivered(true);
   }
 
   if (!decoding_state_.sendHeaders()) {
     ENVOY_LOG(trace, "decodeHeaders: Skipped");
-    decoding_state_.setCallbackState(ProcessorState::CallbackState::HeadersComplete);
     return FilterHeadersStatus::Continue;
   }
 
@@ -106,20 +103,18 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
 Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data,
                                       bool end_stream) {
-
   if (end_stream) {
-    state.setFilterState(ProcessorState::FilterState::Done);
-  } else {
-    state.setFilterState(ProcessorState::FilterState::Body);
+    state.setCompleteBodyDelivered(true);
   }
 
   bool send_trailers = false;
-  Http::HeaderMap* newTrailers = nullptr;
+  Http::HeaderMap* new_trailers = nullptr;
   if (end_stream && state.sendTrailers()) {
     // We're at the end of the stream, but the filter wants to process trailers.
     // We need to add them right here so we can process them later.
     ENVOY_LOG(trace, "Creating new, empty trailers");
-    newTrailers = state.addTrailers();
+    new_trailers = state.addTrailers();
+    state.setTrailersDelivered(true);
     send_trailers = true;
   }
 
@@ -167,12 +162,10 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& d
   case ProcessingMode::BUFFERED_PARTIAL:
   case ProcessingMode::STREAMED:
     ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
-    state.setCallbackState(ProcessorState::CallbackState::BodyComplete);
     result = FilterDataStatus::Continue;
     break;
   case ProcessingMode::NONE:
   default:
-    state.setCallbackState(ProcessorState::CallbackState::BodyComplete);
     result = FilterDataStatus::Continue;
     break;
   }
@@ -189,7 +182,7 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& d
       break;
     }
 
-    sendTrailers(state, *newTrailers);
+    sendTrailers(state, *new_trailers);
     return FilterDataStatus::StopIterationAndBuffer;
   }
   return result;
@@ -208,7 +201,9 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& trailers) {
-  state.setFilterState(ProcessorState::FilterState::Trailers);
+  bool body_delivered = state.completeBodyDelivered();
+  state.setCompleteBodyDelivered(true);
+  state.setTrailersDelivered(true);
   state.setTrailers(&trailers);
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
@@ -217,8 +212,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (state.callbackState() < ProcessorState::CallbackState::BufferedBodyCallback &&
-      state.bodyMode() == ProcessingMode::BUFFERED) {
+  if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
@@ -260,14 +254,11 @@ FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
   if (end_stream) {
-    encoding_state_.setFilterState(ProcessorState::FilterState::Done);
-  } else {
-    encoding_state_.setFilterState(ProcessorState::FilterState::Headers);
+    encoding_state_.setCompleteBodyDelivered(true);
   }
 
   if (processing_complete_ || !encoding_state_.sendHeaders()) {
     ENVOY_LOG(trace, "encodeHeaders: Continue");
-    encoding_state_.setCallbackState(ProcessorState::CallbackState::HeadersComplete);
     return FilterHeadersStatus::Continue;
   }
 

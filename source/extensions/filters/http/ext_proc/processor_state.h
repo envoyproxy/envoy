@@ -20,38 +20,19 @@ class ProcessorState : public Logger::Loggable<Logger::Id::filter> {
 public:
   // This describes whether the filter is waiting for a response to a gRPC message
   enum class CallbackState {
-    Idle = 0,
+    // Not waiting for anything
+    Idle,
     // Waiting for a "headers" response
-    HeadersCallback = 1,
-    // Done processing headers for whatever reason
-    HeadersComplete = 2,
+    HeadersCallback,
     // Waiting for a "body" response in buffered mode
-    BufferedBodyCallback = 3,
-    // And done
-    BodyComplete = 4,
+    BufferedBodyCallback,
     // and waiting for a "trailers" response
-    TrailersCallback = 5,
-    // And all done
-    TrailersComplete = 6,
+    TrailersCallback,
   };
 
-  // This describes where we are in the filter lifecycle -- which calls have
-  // been made so far to the filter
-  enum class FilterState {
-    Idle = 0,
-    // Received headers
-    Headers = 1,
-    // Received part of the body
-    Body = 2,
-    // Received the whole body
-    BodyComplete = 3,
-    // Received trailers
-    Trailers = 4,
-    // All done
-    Done = 5,
-  };
-
-  explicit ProcessorState(Filter& filter) : filter_(filter) {}
+  explicit ProcessorState(Filter& filter)
+      : filter_(filter), watermark_requested_(false), complete_body_delivered_(false),
+        trailers_delivered_(false) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -59,7 +40,9 @@ public:
   CallbackState callbackState() const { return callback_state_; }
   void setCallbackState(CallbackState state) { callback_state_ = state; }
 
-  void setFilterState(FilterState state) { filter_state_ = state; }
+  bool completeBodyDelivered() const { return complete_body_delivered_; }
+  void setCompleteBodyDelivered(bool d) { complete_body_delivered_ = d; }
+  void setTrailersDelivered(bool d) { trailers_delivered_ = d; }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -104,12 +87,23 @@ protected:
   Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
   CallbackState callback_state_ = CallbackState::Idle;
-  FilterState filter_state_ = FilterState::Idle;
-  bool send_headers_;
-  bool send_trailers_;
-  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode body_mode_;
+
   // Keep track of whether we requested a watermark.
-  bool watermark_requested_ = false;
+  bool watermark_requested_ : 1;
+
+  // If true, then the filter received the complete body
+  bool complete_body_delivered_ : 1;
+  // If true, then the filter received the trailers
+  bool trailers_delivered_ : 1;
+
+  // If true, the server wants to see the headers
+  bool send_headers_ : 1;
+  // If true, the server wants to see the trailers
+  bool send_trailers_ : 1;
+
+  // The specific mode for body handling
+  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode body_mode_;
+
   Http::HeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;

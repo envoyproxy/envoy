@@ -25,12 +25,12 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response");
     MutationUtils::applyCommonHeaderResponse(response, *headers_);
-    callback_state_ = CallbackState::HeadersComplete;
+    callback_state_ = CallbackState::Idle;
     clearWatermark();
     message_timer_->disableTimer();
 
     if (body_mode_ == ProcessingMode::BUFFERED) {
-      if (filter_state_ >= FilterState::BodyComplete) {
+      if (complete_body_delivered_) {
         // If we get here, then all the body data came in before the header message
         // was complete, and the server wants the body. So, don't continue filter
         // processing, but send the buffered request body now.
@@ -44,7 +44,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
       return true;
     }
 
-    if (send_trailers_ && filter_state_ >= FilterState::Trailers) {
+    if (send_trailers_ && trailers_delivered_) {
       // Trailers came in while we were waiting for this response, and the server
       // is not interested in the body, so send them now.
       filter_.sendTrailers(*this, *trailers_);
@@ -67,10 +67,10 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       MutationUtils::applyCommonBodyResponse(response, headers_, data);
     });
     headers_ = nullptr;
-    callback_state_ = CallbackState::BodyComplete;
+    callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
 
-    if (send_trailers_ && filter_state_ >= FilterState::Trailers) {
+    if (send_trailers_ && trailers_delivered_) {
       // Trailers came in while we were waiting for this response, and the server
       // asked to see them -- send them now.
       filter_.sendTrailers(*this, *trailers_);
@@ -100,16 +100,9 @@ bool ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
 
 void ProcessorState::clearAsyncState() {
   cleanUpTimer();
-  switch (callback_state_) {
-  case CallbackState::HeadersCallback:
-  case CallbackState::BufferedBodyCallback:
-  case CallbackState::TrailersCallback:
-    callback_state_ = CallbackState::Idle;
+  if (callback_state_ != CallbackState::Idle) {
     continueProcessing();
-    break;
-  default:
-    // No need to do anything
-    break;
+    callback_state_ = CallbackState::Idle;
   }
 }
 
