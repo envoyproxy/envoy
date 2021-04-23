@@ -124,8 +124,10 @@ public:
   // about overload state changes.
   void stop();
 
-  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment);
-  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement);
+  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment,
+                           ReactiveResourceUpdateCallbacks& cb);
+  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement,
+                             ReactiveResourceUpdateCallbacks& cb);
 
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
@@ -135,12 +137,12 @@ protected:
 
 private:
   using FlushEpochId = uint64_t;
-  class Resource : public Callbacks {
+  class Resource : public ResourceUpdateCallbacks {
   public:
     Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager,
              Stats::Scope& stats_scope);
 
-    // ResourceMonitor::Callbacks
+    // ResourceMonitor::ResourceUpdateCallbacks
     void onSuccess(const ResourceUsage& usage) override;
     void onFailure(const EnvoyException& error) override;
 
@@ -157,23 +159,19 @@ private:
     Stats::Counter& skipped_updates_counter_;
   };
 
-  class ReactiveResource : public Callbacks {
+  class ReactiveResource {
   public:
     ReactiveResource(const std::string& name, ReactiveResourceMonitorPtr monitor,
                      OverloadManagerImpl& manager, Stats::Scope& stats_scope);
 
-    // Callbacks
-    void onSuccess(const ResourceUsage& usage) override;
-    void onFailure(const EnvoyException& error) override;
-
     bool tryAllocateResource(uint64_t increment);
     bool tryDeallocateResource(uint64_t decrement);
+    uint64_t currentResourceUsage();
 
   private:
     const std::string name_;
     ReactiveResourceMonitorPtr monitor_;
     OverloadManagerImpl& manager_;
-    Stats::Gauge& pressure_gauge_;
     Stats::Counter& failed_updates_counter_;
     Stats::Counter& skipped_updates_counter_;
   };
@@ -187,7 +185,6 @@ private:
 
   void updateResourcePressure(const std::string& resource, double pressure,
                               FlushEpochId flush_epoch);
-  void updateReactiveResourcePressure(const std::string& resource, double pressure);
   // Flushes any enqueued action state updates to all worker threads.
   void flushResourceUpdates();
 
@@ -218,7 +215,6 @@ private:
       std::unordered_multimap<NamedOverloadActionSymbolTable::Symbol, ActionCallback,
                               absl::Hash<NamedOverloadActionSymbolTable::Symbol>>;
   ActionToCallbackMap action_to_callbacks_;
-  ActionToCallbackMap reactive_action_to_callbacks_;
 };
 
 } // namespace Server

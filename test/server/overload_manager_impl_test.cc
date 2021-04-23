@@ -59,7 +59,7 @@ public:
     update_async_ = new_update_async;
   }
 
-  void updateResourceUsage(ResourceMonitor::Callbacks& callbacks) override {
+  void updateResourceUsage(ResourceMonitor::ResourceUpdateCallbacks& callbacks) override {
     if (update_async_) {
       callbacks_.emplace(callbacks);
     } else {
@@ -76,7 +76,7 @@ public:
   }
 
 private:
-  void publishUpdate(ResourceMonitor::Callbacks& callbacks) {
+  void publishUpdate(ResourceMonitor::ResourceUpdateCallbacks& callbacks) {
     if (absl::holds_alternative<double>(response_)) {
       Server::ResourceUsage usage;
       usage.resource_pressure_ = absl::get<double>(response_);
@@ -90,7 +90,7 @@ private:
   Event::Dispatcher& dispatcher_;
   absl::variant<double, EnvoyException> response_;
   bool update_async_ = false;
-  absl::optional<std::reference_wrapper<ResourceMonitor::Callbacks>> callbacks_;
+  absl::optional<std::reference_wrapper<ResourceMonitor::ResourceUpdateCallbacks>> callbacks_;
 };
 
 class FakeReactiveResourceMonitor : public ReactiveResourceMonitor {

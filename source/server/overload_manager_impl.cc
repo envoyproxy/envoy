@@ -26,11 +26,9 @@ namespace Server {
  */
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
-  explicit ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table,
-                                        OverloadManagerImpl& manager)
+  explicit ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table)
       : action_symbol_table_(action_symbol_table),
-        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
-        manager_(manager) {}
+        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())) {}
 
   const OverloadActionState& getState(const std::string& action) override {
     if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
@@ -47,7 +45,6 @@ private:
   static const OverloadActionState always_inactive_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;
   std::vector<OverloadActionState> actions_;
-  OverloadManagerImpl& manager_;
 };
 
 const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
@@ -276,7 +273,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
   // reactive and regular resource monitors in configuration API. But internally we will maintain
   // two distinct collections of reactive and regular resources. Reactive resources are not subject
   // to periodic flushes and can be recalculated/updated on demand by invoking
-  // `updateReactiveResource` in overload manager.
+  // `tryAllocateResource/tryDeallocateResource` in overload manager.
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
     // Check if it is a reactive resource.
@@ -350,7 +347,7 @@ void OverloadManagerImpl::start() {
   started_ = true;
 
   tls_.set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_, *this);
+    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_);
   });
 
   if (resources_.empty()) {
@@ -383,14 +380,13 @@ void OverloadManagerImpl::stop() {
 
   // Clear the resource map to block on any pending updates.
   resources_.clear();
+  reactive_resources_.clear();
 }
 
 bool OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
                                             OverloadActionCb callback) {
   ASSERT(!started_);
-  bool is_reactive_action = OverloadActionNames::get().reactive_action_names_.find(action) !=
-                            OverloadActionNames::get().reactive_action_names_.end();
   const auto symbol = action_symbol_table_.get(action);
 
   if (actions_.find(symbol) == actions_.end()) {
@@ -398,21 +394,26 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
     return false;
   }
 
-  if (is_reactive_action) {
-    reactive_action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(symbol),
-                                          std::forward_as_tuple(dispatcher, callback));
-  } else {
-    action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(symbol),
-                                 std::forward_as_tuple(dispatcher, callback));
-  }
+  action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(symbol),
+                               std::forward_as_tuple(dispatcher, callback));
   return true;
 }
 
 bool OverloadManagerImpl::tryAllocateResource(OverloadReactiveResourceName resource_name,
-                                              uint64_t increment) {
+                                              uint64_t increment,
+                                              ReactiveResourceUpdateCallbacks& cb) {
   const auto reactive_resource = reactive_resources_.find(resource_name);
   if (reactive_resource != reactive_resources_.end()) {
-    return reactive_resource->second.tryAllocateResource(increment);
+    if (reactive_resource->second.tryAllocateResource(increment)) {
+      cb.dispatcher().post(
+          [&cb, resource_usage = reactive_resource->second.currentResourceUsage()]() {
+            cb.onSuccess(resource_usage);
+          });
+      return true;
+    } else {
+      cb.dispatcher().post([&cb]() { cb.onFailure(); });
+      return true;
+    }
   } else {
     ENVOY_LOG(warn, " {Failed to allocate unknown reactive resource }");
     return false;
@@ -420,10 +421,20 @@ bool OverloadManagerImpl::tryAllocateResource(OverloadReactiveResourceName resou
 }
 
 bool OverloadManagerImpl::tryDeallocateResource(OverloadReactiveResourceName resource_name,
-                                                uint64_t decrement) {
+                                                uint64_t decrement,
+                                                ReactiveResourceUpdateCallbacks& cb) {
   const auto reactive_resource = reactive_resources_.find(resource_name);
   if (reactive_resource != reactive_resources_.end()) {
-    return reactive_resource->second.tryDeallocateResource(decrement);
+    if (reactive_resource->second.tryDeallocateResource(decrement)) {
+      cb.dispatcher().post(
+          [&cb, resource_usage = reactive_resource->second.currentResourceUsage()]() {
+            cb.onSuccess(resource_usage);
+          });
+      return true;
+    } else {
+      cb.dispatcher().post([&cb]() { cb.onFailure(); });
+      return true;
+    }
   } else {
     ENVOY_LOG(warn, " {Failed to deallocate unknown reactive resource }");
     return false;
@@ -496,53 +507,6 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
   }
 }
 
-void OverloadManagerImpl::updateReactiveResourcePressure(const std::string& resource,
-                                                         double pressure) {
-  auto shared_updates = std::make_shared<
-      absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>>();
-  auto reactive_callbacks_to_trigger = absl::flat_hash_map<ActionCallback*, OverloadActionState>();
-  // Reactive resources will have separate collection of actions, as they (reactive resources) have
-  // different names.
-  auto [start, end] = resource_to_actions_.equal_range(resource);
-  std::for_each(start, end, [&](ResourceToActionMap::value_type& entry) {
-    const NamedOverloadActionSymbolTable::Symbol action = entry.second;
-    auto action_it = actions_.find(action);
-    ASSERT(action_it != actions_.end());
-    const OverloadActionState old_state = action_it->second.getState();
-    // This will update actions that are computed during periodic flushes.
-    if (action_it->second.updateResourcePressure(resource, pressure)) {
-      const auto state = action_it->second.getState();
-
-      if (old_state.isSaturated() != state.isSaturated()) {
-        ENVOY_LOG(debug, "Overload action {} became {}", action_symbol_table_.name(action),
-                  (state.isSaturated() ? "saturated" : "scaling"));
-      }
-
-      shared_updates.get()->insert_or_assign(action, state);
-
-      state_updates_to_flush_.insert_or_assign(action, state);
-      auto [callbacks_start, callbacks_end] = reactive_action_to_callbacks_.equal_range(action);
-      std::for_each(callbacks_start, callbacks_end, [&](ActionToCallbackMap::value_type& cb_entry) {
-        reactive_callbacks_to_trigger.insert_or_assign(&cb_entry.second, state);
-      });
-    }
-
-    if (!shared_updates.get()->empty()) {
-
-      tls_.runOnAllThreads([updates = std::move(shared_updates)](
-                               OptRef<ThreadLocalOverloadStateImpl> overload_state) {
-        for (const auto& [action, state] : *updates) {
-          overload_state->setState(action, state);
-        }
-      });
-
-      for (const auto& [cb, state] : callbacks_to_flush_) {
-        cb->dispatcher_.post([cb = cb, state = state]() { cb->callback_(state); });
-      }
-    }
-  });
-}
-
 void OverloadManagerImpl::flushResourceUpdates() {
   if (!state_updates_to_flush_.empty()) {
     auto shared_updates = std::make_shared<
@@ -599,27 +563,19 @@ OverloadManagerImpl::ReactiveResource::ReactiveResource(const std::string& name,
                                                         OverloadManagerImpl& manager,
                                                         Stats::Scope& stats_scope)
     : name_(name), monitor_(std::move(monitor)), manager_(manager),
-      pressure_gauge_(
-          makeGauge(stats_scope, name, "pressure", Stats::Gauge::ImportMode::NeverImport)),
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),
       skipped_updates_counter_(makeCounter(stats_scope, name, "skipped_updates")) {}
 
 bool OverloadManagerImpl::ReactiveResource::tryAllocateResource(uint64_t increment) {
-  return monitor_->tryAllocateResource(increment, *this);
+  return monitor_->tryAllocateResource(increment);
 }
 
 bool OverloadManagerImpl::ReactiveResource::tryDeallocateResource(uint64_t decrement) {
-  return monitor_->tryDeallocateResource(decrement, *this);
+  return monitor_->tryDeallocateResource(decrement);
 }
 
-void OverloadManagerImpl::ReactiveResource::onSuccess(const ResourceUsage& usage) {
-  manager_.updateReactiveResourcePressure(name_, usage.resource_pressure_);
-  pressure_gauge_.set(usage.resource_pressure_ * 100); // convert to percent
-}
-
-void OverloadManagerImpl::ReactiveResource::onFailure(const EnvoyException& error) {
-  ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.what());
-  failed_updates_counter_.inc();
+uint64_t OverloadManagerImpl::ReactiveResource::currentResourceUsage() {
+  return monitor_->currentResourceUsage();
 }
 
 } // namespace Server

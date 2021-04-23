@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"
 
@@ -23,9 +24,9 @@ struct ResourceUsage {
 /**
  * Notifies caller of updated resource usage.
  */
-class Callbacks {
+class ResourceUpdateCallbacks {
 public:
-  virtual ~Callbacks() = default;
+  virtual ~ResourceUpdateCallbacks() = default;
 
   /**
    * Called when the request for updated resource usage succeeds.
@@ -40,6 +41,25 @@ public:
   virtual void onFailure(const EnvoyException& error) PURE;
 };
 
+class ReactiveResourceUpdateCallbacks {
+public:
+  virtual ~ReactiveResourceUpdateCallbacks() = default;
+
+  /**
+   * Called when the request for updated resource usage succeeds.
+   * @param usage the updated resource usage
+   */
+  virtual void onSuccess(const uint64_t usage) PURE;
+
+  /**
+   * Called when the request for updated resource usage fails.
+   * todo may need propagate error
+   */
+  virtual void onFailure() PURE;
+
+  virtual Event::Dispatcher& dispatcher() PURE;
+};
+
 class ResourceMonitor {
 public:
   virtual ~ResourceMonitor() = default;
@@ -49,15 +69,15 @@ public:
    * This must be non-blocking so if RPCs need to be made they should be
    * done asynchronously and invoke the callback when finished.
    */
-  virtual void updateResourceUsage(Callbacks& callbacks) PURE;
+  virtual void updateResourceUsage(ResourceUpdateCallbacks& callbacks) PURE;
 };
 
 class ReactiveResourceMonitor {
 public:
   ReactiveResourceMonitor() = default;
   virtual ~ReactiveResourceMonitor() = default;
-  virtual bool tryAllocateResource(uint64_t increment, Callbacks& callbacks) PURE;
-  virtual bool tryDeallocateResource(uint64_t decrement, Callbacks& callbacks) PURE;
+  virtual bool tryAllocateResource(uint64_t increment) PURE;
+  virtual bool tryDeallocateResource(uint64_t decrement) PURE;
   virtual uint64_t currentResourceUsage() const PURE;
   virtual uint64_t maxResourceUsage() const PURE;
 };
@@ -72,29 +92,26 @@ public:
   ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
       : max_(max_active_conns), current_(0){};
 
-  bool tryAllocateResource(uint64_t increment, Callbacks& callbacks) {
-    // Calling code will need to reset its current value after this.
-    current_ += increment;
-    // Invoke callback actions.
-
-    Server::ResourceUsage usage;
-    usage.resource_pressure_ = currentResourceUsage() / maxResourceUsage();
-
-    callbacks.onSuccess(usage);
-    return true;
+  bool tryAllocateResource(uint64_t increment) {
+    auto curr_capacity = current_.load();
+    if (curr_capacity + increment < curr_capacity) {
+      // uint64_t overflow, cannot allocate resource.
+      return false;
+    } else {
+      current_ += increment;
+      return true;
+    }
   }
 
-  bool tryDeallocateResource(uint64_t decrement, Callbacks& callbacks) {
-    if (currentResourceUsage() - decrement > 0) {
+  bool tryDeallocateResource(uint64_t decrement) {
+    auto curr_capacity = current_.load();
+    if (decrement > curr_capacity) {
+      // There are not enough resources to deallocate.
+      return false;
+    } else {
       current_ -= decrement;
+      return true;
     }
-    // Invoke callback actions.
-
-    Server::ResourceUsage usage;
-    usage.resource_pressure_ = currentResourceUsage() / maxResourceUsage();
-
-    callbacks.onSuccess(usage);
-    return true;
   }
 
   uint64_t currentResourceUsage() const { return current_.load(); }
