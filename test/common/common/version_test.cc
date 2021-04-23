@@ -11,6 +11,7 @@ class VersionInfoTestPeer {
 public:
   static const std::string& buildType() { return VersionInfo::buildType(); }
   static const std::string& sslVersion() { return VersionInfo::sslVersion(); }
+  static const std::string& fipsMode() { return VersionInfo::fipsMode(); }
   static envoy::config::core::v3::BuildVersion makeBuildVersion(const char* version) {
     return VersionInfo::makeBuildVersion(version);
   }
@@ -34,6 +35,7 @@ TEST(VersionTest, BuildVersion) {
             fields.at(BuildVersionMetadataKeys::get().RevisionStatus).string_value());
   EXPECT_EQ(VersionInfoTestPeer::buildType(),
             fields.at(BuildVersionMetadataKeys::get().BuildType).string_value());
+  EXPECT_EQ(VersionInfoTestPeer::fipsMode(), "0");
   EXPECT_EQ(VersionInfoTestPeer::sslVersion(),
             fields.at(BuildVersionMetadataKeys::get().SslVersion).string_value());
 }
@@ -45,6 +47,7 @@ TEST(VersionTest, MakeBuildVersionWithLabel) {
   EXPECT_EQ(3, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
   EXPECT_GE(fields.size(), 1);
+  EXPECT_EQ(VersionInfoTestPeer::fipsMode(), "0");
   EXPECT_EQ("foo-bar", fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
 }
 

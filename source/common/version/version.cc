@@ -36,12 +36,13 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
   return *result;
 }
 
-bool VersionInfo::sslFipsCompliant() {
-  bool fipsCompliant = false;
+const std::string& VersionInfo::fipsMode() {
 #ifdef BORINGSSL_FIPS
-  fipsCompliant = true;
+  static const std::string fips_mode = "1";
+#else
+  static const std::string fips_mode = "0";
 #endif
-  return fipsCompliant;
+  return fips_mode;
 }
 
 const std::string& VersionInfo::buildType() {
