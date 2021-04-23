@@ -23,7 +23,7 @@ public:
   // Repository information and build type.
   static const std::string& version();
   // FIPS Compliance of envoy build
-  static bool fipsMode();
+  static bool sslFipsCompliant();
 
   static const envoy::config::core::v3::BuildVersion& buildVersion();
 

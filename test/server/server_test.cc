@@ -367,7 +367,7 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
   auto server_thread =
       startTestServer("test/server/test_data/server/proxy_version_bootstrap.yaml", true);
 
-  if (VersionInfo::fipsMode()) {
+  if (VersionInfo::sslFipsCompliant()) {
     EXPECT_EQ(
         1L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
   } else {
