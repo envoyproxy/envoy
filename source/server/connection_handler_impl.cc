@@ -172,7 +172,6 @@ Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
   // This is a linear operation, may need to add a map<address, listener> to improve performance.
   // However, linear performance might be adequate since the number of listeners is small.
-  // If this is modified in the future, note that a listener's address may change.
   // We do not return stopped listeners.
   auto listener_it =
       std::find_if(listeners_.begin(), listeners_.end(),
