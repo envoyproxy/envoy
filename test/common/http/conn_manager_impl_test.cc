@@ -1120,6 +1120,8 @@ TEST_F(HttpConnectionManagerImplTest, StripTrailingHostDot) {
   RequestHeaderMap* updated_headers = headers.get();
   decoder_->decodeHeaders(std::move(headers), true);
   EXPECT_EQ(updated_host, updated_headers->getHostValue());
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(HttpConnectionManagerImplTest, DateHeaderNotPresent) {
