@@ -33,6 +33,17 @@ TEST_F(LocalizedSamplingStrategyTest, BadJson) {
   ASSERT_TRUE(strategy.usingDefaultManifest());
 }
 
+TEST_F(LocalizedSamplingStrategyTest, EmptyRulesDefaultRate) {
+  NiceMock<Random::MockRandomGenerator> random_generator;
+  LocalizedSamplingStrategy strategy{"{{}", random_generator, time_system_};
+  ASSERT_TRUE(strategy.usingDefaultManifest());
+  // Make a copy of default_manifest_(LocalizedSamplingManifest object) since the
+  // object returned is a const reference and defaultRule() function is not a
+  // 'const member function' of LocalizedSamplingManifest class.
+  LocalizedSamplingManifest default_manifest_copy{strategy.defaultManifest()};
+  ASSERT_EQ(default_manifest_copy.defaultRule().rate(), 0.05);
+}
+
 TEST_F(LocalizedSamplingStrategyTest, ValidCustomRules) {
   NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(

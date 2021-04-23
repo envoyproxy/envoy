@@ -41,7 +41,7 @@ decoder/encoder filters):
     - A
     - B
     # The last configured filter has to be a terminal filter, as determined by the
-    # NamedHttpFilterConfigFactory::isTerminalFilter() function. This is most likely the router
+    # NamedHttpFilterConfigFactory::isTerminalFilterByProto(config, context) function. This is most likely the router
     # filter.
     - C
 

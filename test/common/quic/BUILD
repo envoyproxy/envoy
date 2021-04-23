@@ -135,7 +135,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "@com_googlesource_quiche//:quic_test_tools_config_peer_lib",
         "@com_googlesource_quiche//:quic_test_tools_server_session_base_peer",
-        "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
+        "@com_googlesource_quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 
@@ -233,7 +233,7 @@ envoy_cc_test_library(
     deps = [
         ":test_proof_source_lib",
         ":test_proof_verifier_lib",
-        "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
+        "@com_googlesource_quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 
