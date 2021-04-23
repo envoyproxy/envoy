@@ -84,16 +84,32 @@ public:
     CLOSED // Connection is closed and object is queued for destruction.
   };
 
+  State state() const { return state_; }
+
+  void setState(State state) {
+    // If the client is transitioning to draining, update the remaining
+    // streams and pool and cluster capacity.
+    if (state == State::DRAINING) {
+      drain();
+    }
+    state_ = state;
+  }
+
+  // Sets the remaining streams to 0, and updates pool and cluster capacity.
+  virtual void drain();
+
   ConnPoolImplBase& parent_;
   uint32_t remaining_streams_;
   uint32_t concurrent_stream_limit_;
-  State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
   Event::TimerPtr connect_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
+
+private:
+  State state_{State::CONNECTING};
 };
 
 // PendingStream is the base class tracking streams for which a connection has been created but not
@@ -220,6 +236,13 @@ public:
     s.dumpState(os);
     return os;
   }
+  Upstream::ClusterConnectivityState& state() { return state_; }
+
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.decrConnectingAndConnectedStreamCapacity(delta);
+    ASSERT(connecting_stream_capacity_ >= delta);
+    connecting_stream_capacity_ -= delta;
+  }
 
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
@@ -263,11 +286,6 @@ protected:
   void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
     state_.incrConnectingAndConnectedStreamCapacity(delta);
     connecting_stream_capacity_ += delta;
-  }
-  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
-    state_.decrConnectingAndConnectedStreamCapacity(delta);
-    ASSERT(connecting_stream_capacity_ > delta);
-    connecting_stream_capacity_ -= delta;
   }
 
   Upstream::ClusterConnectivityState& state_;

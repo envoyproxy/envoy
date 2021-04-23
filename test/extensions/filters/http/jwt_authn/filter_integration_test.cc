@@ -117,7 +117,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   // Verify the token is removed.
   EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -137,7 +137,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
       {"Authorization", "Bearer " + std::string(ExpiredToken)},
   });
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
 }
@@ -155,7 +155,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
       {":authority", "host"},
   });
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
 }
@@ -174,7 +174,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
       {"Authorization", "Bearer " + std::string(ExpiredToken)},
   });
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_NE("0", response->headers().getContentLengthValue());
@@ -198,7 +198,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -221,7 +221,7 @@ TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -298,7 +298,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ(test.expected_status, response->headers().getStatusValue());
   }
@@ -396,7 +396,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
@@ -421,7 +421,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
   // Fails the jwks fetching.
   waitForJwksResponse("500", "");
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
 
@@ -441,7 +441,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
       {"Authorization", "Bearer " + std::string(GoodToken)},
   });
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
 
@@ -493,7 +493,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -528,7 +528,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigWrongRequireName) {
       {"Authorization", "Bearer " + std::string(GoodToken)},
   });
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
@@ -566,7 +566,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigOK) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
@@ -578,7 +578,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigOK) {
       {":authority", "host"},
   });
 
-  response1->waitForEndStream();
+  ASSERT_TRUE(response1->waitForEndStream());
   ASSERT_TRUE(response1->complete());
   EXPECT_EQ("401", response1->headers().getStatusValue());
 }

@@ -23,7 +23,7 @@ TEST(MySQLCodecTest, MySQLCommandInitDb) {
   Command mysql_cmd_encode{};
   mysql_cmd_encode.setCmd(Command::Cmd::InitDb);
   std::string db = "mysqlDB";
-  mysql_cmd_encode.setData(db);
+  mysql_cmd_encode.setDb(db);
   Buffer::OwnedImpl decode_data;
   mysql_cmd_encode.encode(decode_data);
 
@@ -39,7 +39,7 @@ TEST(MySQLCodecTest, MySQLCommandCreateDb) {
   Command mysql_cmd_encode{};
   mysql_cmd_encode.setCmd(Command::Cmd::CreateDb);
   std::string db = "mysqlDB";
-  mysql_cmd_encode.setData(db);
+  mysql_cmd_encode.setDb(db);
   Buffer::OwnedImpl decode_data;
   mysql_cmd_encode.encode(decode_data);
 
@@ -55,7 +55,7 @@ TEST(MySQLCodecTest, MySQLCommandDropDb) {
   Command mysql_cmd_encode{};
   mysql_cmd_encode.setCmd(Command::Cmd::DropDb);
   std::string db = "mysqlDB";
-  mysql_cmd_encode.setData(db);
+  mysql_cmd_encode.setDb(db);
   Buffer::OwnedImpl decode_data;
   mysql_cmd_encode.encode(decode_data);
 
@@ -72,7 +72,6 @@ TEST(MySQLCodecTest, MySQLCommandOther) {
   mysql_cmd_encode.setCmd(Command::Cmd::FieldList);
   Buffer::OwnedImpl decode_data;
   mysql_cmd_encode.encode(decode_data);
-
   BufferHelper::encodeHdr(decode_data, 0);
 
   Command mysql_cmd_decode{};
