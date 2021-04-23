@@ -70,13 +70,15 @@ protected:
   /**
    * Notify the originating filter that this request has an answer ready.
    * This method is to be invoked by each request after it has finished processing.
+   * Obviously, if the filter is no longer active (connection got closed before we were ready to
+   * answer) nothing will happen.
    */
   void notifyFilter();
 
   // Filter that originated this request.
   AbstractRequestListener& filter_;
 
-  // Whether the filter_ reference is still alive.
+  // Whether the filter_ reference is still viable.
   bool filter_active_ = true;
 };
 

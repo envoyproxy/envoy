@@ -46,22 +46,16 @@ void RequestProcessor::onFailedParse(RequestParseFailureSharedPtr arg) {
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<ProduceRequest>> request) const {
-  ENVOY_LOG(warn, "RequestProcessor - create(Produce({})) for cid {}",
-            request->request_header_.api_version_, request->request_header_.correlation_id_);
   auto res = std::make_shared<ProduceRequestHolder>(origin_, request);
   origin_.onRequest(res);
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<MetadataRequest>> request) const {
-  ENVOY_LOG(warn, "RequestProcessor - create(Metadata) for cid {}",
-            request->request_header_.correlation_id_);
   auto res = std::make_shared<MetadataRequestHolder>(origin_, clustering_configuration_, request);
   origin_.onRequest(res);
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const {
-  ENVOY_LOG(warn, "RequestProcessor - create(ApiVersions) for cid {}",
-            request->request_header_.correlation_id_);
   auto res = std::make_shared<ApiVersionsRequestHolder>(origin_, request);
   origin_.onRequest(res);
 }

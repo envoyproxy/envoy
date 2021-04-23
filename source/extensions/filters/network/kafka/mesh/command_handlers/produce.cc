@@ -40,20 +40,21 @@ void ProduceRequestHolder::invoke(UpstreamKafkaFacade& kafka_facade) {
 
 bool ProduceRequestHolder::finished() const { return 0 == expected_responses_; }
 
+// Find a record that matches provided delivery memento.
+// If all the records got their delivery data filled in, we are done, and can notify the origin
+// filter.
 bool ProduceRequestHolder::accept(const DeliveryMemento& memento) {
-  ENVOY_LOG(warn, "ProduceRequestHolder - accept: {}/{}", memento.error_code_, memento.offset_);
   for (auto& outbound_record : outbound_records_) {
     if (outbound_record.value_.data() == memento.data_) {
       // We have matched the downstream request that matches our confirmation from upstream Kafka.
-      ENVOY_LOG(trace, "ProduceRequestHolder - accept - match found for {} in request {}",
-                reinterpret_cast<long>(memento.data_), request_->request_header_.correlation_id_);
+      ENVOY_LOG(trace, "Request {} matches delivery memento [{}]",
+                request_->request_header_.correlation_id_, reinterpret_cast<long>(memento.data_));
       outbound_record.error_code_ = memento.error_code_;
       outbound_record.saved_offset_ = memento.offset_;
       --expected_responses_;
       if (finished()) {
         // All elements had their responses matched.
-        // We can notify the filter to check if it can send another response.
-        ENVOY_LOG(warn, "ProduceRequestHolder - accept - notifying filter for {}",
+        ENVOY_LOG(trace, "All deliveries finished for produce request {}",
                   request_->request_header_.correlation_id_);
         notifyFilter();
       }

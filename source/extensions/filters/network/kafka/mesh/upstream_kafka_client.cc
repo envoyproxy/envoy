@@ -47,7 +47,6 @@ RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
   }
 
   if (utils.setConfDeliveryCallback(*conf, this, errstr) != RdKafka::Conf::CONF_OK) {
-    ENVOY_LOG(warn, "dr_cb", errstr);
     throw EnvoyException(absl::StrCat("Could not set producer callback:", errstr));
   }
 
@@ -63,32 +62,32 @@ RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
 }
 
 RichKafkaProducer::~RichKafkaProducer() {
-  ENVOY_LOG(warn, "Shutting down worker thread");
+  ENVOY_LOG(debug, "Shutting down worker thread");
   // Impl note: this could be optimized by having flag flipped by owning Facade for all of its
   // clients so shutdowns happen in parallel.
   poller_thread_active_ = false;
   poller_thread_->join();
-  ENVOY_LOG(warn, "Worker thread shut down successfully");
+  ENVOY_LOG(debug, "Worker thread shut down successfully");
 }
 
 void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
                              const int32_t partition, const absl::string_view key,
                              const absl::string_view value) {
   {
-    ENVOY_LOG(warn, "Sending {} value-bytes to [{}/{}] (data = {})", value.size(), topic, partition,
-              reinterpret_cast<long>(value.data()));
+    void* value_data = const_cast<char*>(value.data()); // Needed for Kafka API.
+    ENVOY_LOG(trace, "Sending [{}] to [{}/{}]", reinterpret_cast<long>(value_data), topic,
+              partition);
     // No flags, we leave all the memory management to Envoy, as we will use address of value data
     // in message callback to tell apart the requests.
     const int flags = 0;
-    void* value_data = const_cast<char*>(value.data());
-    RdKafka::ErrorCode ec = producer_->produce(topic, partition, flags, value_data, value.size(),
-                                               key.data(), key.size(), 0, nullptr);
+    const RdKafka::ErrorCode ec = producer_->produce(
+        topic, partition, flags, value_data, value.size(), key.data(), key.size(), 0, nullptr);
     if (RdKafka::ERR_NO_ERROR == ec) {
       // We have succeeded with submitting data to producer, so we register a callback.
       unfinished_produce_requests_.push_back(origin);
     } else {
-      ENVOY_LOG(warn, "Produce failure [{}] while sending {} value-bytes to [{}/{}]", ec,
-                value.size(), topic, partition);
+      ENVOY_LOG(trace, "Produce failure: {}, while sending [{}] to [{}/{}]", ec,
+                reinterpret_cast<long>(value_data), topic, partition);
       const DeliveryMemento memento = {value_data, ec, 0};
       origin->accept(memento);
     }
@@ -103,27 +102,27 @@ void RichKafkaProducer::checkDeliveryReports() {
     producer_->poll(1000);
     // This invokes the callback below, if any delivery finished (successful or not).
   }
-  ENVOY_LOG(warn, "Poller thread finished");
+  ENVOY_LOG(debug, "Poller thread finished");
 }
 
-// Kafka callback that contains the information
+// Kafka callback that contains the delivery information.
+// Because this method gets executed in poller thread, we need to pass the data through dispatcher.
 void RichKafkaProducer::dr_cb(RdKafka::Message& message) {
-  ENVOY_LOG(warn, "RichKafkaProducer - dr_cb: [{}] {}/{} -> {} (data = {})", message.err(),
-            message.topic_name(), message.partition(), message.offset(),
-            reinterpret_cast<long>(message.payload()));
+  ENVOY_LOG(trace, "Delivery finished: {}, payload [{}] has been saved at offset {} in {}/{}",
+            message.err(), reinterpret_cast<long>(message.payload()), message.topic_name(),
+            message.partition(), message.offset());
   const DeliveryMemento memento = {message.payload(), message.err(), message.offset()};
   const Event::PostCb callback = [this, memento]() -> void { processDelivery(memento); };
   dispatcher_.post(callback);
 }
 
+// We got the delivery data.
+// Now we just check all unfinished requests, find the one that originated this particular delivery,
+// and notify it.
 void RichKafkaProducer::processDelivery(const DeliveryMemento& memento) {
-  ENVOY_LOG(trace, "RichKafkaProducer - processDelivery - entry [{}]",
-            reinterpret_cast<long>(memento.data_));
   for (auto it = unfinished_produce_requests_.begin(); it != unfinished_produce_requests_.end();) {
     bool accepted = (*it)->accept(memento);
     if (accepted) {
-      ENVOY_LOG(trace, "RichKafkaProducer - processDelivery - accepted [{}]",
-                reinterpret_cast<long>(memento.data_));
       unfinished_produce_requests_.erase(it);
       break; // This is important - a single request can be mapped into multiple callbacks here.
     } else {

@@ -54,7 +54,7 @@ ClusteringConfigurationImpl::ClusteringConfigurationImpl(const KafkaMeshProtoCon
   for (const auto& rule : forwarding_rules) {
     const std::string& target_cluster = rule.target_cluster();
     ASSERT(rule.trigger_case() == ForwardingRule::TriggerCase::kTopicPrefix);
-    ENVOY_LOG(warn, "rule: {} -> {}", rule.topic_prefix(), target_cluster);
+    ENVOY_LOG(trace, "Setting up forwarding rule: {} -> {}", rule.topic_prefix(), target_cluster);
     if (cluster_name_to_cluster_config.find(target_cluster) ==
         cluster_name_to_cluster_config.end()) {
       throw EnvoyException(absl::StrCat(

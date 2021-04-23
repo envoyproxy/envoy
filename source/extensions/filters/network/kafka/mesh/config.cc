@@ -23,16 +23,13 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
     const KafkaMeshProtoConfig& config, Server::Configuration::FactoryContext& context) {
 
 #ifdef WIN32
-  throw "boom";
+  throw ExceptionUtil::throwEnvoyException("Kafka mesh filter is not ready for Windows");
 #else
-  ENVOY_LOG(warn, "Creating ClusteringConfiguration instance");
   const ClusteringConfigurationSharedPtr clustering_configuration =
       std::make_shared<ClusteringConfigurationImpl>(config);
-  ENVOY_LOG(warn, "Creating UpstreamKafkaFacadeImpl instance");
   const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade =
       std::make_shared<UpstreamKafkaFacadeImpl>(*clustering_configuration, context.threadLocal(),
                                                 context.api().threadFactory());
-  ENVOY_LOG(warn, "Shared instances have been created");
 
   return [clustering_configuration,
           upstream_kafka_facade](Network::FilterManager& filter_manager) -> void {

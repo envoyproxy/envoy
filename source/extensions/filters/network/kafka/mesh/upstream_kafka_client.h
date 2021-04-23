@@ -38,6 +38,8 @@ class ProduceFinishCb {
 public:
   virtual ~ProduceFinishCb() = default;
 
+  // Attempt to process this delivery.
+  // @returns true if given callback is related to this delivery
   virtual bool accept(const DeliveryMemento& memento) PURE;
 };
 
@@ -119,11 +121,15 @@ public:
 
   void processDelivery(const DeliveryMemento& memento);
 
+  // Runnable for monitoring thread.
   void checkDeliveryReports();
 
   // RdKafka::DeliveryReportCb
   void dr_cb(RdKafka::Message& message) override;
 
+  // Notifies this instance that it is going to be destroyed soon.
+  // Impl note: it allows us to prepare all rich producers for shutdown instead of waiting for each
+  // one by one.
   void markFinished();
 
   std::list<ProduceFinishCbSharedPtr>& getUnfinishedRequestsForTest();

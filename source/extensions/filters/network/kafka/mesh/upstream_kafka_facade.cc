@@ -60,7 +60,7 @@ RecordSink& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& topic
 
 RichKafkaProducer&
 ThreadLocalKafkaFacade::registerNewProducer(const ClusterConfig& cluster_config) {
-  ENVOY_LOG(info, "Register new Kafka producer for cluster [{}]", cluster_config.name_);
+  ENVOY_LOG(debug, "Registering new Kafka producer for cluster [{}]", cluster_config.name_);
   RichKafkaProducerPtr new_producer = std::make_unique<RichKafkaProducer>(
       dispatcher_, thread_factory_, cluster_config.upstream_producer_properties_);
   auto result = cluster_to_kafka_client_.emplace(cluster_config.name_, std::move(new_producer));

@@ -24,19 +24,16 @@ class KafkaMeshFilter : public Network::ReadFilter,
                         public AbstractRequestListener,
                         private Logger::Loggable<Logger::Id::kafka> {
 public:
-  /**
-   * Main constructor.
-   */
+  // Main constructor.
   KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
                   UpstreamKafkaFacade& upstream_kafka_facade);
 
-  /**
-   * Visible for testing.
-   */
+  // Visible for testing.
   KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
                   UpstreamKafkaFacade& upstream_kafka_facade,
                   RequestDecoderSharedPtr request_decoder);
 
+  // Non-trivial. See 'abandonAllInFlightRequests'.
   ~KafkaMeshFilter() override;
 
   // Network::ReadFilter
@@ -56,9 +53,12 @@ public:
   std::list<InFlightRequestSharedPtr>& getRequestsInFlightForTest();
 
 private:
-  /**
-   * Helper method invoked when connection gets dropped.
-   */
+  // Helper method invoked when connection gets dropped.
+  // Request references are stored in 2 places: this filter (request's origin) and in
+  // UpstreamKafkaClient instances (to match pure-Kafka confirmations to the requests). Because
+  // filter can be destroyed before confirmations from Kafka are received, we are just going to mark
+  // related requests as abandoned, so they do not attempt to reference this filter anymore. Impl
+  // note: this is similar to what Redis filter does.
   void abandonAllInFlightRequests();
 
   const RequestDecoderSharedPtr request_decoder_;
