@@ -98,5 +98,11 @@ message LocalRateLimit {
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
   uint32 stage = 9 [(validate.rules).uint32 = {lte: 10}];
 
+  // Specifies the scope of the rate limiter's token bucket.
+  // If set to false, the token bucket is shared across all worker threads,
+  // thus the rate limits are applied per Envoy process.
+  // If set to true, a token bucket is allocated for each connection.
+  // Thus the rate limits are applied per connection thereby allowing
+  // one to rate limit requests on a per connection basis.
   bool per_connection = 10;
 }
