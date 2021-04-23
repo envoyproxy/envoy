@@ -1194,26 +1194,61 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   EXPECT_CALL(*access_log_, log(_, _, _, _));
   handler_->removeListeners(listener_tag);
 
-  // Trigger the deletion if any.
-  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
-  dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, handler_->numConnections());
+
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
+
+  const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
+  MockFunction<void()> on_filter_chain_removed;
+  handler_->removeFilterChains(listener_tag, filter_chains,
+                               [&on_filter_chain_removed]() { on_filter_chain_removed.Call(); });
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  // on_filter_chain_removed must be deferred called.
+  EXPECT_CALL(on_filter_chain_removed, Call());
+  dispatcher_.clearDeferredDeleteList();
+
+  // Final counters.
   EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
   EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
-  const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
-  MockFunction<void()> on_filter_chain_removed;
-  EXPECT_CALL(on_filter_chain_removed, Call());
-
-  // The completion callback is invoked immediately if listener is removed.
-  handler_->removeFilterChains(listener_tag, filter_chains,
-                               [&on_filter_chain_removed]() { on_filter_chain_removed.Call(); });
-
   // Verify that the callback is invoked already.
   testing::Mock::VerifyAndClearExpectations(&on_filter_chain_removed);
   handler_.reset();
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveListener) {
+  InSequence s;
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  // Test stop/remove of not existent listener.
+  handler_->stopListeners(0);
+  handler_->removeListeners(0);
+
+  EXPECT_CALL(*listener, onDestroy());
+  handler_->stopListeners(1);
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  handler_->removeListeners(1);
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  // Test stop/remove of not existent listener.
+  handler_->stopListeners(0);
+  handler_->removeListeners(0);
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerGlobalCxLimitReject) {

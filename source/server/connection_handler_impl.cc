@@ -94,7 +94,9 @@ void ConnectionHandlerImpl::removeFilterChains(
     }
   }
   // Reach here if the target listener was removed by a full listener update.
-  completion();
+  // Completion must be deferred called so that the deferred deleting connection can refer the
+  // filter chains.
+  Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
