@@ -1544,6 +1544,8 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/extensions/filters/http/health_check:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:address_restore_listener_filter_lib",
+        "//source/extensions/filters/listener/original_dst:config",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

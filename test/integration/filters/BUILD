@@ -447,3 +447,22 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "address_restore_listener_filter_lib",
+    srcs = [
+        "address_restore_listener_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:upstream_socket_options_filter_state_lib",
+        "//source/common/network:utility_lib",
+    ],
+)
