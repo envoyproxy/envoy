@@ -371,7 +371,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  ASSERT_TRUE(payload_reader_->waitForLength(6, std::chrono::milliseconds(1000)));
+  ASSERT_TRUE(payload_reader_->waitForLength(6, std::chrono::milliseconds(2000)));
 
   // Make sure we received the 'switch' command from the upstream.
   ASSERT_EQ("switch", payload_reader_->data());
@@ -395,7 +395,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   }
 
   // Make sure we get our echo back
-  ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(1000)));
+  ASSERT_TRUE(payload_reader_->waitForLength(4, std::chrono::milliseconds(2000)));
   ASSERT_EQ("hola", payload_reader_->data());
   payload_reader_->clearData();
 
