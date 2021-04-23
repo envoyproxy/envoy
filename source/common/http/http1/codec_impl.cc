@@ -174,8 +174,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   if (saw_content_length || disable_chunk_encoding_) {
     chunk_encoding_ = false;
   } else {
-    if (status && *status == 100) {
+    if (status && (*status == 100 || *status == 304)) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
+      // For 304 response, since it should never have a body, we should not need to chunk encoding
+      // at all.
       chunk_encoding_ = false;
     } else if (end_stream && !is_response_to_head_request_) {
       // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a

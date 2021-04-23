@@ -1423,6 +1423,59 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainProperHeaders) {
             output);
 }
 
+TEST_F(Http1ServerConnectionImplTest, 304ResponseTransferEncodingNotAddedWhenContentLengthPresent) {
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nif-none-match: \"1234567890\"\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestResponseHeaderMapImpl headers{
+      {":status", "304"}, {"etag", "\"1234567890\""}, {"content-length", "123"}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\ncontent-length: 123\r\n\r\n",
+            output);
+}
+
+// 304 Response does not need to have Transfer-Encoding added even it's allowed by RFC 7230,
+// Section 3.3.1
+TEST_F(Http1ServerConnectionImplTest,
+       304ResponseTransferEncodingNotAddedWhenContentLengthNotPresent) {
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nif-none-match: \"1234567890\"\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestResponseHeaderMapImpl headers{{":status", "304"}, {"etag", "\"1234567890\""}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\n\r\n", output);
+}
+
 TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith204) {
   initialize();
 
