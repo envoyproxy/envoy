@@ -66,6 +66,7 @@ public:
 static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;
 static const uint64_t NUM_DATAGRAMS_PER_GRO_RECEIVE = 16;
 static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
+static const uint64_t MAX_NUM_READS_PER_EVENT_LOOP = 1;
 
 /**
  * Wrapper which resolves UDP socket proto config with defaults.
@@ -366,14 +367,16 @@ public:
                                                 uint32_t* packets_dropped);
 
   /**
-   * Read available packets from a given UDP socket and pass the packet to a given
-   * UdpPacketProcessor.
+   * Read some packets from a given UDP socket and pass the packet to a given
+   * UdpPacketProcessor. Only make NUM_READS_PER_EVENT_LOOP read system calls.
    * @param handle is the UDP socket to read from.
    * @param local_address is the socket's local address used to populate port.
    * @param udp_packet_processor is the callback to receive the packets.
    * @param time_source is the time source used to generate the time stamp of the received packets.
    * @param prefer_gro supplies whether to use GRO if the OS supports it.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel.
+   * Return the io error encountered or nullptr if no io error but read stopped
+   * because of NUM_READS_PER_EVENT_LOOP.
    *
    * TODO(mattklein123): Allow the number of packets read to be limited for fairness. Currently
    *                     this function will always return an error, even if EAGAIN. In the future

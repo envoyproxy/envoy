@@ -696,6 +696,7 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, bool prefer_gro,
                                                uint32_t& packets_dropped) {
+  uint64_t i = MAX_NUM_READS_PER_EVENT_LOOP;
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
@@ -723,7 +724,9 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
     }
-  } while (true);
+    --i;
+  } while (i > 0);
+  return std::move(Api::ioCallUint64ResultNoError().err_);
 }
 
 ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(

@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -145,7 +146,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test a large datagram that gets dropped using recvmmsg if supported.
+// Test a large datagram that gets dropped using recvmsg or recvmmsg if supported.
 TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   setup();
 
@@ -172,33 +173,36 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   EXPECT_EQ(2, listener_->packetsDropped());
 }
 
-// Test a large datagram that gets dropped using recvmsg.
-TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
+TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   setup();
+  const uint64_t num_packets_per_read =
+      Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u;
+  const std::string payload1(10, 'a');
+  for (uint64_t i = 0; i < NUM_READS_PER_EVENT_LOOP * num_packets_per_read; ++i) {
+    client_.write(payload1, *send_to_addr_);
+  }
+  const std::string payload2(20, 'b');
+  for (uint64_t i = 0; i < NUM_READS_PER_EVENT_LOOP * num_packets_per_read; ++i) {
+    client_.write(payload2, *send_to_addr_);
+  }
+  const std::string last_piece("ccc");
+  client_.write(last_piece, *send_to_addr_);
 
-  ON_CALL(override_syscall_, supportsMmsg()).WillByDefault(Return(false));
+  // These packets should be read in more than 2 loops.
+  EXPECT_CALL(listener_callbacks_, onReadReady()).Times(testing::AtLeast(2u));
 
-  // This will get dropped.
-  const std::string first(4096, 'a');
-  client_.write(first, *send_to_addr_);
-  const std::string second("second");
-  client_.write(second, *send_to_addr_);
-  // This will get dropped.
-  const std::string third(4096, 'b');
-  client_.write(third, *send_to_addr_);
-
-  EXPECT_CALL(listener_callbacks_, onReadReady());
-  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
-  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-    validateRecvCallbackParams(
-        data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u);
-    EXPECT_EQ(data.buffer_->toString(), second);
-
-    dispatcher_->exit();
-  }));
-
+  const uint32_t packets_read{0};
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+        ++packets_read;
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg()
+                                             ? NUM_DATAGRAMS_PER_MMSG_RECEIVE
+                                             : 1u);
+        if (packets_read == 2 * num_packets_per_read * NUM_READS_PER_EVENT_LOOP + 1) {
+          dispatcher_->exit();
+        }
+      }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(2, listener_->packetsDropped());
 }
 
 #ifdef UDP_GRO
