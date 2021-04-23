@@ -87,7 +87,6 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
   } else if (hasDataToWrite()) {
     // Quic connection has unsent data but caller wants to close right away.
     ASSERT(type == Network::ConnectionCloseType::NoFlush);
-    quic_connection_->OnCanWrite();
     closeConnectionImmediately();
   } else {
     // Quic connection doesn't have unsent data. It's up to the caller and

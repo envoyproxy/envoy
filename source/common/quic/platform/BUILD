@@ -263,7 +263,6 @@ envoy_cc_library(
         "spdy_containers_impl.h",
         "spdy_logging_impl.h",
         "spdy_string_utils_impl.h",
-        "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
     ],
     external_deps = [
