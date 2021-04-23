@@ -500,7 +500,6 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
 }
 
 TEST_P(ProtocolIntegrationTest, Retry) {
-  EXCLUDE_UPSTREAM_HTTP3; // flakes with CHECK failed: (max_plaintext_size_) >= (PacketSize()).
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -552,7 +551,6 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
-  EXCLUDE_UPSTREAM_HTTP3; // flakes with CHECK failed: (max_plaintext_size_) >= (PacketSize()).
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
