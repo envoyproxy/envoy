@@ -688,6 +688,8 @@ filter_chains: {}
   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
 
   ListenerHandle* listener_foo_different_address = expectListenerCreate(false, true);
+  // Another socket should be created.
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(
       parseListenerFromV3Yaml(listener_foo_different_address_yaml), "version2", true));

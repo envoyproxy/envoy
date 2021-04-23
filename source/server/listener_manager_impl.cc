@@ -443,12 +443,20 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory());
+    if (*(*existing_warming_listener)->address() != *new_listener->address()) {
+      setNewOrDrainingSocketFactory(name, config.address(), *new_listener, config.reuse_port());
+    } else {
+      new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory());
+    }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
-    // have been started or not. Either way we get the socket from the existing listener.
-    new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory());
+    // have been started or not.
+    if (*(*existing_active_listener)->address() != *new_listener->address()) {
+      setNewOrDrainingSocketFactory(name, config.address(), *new_listener, config.reuse_port());
+    } else {
+      new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory());
+    }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
