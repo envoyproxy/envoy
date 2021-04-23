@@ -431,6 +431,42 @@ TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
   EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
 }
 
+TEST_P(WasmNetworkFilterTest, CloseDownstream) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupConfig("", "close_stream");
+  setupFilter();
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_downstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onWrite(fake_downstream_data, false));
+
+  // Should close downstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+}
+
+TEST_P(WasmNetworkFilterTest, CloseUpstream) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupConfig("", "close_stream");
+  setupFilter();
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_upstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onData(fake_upstream_data, false));
+
+  // Should close downstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+}
+
 } // namespace Wasm
 } // namespace NetworkFilters
 } // namespace Extensions

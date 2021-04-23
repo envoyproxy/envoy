@@ -26,13 +26,6 @@ public:
   FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
   FilterDataStatus onResponseBody(size_t, bool) override;
   FilterTrailersStatus onResponseTrailers(uint32_t) override;
-
-private:
-  PanicRootContext* root() { return static_cast<PanicRootContext*>(Context::root()); }
-  static void logBody(WasmBufferType type);
-  FilterDataStatus onBody(WasmBufferType type, size_t buffer_length, bool end);
-  std::string body_op_;
-  int num_chunks_ = 0;
 };
 
 static RegisterContextFactory register_PanicContext(CONTEXT_FACTORY(PanicContext),

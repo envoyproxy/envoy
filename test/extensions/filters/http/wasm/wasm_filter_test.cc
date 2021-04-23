@@ -1944,6 +1944,44 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseTrailers) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter().encodeTrailers(response_trailers));
 }
 
+TEST_P(WasmHttpFilterTest, CloseUpstream) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupTest("close_stream");
+  setupFilter();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, setResponseCodeDetails("wasm_close_stream"));
+  EXPECT_CALL(encoder_callbacks, resetStream());
+
+  // Create context without calling OnRequestHeaders.
+  filter().onCreate();
+  Http::TestResponseHeaderMapImpl response_headers{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().encodeHeaders(response_headers, false));
+}
+
+TEST_P(WasmHttpFilterTest, CloseDownstream) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupTest("close_stream");
+  setupFilter();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, setResponseCodeDetails("wasm_close_stream"));
+  EXPECT_CALL(decoder_callbacks, resetStream());
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+}
+
 } // namespace Wasm
 } // namespace HttpFilters
 } // namespace Extensions

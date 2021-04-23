@@ -89,6 +89,7 @@ envoy_cc_library(
     srcs = [
         "test_async_call_cpp.cc",
         "test_body_cpp.cc",
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_cpp_null_plugin.cc",
         "test_grpc_call_cpp.cc",
@@ -116,6 +117,7 @@ envoy_wasm_cc_binary(
     srcs = [
         "test_async_call_cpp.cc",
         "test_body_cpp.cc",
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_grpc_call_cpp.cc",
         "test_grpc_stream_cpp.cc",

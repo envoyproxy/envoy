@@ -30,6 +30,7 @@ wasm_rust_binary(
 envoy_cc_library(
     name = "test_cpp_plugin",
     srcs = [
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_cpp_null_plugin.cc",
         "test_resume_call_cpp.cc",
@@ -48,6 +49,7 @@ envoy_cc_library(
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
     srcs = [
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_panic_cpp.cc",
         "test_resume_call_cpp.cc",
