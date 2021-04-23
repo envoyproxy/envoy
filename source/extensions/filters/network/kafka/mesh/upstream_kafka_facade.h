@@ -5,7 +5,7 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/kafka/mesh/clustering.h"
+#include "extensions/filters/network/kafka/mesh/upstream_config.h"
 #include "extensions/filters/network/kafka/mesh/upstream_kafka_client.h"
 
 namespace Envoy {
@@ -32,11 +32,11 @@ using UpstreamKafkaFacadeSharedPtr = std::shared_ptr<UpstreamKafkaFacade>;
 class UpstreamKafkaFacadeImpl : public UpstreamKafkaFacade,
                                 private Logger::Loggable<Logger::Id::kafka> {
 public:
-  UpstreamKafkaFacadeImpl(const ClusteringConfiguration& clustering_configuration,
+  UpstreamKafkaFacadeImpl(const UpstreamKafkaConfiguration& configuration,
                           ThreadLocal::SlotAllocator& slot_allocator,
                           Thread::ThreadFactory& thread_factory);
 
-  // WRITE DOC
+  // Returns a Kafka producer that points to a cluster for a given topic.
   RecordSink& getProducerForTopic(const std::string& topic) override;
 
   size_t getProducerCountForTest();

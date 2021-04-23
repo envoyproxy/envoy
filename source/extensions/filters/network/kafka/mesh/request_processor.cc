@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/mesh/splitter.h"
+#include "extensions/filters/network/kafka/mesh/request_processor.h"
 
 #include "envoy/common/exception.h"
 
@@ -13,8 +13,8 @@ namespace Kafka {
 namespace Mesh {
 
 RequestProcessor::RequestProcessor(AbstractRequestListener& origin,
-                                   const ClusteringConfiguration& clustering_configuration)
-    : origin_{origin}, clustering_configuration_{clustering_configuration} {}
+                                   const UpstreamKafkaConfiguration& configuration)
+    : origin_{origin}, configuration_{configuration} {}
 
 // Helper function. Throws a nice message. Filter will react by closing the connection.
 static void throwOnUnsupportedRequest(const std::string& reason, const RequestHeader& header) {
@@ -51,7 +51,7 @@ void RequestProcessor::process(const std::shared_ptr<Request<ProduceRequest>> re
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<MetadataRequest>> request) const {
-  auto res = std::make_shared<MetadataRequestHolder>(origin_, clustering_configuration_, request);
+  auto res = std::make_shared<MetadataRequestHolder>(origin_, configuration_, request);
   origin_.onRequest(res);
 }
 

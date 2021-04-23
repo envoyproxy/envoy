@@ -39,12 +39,12 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "splitter_unit_test",
-    srcs = ["splitter_unit_test.cc"],
+    name = "request_processor_unit_test",
+    srcs = ["request_processor_unit_test.cc"],
     extension_name = "envoy.filters.network.kafka_mesh",
     tags = ["skip_on_windows"],
     deps = [
-        "//source/extensions/filters/network/kafka/mesh:splitter_lib",
+        "//source/extensions/filters/network/kafka/mesh:request_processor_lib",
     ],
 )
 
@@ -74,12 +74,12 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "clustering_unit_test",
-    srcs = ["clustering_unit_test.cc"],
+    name = "upstream_config_unit_test",
+    srcs = ["upstream_config_unit_test.cc"],
     extension_name = "envoy.filters.network.kafka_mesh",
     tags = ["skip_on_windows"],
     deps = [
-        "//source/extensions/filters/network/kafka/mesh:clustering_lib",
+        "//source/extensions/filters/network/kafka/mesh:upstream_config_lib",
     ],
 )
 

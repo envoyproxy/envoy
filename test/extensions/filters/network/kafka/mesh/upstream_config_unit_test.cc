@@ -1,6 +1,6 @@
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/network/kafka/mesh/clustering.h"
+#include "extensions/filters/network/kafka/mesh/upstream_config.h"
 
 #include "test/test_common/utility.h"
 
@@ -12,17 +12,17 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-TEST(ClusteringConfigurationTest, shouldThrowIfNoKafkaClusters) {
+TEST(UpstreamKafkaConfigurationTest, shouldThrowIfNoKafkaClusters) {
   // given
   KafkaMeshProtoConfig proto_config;
 
   // when
   // then - exception gets thrown
-  EXPECT_THROW_WITH_REGEX(ClusteringConfigurationImpl{proto_config}, EnvoyException,
+  EXPECT_THROW_WITH_REGEX(UpstreamKafkaConfigurationImpl{proto_config}, EnvoyException,
                           "at least one upstream Kafka cluster");
 }
 
-TEST(ClusteringConfigurationTest, shouldThrowIfKafkaClustersWithSameName) {
+TEST(UpstreamKafkaConfigurationTest, shouldThrowIfKafkaClustersWithSameName) {
   // given
   const std::string yaml = R"EOF(
 advertised_host: mock
@@ -41,11 +41,11 @@ forwarding_rules:
 
   // when
   // then - exception gets thrown
-  EXPECT_THROW_WITH_REGEX(ClusteringConfigurationImpl{proto_config}, EnvoyException,
+  EXPECT_THROW_WITH_REGEX(UpstreamKafkaConfigurationImpl{proto_config}, EnvoyException,
                           "multiple Kafka clusters referenced by the same name");
 }
 
-TEST(ClusteringConfigurationTest, shouldThrowIfNoForwardingRules) {
+TEST(UpstreamKafkaConfigurationTest, shouldThrowIfNoForwardingRules) {
   // given
   const std::string yaml = R"EOF(
 advertised_host: mock_host
@@ -61,11 +61,11 @@ forwarding_rules:
 
   // when
   // then - exception gets thrown
-  EXPECT_THROW_WITH_REGEX(ClusteringConfigurationImpl{proto_config}, EnvoyException,
+  EXPECT_THROW_WITH_REGEX(UpstreamKafkaConfigurationImpl{proto_config}, EnvoyException,
                           "at least one forwarding rule");
 }
 
-TEST(ClusteringConfigurationTest, shouldThrowIfForwardingRuleWithUnknownTarget) {
+TEST(UpstreamKafkaConfigurationTest, shouldThrowIfForwardingRuleWithUnknownTarget) {
   // given
   const std::string yaml = R"EOF(
 advertised_host: mock_host
@@ -83,11 +83,11 @@ forwarding_rules:
 
   // when
   // then - exception gets thrown
-  EXPECT_THROW_WITH_REGEX(ClusteringConfigurationImpl{proto_config}, EnvoyException,
+  EXPECT_THROW_WITH_REGEX(UpstreamKafkaConfigurationImpl{proto_config}, EnvoyException,
                           "forwarding rule is referencing unknown upstream Kafka cluster");
 }
 
-TEST(ClusteringConfigurationTest, shouldBehaveProperly) {
+TEST(UpstreamKafkaConfigurationTest, shouldBehaveProperly) {
   // given
   const std::string yaml = R"EOF(
 advertised_host: mock_host
@@ -107,7 +107,7 @@ forwarding_rules:
   )EOF";
   KafkaMeshProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  const ClusteringConfiguration& testee = ClusteringConfigurationImpl{proto_config};
+  const UpstreamKafkaConfiguration& testee = UpstreamKafkaConfigurationImpl{proto_config};
 
   const ClusterConfig cluster1 = {"cluster1", 1, {{"bootstrap.servers", "s1"}}};
   const ClusterConfig cluster2 = {"cluster2", 2, {{"bootstrap.servers", "s2"}}};

@@ -8,8 +8,8 @@
 
 #include "extensions/filters/network/kafka/external/requests.h"
 #include "extensions/filters/network/kafka/mesh/abstract_command.h"
-#include "extensions/filters/network/kafka/mesh/clustering.h"
-#include "extensions/filters/network/kafka/mesh/splitter.h"
+#include "extensions/filters/network/kafka/mesh/request_processor.h"
+#include "extensions/filters/network/kafka/mesh/upstream_config.h"
 #include "extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
@@ -18,18 +18,45 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
-
+/**
+ * Main entry point.
+ * Decoded request bytes are passed to processor, that calls us back with enriched request.
+ * Request then gets invoked with upstream Kafka facade, which maintains thread-local list of
+ * (enriched) Kafka producers. Filter is going to maintain a list of in-flight-request so it can
+ * send responses when they finish.
+ *
+ *
+ * +----------------+    <creates>    +-----------------------+
+ * |RequestProcessor+----------------->AbstractInFlightRequest|
+ * +-------^--------+                 +------^--^-------------+
+ *         |                                 |  |
+ *         |                                 |  |
+ * +-------+-------+   <in-flight-reference> |  |
+ * |KafkaMeshFilter+-------------------------+  |
+ * +-------+-------+                            |
+ *         |                                    |
+ *         |                                    |
+ * +-------v-----------+                        |<in-flight-reference>
+ * |UpstreamKafkaFacade|                        |(for callback when finished)
+ * +-------+-----------+                        |
+ *         |                                    |
+ *         |                                    |
+ * +-------v--------------+       +-------------+---+       +-----------------+
+ * |<<ThreadLocalObject>> +------->RichKafkaProducer+-------><<librdkafka>>   |
+ * |ThreadLocalKafkaFacade|       +-----------------+       |RdKafka::Producer|
+ * +----------------------+                                 +-----------------+
+ **/
 class KafkaMeshFilter : public Network::ReadFilter,
                         public Network::ConnectionCallbacks,
                         public AbstractRequestListener,
                         private Logger::Loggable<Logger::Id::kafka> {
 public:
   // Main constructor.
-  KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
+  KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
                   UpstreamKafkaFacade& upstream_kafka_facade);
 
   // Visible for testing.
-  KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
+  KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
                   UpstreamKafkaFacade& upstream_kafka_facade,
                   RequestDecoderSharedPtr request_decoder);
 

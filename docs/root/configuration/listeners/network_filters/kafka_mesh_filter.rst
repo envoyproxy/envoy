@@ -3,7 +3,10 @@
 Kafka Mesh filter
 ===================
 
-The Apache Kafka mesh filter TODO
+The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_ producers.
+Produce requests sent to this filter insance can be forwarded to one of multiple clusters, depending on configured forwarding rules.
+The message versions in `Kafka 2.4.0 <http://kafka.apache.org/24/protocol.html#protocol_api_keys>`_
+are supported.
 
 .. attention::
 
@@ -15,7 +18,8 @@ The Apache Kafka mesh filter TODO
 Configuration
 -------------
 
-The Kafka Mesh filter TODO
+Below example shows us typical filter configuration that proxies 3 Kafka clusters.
+Clients are going to connect to '127.0.0.1:19092', and their messages are going to be distributed to cluster depending on topic names.
 
 .. code-block:: yaml
 
@@ -27,19 +31,49 @@ The Kafka Mesh filter TODO
     filter_chains:
     - filters:
       - name: envoy.filters.network.kafka_mesh
-        config:
-          stat_prefix: exampleprefix
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh
+          advertised_host: "127.0.0.1"
+          advertised_port: 19092
+          upstream_clusters:
+          - cluster_name: kafka_c1
+            bootstrap_servers: cluster1_node1:9092,cluster1_node2:9092,cluster1_node3:9092
+            partition_count: 1
+          - cluster_name: kafka_c2
+            bootstrap_servers: cluster2_node1:9092,cluster2_node2:9092,cluster2_node3:9092
+            partition_count: 1
+          - cluster_name: kafka_c3
+            bootstrap_servers: cluster3_node1:9092,cluster3_node2:9092
+            partition_count: 5
+            producer_config:
+              acks: "1"
+              linger.ms: "500"
+          forwarding_rules:
+          - target_cluster: kafka_c1
+            topic_prefix: apples
+          - target_cluster: kafka_c2
+            topic_prefix: bananas
+          - target_cluster: kafka_c3
+            topic_prefix: cherries
 
-.. _config_network_filters_kafka_mesh_stats:
+.. _config_network_filters_kafka_mesh_notes:
 
-Statistics
-----------
+Notes
+-----
+Given that this filter does its own processing of received requests, there are some changes in behaviour compared to explicit connection to a Kafka cluster:
 
-Every configured Kafka Mesh filter has statistics rooted at *kafka.<stat_prefix>.*, with multiple
-statistics per message type. TODO
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
-
-  request.TYPE, Counter, TODO
+#. Record headers are not sent upstream.
+#. Only ProduceRequests with version 2 are supported (what means very old clients like 0.8 might not be supported).
+#. Python producers need to set API version of at least 1.0.0.
+#. Downstream handling of Kafka producer 'acks' property is delegated to upstream client.
+   E.g. if upstream client is configured to use acks=0 then the response is going to be sent to downstream client as soon as possible (even if they had non-zero acks!).
+#. As the filter splits single producer requests into separate records, it's possible that delivery of only some of these records fails.
+   In that case, the response returned to upstream client is a failure, however it is possible some of the records have been appended in target cluster.
+#. Because of the splitting mentioned above, records are not necessarily appended one after another (as they do not get sent as single request to upstream).
+   Users that want to avoid this scenario might want to take a look into downstream producer configs: 'linger.ms' and 'batch.size'.
+#. Produce requests that reference to topics that do not match any of the rules are going to close connection and fail.
+   This usually should not happen (clients request metadata first, and they should then fail with 'no broker available' first),
+   but is possible if someone tailors binary payloads over the connection.
+#. librdkafka was compiled without ssl, lz4, gssapi, so related custom producer config options are not supported.
+#. Invalid custom producer configs are not found at startup (only when appropriate clusters are being sent to).
+   Requests that would have referenced these clusters are going to close connection and fail.

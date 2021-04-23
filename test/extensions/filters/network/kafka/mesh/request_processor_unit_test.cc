@@ -2,7 +2,7 @@
 #include "extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
 #include "extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
 #include "extensions/filters/network/kafka/mesh/command_handlers/produce.h"
-#include "extensions/filters/network/kafka/mesh/splitter.h"
+#include "extensions/filters/network/kafka/mesh/request_processor.h"
 
 #include "test/test_common/utility.h"
 
@@ -24,7 +24,7 @@ public:
   MOCK_METHOD(void, onRequestReadyForAnswer, ());
 };
 
-class MockClusteringConfiguration : public ClusteringConfiguration {
+class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
@@ -34,7 +34,7 @@ public:
 class RequestProcessorTest : public testing::Test {
 protected:
   MockAbstractRequestListener listener_;
-  MockClusteringConfiguration configuration_;
+  MockUpstreamKafkaConfiguration configuration_;
   RequestProcessor testee_ = {listener_, configuration_};
 };
 

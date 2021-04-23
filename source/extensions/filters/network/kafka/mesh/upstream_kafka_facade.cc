@@ -14,7 +14,7 @@ namespace Mesh {
 class ThreadLocalKafkaFacade : public ThreadLocal::ThreadLocalObject,
                                private Logger::Loggable<Logger::Id::kafka> {
 public:
-  ThreadLocalKafkaFacade(const ClusteringConfiguration& clustering_configuration,
+  ThreadLocalKafkaFacade(const UpstreamKafkaConfiguration& configuration,
                          Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory);
   ~ThreadLocalKafkaFacade() override;
 
@@ -26,18 +26,17 @@ private:
   // Mutates 'cluster_to_kafka_client_'.
   RichKafkaProducer& registerNewProducer(const ClusterConfig& cluster_config);
 
-  const ClusteringConfiguration& clustering_configuration_;
+  const UpstreamKafkaConfiguration& configuration_;
   Event::Dispatcher& dispatcher_;
   Thread::ThreadFactory& thread_factory_;
 
   std::map<std::string, RichKafkaProducerPtr> cluster_to_kafka_client_;
 };
 
-ThreadLocalKafkaFacade::ThreadLocalKafkaFacade(
-    const ClusteringConfiguration& clustering_configuration, Event::Dispatcher& dispatcher,
-    Thread::ThreadFactory& thread_factory)
-    : clustering_configuration_{clustering_configuration}, dispatcher_{dispatcher},
-      thread_factory_{thread_factory} {}
+ThreadLocalKafkaFacade::ThreadLocalKafkaFacade(const UpstreamKafkaConfiguration& configuration,
+                                               Event::Dispatcher& dispatcher,
+                                               Thread::ThreadFactory& thread_factory)
+    : configuration_{configuration}, dispatcher_{dispatcher}, thread_factory_{thread_factory} {}
 
 ThreadLocalKafkaFacade::~ThreadLocalKafkaFacade() {
   for (auto& entry : cluster_to_kafka_client_) {
@@ -47,7 +46,7 @@ ThreadLocalKafkaFacade::~ThreadLocalKafkaFacade() {
 
 RecordSink& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& topic) {
   const absl::optional<ClusterConfig> cluster_config =
-      clustering_configuration_.computeClusterConfigForTopic(topic);
+      configuration_.computeClusterConfigForTopic(topic);
   if (cluster_config) {
     const auto it = cluster_to_kafka_client_.find(cluster_config->name_);
     // Return client already present or create new one and register it.
@@ -71,16 +70,15 @@ size_t ThreadLocalKafkaFacade::getProducerCountForTest() const {
   return cluster_to_kafka_client_.size();
 }
 
-UpstreamKafkaFacadeImpl::UpstreamKafkaFacadeImpl(
-    const ClusteringConfiguration& clustering_configuration,
-    ThreadLocal::SlotAllocator& slot_allocator, Thread::ThreadFactory& thread_factory)
+UpstreamKafkaFacadeImpl::UpstreamKafkaFacadeImpl(const UpstreamKafkaConfiguration& configuration,
+                                                 ThreadLocal::SlotAllocator& slot_allocator,
+                                                 Thread::ThreadFactory& thread_factory)
     : tls_{slot_allocator.allocateSlot()} {
 
   ThreadLocal::Slot::InitializeCb cb =
-      [&clustering_configuration,
+      [&configuration,
        &thread_factory](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalKafkaFacade>(clustering_configuration, dispatcher,
-                                                    thread_factory);
+    return std::make_shared<ThreadLocalKafkaFacade>(configuration, dispatcher, thread_factory);
   };
   tls_->set(cb);
 }

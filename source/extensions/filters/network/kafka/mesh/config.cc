@@ -7,7 +7,7 @@
 #include "envoy/stats/scope.h"
 
 #ifndef WIN32
-#include "extensions/filters/network/kafka/mesh/clustering.h"
+#include "extensions/filters/network/kafka/mesh/upstream_config.h"
 #include "extensions/filters/network/kafka/mesh/filter.h"
 #endif
 
@@ -18,23 +18,22 @@ namespace Kafka {
 namespace Mesh {
 
 // The mesh filter doesn't do anything special, it just sets up the shared entities.
-// Any extra configuration validation is done in ClusteringConfiguration constructor.
+// Any extra configuration validation is done in UpstreamKafkaConfiguration constructor.
 Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyped(
     const KafkaMeshProtoConfig& config, Server::Configuration::FactoryContext& context) {
 
 #ifdef WIN32
   throw ExceptionUtil::throwEnvoyException("Kafka mesh filter is not ready for Windows");
 #else
-  const ClusteringConfigurationSharedPtr clustering_configuration =
-      std::make_shared<ClusteringConfigurationImpl>(config);
+  const UpstreamKafkaConfigurationSharedPtr configuration =
+      std::make_shared<UpstreamKafkaConfigurationImpl>(config);
   const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade =
-      std::make_shared<UpstreamKafkaFacadeImpl>(*clustering_configuration, context.threadLocal(),
+      std::make_shared<UpstreamKafkaFacadeImpl>(*configuration, context.threadLocal(),
                                                 context.api().threadFactory());
 
-  return [clustering_configuration,
-          upstream_kafka_facade](Network::FilterManager& filter_manager) -> void {
+  return [configuration, upstream_kafka_facade](Network::FilterManager& filter_manager) -> void {
     Network::ReadFilterSharedPtr filter =
-        std::make_shared<KafkaMeshFilter>(*clustering_configuration, *upstream_kafka_facade);
+        std::make_shared<KafkaMeshFilter>(*configuration, *upstream_kafka_facade);
     filter_manager.addReadFilter(filter);
   };
 #endif

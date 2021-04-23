@@ -24,7 +24,7 @@ public:
   MOCK_METHOD(RichKafkaProducer&, getProducerForTopic, (const std::string&));
 };
 
-class MockClusteringConfiguration : public ClusteringConfiguration {
+class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
@@ -35,7 +35,7 @@ TEST(MetadataTest, shouldBeAlwaysReadyForAnswer) {
   // given
   MockAbstractRequestListener filter;
   EXPECT_CALL(filter, onRequestReadyForAnswer());
-  MockClusteringConfiguration configuration;
+  MockUpstreamKafkaConfiguration configuration;
   const std::pair<std::string, int32_t> advertised_address = {"host", 1234};
   EXPECT_CALL(configuration, getAdvertisedAddress()).WillOnce(Return(advertised_address));
   // First topic is going to have configuration present (42 partitions for each topic).

@@ -121,7 +121,7 @@ public:
 
   void processDelivery(const DeliveryMemento& memento);
 
-  // Runnable for monitoring thread.
+  // Method executed by monitoring thread.
   void checkDeliveryReports();
 
   // RdKafka::DeliveryReportCb

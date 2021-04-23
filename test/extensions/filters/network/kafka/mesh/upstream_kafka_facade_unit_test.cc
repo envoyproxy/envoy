@@ -18,7 +18,7 @@ namespace Kafka {
 namespace Mesh {
 namespace {
 
-class MockClusteringConfiguration : public ClusteringConfiguration {
+class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
@@ -36,17 +36,15 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateProducerOnlyOnceForTheSameCluster) {
   const std::string topic1 = "topic1";
   const std::string topic2 = "topic2";
 
-  MockClusteringConfiguration clustering_configuration;
+  MockUpstreamKafkaConfiguration configuration;
   const ClusterConfig cluster_config = {"cluster", 1, {{"bootstrap.servers", "localhost:9092"}}};
-  EXPECT_CALL(clustering_configuration, computeClusterConfigForTopic(topic1))
-      .WillOnce(Return(cluster_config));
-  EXPECT_CALL(clustering_configuration, computeClusterConfigForTopic(topic2))
-      .WillOnce(Return(cluster_config));
+  EXPECT_CALL(configuration, computeClusterConfigForTopic(topic1)).WillOnce(Return(cluster_config));
+  EXPECT_CALL(configuration, computeClusterConfigForTopic(topic2)).WillOnce(Return(cluster_config));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
       .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-  UpstreamKafkaFacadeImpl testee = {clustering_configuration, slot_allocator, thread_factory};
+  UpstreamKafkaFacadeImpl testee = {configuration, slot_allocator, thread_factory};
 
   // when
   auto& result1 = testee.getProducerForTopic(topic1);
@@ -62,19 +60,19 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateDifferentProducersForDifferentClusters
   const std::string topic1 = "topic1";
   const std::string topic2 = "topic2";
 
-  MockClusteringConfiguration clustering_configuration;
+  MockUpstreamKafkaConfiguration configuration;
   // Notice it's the cluster name that matters, not the producer config.
   const ClusterConfig cluster_config1 = {"cluster1", 1, {{"bootstrap.servers", "localhost:9092"}}};
-  EXPECT_CALL(clustering_configuration, computeClusterConfigForTopic(topic1))
+  EXPECT_CALL(configuration, computeClusterConfigForTopic(topic1))
       .WillOnce(Return(cluster_config1));
   const ClusterConfig cluster_config2 = {"cluster2", 1, {{"bootstrap.servers", "localhost:9092"}}};
-  EXPECT_CALL(clustering_configuration, computeClusterConfigForTopic(topic2))
+  EXPECT_CALL(configuration, computeClusterConfigForTopic(topic2))
       .WillOnce(Return(cluster_config2));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
       .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-  UpstreamKafkaFacadeImpl testee = {clustering_configuration, slot_allocator, thread_factory};
+  UpstreamKafkaFacadeImpl testee = {configuration, slot_allocator, thread_factory};
 
   // when
   auto& result1 = testee.getProducerForTopic(topic1);
@@ -89,15 +87,14 @@ TEST(UpstreamKafkaFacadeTest, shouldThrowIfThereIsNoConfigurationForGivenTopic) 
   // given
   const std::string topic = "topic1";
 
-  MockClusteringConfiguration clustering_configuration;
+  MockUpstreamKafkaConfiguration configuration;
   const ClusterConfig cluster_config = {"cluster", 1, {{"bootstrap.servers", "localhost:9092"}}};
-  EXPECT_CALL(clustering_configuration, computeClusterConfigForTopic(topic))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(configuration, computeClusterConfigForTopic(topic)).WillOnce(Return(absl::nullopt));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
       .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-  UpstreamKafkaFacadeImpl testee = {clustering_configuration, slot_allocator, thread_factory};
+  UpstreamKafkaFacadeImpl testee = {configuration, slot_allocator, thread_factory};
 
   // when, then - exception gets thrown.
   EXPECT_THROW(testee.getProducerForTopic(topic), EnvoyException);

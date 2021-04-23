@@ -16,7 +16,7 @@ namespace Kafka {
 namespace Mesh {
 namespace {
 
-class MockClusteringConfiguration : public ClusteringConfiguration {
+class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
@@ -56,7 +56,7 @@ public:
 
 class FilterUnitTest : public testing::Test {
 protected:
-  MockClusteringConfiguration configuration_;
+  MockUpstreamKafkaConfiguration configuration_;
   MockUpstreamKafkaFacade upstream_kafka_facade_;
   MockRequestDecoderSharedPtr request_decoder_ = std::make_shared<MockRequestDecoder>();
   KafkaMeshFilter testee_{configuration_, upstream_kafka_facade_, request_decoder_};

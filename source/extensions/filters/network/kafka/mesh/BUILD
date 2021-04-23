@@ -28,7 +28,7 @@ envoy_cc_extension(
     ] + select({
         "//bazel:windows": [],
         "//conditions:default": [
-            ":clustering_lib",
+            ":upstream_config_lib",
             ":filter_lib",
             ":upstream_kafka_facade_lib",
         ],
@@ -44,8 +44,8 @@ envoy_cc_library(
     tags = ["skip_on_windows"],
     deps = [
         ":abstract_command_lib",
-        ":clustering_lib",
-        ":splitter_lib",
+        ":request_processor_lib",
+        ":upstream_config_lib",
         ":upstream_kafka_facade_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:connection_interface",
@@ -58,12 +58,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "splitter_lib",
+    name = "request_processor_lib",
     srcs = [
-        "splitter.cc",
+        "request_processor.cc",
     ],
     hdrs = [
-        "splitter.h",
+        "request_processor.h",
     ],
     tags = ["skip_on_windows"],
     deps = [
@@ -87,7 +87,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
-        ":clustering_lib",
+        ":upstream_config_lib",
         ":upstream_kafka_facade_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/filters/network/kafka:kafka_response_lib",
@@ -105,7 +105,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
-        ":clustering_lib",
+        ":upstream_config_lib",
         ":upstream_kafka_client_lib",
         "//include/envoy/thread:thread_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -130,12 +130,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "clustering_lib",
+    name = "upstream_config_lib",
     srcs = [
-        "clustering.cc",
+        "upstream_config.cc",
     ],
     hdrs = [
-        "clustering.h",
+        "upstream_config.h",
     ],
     tags = ["skip_on_windows"],
     deps = [

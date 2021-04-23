@@ -42,20 +42,20 @@ struct ClusterConfig {
  * Impl note: current matching from topic to cluster is based on prefix matching but more complex
  * rules could be added.
  */
-class ClusteringConfiguration {
+class UpstreamKafkaConfiguration {
 public:
-  virtual ~ClusteringConfiguration() = default;
+  virtual ~UpstreamKafkaConfiguration() = default;
   virtual absl::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const PURE;
   virtual std::pair<std::string, int32_t> getAdvertisedAddress() const PURE;
 };
 
-using ClusteringConfigurationSharedPtr = std::shared_ptr<const ClusteringConfiguration>;
+using UpstreamKafkaConfigurationSharedPtr = std::shared_ptr<const UpstreamKafkaConfiguration>;
 
-class ClusteringConfigurationImpl : public ClusteringConfiguration,
-                                    private Logger::Loggable<Logger::Id::kafka> {
+class UpstreamKafkaConfigurationImpl : public UpstreamKafkaConfiguration,
+                                       private Logger::Loggable<Logger::Id::kafka> {
 public:
-  ClusteringConfigurationImpl(const KafkaMeshProtoConfig& config);
+  UpstreamKafkaConfigurationImpl(const KafkaMeshProtoConfig& config);
   absl::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const override;
   std::pair<std::string, int32_t> getAdvertisedAddress() const override;

@@ -12,10 +12,13 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+/**
+ * Processes (enriches) incoming requests and passes it back to origin.
+ */
 class RequestProcessor : public RequestCallback, private Logger::Loggable<Logger::Id::kafka> {
 public:
   RequestProcessor(AbstractRequestListener& origin,
-                   const ClusteringConfiguration& clustering_configuration);
+                   const UpstreamKafkaConfiguration& configuration);
 
   // RequestCallback
   void onMessage(AbstractRequestSharedPtr arg) override;
@@ -27,7 +30,7 @@ private:
   void process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const;
 
   AbstractRequestListener& origin_;
-  const ClusteringConfiguration& clustering_configuration_;
+  const UpstreamKafkaConfiguration& configuration_;
 };
 
 } // namespace Mesh

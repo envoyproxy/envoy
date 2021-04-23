@@ -12,7 +12,7 @@ namespace Mesh {
 class MetadataRequestHolder : public BaseInFlightRequest {
 public:
   MetadataRequestHolder(AbstractRequestListener& filter,
-                        const ClusteringConfiguration& clustering_configuration,
+                        const UpstreamKafkaConfiguration& configuration,
                         const std::shared_ptr<Request<MetadataRequest>> request);
 
   void invoke(UpstreamKafkaFacade&) override;
@@ -23,7 +23,7 @@ public:
 
 private:
   // Configuration used to provide data for response.
-  const ClusteringConfiguration& clustering_configuration_;
+  const UpstreamKafkaConfiguration& configuration_;
 
   // Original request.
   const std::shared_ptr<Request<MetadataRequest>> request_;

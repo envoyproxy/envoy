@@ -9,10 +9,9 @@ namespace Kafka {
 namespace Mesh {
 
 MetadataRequestHolder::MetadataRequestHolder(
-    AbstractRequestListener& filter, const ClusteringConfiguration& clustering_configuration,
+    AbstractRequestListener& filter, const UpstreamKafkaConfiguration& configuration,
     const std::shared_ptr<Request<MetadataRequest>> request)
-    : BaseInFlightRequest{filter},
-      clustering_configuration_{clustering_configuration}, request_{request} {}
+    : BaseInFlightRequest{filter}, configuration_{configuration}, request_{request} {}
 
 // Metadata requests are immediately ready for answer (as they do not need to reach upstream).
 void MetadataRequestHolder::invoke(UpstreamKafkaFacade&) { notifyFilter(); }
@@ -29,7 +28,7 @@ AbstractResponseSharedPtr MetadataRequestHolder::computeAnswer() const {
   const auto& header = request_->request_header_;
   const ResponseMetadata metadata = {header.api_key_, header.api_version_, header.correlation_id_};
 
-  const auto advertised_address = clustering_configuration_.getAdvertisedAddress();
+  const auto advertised_address = configuration_.getAdvertisedAddress();
   MetadataResponseBroker broker = {ENVOY_BROKER_ID, advertised_address.first,
                                    advertised_address.second};
   std::vector<MetadataResponseTopic> response_topics;
@@ -38,7 +37,7 @@ AbstractResponseSharedPtr MetadataRequestHolder::computeAnswer() const {
       const std::string& topic_name = topic.name_;
       std::vector<MetadataResponsePartition> topic_partitions;
       const absl::optional<ClusterConfig> cluster_config =
-          clustering_configuration_.computeClusterConfigForTopic(topic_name);
+          configuration_.computeClusterConfigForTopic(topic_name);
       if (!cluster_config) {
         // Someone is requesting topics that are not known to our configuration.
         // So we do not attach any metadata, this will cause clients failures downstream as they
