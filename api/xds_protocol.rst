@@ -300,7 +300,7 @@ An example EDS request might be:
     resource_names:
     - foo
     - bar
-    "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
+    type_url: type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
     response_nonce:
 
 The management server may reply either immediately or when the requested
@@ -312,7 +312,7 @@ resources are available with a :ref:`DiscoveryResponse <envoy_v3_api_msg_service
     resources:
     - foo ClusterLoadAssignment proto encoding
     - bar ClusterLoadAssignment proto encoding
-    "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
+    type_url: type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
     nonce: A
 
 After processing the :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`, Envoy will send a new
