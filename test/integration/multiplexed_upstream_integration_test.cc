@@ -68,20 +68,11 @@ TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, Retry) {
-  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
-  testRetry();
-}
+TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) {
-  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
-  testGrpcRetry();
-}
+TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, Trailers) {
-  EXCLUDE_UPSTREAM_HTTP3; // CHECK failed: max_plaintext_size_ (=18) >= PacketSize() (=20)
-  testTrailers(1024, 2048, true, true);
-}
+TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
 TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
   autonomous_upstream_ = true;
