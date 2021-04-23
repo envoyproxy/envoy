@@ -9,14 +9,15 @@
 #include <set>
 
 #include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
 namespace quiche {
 
 namespace {
 
-absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
-  absl::flat_hash_map<std::string, Flag*> flags;
+absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
+  absl::flat_hash_map<absl::string_view, Flag*> flags;
 
 #define QUIC_FLAG(flag, ...) flags.emplace(flag->name(), flag);
 #include "quiche/quic/core/quic_flags_list.h"
@@ -53,7 +54,10 @@ void FlagRegistry::resetFlags() const {
   }
 }
 
-Flag* FlagRegistry::findFlag(const std::string& name) const {
+Flag* FlagRegistry::findFlag(absl::string_view name) const {
+  if (absl::StartsWith(name, EnvoyQuicheFlagPrefix)) {
+    name = name.substr(EnvoyFeaturePrefix.length());
+  }
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;
 }

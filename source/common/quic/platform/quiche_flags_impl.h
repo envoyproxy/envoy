@@ -13,6 +13,9 @@
 
 namespace quiche {
 
+const std::string EnvoyQuicheFlagPrefix = "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
+const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
+
 class Flag;
 
 // TODO: modify flags implementation to be backed by
@@ -32,12 +35,12 @@ public:
   void resetFlags() const;
 
   // Look up a flag by name.
-  Flag* findFlag(const std::string& name) const;
+  Flag* findFlag(absl::string_view name) const;
 
 private:
   FlagRegistry();
 
-  const absl::flat_hash_map<std::string, Flag*> flags_;
+  const absl::flat_hash_map<absl::string_view, Flag*> flags_;
 };
 
 // Abstract class for QUICHE protocol and feature flags.
@@ -54,10 +57,10 @@ public:
   virtual void resetValue() = 0;
 
   // Return flag name.
-  std::string name() const { return name_; }
+  absl::string_view name() const { return name_; }
 
   // Return flag help string.
-  std::string help() const { return help_; }
+  absl::string_view help() const { return help_; }
 
 private:
   std::string name_;

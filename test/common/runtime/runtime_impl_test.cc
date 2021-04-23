@@ -28,6 +28,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/envoy_quic_utils.h"
+#endif
+
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -192,6 +196,14 @@ TEST_F(DiskLoaderImplTest, All) {
   // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
+#ifdef ENVOY_ENABLE_QUIC
+  EXPECT_EQ(
+      true,
+      snapshot->runtimeFeatureEnabled(
+          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
+  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
+#endif
+
   // Deprecation
   EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
                        "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", false));
@@ -258,7 +270,7 @@ TEST_F(DiskLoaderImplTest, All) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(25, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(26, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
