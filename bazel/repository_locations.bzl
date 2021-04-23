@@ -623,11 +623,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.25.0",
-        sha256 = "6f111c57fd50baf5b8ee9d63024874dd2a014b069426156c55adbf6d3d22cb7b",
+        version = "0.27.0",
+        sha256 = "69de5c704a05ff37862f7e0f5534d4f479418afc21806c887db544a316f3cb6b",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.tar.gz"],
         use_category = ["build", "api"],
-        release_date = "2020-12-02",
+        release_date = "2021-03-17",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -782,12 +782,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/88c8d5903d851744410ea9840201b6507feae981.tar.gz
-        version = "88c8d5903d851744410ea9840201b6507feae981",
-        sha256 = "b254fa8f363be0637a468c14c3f57bf7aa2ae23b26a8d388ad0f31cb9863332d",
+        version = "6460972177446abe179ea430bf85b217c5ce240b",
+        sha256 = "5397ae241fc505e887203dc2c2f439549e42b1287687b155bcecac34536db434",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/{version}.tar.gz
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_core"],
-        release_date = "2021-04-07",
+        release_date = "2021-04-21",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
