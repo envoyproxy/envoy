@@ -50,7 +50,11 @@ public:
 
     SignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
                       time_system_);
-    signer.sign(headers, use_unsigned_payload);
+    if (use_unsigned_payload) {
+      signer.signUnsignedPayload(headers);
+    } else {
+      signer.signEmptyPayload(headers);
+    }
 
     EXPECT_EQ(fmt::format("AWS4-HMAC-SHA256 Credential=akid/20180102/region/{}/aws4_request, "
                           "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "

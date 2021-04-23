@@ -52,7 +52,9 @@ public:
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
   void sign(Http::RequestMessage& message, bool sign_body = false) override;
-  void sign(Http::RequestHeaderMap& headers, bool use_unsigned_payload = false) override;
+  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash) override;
+  void signEmptyPayload(Http::RequestHeaderMap& headers) override;
+  void signUnsignedPayload(Http::RequestHeaderMap& headers) override;
 
 private:
   std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
@@ -69,8 +71,6 @@ private:
                                         absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         absl::string_view signature) const;
-
-  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash) override;
 
   const std::string service_name_;
   const std::string region_;

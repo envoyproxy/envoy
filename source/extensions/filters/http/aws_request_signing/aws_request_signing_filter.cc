@@ -46,7 +46,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   try {
     ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
               use_unsigned_payload);
-    config_->signer().sign(headers, use_unsigned_payload);
+    if (use_unsigned_payload) {
+      config_->signer().signUnsignedPayload(headers);
+    } else {
+      config_->signer().signEmptyPayload(headers);
+    }
     config_->stats().signing_added_.inc();
   } catch (const EnvoyException& e) {
     // TODO: sign should not throw to avoid exceptions in the request path

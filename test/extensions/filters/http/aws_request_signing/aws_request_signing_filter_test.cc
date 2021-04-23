@@ -55,8 +55,7 @@ public:
 // Verify filter functionality when signing works for header only request.
 TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_),
-              sign(An<Http::RequestHeaderMap&>(), Matcher<bool>(false)));
+  EXPECT_CALL(*(filter_config_->signer_), signEmptyPayload(An<Http::RequestHeaderMap&>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -67,7 +66,7 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
   setup();
   filter_config_->use_unsigned_payload_ = true;
-  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), Matcher<bool>(true)));
+  EXPECT_CALL(*(filter_config_->signer_), signUnsignedPayload(An<Http::RequestHeaderMap&>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -77,7 +76,7 @@ TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayloadHeaderOnly) {
   setup();
   filter_config_->use_unsigned_payload_ = true;
-  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), Matcher<bool>(true)));
+  EXPECT_CALL(*(filter_config_->signer_), signUnsignedPayload(An<Http::RequestHeaderMap&>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -137,8 +136,7 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
 TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   setup();
   filter_config_->host_rewrite_ = "foo";
-  EXPECT_CALL(*(filter_config_->signer_),
-              sign(An<Http::RequestHeaderMap&>(), Matcher<bool>(false)));
+  EXPECT_CALL(*(filter_config_->signer_), signEmptyPayload(An<Http::RequestHeaderMap&>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -149,8 +147,8 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
 // Verify filter functionality when signing fails in decodeHeaders.
 TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(), Matcher<bool>(false)))
-      .WillOnce(Invoke([](Http::HeaderMap&, bool) -> void { throw EnvoyException("failed"); }));
+  EXPECT_CALL(*(filter_config_->signer_), signEmptyPayload(An<Http::RequestHeaderMap&>()))
+      .WillOnce(Invoke([](Http::HeaderMap&) -> void { throw EnvoyException("failed"); }));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));

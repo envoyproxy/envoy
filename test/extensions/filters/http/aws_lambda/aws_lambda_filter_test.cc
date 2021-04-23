@@ -77,7 +77,7 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
  */
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
-  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), Matcher<bool>(false)));
+  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);

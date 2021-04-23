@@ -21,13 +21,18 @@ public:
   virtual void sign(Http::RequestMessage& message, bool sign_body) PURE;
 
   /**
-   * Sign an AWS request.
+   * Sign an AWS request without a payload (empty string used as content hash).
    * @param headers AWS API request headers.
-   * @param use_unsigned_payload use the literal string `UNSIGNED-PAYLOAD` to calculate the payload
-   * hash.
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::RequestHeaderMap& headers, bool use_unsigned_payload = false) PURE;
+  virtual void signEmptyPayload(Http::RequestHeaderMap& headers) PURE;
+
+  /**
+   * Sign an AWS request using the literal string UNSIGNED-PAYLOAD in the canonical request.
+   * @param headers AWS API request headers.
+   * @throws EnvoyException if the request cannot be signed.
+   */
+  virtual void signUnsignedPayload(Http::RequestHeaderMap& headers) PURE;
 
   /**
    * Sign an AWS request.
