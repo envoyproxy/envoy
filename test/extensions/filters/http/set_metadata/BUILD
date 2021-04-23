@@ -1,0 +1,26 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_extension_cc_test(
+    name = "set_metadata_filter_test",
+    srcs = [
+        "set_metadata_filter_test.cc",
+    ],
+    extension_name = "envoy.filters.http.set_metadata",
+    deps = [
+        "//source/extensions/filters/http/set_metadata:config",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

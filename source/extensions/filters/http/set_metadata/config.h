@@ -1,0 +1,31 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.validate.h"
+
+#include "extensions/filters/http/common/factory_base.h"
+#include "extensions/filters/http/well_known_names.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace SetMetadataFilter {
+
+/**
+ * Config registration for the header-to-metadata filter. @see NamedHttpFilterConfigFactory.
+ */
+class SetMetadataConfig
+    : public Common::FactoryBase<envoy::extensions::filters::http::set_metadata::v3::Config> {
+public:
+  SetMetadataConfig() : FactoryBase(HttpFilterNames::get().SetMetadata) {}
+
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+};
+
+} // namespace SetMetadataFilter
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
