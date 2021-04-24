@@ -28,10 +28,4 @@ message FilterConfig {
   // <envoy_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
   common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1
       [(validate.rules).message = {required: true}];
-
-  oneof port_specifier {
-    // The port number to connect to the upstream. The destination port of the downstream TCP
-    // connection will be used if this is unset.
-    uint32 port_value = 2 [(validate.rules).uint32 = {lte: 65535 gt: 0}];
-  }
 }

@@ -12,7 +12,10 @@ this network filter and the
 :ref:`dynamic forward proxy cluster <envoy_api_msg_config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig>`,
 Envoy supports SNI based dynamic forward proxy. The implementation works just like the
 :ref:`HTTP dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>`, but using the value in
-SNI as target host instead.
+SNI as target host instead. In addition, whereas the HTTP dynamic forward proxy uses the port
+embedded in the Host header for the destination port of the upstream TCP connection, the SNI dynamic
+forward proxy uses the destination port of the downstream TCP connection as the destination port of
+the upstream TCP connection.
 
 The following is a complete configuration that configures both this filter
 as well as the :ref:`dynamic forward proxy cluster
