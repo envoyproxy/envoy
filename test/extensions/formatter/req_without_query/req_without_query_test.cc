@@ -147,6 +147,23 @@ TEST_F(ReqWithoutQueryTest, TestFormatJson) {
   EXPECT_TRUE(TestUtility::jsonStringEqual(actual, expected));
 }
 
+TEST_F(ReqWithoutQueryTest, TestParserNotRecognizingCommand) {
+
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%COMMAND_THAT_DOES_NOT_EXIST()%"
+  formatters:
+    - name: envoy.formatter.req_without_query
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW(
+      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
+      EnvoyException);
+}
+
 } // namespace Formatter
 } // namespace Extensions
 } // namespace Envoy
