@@ -36,7 +36,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.path().empty()) {
     watcher_ = TagSetWatcher::create(factory_context, config.path());
 
-   } else if (!config.ip_tags().empty()) {
+  } else if (!config.ip_tags().empty()) {
     const IPTagsProto tags = config.ip_tags();
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
         IpTaggingFilterSetTagData(tags);
@@ -199,7 +199,8 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
-  std::vector<std::string> tags = config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
+  std::vector<std::string> tags =
+      config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");

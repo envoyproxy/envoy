@@ -19,6 +19,51 @@ Configuration
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging>`
 * This filter should be configured with the name *envoy.filters.http.ip_tagging*.
 
+Examples
+--------
+IP tags can be either read as inline block or from a file on filesystem. Envoy will watch the file for out of band updates.
+
+A sample filter configuration to read inline tags could be:
+
+.. code-block:: yaml
+   http_filters
+     - name: ip.tagging
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+         request_type: BOTH
+         ip_tags:
+         - ip_tag_name: block
+           ip_list:
+             - address_prefix: 1.2.3.4
+               prefix_len:
+                 value: 32
+
+Sample configuration to read tags from a file on filesystem:
+
+.. code-block:: yaml
+   http_filters
+     - name: ip.tagging
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+         request_type: BOTH
+         path: /path/to/tags.yaml
+
+The content of the `yaml` file looks like:
+
+.. code-block:: yaml
+  - ip_tag_name: tag1
+    ip_tags:
+      - address_prefix: 1.2.3.4
+        prefix_len: 32
+      - address_prefix: 1.2.3.5
+        prefix_len: 30
+  - ip_tag_name: tag2
+    ip_tags:
+      - address_prefix: 1.2.3.6
+        prefix_len: 32
+
+This filter supports both Json and Yaml formats for reading IP tags from a file on filesystem.
+
 Statistics
 ----------
 

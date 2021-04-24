@@ -24,9 +24,9 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
-        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
     ],
 )

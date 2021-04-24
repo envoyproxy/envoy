@@ -10,9 +10,9 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
-#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -45,15 +45,16 @@ ip_tags:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", stats_, runtime_, factory_context);
+    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", stats_, runtime_,
+                                                      factory_context);
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
   ~IpTaggingFilterTest() override {
-     if (filter_ != nullptr) {
-       filter_->onDestroy();
-     }
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
+    }
   }
 
   NiceMock<Stats::MockStore> stats_;
@@ -133,9 +134,17 @@ ip_tags:
   EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
+#if 0 // TODO: enable this later
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
+#endif
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
 
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 TEST_F(IpTaggingFilterTest, InternalRequest) {
