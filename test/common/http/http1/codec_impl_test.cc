@@ -2304,7 +2304,7 @@ TEST_F(Http1ClientConnectionImplTest, 204ResponseContentLengthNotAllowed) {
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+        {{"envoy.reloadable_features.require_strict_1xx_and_204_response_headers", "false"}});
 
     initialize();
 
@@ -2340,7 +2340,7 @@ TEST_F(Http1ClientConnectionImplTest, 204ResponseWithContentLength0) {
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+        {{"envoy.reloadable_features.require_strict_1xx_and_204_response_headers", "false"}});
 
     NiceMock<MockResponseDecoder> response_decoder;
     Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
@@ -2374,7 +2374,7 @@ TEST_F(Http1ClientConnectionImplTest, 204ResponseTransferEncodingNotAllowed) {
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+        {{"envoy.reloadable_features.require_strict_1xx_and_204_response_headers", "false"}});
 
     initialize();
 
@@ -2476,7 +2476,7 @@ TEST_F(Http1ClientConnectionImplTest, 101ResponseTransferEncodingNotAllowed) {
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.strict_1xx_and_204_response_headers", "false"}});
+        {{"envoy.reloadable_features.require_strict_1xx_and_204_response_headers", "false"}});
 
     initialize();
 
