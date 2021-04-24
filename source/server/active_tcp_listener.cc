@@ -249,7 +249,7 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
   auto active_socket = std::make_unique<ActiveTcpSocket>(*this, std::move(socket),
                                                          hand_off_restored_destination_connections);
 
-  // Create and run the filters
+  // Create and run the filters.
   config_->filterChainFactory().createListenerFilterChain(*active_socket);
   active_socket->continueFilterChain(true);
 
