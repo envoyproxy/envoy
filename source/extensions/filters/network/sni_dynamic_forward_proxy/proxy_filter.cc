@@ -41,19 +41,19 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  uint32_t default_port = config_->port();
-
-  std::string host = std::string(sni).c_str();
-  if (default_port == 0) {
-    // Embed downstream TCP connection destination port into SNI hostname. This is necessary to
-    // differentiate DNS cache entries for the same hostname on different ports. This is not
-    // necessary when using the HTTP dynamic forward proxy since the port is embedded by the client
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host
-    absl::StrAppend(&host, ":",
-                    read_callbacks_->connection().addressProvider().localAddress()->ip()->port());
+  uint32_t port = config_->port();
+  if (port == 0) {
+    port = read_callbacks_->connection().addressProvider().localAddress()->ip()->port()
   }
 
-  auto result = config_->cache().loadDnsCacheEntry(host, default_port, *this);
+  // Embed downstream TCP connection destination port into SNI hostname. This is necessary to
+  // differentiate DNS cache entries for the same hostname on different ports. This is not
+  // necessary when using the HTTP dynamic forward proxy since the port is embedded by the client
+  // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host
+  std::string host = std::string(sni).c_str();
+  absl::StrAppend(&host, ":", port);
+
+  auto result = config_->cache().loadDnsCacheEntry(host, 0, *this);
 
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
