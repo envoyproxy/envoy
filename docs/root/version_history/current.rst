@@ -14,6 +14,9 @@ Minor Behavior Changes
   (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
   `envoy.reloadable_features.send_strict_1xx_and_204_response_headers`
   (do not send 1xx or 204 responses with these headers). Both are true by default.
+* listener: Respect the :ref:`ConnectionBalanceConfig <envoy_api_msg_config.listener.v3.Listener.ConnectionBalanceConfig>`
+  defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+
 
 Bug Fixes
 ---------
