@@ -54,13 +54,16 @@ The content of the `yaml` file looks like:
   - ip_tag_name: tag1
     ip_tags:
       - address_prefix: 1.2.3.4
-        prefix_len: 32
+        prefix_len:
+          value: 32
       - address_prefix: 1.2.3.5
-        prefix_len: 30
+        prefix_len:
+          value: 32
   - ip_tag_name: tag2
     ip_tags:
       - address_prefix: 1.2.3.6
-        prefix_len: 32
+        prefix_len:
+          value: 32
 
 This filter supports both Json and Yaml formats for reading IP tags from a file on filesystem.
 
