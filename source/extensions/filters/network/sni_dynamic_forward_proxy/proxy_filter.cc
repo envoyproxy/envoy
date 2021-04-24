@@ -16,8 +16,7 @@ ProxyFilterConfig::ProxyFilterConfig(
     const FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Upstream::ClusterManager&)
-    : port_(static_cast<uint16_t>(proto_config.port_value())),
-      dns_cache_manager_(cache_manager_factory.get()),
+    : dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())) {}
 
 ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(config)) {}
@@ -45,9 +44,8 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   // differentiate DNS cache entries for the same hostname on different ports. This is not necessary
   // when using the HTTP dynamic forward proxy since the port is embedded by the client
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host
-  std::string host = std::string(sni).c_str();
-  absl::StrAppend(&host, ":",
-                  read_callbacks_->connection().addressProvider().localAddress()->ip()->port());
+  std::string host = absl::StrCat(
+      sni, ":", read_callbacks_->connection().addressProvider().localAddress()->ip()->port());
 
   auto result = config_->cache().loadDnsCacheEntry(host, 0, *this);
 
