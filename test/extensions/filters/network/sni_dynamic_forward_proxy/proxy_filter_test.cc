@@ -76,8 +76,12 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
       .WillOnce(Return(circuit_breakers_));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_,
-              loadDnsCacheEntry_(Eq("foo"), fake_upstreams_[0]->localAddress()->ip()->port(), _))
+  EXPECT_CALL(
+      *dns_cache_manager_->dns_cache_,
+      loadDnsCacheEntry_(
+          Eq(absl::StrCat("foo:",
+                          callbacks_.connection().addressProvider().localAddress()->ip()->port())),
+          0, _))
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
@@ -95,8 +99,12 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
       new Upstream::ResourceAutoIncDec(pending_requests_)};
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_,
-              loadDnsCacheEntry_(Eq("foo"), fake_upstreams_[0]->localAddress()->ip()->port(), _))
+  EXPECT_CALL(
+      *dns_cache_manager_->dns_cache_,
+      loadDnsCacheEntry_(
+          Eq(absl::StrCat("foo:",
+                          callbacks_.connection().addressProvider().localAddress()->ip()->port())),
+          0, _))
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
 
@@ -110,8 +118,12 @@ TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
       new Upstream::ResourceAutoIncDec(pending_requests_)};
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_,
-              loadDnsCacheEntry_(Eq("foo"), fake_upstreams_[0]->localAddress()->ip()->port(), _))
+  EXPECT_CALL(
+      *dns_cache_manager_->dns_cache_,
+      loadDnsCacheEntry_(
+          Eq(absl::StrCat("foo:",
+                          callbacks_.connection().addressProvider().localAddress()->ip()->port())),
+          0, _))
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));

@@ -14,7 +14,7 @@ Envoy supports SNI based dynamic forward proxy. The implementation works just li
 :ref:`HTTP dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>`, but using the value in
 SNI as target host instead. In addition, whereas the HTTP dynamic forward proxy uses the port
 embedded in the Host header for the destination port of the upstream TCP connection, the SNI dynamic
-forward proxy uses the destination port of the downstream TCP connection as the destination port of
+forward proxy uses the destination port of the downstream TCP connection as the destination port for
 the upstream TCP connection.
 
 The following is a complete configuration that configures both this filter
