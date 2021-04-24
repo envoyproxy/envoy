@@ -36,8 +36,7 @@ public:
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
 
-      const std::string filter =
-          fmt::format(R"EOF(
+      const std::string filter = fmt::format(R"EOF(
 name: envoy.filters.http.dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
@@ -47,10 +46,9 @@ typed_config:
     max_hosts: {}
     dns_cache_circuit_breaker:
       max_pending_requests: {}
-  port_value: {}
 )EOF",
-                      Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts,
-                      max_pending_requests, fake_upstreams_[0]->localAddress()->ip()->port());
+                                             Network::Test::ipVersionToDnsFamily(GetParam()),
+                                             max_hosts, max_pending_requests);
       config_helper_.addNetworkFilter(filter);
     });
 
