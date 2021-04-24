@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
 
 #include "common/formatter/substitution_format_string.h"
+#include "common/formatter/substitution_formatter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -97,6 +98,53 @@ TEST_F(ReqWithoutQueryTest, TestTruncateHeader) {
       ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   EXPECT_EQ("/requ", formatter->format(request_headers_, response_headers_, response_trailers_,
                                        stream_info_, body_));
+}
+
+TEST_F(ReqWithoutQueryTest, TestNonExistingHeader) {
+
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%REQ_WITHOUT_QUERY(does-not-exist)%"
+  formatters:
+    - name: envoy.formatter.req_without_query
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  EXPECT_EQ("-", formatter->format(request_headers_, response_headers_, response_trailers_,
+                                   stream_info_, body_));
+}
+
+TEST_F(ReqWithoutQueryTest, TestFormatJson) {
+  const std::string yaml = R"EOF(
+  json_format:
+    no_query: "%REQ_WITHOUT_QUERY(:PATH)%"
+    select_main_header: "%REQ_WITHOUT_QUERY(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+    select_alt_header: "%REQ_WITHOUT_QUERY(X-NON-EXISTING-HEADER?:PATH)%"
+    truncate: "%REQ_WITHOUT_QUERY(:PATH):5%"
+    does_not_exist: "%REQ_WITHOUT_QUERY(does-not-exist)%"
+  formatters:
+    - name: envoy.formatter.req_without_query
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+)EOF";
+  const std::string expected = R"EOF({
+    "no_query": "/request/path",
+    "select_main_header": "/original/path",
+    "select_alt_header": "/request/path",
+    "truncate": "/requ",
+    "does_not_exist": null
+})EOF";
+
+  TestUtility::loadFromYaml(yaml, config_);
+  auto formatter =
+      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  const std::string actual = formatter->format(request_headers_, response_headers_,
+                                               response_trailers_, stream_info_, body_);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(actual, expected));
 }
 
 } // namespace Formatter
