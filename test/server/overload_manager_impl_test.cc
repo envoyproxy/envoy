@@ -59,7 +59,7 @@ public:
     update_async_ = new_update_async;
   }
 
-  void updateResourceUsage(ResourceMonitor::ResourceUpdateCallbacks& callbacks) override {
+  void updateResourceUsage(ResourceUpdateCallbacks& callbacks) override {
     if (update_async_) {
       callbacks_.emplace(callbacks);
     } else {
@@ -76,7 +76,7 @@ public:
   }
 
 private:
-  void publishUpdate(ResourceMonitor::ResourceUpdateCallbacks& callbacks) {
+  void publishUpdate(ResourceUpdateCallbacks& callbacks) {
     if (absl::holds_alternative<double>(response_)) {
       Server::ResourceUsage usage;
       usage.resource_pressure_ = absl::get<double>(response_);
@@ -90,21 +90,7 @@ private:
   Event::Dispatcher& dispatcher_;
   absl::variant<double, EnvoyException> response_;
   bool update_async_ = false;
-  absl::optional<std::reference_wrapper<ResourceMonitor::ResourceUpdateCallbacks>> callbacks_;
-};
-
-class FakeReactiveResourceMonitor : public ReactiveResourceMonitor {
-public:
-  FakeResourceMonitor(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), response_(0.0) {}
-
-  void setPressure(double pressure) { response_ = pressure; }
-
-  void setError() { response_ = EnvoyException("fake_error"); }
-
-  // TBD
-private:
-  Event::Dispatcher& dispatcher_;
-  absl::variant<double, EnvoyException> response_;
+  absl::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
 };
 
 // TODO add fake factory for reactive resources

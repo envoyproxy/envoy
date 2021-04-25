@@ -286,7 +286,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       // Invoke corresponding resource monitor factory here.
       reactive_resources_.try_emplace(reactive_resource_it->second, name,
                                       std::make_unique<Server::ActiveConnectionsResourceMonitor>(1),
-                                      *this, stats_scope);
+                                      stats_scope);
     } else {
       ENVOY_LOG(debug, "Adding resource monitor for {}", name);
       auto& factory =
@@ -560,9 +560,8 @@ void OverloadManagerImpl::Resource::onFailure(const EnvoyException& error) {
 
 OverloadManagerImpl::ReactiveResource::ReactiveResource(const std::string& name,
                                                         ReactiveResourceMonitorPtr monitor,
-                                                        OverloadManagerImpl& manager,
                                                         Stats::Scope& stats_scope)
-    : name_(name), monitor_(std::move(monitor)), manager_(manager),
+    : name_(name), monitor_(std::move(monitor)),
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")) {}
 
 bool OverloadManagerImpl::ReactiveResource::tryAllocateResource(uint64_t increment) {

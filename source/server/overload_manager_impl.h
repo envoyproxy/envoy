@@ -162,7 +162,7 @@ private:
   class ReactiveResource {
   public:
     ReactiveResource(const std::string& name, ReactiveResourceMonitorPtr monitor,
-                     OverloadManagerImpl& manager, Stats::Scope& stats_scope);
+                     Stats::Scope& stats_scope);
 
     bool tryAllocateResource(uint64_t increment);
     bool tryDeallocateResource(uint64_t decrement);
@@ -171,7 +171,6 @@ private:
   private:
     const std::string name_;
     ReactiveResourceMonitorPtr monitor_;
-    OverloadManagerImpl& manager_;
     Stats::Counter& failed_updates_counter_;
   };
 
