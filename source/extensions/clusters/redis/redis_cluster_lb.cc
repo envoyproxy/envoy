@@ -11,13 +11,8 @@ bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSl
     return false;
   }
 
-  std::set<std::string> replicas_set;
-  for (auto const& replica : replicas_) {
-    replicas_set.emplace(replica->asString());
-  }
-
   for (auto const& replica : rhs.replicas_) {
-    if (replicas_set.find(replica->asString()) == replicas_set.end()) {
+    if (replicas_.find(replica) == replicas_.end()) {
       return false;
     }
   }
