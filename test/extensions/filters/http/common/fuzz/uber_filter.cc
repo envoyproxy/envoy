@@ -47,8 +47,8 @@ UberFilterFuzzer::UberFilterFuzzer()
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details, bool retain_http_status_for_grpc) {
             enabled_ = false;
-            decoder_callbacks_.sendLocalReply_mock(code, body, modify_headers, grpc_status, details,
-                                                   retain_http_status_for_grpc);
+            decoder_callbacks_.sendLocalReplyMock(code, body, modify_headers, grpc_status, details,
+                                                  retain_http_status_for_grpc);
           }));
   ON_CALL(encoder_callbacks_, addEncodedTrailers())
       .WillByDefault(testing::ReturnRef(encoded_trailers_));
