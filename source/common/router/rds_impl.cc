@@ -31,9 +31,9 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager) {
   OptionalHttpFilters optional_http_filters;
   auto& filters = config.http_filters();
-  for (int32_t i = 0; i < filters.size(); i++) {
-    if (filters[i].is_optional()) {
-      optional_http_filters.insert(filters[i].name());
+  for (const auto& filter : filters) {
+    if (filter.is_optional()) {
+      optional_http_filters.insert(filter.name());
     }
   }
   switch (config.route_specifier_case()) {
