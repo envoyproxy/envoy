@@ -250,7 +250,7 @@ message Listener {
   //
   // Consider the scenario that the listener X set :ref: `original_dst <config_listener_filters_original_dst>`,
   // and the listeners Y1,Y2 set `bind_to_port <envoy_api_field_config.listener.v3.Listener.bind_to_port>` to
-  // false. The balance config should be cleared in listener X and be enabled in Y1 and Y2.
+  // false. The balance config should be disabled in listener X and be enabled in Y1 and Y2.
   ConnectionBalanceConfig connection_balance_config = 20;
 
   // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
