@@ -52,7 +52,7 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "ustream_starttls_integration_test",
+    name = "upstream_starttls_integration_test",
     srcs = [
         "upstream_starttls_integration_test.cc",
     ],
