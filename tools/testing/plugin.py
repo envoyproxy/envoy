@@ -2,7 +2,6 @@
 # This is pytest plugin providing fixtures for tests.
 #
 
-import importlib
 from contextlib import contextmanager, ExitStack
 from typing import ContextManager, Iterator
 from unittest.mock import patch
@@ -40,3 +39,18 @@ def _patches(*args, prefix: str = "") -> ContextManager:
 @pytest.fixture
 def patches():
     return _patches
+
+
+def _command_main(main, handler):
+    class_mock = patch(handler)
+
+    with class_mock as m_class:
+        assert (main("arg0", "arg1", "arg2") == m_class.return_value.run.return_value)
+
+    assert (list(m_class.call_args) == [('arg0', 'arg1', 'arg2'), {}])
+    assert (list(m_class.return_value.run.call_args) == [(), {}])
+
+
+@pytest.fixture
+def command_main():
+    return _command_main

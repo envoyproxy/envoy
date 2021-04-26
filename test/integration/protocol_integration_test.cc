@@ -500,7 +500,6 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
 }
 
 TEST_P(ProtocolIntegrationTest, Retry) {
-  EXCLUDE_UPSTREAM_HTTP3; // flakes with CHECK failed: (max_plaintext_size_) >= (PacketSize()).
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -552,7 +551,6 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
-  EXCLUDE_UPSTREAM_HTTP3; // flakes with CHECK failed: (max_plaintext_size_) >= (PacketSize()).
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1192,7 +1190,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
@@ -1257,7 +1255,7 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
   // 304-with-body, is there a protocol error on the active stream.
   if (downstream_protocol_ >= Http::CodecClient::Type::HTTP2 &&
       upstreamProtocol() >= FakeHttpConnection::Type::HTTP2) {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
   }
 }
 
@@ -1438,7 +1436,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 
@@ -1497,7 +1495,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 
@@ -1553,7 +1551,7 @@ name: local-reply-during-encode-data
 
   // Response was aborted after headers were sent to the client.
   // The stream was reset. Client does not receive body or trailers.
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0, response->body().length());
@@ -1622,7 +1620,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 }
@@ -2193,8 +2191,7 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
-  response->waitForReset();
-  EXPECT_TRUE(response->complete());
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
@@ -2214,7 +2211,7 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("max_duration_timeout"));
 }
@@ -2259,7 +2256,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
     EXPECT_EQ("404", response->headers().getStatusValue());
     EXPECT_TRUE(response->complete());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
 }
@@ -2288,7 +2285,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
 
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(codec_client_->disconnected());
 }
 
@@ -2321,7 +2318,7 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_FALSE(response->complete());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     EXPECT_FALSE(response->complete());
   }
 }
