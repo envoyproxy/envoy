@@ -1,3 +1,5 @@
+.. _watchdog_overview:
+
 Watchdog
 ========
 
