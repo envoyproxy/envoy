@@ -34,11 +34,6 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
 
-    if (header_as_string_result_) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              header_as_string_result_->result()};
-    }
-
     header_as_string_result_ = HeaderUtility::getAllOfHeaderAsString(header, ",");
 
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,

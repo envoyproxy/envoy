@@ -9,16 +9,22 @@ namespace Envoy {
 namespace Http {
 namespace Matching {
 
-// Provides test coverage for retrieving a header value multiple times from the same input class.
-TEST(HttpHeadersDataInputBase, Idempotence) {
+TEST(HttpHeadersDataInputBase, ReturnValueNotPersistedBetweenCalls) {
   HttpRequestHeadersDataInput input("header");
-
   HttpMatchingDataImpl data;
-  TestRequestHeaderMapImpl request_headers({{"header", "bar"}});
-  data.onRequestHeaders(request_headers);
 
-  EXPECT_EQ(input.get(data).data_, "bar");
-  EXPECT_EQ(input.get(data).data_, "bar");
+  {
+    TestRequestHeaderMapImpl request_headers({{"header", "bar"}});
+    data.onRequestHeaders(request_headers);
+
+    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(input.get(data).data_, "bar");
+  }
+
+  TestRequestHeaderMapImpl request_headers({{"header", "baz"}});
+  data.onRequestHeaders(request_headers);
+  EXPECT_EQ(input.get(data).data_, "baz");
+  EXPECT_EQ(input.get(data).data_, "baz");
 }
 } // namespace Matching
 } // namespace Http
