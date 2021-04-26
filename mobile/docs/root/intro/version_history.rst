@@ -1,6 +1,30 @@
 Version history
 ---------------
 
+0.4.0 (March 23, 2021)
+======================
+
+This is a large release. Moving forward the team will aim to release smaller version updates.
+The following is a very high-level overview of the larger changes going into this release.
+
+Richer Platform-level Feature Set:
+- Adds pluggable logging capabilities via :ref:`setLogger <api_starting_envoy>`
+- Adds :ref:`platform APIs <api_stats>` for emitting time-series data
+- Adds platform Filters
+- Adds API for accessing arbitrary strings from platform runtime via :ref:`addStringAccessor <api_starting_envoy>`
+
+Additional Language Bindings:
+- Alpha version of python APIs via C++ bindings
+- Alpha version exposing cronet compatible APIs
+
+Continued Bug fixes uncovered by additional testing
+- Fixes several memory management corner-cases
+- Fixes several issues that have led to production crashes
+
+Additional hardening of the codebase via extensive testing:
+- Adds end-to-end testing that covers roundtrip code execution from the platform layer to the core layer.
+- Adds coverage CI runs for core C++ core
+
 0.3.1 (July 23, 2020)
 =====================
 
