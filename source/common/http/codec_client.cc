@@ -45,7 +45,9 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 }
 
 CodecClient::~CodecClient() {
+#ifndef NDEBUG
   ASSERT(connect_called_, "CodecClient::connect() is not called through out the life time.");
+#endif
 }
 
 void CodecClient::connect() {
