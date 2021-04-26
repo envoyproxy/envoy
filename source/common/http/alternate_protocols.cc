@@ -14,8 +14,14 @@ AlternateProtocols::AlternateProtocols(TimeSource& time_source) : time_source_(t
 
 void AlternateProtocols::setAlternatives(const Origin& origin,
                                          const std::vector<AlternateProtocol>& protocols,
-                                         const MonotonicTime& ttl) {
-  protocols_[origin] = {protocols, ttl};
+                                         const MonotonicTime& expiration) {
+  Entry& entry = protocols_[origin];
+  if (entry.protocols_ != protocols) {
+    entry.protocols_ = protocols;
+  }
+  if (entry.expiration_ != expiration) {
+    entry.expiration_ = expiration;
+  }
 }
 
 const std::vector<AlternateProtocols::AlternateProtocol>*
