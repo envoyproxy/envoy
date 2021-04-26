@@ -64,7 +64,7 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
 } // namespace
 
 const std::string& OriginalConnectPort::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_portr");
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
 }
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -572,8 +572,10 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Restore the port if this was a CONNECT request.
+  // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as as HTTP/1.1 style
+  // CONNECT requests.
   if (stream_info.filterState().hasData<OriginalConnectPort>(OriginalConnectPort::key()) &&
-      headers.getHostValue().find(':') == absl::string_view::npos) {
+      Http::HeaderUtility::getPortStart(headers.getHostValue()) == absl::string_view::npos) {
     const OriginalConnectPort& original_port =
         stream_info.filterState().getDataReadOnly<OriginalConnectPort>(OriginalConnectPort::key());
     headers.setHost(absl::StrCat(headers.getHostValue(), ":", original_port.value()));

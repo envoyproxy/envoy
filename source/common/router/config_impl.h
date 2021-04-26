@@ -42,7 +42,7 @@ namespace Router {
  */
 class OriginalConnectPort : public StreamInfo::FilterState::Object {
 public:
-  OriginalConnectPort(uint32_t port) : port_(port) {}
+  explicit OriginalConnectPort(uint32_t port) : port_(port) {}
   const uint32_t& value() const { return port_; }
   static const std::string& key();
 
