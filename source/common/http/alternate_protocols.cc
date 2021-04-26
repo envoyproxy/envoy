@@ -24,20 +24,20 @@ void AlternateProtocols::setAlternatives(const Origin& origin,
   }
 }
 
-const std::vector<AlternateProtocols::AlternateProtocol>*
+OptRef<const std::vector<AlternateProtocols::AlternateProtocol>>
 AlternateProtocols::findAlternatives(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
-    return nullptr;
+    return makeOptRefFromPtr<const std::vector<AlternateProtocols::AlternateProtocol>>(nullptr);
   }
 
   const Entry& entry = entry_it->second;
   if (time_source_.monotonicTime() > entry.expiration_) {
     // Expire the entry.
     protocols_.erase(entry_it);
-    return nullptr;
+    return makeOptRefFromPtr<const std::vector<AlternateProtocols::AlternateProtocol>>(nullptr);
   }
-  return &entry.protocols_;
+  return makeOptRef(entry.protocols_);
 }
 
 size_t AlternateProtocols::size() const { return protocols_.size(); }

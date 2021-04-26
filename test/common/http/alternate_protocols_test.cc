@@ -46,40 +46,40 @@ TEST_F(AlternateProtocolsTest, SetAlternatives) {
 
 TEST_F(AlternateProtocolsTest, FindAlternatives) {
   protocols_.setAlternatives(origin1_, protocols1_, expiration1_);
-  const std::vector<AlternateProtocols::AlternateProtocol>* protocols =
+  OptRef<const std::vector<AlternateProtocols::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
-  ASSERT_NE(nullptr, protocols);
-  EXPECT_EQ(protocols1_, *protocols);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols1_, protocols.ref());
 }
 
 TEST_F(AlternateProtocolsTest, FindAlternativesAfterReplacement) {
   protocols_.setAlternatives(origin1_, protocols1_, expiration1_);
   protocols_.setAlternatives(origin1_, protocols2_, expiration2_);
-  const std::vector<AlternateProtocols::AlternateProtocol>* protocols =
+  OptRef<const std::vector<AlternateProtocols::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
-  ASSERT_NE(nullptr, protocols);
-  EXPECT_EQ(protocols2_, *protocols);
-  EXPECT_NE(protocols1_, *protocols);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols2_, protocols.ref());
+  EXPECT_NE(protocols1_, protocols.ref());
 }
 
 TEST_F(AlternateProtocolsTest, FindAlternativesForMultipleOrigins) {
   protocols_.setAlternatives(origin1_, protocols1_, expiration1_);
   protocols_.setAlternatives(origin2_, protocols2_, expiration2_);
-  const std::vector<AlternateProtocols::AlternateProtocol>* protocols =
+  OptRef<const std::vector<AlternateProtocols::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
-  ASSERT_NE(nullptr, protocols);
-  EXPECT_EQ(protocols1_, *protocols);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols1_, protocols.ref());
 
   protocols = protocols_.findAlternatives(origin2_);
-  EXPECT_EQ(protocols2_, *protocols);
+  EXPECT_EQ(protocols2_, protocols.ref());
 }
 
 TEST_F(AlternateProtocolsTest, FindAlternativesAfterExpiration) {
   protocols_.setAlternatives(origin1_, protocols1_, expiration1_);
   simTime().setMonotonicTime(expiration1_ + Seconds(1));
-  const std::vector<AlternateProtocols::AlternateProtocol>* protocols =
+  OptRef<const std::vector<AlternateProtocols::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
-  ASSERT_EQ(nullptr, protocols);
+  ASSERT_FALSE(protocols.has_value());
   EXPECT_EQ(0, protocols_.size());
 }
 

@@ -5,6 +5,7 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
@@ -83,7 +84,7 @@ public:
   // specified origin, or nullptr if not alternatives are found. The returned pointer
   // is owned by the AlternateProtocols and is valid until the next operation on
   // AlternateProtocols.
-  const std::vector<AlternateProtocol>* findAlternatives(const Origin& origin);
+  OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin);
 
   // Returns the number of entries in the map.
   size_t size() const;
