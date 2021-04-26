@@ -33,8 +33,7 @@ public:
   void terminate();
 
 private:
-  Engine(envoy_engine_t engine, const std::string& configuration, LogLevel log_level,
-         EngineCallbacksSharedPtr callbacks);
+  Engine(envoy_engine_t engine, const std::string& configuration, LogLevel log_level);
 
   friend class EngineBuilder;
 

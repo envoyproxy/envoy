@@ -2,48 +2,49 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/deferred_deletable.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/common/thread_synchronizer.h"
 #include "common/http/codec_helper.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
+#include "library/common/event/provisional_dispatcher.h"
+#include "library/common/network/synthetic_address_impl.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Http {
 
 /**
- * All dispatcher stats. @see stats_macros.h
+ * All http client stats. @see stats_macros.h
  */
-#define ALL_HTTP_DISPATCHER_STATS(COUNTER)                                                         \
+#define ALL_HTTP_CLIENT_STATS(COUNTER)                                                             \
   COUNTER(stream_success)                                                                          \
   COUNTER(stream_failure)                                                                          \
   COUNTER(stream_cancel)
 
 /**
- * Struct definition for dispatcher stats. @see stats_macros.h
+ * Struct definition for client stats. @see stats_macros.h
  */
-struct DispatcherStats {
-  ALL_HTTP_DISPATCHER_STATS(GENERATE_COUNTER_STRUCT)
+struct HttpClientStats {
+  ALL_HTTP_CLIENT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
  * Manages HTTP streams, and provides an interface to interact with them.
- * The Dispatcher executes all stream operations on the provided Event::Dispatcher's event loop.
  */
-class Dispatcher : public Logger::Loggable<Logger::Id::http> {
+class Client : public Logger::Loggable<Logger::Id::http> {
 public:
-  Dispatcher(std::atomic<envoy_network_t>& preferred_network);
-
-  void ready(Event::Dispatcher& event_dispatcher, Stats::Scope& scope, ApiListener& api_listener);
+  Client(ApiListener& api_listener, Event::ProvisionalDispatcher& dispatcher, Stats::Scope& scope,
+         std::atomic<envoy_network_t>& preferred_network)
+      : api_listener_(api_listener), dispatcher_(dispatcher),
+        stats_(HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."))}),
+        preferred_network_(preferred_network),
+        address_(std::make_shared<Network::Address::SyntheticAddressImpl>()) {}
 
   /**
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
@@ -99,7 +100,8 @@ public:
    */
   envoy_status_t cancelStream(envoy_stream_t stream);
 
-  const DispatcherStats& stats() const;
+  const HttpClientStats& stats() const;
+
   // Used to fill response code details for streams that are cancelled via cancelStream.
   const std::string& getCancelDetails() {
     CONSTRUCT_ON_FIRST_USE(std::string, "client cancelled stream");
@@ -121,7 +123,7 @@ private:
   class DirectStreamCallbacks : public ResponseEncoder, public Logger::Loggable<Logger::Id::http> {
   public:
     DirectStreamCallbacks(DirectStream& direct_stream, envoy_http_callbacks bridge_callbacks,
-                          Dispatcher& http_dispatcher);
+                          Client& http_client);
 
     void closeStream();
     void onComplete();
@@ -135,7 +137,7 @@ private:
     Stream& getStream() override { return direct_stream_; }
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
     void encode100ContinueHeaders(const ResponseHeaderMap&) override {
-      // TODO(goaway): implement
+      // TODO(goaway): implement?
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
@@ -144,7 +146,7 @@ private:
   private:
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;
-    Dispatcher& http_dispatcher_;
+    Client& http_client_;
     absl::optional<envoy_error_code_t> error_code_;
     absl::optional<envoy_data> error_message_;
     absl::optional<int32_t> error_attempt_count_;
@@ -161,7 +163,7 @@ private:
                        public StreamCallbackHelper,
                        public Logger::Loggable<Logger::Id::http> {
   public:
-    DirectStream(envoy_stream_t stream_handle, Dispatcher& http_dispatcher);
+    DirectStream(envoy_stream_t stream_handle, Client& http_client);
     ~DirectStream();
 
     // Stream
@@ -188,7 +190,7 @@ private:
     RequestDecoder* request_decoder_;
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
-    Dispatcher& parent_;
+    Client& parent_;
     // Response details used by the connection manager.
     absl::string_view response_details_;
   };
@@ -200,40 +202,23 @@ private:
   // necessary ordering of ActiveStream deletion w.r.t DirectStream deletion; the former needs to be
   // destroyed first. Using post to defer delete the DirectStream provides no ordering guarantee per
   // envoy/source/common/event/libevent.h Maintaining a container of DirectStreamSharedPtr is
-  // important because Dispatcher::resetStream is initiated by a platform thread.
+  // important because Client::resetStream is initiated by a platform thread.
   struct DirectStreamWrapper : public Event::DeferredDeletable {
     DirectStreamWrapper(DirectStreamSharedPtr stream) : stream_(stream) {}
 
   private:
     const DirectStreamSharedPtr stream_;
   };
+
   using DirectStreamWrapperPtr = std::unique_ptr<DirectStreamWrapper>;
 
-  static DispatcherStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return DispatcherStats{ALL_HTTP_DISPATCHER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
-  }
-  /**
-   * Post a functor to the dispatcher. This is safe cross thread.
-   * @param callback, the functor to post.
-   */
-  void post(Event::PostCb callback);
   DirectStreamSharedPtr getStream(envoy_stream_t stream_handle);
   void removeStream(envoy_stream_t stream_handle);
   void setDestinationCluster(HeaderMap& headers);
 
-  Thread::MutexBasicLockable ready_lock_;
-  std::list<Event::PostCb> init_queue_ GUARDED_BY(ready_lock_);
-  Event::Dispatcher* event_dispatcher_ GUARDED_BY(ready_lock_){};
-  ApiListener* api_listener_ GUARDED_BY(ready_lock_){};
-  // stats_ is not currently const because the Http::Dispatcher is constructed before there is
-  // access to MainCommon's stats scope.
-  // This can be fixed when queueing logic is moved out of the Http::Dispatcher, as at that point
-  // the Http::Dispatcher could be constructed when access to all objects set in
-  // Http::Dispatcher::ready() is done; obviously this would require "ready()" to not me a member
-  // function of the dispatcher, but rather have a static factory method.
-  // Related issue: https://github.com/lyft/envoy-mobile/issues/720
-  const std::string stats_prefix_;
-  absl::optional<DispatcherStats> stats_ GUARDED_BY(ready_lock_){};
+  ApiListener& api_listener_;
+  Event::ProvisionalDispatcher& dispatcher_;
+  HttpClientStats stats_;
   absl::flat_hash_map<envoy_stream_t, DirectStreamSharedPtr> streams_;
   std::atomic<envoy_network_t>& preferred_network_;
   // Shared synthetic address across DirectStreams.

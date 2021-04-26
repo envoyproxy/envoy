@@ -33,6 +33,7 @@ envoy_cc_test(
         "//library/common/data:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
+        "//test/common/mocks/event:event_mocks",
         "@envoy//test/common/http:common_lib",
     ],
 )

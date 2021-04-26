@@ -11,8 +11,11 @@ import java.util.Map;
 public class AndroidEngineImpl implements EnvoyEngine {
   private final EnvoyEngine envoyEngine;
 
-  public AndroidEngineImpl(Context context) {
-    this.envoyEngine = new EnvoyEngineImpl();
+  /**
+   * @param runningCallback Called when the engine finishes its async startup and begins running.
+   */
+  public AndroidEngineImpl(Context context, EnvoyOnEngineRunning runningCallback) {
+    this.envoyEngine = new EnvoyEngineImpl(runningCallback);
     AndroidJniLibrary.load(context);
     AndroidNetworkMonitor.load(context, envoyEngine);
   }
@@ -23,27 +26,22 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void terminate() {
-    envoyEngine.terminate();
-  }
-
-  @Override
-  public int runWithConfig(String configurationYAML, String logLevel,
-                           EnvoyOnEngineRunning onEngineRunning) {
+  public int runWithConfig(String configurationYAML, String logLevel) {
     // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
     // gets fixed. AndroidAppLifecycleMonitor monitor = new AndroidAppLifecycleMonitor();
     // application.registerActivityLifecycleCallbacks(monitor);
-    return envoyEngine.runWithConfig(configurationYAML, logLevel, onEngineRunning);
+    return envoyEngine.runWithConfig(configurationYAML, logLevel);
   }
 
   @Override
-  public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel,
-                           EnvoyOnEngineRunning onEngineRunning) {
+  public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
     // gets fixed. AndroidAppLifecycleMonitor monitor = new AndroidAppLifecycleMonitor();
     // application.registerActivityLifecycleCallbacks(monitor);
-    return envoyEngine.runWithConfig(envoyConfiguration, logLevel, onEngineRunning);
+    return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }
+
+  public void terminate() { envoyEngine.terminate(); }
 
   @Override
   public int recordCounterInc(String elements, Map<String, String> tags, int count) {

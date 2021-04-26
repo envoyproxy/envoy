@@ -3,6 +3,8 @@ import Foundation
 
 /// Mock implementation of `EnvoyEngine`. Used internally for testing the bridging layer & mocking.
 final class MockEnvoyEngine: NSObject {
+  init(runningCallback onEngineRunning: (() -> Void)? = nil, logger: ((String) -> Void)? = nil) {}
+
   /// Closure called when `run(withConfig:)` is called.
   static var onRunWithConfig: ((_ config: EnvoyConfiguration, _ logLevel: String?) -> Void)?
   /// Closure called when `run(withConfigYAML:)` is called.
@@ -26,15 +28,13 @@ final class MockEnvoyEngine: NSObject {
 }
 
 extension MockEnvoyEngine: EnvoyEngine {
-  func run(withConfig config: EnvoyConfiguration, logLevel: String,
-           onEngineRunning: (() -> Void)?, logger: ((String) -> Void)?) -> Int32
+  func run(withConfig config: EnvoyConfiguration, logLevel: String) -> Int32
   {
     MockEnvoyEngine.onRunWithConfig?(config, logLevel)
     return kEnvoySuccess
   }
 
-  func run(withTemplate template: String, config: EnvoyConfiguration, logLevel: String,
-           onEngineRunning: (() -> Void)?, logger: ((String) -> Void)?) -> Int32
+  func run(withTemplate template: String, config: EnvoyConfiguration, logLevel: String) -> Int32
   {
     MockEnvoyEngine.onRunWithTemplate?(template, config, logLevel)
     return kEnvoySuccess
