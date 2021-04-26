@@ -155,6 +155,20 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionInvalid) {
+  EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Failure, false));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Failure, false));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V6Only,
+                                             DnsResolver::ResolutionStatus::Failure, false));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_F(AppleDnsImplTest, CallbackException) {
   EXPECT_NE(nullptr, resolveWithException("google.com", DnsLookupFamily::V4Only));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
