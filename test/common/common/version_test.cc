@@ -36,9 +36,9 @@ TEST(VersionTest, BuildVersion) {
   EXPECT_EQ(VersionInfoTestPeer::buildType(),
             fields.at(BuildVersionMetadataKeys::get().BuildType).string_value());
 #ifdef BORINGSSL_FIPS
-  std::cout << "In ifdef block BORINGSSL_FIPS\n";
+  std::cout << "From Test --> In ifdef block BORINGSSL_FIPS\n";
 #else
-  std::cout << "In non-fips\n";
+  std::cout << "From Test --> In non-fips\n";
 #endif
   EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
   EXPECT_EQ(VersionInfoTestPeer::sslVersion(),
