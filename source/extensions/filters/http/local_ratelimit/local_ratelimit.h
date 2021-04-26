@@ -120,7 +120,6 @@ private:
   const uint64_t stage_;
   const bool has_descriptors_;
   const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit proto_config_;
-  Event::Dispatcher& dispatcher_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
