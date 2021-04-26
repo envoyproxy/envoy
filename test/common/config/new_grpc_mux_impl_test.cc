@@ -164,7 +164,7 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   add_response_resource("x", "2000", *response);
   add_response_resource("y", "3000", *response);
   // Pause EDS to allow the ACK to be cached.
-  auto resume_cds = grpc_mux_->pause(type_url);
+  auto resume_eds = grpc_mux_->pause(type_url);
   grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   // Now disconnect.
   // Grpc stream retry timer will kick in and reconnection will happen.
@@ -230,12 +230,12 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
         }));
-    // Expect a reply with the nonce.
+    // Expect an ack with the nonce.
     expectSendMessage(type_url, {}, {}, "111");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
   // Send another response with a different resource, but where EDS is paused.
-  auto resume_cds = grpc_mux_->pause(type_url);
+  auto resume_eds = grpc_mux_->pause(type_url);
   {
     auto response = create_response("y", "2000", "222");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2000"))
@@ -246,7 +246,7 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
         }));
-    // No reply is expected in this case.
+    // No ack reply is expected in this case, as EDS is suspended.
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
 
