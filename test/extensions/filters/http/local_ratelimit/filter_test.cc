@@ -54,6 +54,9 @@ public:
                        testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
         .WillRepeatedly(testing::Return(enforced));
 
+    ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(decoder_callbacks_2_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+
     envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
     TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, stats_, runtime_,
