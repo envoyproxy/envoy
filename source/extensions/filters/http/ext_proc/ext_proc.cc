@@ -107,15 +107,17 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& d
     state.setCompleteBodyDelivered(true);
   }
 
-  bool send_trailers = false;
+  bool just_added_trailers = false;
   Http::HeaderMap* new_trailers = nullptr;
   if (end_stream && state.sendTrailers()) {
     // We're at the end of the stream, but the filter wants to process trailers.
-    // We need to add them right here so we can process them later.
+    // According to the filter contract, this is the only place where we can
+    // add trailers, even if we will return right after this and process them
+    // later.
     ENVOY_LOG(trace, "Creating new, empty trailers");
     new_trailers = state.addTrailers();
     state.setTrailersDelivered(true);
-    send_trailers = true;
+    just_added_trailers = true;
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
@@ -170,7 +172,7 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& d
     break;
   }
 
-  if (send_trailers) {
+  if (just_added_trailers) {
     // If we get here, then we need to send the trailers message now
     switch (openStream()) {
     case StreamOpenState::Error:
