@@ -24,13 +24,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 // JniLibrary
 
-extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
-    JNIEnv* env,
-    jclass // class
-) {
-  return init_engine();
-}
-
 static void jvm_on_engine_running(void* context) {
   if (context == nullptr) {
     return;
@@ -59,14 +52,19 @@ static void jvm_on_exit(void*) {
   jvm_detach_thread();
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
-    JNIEnv* env, jclass, jlong engine, jstring config, jstring jvm_log_level, jobject context) {
+extern "C" JNIEXPORT jlong JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(JNIEnv* env, jclass, jobject context) {
   jobject retained_context = env->NewGlobalRef(context); // Required to keep context in memory
   envoy_engine_callbacks native_callbacks = {jvm_on_engine_running, jvm_on_exit, retained_context};
   // TODO(junr03): wire up once Android support lands.
   envoy_logger logger = {nullptr, nullptr, nullptr};
-  return run_engine(engine, native_callbacks, logger, env->GetStringUTFChars(config, nullptr),
-                    env->GetStringUTFChars(jvm_log_level, nullptr));
+  return init_engine(native_callbacks, logger);
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
+    JNIEnv* env, jclass, jlong engine, jstring config, jstring log_level) {
+  return run_engine(engine, env->GetStringUTFChars(config, nullptr),
+                    env->GetStringUTFChars(log_level, nullptr));
 }
 
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_terminateEngine(

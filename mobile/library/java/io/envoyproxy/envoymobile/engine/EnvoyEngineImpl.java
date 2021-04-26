@@ -16,9 +16,13 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   private final long engineHandle;
   private EnvoyOnEngineRunning onEngineRunning = () -> { return null; };
 
-  public EnvoyEngineImpl() {
+  /**
+   * @param runningCallback Called when the engine finishes its async startup and begins running.
+   */
+  public EnvoyEngineImpl(EnvoyOnEngineRunning runningCallback) {
     JniLibrary.load();
-    this.engineHandle = JniLibrary.initEngine();
+    this.onEngineRunning = runningCallback;
+    this.engineHandle = JniLibrary.initEngine(runningCallback);
   }
 
   /**
@@ -45,16 +49,12 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
-   * @param onEngineRunning    Called when the engine finishes its async startup and begins running.
    * @return A status indicating if the action was successful.
    */
   @Override
-  public int runWithConfig(String configurationYAML, String logLevel,
-                           EnvoyOnEngineRunning onEngineRunning) {
-    this.onEngineRunning = onEngineRunning;
+  public int runWithConfig(String configurationYAML, String logLevel) {
     try {
-      return JniLibrary.runEngine(this.engineHandle, configurationYAML, logLevel,
-                                  this.onEngineRunning);
+      return JniLibrary.runEngine(this.engineHandle, configurationYAML, logLevel);
     } catch (Throwable throwable) {
       // TODO: Need to have a way to log the exception somewhere.
       return ENVOY_FAILURE;
@@ -66,13 +66,10 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
-   * @param onEngineRunning    Called when the engine finishes its async startup and begins running.
    * @return int A status indicating if the action was successful.
    */
   @Override
-  public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel,
-                           EnvoyOnEngineRunning onEngineRunning) {
-
+  public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     for (EnvoyHTTPFilterFactory filterFactory : envoyConfiguration.httpPlatformFilterFactories) {
       JniLibrary.registerFilterFactory(filterFactory.getFilterName(),
                                        new JvmFilterFactoryContext(filterFactory));
@@ -87,7 +84,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
     return runWithConfig(envoyConfiguration.resolveTemplate(
                              JniLibrary.templateString(), JniLibrary.platformFilterTemplateString(),
                              JniLibrary.nativeFilterTemplateString()),
-                         logLevel, onEngineRunning);
+                         logLevel);
   }
 
   /**

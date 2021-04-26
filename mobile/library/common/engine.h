@@ -2,29 +2,28 @@
 
 #include "envoy/server/lifecycle_notifier.h"
 
+#include "common/common/logger.h"
 #include "common/upstream/logical_dns_cluster.h"
 
 #include "absl/base/call_once.h"
 #include "extension_registry.h"
 #include "library/common/common/lambda_logger_delegate.h"
 #include "library/common/envoy_mobile_main_common.h"
-#include "library/common/http/dispatcher.h"
+#include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
 
-class Engine {
+class Engine : public Logger::Loggable<Logger::Id::main> {
 public:
   /**
    * Constructor for a new engine instance.
    * @param callbacks, the callbacks to use for engine lifecycle monitoring.
    * @param logger, the callbacks to use for engine logging.
-   * @param config, the Envoy configuration to use when starting the instance.
-   * @param log_level, the log level with which to configure the engine.
    * @param preferred_network, hook to obtain the preferred network for new streams.
    */
-  Engine(envoy_engine_callbacks callbacks, envoy_logger logger, const char* config,
-         const char* log_level, std::atomic<envoy_network_t>& preferred_network);
+  Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
+         std::atomic<envoy_network_t>& preferred_network);
 
   /**
    * Engine destructor.
@@ -32,10 +31,28 @@ public:
   ~Engine();
 
   /**
-   * Accessor for the http dispatcher.
-   * @return Http::Dispatcher&, the dispatcher being used by the engine.
+   * Run the engine with the provided configuration.
+   * @param config, the Envoy bootstrap configuration to use.
+   * @param log_level, the log level.
    */
-  Http::Dispatcher& httpDispatcher();
+  envoy_status_t run(std::string config, std::string log_level);
+
+  /**
+   * Immediately terminate the engine, if running.
+   */
+  envoy_status_t terminate();
+
+  /**
+   * Accessor for the provisional event dispatcher.
+   * @return Event::ProvisionalDispatcher&, the engine dispatcher.
+   */
+  Event::ProvisionalDispatcher& dispatcher();
+
+  /**
+   * Accessor for the http client. Must be called from the dispatcher's context.
+   * @return Http::Client&, the (default) http client.
+   */
+  Http::Client& httpClient();
 
   /**
    * Increment a counter with a given string of elements and by the given count.
@@ -83,23 +100,24 @@ public:
                                       uint64_t value, envoy_histogram_stat_unit_t unit_measure);
 
 private:
-  envoy_status_t run(std::string config, std::string log_level);
+  envoy_status_t main(std::string config, std::string log_level);
 
+  Event::Dispatcher* event_dispatcher_{};
   Stats::ScopePtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
   envoy_engine_callbacks callbacks_;
   envoy_logger logger_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
-  std::unique_ptr<Http::Dispatcher> http_dispatcher_;
-  std::unique_ptr<MobileMainCommon> main_common_ GUARDED_BY(mutex_);
+  std::unique_ptr<Http::Client> http_client_;
+  std::unique_ptr<Event::ProvisionalDispatcher> dispatcher_;
   Logger::LambdaDelegatePtr lambda_logger_{};
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
-  Event::Dispatcher* event_dispatcher_;
-  // main_thread_ should be destroyed first, hence it is the last member variable. Objects that
+  std::atomic<envoy_network_t>& preferred_network_;
+  // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
-  std::thread main_thread_;
+  std::thread main_thread_{}; // Empty placeholder to be populated later.
 };
 
 } // namespace Envoy

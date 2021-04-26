@@ -30,18 +30,19 @@ TEST_F(EngineTest, EarlyExit) {
   const std::string level = "debug";
 
   engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<engine_test_context*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<engine_test_context*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
+  envoy_engine_callbacks callbacks{[](void* context) -> void {
+                                     auto* engine_running =
+                                         static_cast<engine_test_context*>(context);
+                                     engine_running->on_engine_running.Notify();
+                                   } /*on_engine_running*/,
+                                   [](void* context) -> void {
+                                     auto* exit = static_cast<engine_test_context*>(context);
+                                     exit->on_exit.Notify();
+                                   } /*on_exit*/,
+                                   &test_context /*context*/};
 
-  run_engine(0, engine_cbs, {}, config.c_str(), level.c_str());
+  init_engine(callbacks, {});
+  run_engine(0, config.c_str(), level.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   terminate_engine(0);

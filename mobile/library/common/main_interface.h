@@ -89,12 +89,6 @@ envoy_status_t send_trailers(envoy_stream_t stream, envoy_headers trailers);
 envoy_status_t reset_stream(envoy_stream_t stream);
 
 /**
- * Initialize an engine for handling network streams.
- * @return envoy_engine_t, handle to the underlying engine.
- */
-envoy_engine_t init_engine();
-
-/**
  * Update the network interface to the preferred network for opening new streams.
  * Note that this state is shared by all engines.
  * @param network, the network to be preferred for new streams.
@@ -165,16 +159,21 @@ envoy_status_t record_histogram_value(envoy_engine_t engine, const char* element
 envoy_status_t register_platform_api(const char* name, void* api);
 
 /**
- * External entry point for library.
- * @param engine, handle to the engine to run.
+ * Initialize an engine for handling network streams.
  * @param callbacks, the callbacks that will run the engine callbacks.
  * @param logger, optional callbacks to handle logging.
+ * @return envoy_engine_t, handle to the underlying engine.
+ */
+envoy_engine_t init_engine(envoy_engine_callbacks callbacks, envoy_logger logger);
+
+/**
+ * External entry point for library.
+ * @param engine, handle to the engine to run.
  * @param config, the configuration blob to run envoy with.
  * @param log_level, the logging level to run envoy with.
  * @return envoy_status_t, the resulting status of the operation.
  */
-envoy_status_t run_engine(envoy_engine_t engine, envoy_engine_callbacks callbacks,
-                          envoy_logger logger, const char* config, const char* log_level);
+envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char* log_level);
 
 void terminate_engine(envoy_engine_t engine);
 

@@ -5,6 +5,21 @@
 namespace Envoy {
 namespace Platform {
 
+namespace {
+
+void c_on_engine_running(void* context) {
+  EngineCallbacks* engine_callbacks = static_cast<EngineCallbacks*>(context);
+  engine_callbacks->on_engine_running();
+}
+
+void c_on_exit(void* context) {
+  // NOTE: this function is intentionally empty
+  // as we don't actually do any post-processing on exit.
+  (void)context;
+}
+
+} // namespace
+
 EngineBuilder::EngineBuilder(std::string config_template) : config_template_(config_template) {}
 EngineBuilder::EngineBuilder() : EngineBuilder(std::string(config_template)) {}
 
@@ -89,7 +104,20 @@ EngineSharedPtr EngineBuilder::build() {
     }
   }
 
-  Engine* engine = new Engine(init_engine(), config_str, this->log_level_, this->callbacks_);
+  envoy_logger null_logger{
+      .log = nullptr,
+      .release = envoy_noop_release,
+      .context = nullptr,
+  };
+
+  envoy_engine_callbacks envoy_callbacks{
+      .on_engine_running = &c_on_engine_running,
+      .on_exit = &c_on_exit,
+      .context = this->callbacks_.get(),
+  };
+
+  Engine* engine =
+      new Engine(init_engine(envoy_callbacks, null_logger), config_str, this->log_level_);
   return EngineSharedPtr(engine);
 }
 
