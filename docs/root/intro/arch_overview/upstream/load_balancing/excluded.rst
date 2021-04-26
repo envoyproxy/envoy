@@ -22,7 +22,7 @@ Currently, the following two conditions can lead to a host being excluded when u
 health checking:
 
 * Using the :ref:`ignore_new_hosts_until_first_hc
-  <envoy_api_field_Cluster.CommonLbConfig.ignore_new_hosts_until_first_hc>` cluster option.
+  <envoy_v3_api_field_config.cluster.v3.cluster.commonlbconfig.ignore_new_hosts_until_first_hc>` cluster option.
 * Receiving the :ref:`x-envoy-immediate-health-check-fail
   <config_http_filters_router_x-envoy-immediate-health-check-fail>` header in a normal routed
   response or in response to an :ref:`HTTP active health check

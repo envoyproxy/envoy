@@ -73,7 +73,7 @@ the ring. This technique is also commonly known as `"Ketama" <https://github.com
 hashing, and like all hash-based load balancers, it is only effective when protocol routing is used
 that specifies a value to hash on. If you want something other than the host's address to be used
 as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it
-in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.:
+in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>` e.g.:
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.core.v3.Metadata
@@ -82,7 +82,7 @@ in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndp
       envoy.lb:
         hash_key: "YOUR HASH KEY"
 
-This will override :ref:`use_hostname_for_hashing<envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
+This will override :ref:`use_hostname_for_hashing <envoy_v3_api_field_config.cluster.v3.cluster.commonlbconfig.consistent_hashing_lb_config>`.
 
 Each host is hashed and placed on the ring some number of times proportional to its weight. For
 example, if host A has a weight of 1 and host B has a weight of 2, then there might be three entries
@@ -114,7 +114,7 @@ any place in which consistent hashing is desired. Like the ring hash load balanc
 hashing load balancer is only effective when protocol routing is used that specifies a value to
 hash on. If you want something other than the host's address to be used as the hash key (e.g. the
 semantic name of your host in a Kubernetes StatefulSet), then you can specify it in the ``"envoy.lb"``
-:ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.:
+:ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>` e.g.:
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.core.v3.Metadata
@@ -123,7 +123,7 @@ semantic name of your host in a Kubernetes StatefulSet), then you can specify it
       envoy.lb:
         hash_key: "YOUR HASH KEY"
 
-This will override :ref:`use_hostname_for_hashing<envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
+This will override :ref:`use_hostname_for_hashing <envoy_v3_api_field_config.cluster.v3.cluster.commonlbconfig.consistent_hashing_lb_config>`.
 
 The table construction algorithm places each host in the table some number of times proportional
 to its weight, until the table is completely filled. For example, if host A has a weight of 1 and
