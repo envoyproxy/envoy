@@ -1,3 +1,16 @@
+#
+# This module has been copied from sphinx.ext in order to workaround a
+# sphinx issue described here:
+#     https://github.com/sphinx-doc/sphinx/issues/2068
+#
+# using the fix from:
+#     https://github.com/sphinx-doc/sphinx/pull/8981
+#
+# Once upstream is fixed this module should be removed.
+#
+# Envoy tracking bug is here:
+#     https://github.com/envoyproxy/envoy/issues/16181
+#
 """
     sphinx.ext.intersphinx
     ~~~~~~~~~~~~~~~~~~~~~~
