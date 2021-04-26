@@ -18,11 +18,11 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     Envoy::Server::Configuration::FactoryContext& factory_context)
-    : request_type_(requestTypeEnum(config.request_type())), scope_(scope),
-      runtime_(runtime), stats_trie_set_.first(scope.symbolTable().makeSet("IpTagging")),
-      stats_prefix_(stats_trie_set_.first->add(stat_prefix + "ip_tagging")),
-      no_hit_(stats_trie_set_.first->add("no_hit")), total_(stats_trie_set_.first->add("total")),
-      unknown_tag_(stats_trie_set_.first->add("unknown_tag.hit")) {
+    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
+      stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
+      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
+      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs
@@ -38,7 +38,9 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
   } else if (!config.ip_tags().empty()) {
     const IPTagsProto tags = config.ip_tags();
-    stats_trie_set_ = IpTaggingFilterSetTagData(tags);
+    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
+        IpTaggingFilterSetTagData(tags);
+    trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 
   } else {
     throw EnvoyException(
@@ -46,9 +48,9 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 }
 
-StatsTrieSet IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
+std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
+IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
 
-  Stats::StatNameSetPtr stats_data;
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(ip_tags.size());
 
@@ -69,10 +71,11 @@ StatsTrieSet IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto&
     }
 
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-    stats_data->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
+#if 0 // TODO: re-enable this, somewhere
+    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
+#endif
   }
-  return std::make_pair(std::make_unique<Stats::StatNameSetPtr>(stats_data),
-          std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data));
+  return tag_data;
 }
 
 // Check the registry and either return a watcher for a file or create one
@@ -83,14 +86,11 @@ TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
 }
 
 TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
-                             Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
-                             Stats::Scope& scope)
+                             Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
     : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()),
       factory_context_(factory_context),
-      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)),
-      scope_(scope) {
+      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
-  std::get<0>(stats_trie_set_) = scope_.symbolTable().makeSet("IpTagging");
   watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
                      [this]([[maybe_unused]] std::uint32_t event) { maybeUpdate_(); });
 
@@ -118,7 +118,7 @@ void TagSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> new_values =
       fileContentsAsTagSet_(contents);
 
-  new_values.swap(stats_trie_set_.second); // Fastest way to replace the values.
+  new_values.swap(trie_); // Fastest way to replace the values.
   content_hash_ = hash;
 }
 
@@ -141,9 +141,10 @@ TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
 
   IpTagFileProto proto_content = protoFromFileContents_(contents);
 
-  StatsTrieSet set = IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
+      IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
 
-  return set.second;
+  return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
 std::shared_ptr<TagSetWatcher>
