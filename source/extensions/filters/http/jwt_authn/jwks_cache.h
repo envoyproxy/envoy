@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "extensions/filters/http/jwt_authn/jwt_cache.h"
 
@@ -76,7 +77,7 @@ public:
   // Factory function to create an instance.
   static JwksCachePtr
   create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-         TimeSource& time_source, Api::Api& api);
+         TimeSource& time_source, Api::Api& api, ThreadLocal::SlotAllocator& tls);
 };
 
 } // namespace JwtAuthn
