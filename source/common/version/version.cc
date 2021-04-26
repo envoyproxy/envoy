@@ -37,11 +37,25 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
 }
 
 bool VersionInfo::sslFipsCompliant() {
-#ifdef BORINGSSL_FIPS
-  static bool fipsCompliant = true;
-#else
-  static bool fipsCompliant = false;
-#endif
+  const std::string fips_ssl_version = "BoringSSL-FIPS";
+  bool fipsCompliant = false;
+  if (VersionInfo::sslVersion() == fips_ssl_version) {
+    fipsCompliant = true;
+    std::cout << "In BORINGSSL_FIPS\n";
+    std::cout << "SSL Version:" << VersionInfo::sslVersion();
+  } else {
+    std::cout << "In non-fips\n";
+    std::cout << "SSL Version:" << VersionInfo::sslVersion();
+  }
+  //#ifdef BORINGSSL_FIPS
+  //  static bool fipsCompliant = true;
+  //  std::cout << "In BORINGSSL_FIPS\n";
+  //  std::cout << "SSL Version:" << VersionInfo::sslVersion();
+  //#else
+  //  static bool fipsCompliant = false;
+  //  std::cout << "In non-fips\n";
+  //  std::cout << "SSL Version:" << VersionInfo::sslVersion();
+  //#endif
   return fipsCompliant;
 }
 
