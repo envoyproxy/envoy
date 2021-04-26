@@ -34,6 +34,9 @@ namespace IpTagging {
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
 using IPTagsProto =
     Protobuf::RepeatedPtrField<::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>;
+using TriePtr = std::unique_ptr<Network::LcTrie::LcTrie<std::string>>;
+using StatsTrieSet = std::pair<Stats::StatNameSetPtr, TriePtr>;
+
 /**
  * Coordinates with the Filesystem::Watcher and when that reports a change, load up
  * the change and updates it's internal settings.
@@ -47,7 +50,8 @@ public:
   create(Server::Configuration::FactoryContext& factory_context, std::string filename);
 
   TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
-                Event::Dispatcher& dispatcher, Api::Api& api, std::string filename);
+                Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
+                Stats::Scope& scope);
 
   TagSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
       : TagSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
@@ -55,7 +59,7 @@ public:
 
   ~TagSetWatcher();
 
-  const Network::LcTrie::LcTrie<std::string>& get() const { return *trie_; }
+  const Network::LcTrie::LcTrie<std::string>& get() const { return *stats_trie_set_.second; }
   const std::string& filename() { return filename_; }
 
 private:
@@ -71,6 +75,7 @@ private:
 
   IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
 
+  Stats::Scope& scope_;
   Api::Api& api_;
   std::string filename_;
   std::string extension_;
@@ -78,7 +83,8 @@ private:
   std::unique_ptr<Filesystem::Watcher> watcher_;
   Server::Configuration::FactoryContext& factory_context_;
   Registry* registry_ = nullptr; // Set by registry.
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+  // std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+  StatsTrieSet stats_trie_set_;
 
 protected:
   bool yaml;
@@ -123,22 +129,25 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
 
+  Stats::StatNameSetPtr initializeStatsPtr(Stats::Scope& scope, Stats::StatNameSetPtr);
+
   const Network::LcTrie::LcTrie<std::string>& trie() const {
     if (watcher_ != nullptr) {
       return watcher_->get();
     } else {
-      return *trie_;
+      return *stats_trie_set_.second;
     }
   }
 
   void incHit(absl::string_view tag) {
-    incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
+    incCounter(stats_trie_set_.first->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
   }
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
 
-  static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-  IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);
+  // void setStatsData(Stats::StatNameSetPtr);
+
+  static StatsTrieSet IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);
 
 private:
   static FilterRequestType requestTypeEnum(
@@ -160,13 +169,14 @@ private:
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
-  Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
   std::shared_ptr<const TagSetWatcher> watcher_;
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+  StatsTrieSet stats_trie_set_;
+  // Stats::StatNameSetPtr stats_name_set_;
+  // std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
