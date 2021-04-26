@@ -219,6 +219,20 @@ Specify a closure to be called when Envoy's engine emits a log message.
     NSLog("Envoy log: \(msg)")
   }
 
+~~~~~~~~~~~~~~~~~~~~~
+``addStringAccessor``
+~~~~~~~~~~~~~~~~~~~~~
+
+Specify a closure to be called by Envoy to access arbitrary strings from Platform runtime.
+
+**Example**::
+
+  // Kotlin
+  builder.addStringAccessor("demo-accessor", { "PlatformString" })
+
+  // Swift
+  builder.addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
+
 ----------------------
 Advanced configuration
 ----------------------
