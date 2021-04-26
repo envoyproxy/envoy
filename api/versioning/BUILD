@@ -146,6 +146,7 @@ proto_library(
         "//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg",
         "//envoy/extensions/transport_sockets/quic/v3:pkg",
         "//envoy/extensions/transport_sockets/raw_buffer/v3:pkg",
+        "//envoy/extensions/transport_sockets/s2a/v3alpha:pkg",
         "//envoy/extensions/transport_sockets/starttls/v3:pkg",
         "//envoy/extensions/transport_sockets/tap/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/v3:pkg",
