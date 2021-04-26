@@ -195,7 +195,7 @@ class Checker(runner.Runner):
             self.summary.print_summary()
         return 1 if self.has_failed else 0
 
-    def run_checks(self) -> int:
+    def run(self) -> int:
         """Run all configured checks and return the sum of their error counts"""
         checks = self.get_checks()
         self.on_checks_begin()
@@ -222,11 +222,12 @@ class Checker(runner.Runner):
             self.log.warning("\n".join(warnings))
 
 
-class ForkingChecker(Checker):
+class ForkingChecker(runner.ForkingRunner, Checker):
+    pass
 
-    @cached_property
-    def fork(self):
-        return runner.ForkingAdapter(self)
+
+class BazelChecker(runner.BazelRunner, Checker):
+    pass
 
 
 class CheckerSummary(object):
