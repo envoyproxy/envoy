@@ -47,15 +47,11 @@ bool VersionInfo::sslFipsCompliant() {
     std::cout << "In non-fips\n";
     std::cout << "SSL Version:" << VersionInfo::sslVersion();
   }
-  //#ifdef BORINGSSL_FIPS
-  //  static bool fipsCompliant = true;
-  //  std::cout << "In BORINGSSL_FIPS\n";
-  //  std::cout << "SSL Version:" << VersionInfo::sslVersion();
-  //#else
-  //  static bool fipsCompliant = false;
-  //  std::cout << "In non-fips\n";
-  //  std::cout << "SSL Version:" << VersionInfo::sslVersion();
-  //#endif
+#ifdef BORINGSSL_FIPS
+  std::cout << "In ifdef block BORINGSSL_FIPS\n";
+#else
+  std::cout << "In non-fips\n";
+#endif
   return fipsCompliant;
 }
 
