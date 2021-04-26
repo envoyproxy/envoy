@@ -506,7 +506,9 @@ void PlatformBridgeFilter::FilterBase::onResume() {
     pending_headers_ = nullptr;
     ENVOY_LOG(debug, "PlatformBridgeFilter({})->on_resume_ process headers free#1",
               parent_.filter_name_);
-    free(result.pending_headers);
+    if (pending_headers != result.pending_headers) {
+      free(result.pending_headers);
+    }
   }
 
   if (internal_buffer) {
@@ -518,12 +520,16 @@ void PlatformBridgeFilter::FilterBase::onResume() {
         *Buffer::BridgeFragment::createBridgeFragment(*result.pending_data));
     ENVOY_LOG(debug, "PlatformBridgeFilter({})->on_resume_ process data free#1",
               parent_.filter_name_);
-    free(result.pending_data);
+    if (pending_data != result.pending_data) {
+      free(result.pending_data);
+    }
   } else if (result.pending_data) {
     addData(*result.pending_data);
     ENVOY_LOG(debug, "PlatformBridgeFilter({})->on_resume_ process data free#2",
               parent_.filter_name_);
-    free(result.pending_data);
+    if (pending_data != result.pending_data) {
+      free(result.pending_data);
+    }
   }
 
   if (pending_trailers_) {
@@ -533,12 +539,16 @@ void PlatformBridgeFilter::FilterBase::onResume() {
     pending_trailers_ = nullptr;
     ENVOY_LOG(debug, "PlatformBridgeFilter({})->on_resume_ process trailers free#1",
               parent_.filter_name_);
-    free(result.pending_trailers);
+    if (pending_trailers != result.pending_trailers) {
+      free(result.pending_trailers);
+    }
   } else if (result.pending_trailers) {
     addTrailers(*result.pending_trailers);
     ENVOY_LOG(debug, "PlatformBridgeFilter({})->on_resume_ process trailers free#2",
               parent_.filter_name_);
-    free(result.pending_trailers);
+    if (pending_trailers != result.pending_trailers) {
+      free(result.pending_trailers);
+    }
   }
 
   iteration_state_ = IterationState::Ongoing;
