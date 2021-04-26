@@ -13,6 +13,10 @@ LOG_LEVELS = (("info", logging.INFO), ("debug", logging.DEBUG), ("warn", logging
               ("error", logging.ERROR))
 
 
+class BazelRunError(Exception):
+    pass
+
+
 class LogFilter(logging.Filter):
 
     def filter(self, rec):
@@ -80,9 +84,53 @@ class ForkingAdapter(object):
         self.context = context
 
     def __call__(self, *args, **kwargs) -> subprocess.CompletedProcess:
-        return self.fork(*args, **kwargs)
+        return self.subproc_run(*args, **kwargs)
 
-    def fork(self, *args, capture_output: bool = True, **kwargs) -> subprocess.CompletedProcess:
+    def subproc_run(
+            self, *args, capture_output: bool = True, **kwargs) -> subprocess.CompletedProcess:
         """Fork a subprocess, using self.context.path as the cwd by default"""
         kwargs["cwd"] = kwargs.get("cwd", self.context.path)
         return subprocess.run(*args, capture_output=capture_output, **kwargs)
+
+
+class BazelAdapter(object):
+
+    def __init__(self, context: "ForkingRunner"):
+        self.context = context
+
+    def query(self, query: str) -> list:
+        """Run a bazel query and return stdout as list of lines"""
+        resp = self.context.subproc_run(["bazel", "query", f"'{query}'"])
+        if resp.returncode:
+            raise BazelRunError(f"Bazel query failed: {resp}")
+        return resp.stdout.decode("utf-8").split("\n")
+
+    def run(
+            self,
+            target: str,
+            *args,
+            capture_output: bool = False,
+            cwd: str = "",
+            raises: bool = True) -> subprocess.CompletedProcess:
+        """Run a bazel target and return the subprocess response"""
+        args = (("--",) + args) if args else args
+        bazel_args = ("bazel", "run", target) + args
+        resp = self.context.subproc_run(
+            bazel_args, capture_output=capture_output, cwd=cwd or self.context.path)
+        if resp.returncode and raises:
+            raise BazelRunError(f"Bazel run failed: {resp}")
+        return resp
+
+
+class ForkingRunner(Runner):
+
+    @cached_property
+    def subproc_run(self) -> ForkingAdapter:
+        return ForkingAdapter(self)
+
+
+class BazelRunner(ForkingRunner):
+
+    @cached_property
+    def bazel(self) -> BazelAdapter:
+        return BazelAdapter(self)

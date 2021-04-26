@@ -148,7 +148,7 @@ TEST(ConfigTest, ConfigTest) {
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
 
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context));
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
