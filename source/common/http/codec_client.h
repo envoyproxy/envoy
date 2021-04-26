@@ -263,9 +263,7 @@ private:
   bool connected_{};
   bool remote_closed_{};
   bool protocol_error_{false};
-#ifndef NDEBUG
   bool connect_called_{false};
-#endif
 };
 
 using CodecClientPtr = std::unique_ptr<CodecClient>;

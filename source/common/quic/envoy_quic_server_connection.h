@@ -7,6 +7,8 @@
 
 #include "server/connection_handler_impl.h"
 
+// Use QUICHE_INCLUDE_[1...N] to include needed QUICHE headers before including
+// quic_includes_ignores.h
 #define QUICHE_INCLUDE_1 "quiche/quic/core/quic_connection.h"
 #include "common/quic/quic_includes_ignores.h"
 

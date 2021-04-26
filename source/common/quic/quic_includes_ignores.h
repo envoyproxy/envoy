@@ -2,6 +2,10 @@
 
 // NOLINT(namespace-envoy)
 // A wrapper of QUICHE includes which suppresses some compilation warnings thrown from QUICHE.
+// Usage:
+// #define QUICHE_INCLUDE_1 "quiche/quic/core/quic_connection.h"
+// #define QUICHE_INCLUDE_2 "quiche/quic/core/quic_session.h"
+// #include common/quic/quic_includes_ignores.h
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
