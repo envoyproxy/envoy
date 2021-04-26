@@ -47,12 +47,10 @@ TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer)
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  EXCLUDE_UPSTREAM_HTTP3; // Close loop.
   testRouterUpstreamDisconnectBeforeRequestComplete();
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  EXCLUDE_UPSTREAM_HTTP3; // Close loop.
   testRouterUpstreamDisconnectBeforeResponseComplete();
 }
 
@@ -253,7 +251,6 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
-  EXCLUDE_UPSTREAM_HTTP3; // No H3 support yet.
   use_alpn_ = true;
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
@@ -326,7 +323,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
 }
 
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
-  EXCLUDE_UPSTREAM_HTTP3;                     // Close loop.
+  EXCLUDE_UPSTREAM_HTTP3;                     // Times out waiting for reset.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
   std::vector<Http::RequestEncoder*> encoders;

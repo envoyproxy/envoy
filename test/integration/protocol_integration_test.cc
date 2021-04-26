@@ -608,7 +608,6 @@ TEST_P(ProtocolIntegrationTest, RetryStreaming) {
 // sure that Envoy cleans up stream state correctly when doing a retry with
 // complete response but incomplete request.
 TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
-  EXCLUDE_UPSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -728,7 +727,6 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
 // downstream response, and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
-  EXCLUDE_UPSTREAM_HTTP3;
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
   host.set_include_attempt_count_in_response(true);
@@ -778,7 +776,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
     // TODO(alyssawilk) investigate why this combination doesn't work.
     return;
   }
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // Timed out waiting for new stream.
   const Upstream::HealthyLoad healthy_priority_load({0u, 100u});
   const Upstream::DegradedLoad degraded_priority_load({0u, 100u});
   NiceMock<Upstream::MockRetryPriority> retry_priority(healthy_priority_load,
@@ -851,7 +849,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
 // the same host. With a total of two upstream hosts, this should result in us continuously sending
 // requests to the same host.
 TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
-  EXCLUDE_UPSTREAM_HTTP3;
   TestHostPredicateFactory predicate_factory;
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
