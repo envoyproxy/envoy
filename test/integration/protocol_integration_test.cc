@@ -1599,7 +1599,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   Http::TestRequestTrailerMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
-    request_trailers.addCopy("trailer", std::string(1, 'a'));
+    // TODO(alyssawilk) QUIC fails without the trailers being distinct becasue
+    // the checks are done before transformation. Either make the transformation
+    // use commas, or do QUIC checks before and after.
+    request_trailers.addCopy(absl::StrCat("trailer", i), std::string(1, 'a'));
   }
 
   initialize();
@@ -1615,7 +1618,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
   } else {
-    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 }
