@@ -82,10 +82,8 @@ MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
 void MetricsFlusher::flushCounter(io::prometheus::client::MetricFamily& metrics_family,
                                   const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
                                   int64_t snapshot_time_ms) const {
-  metrics_family.set_type(io::prometheus::client::MetricType::COUNTER);
-  metrics_family.set_name(counter_snapshot.counter_.get().name());
-  auto* metric = metrics_family.add_metric();
-  metric->set_timestamp_ms(snapshot_time_ms);
+  auto* metric = populateMetricsFamily(metrics_family, io::prometheus::client::MetricType::COUNTER,
+                                       snapshot_time_ms, counter_snapshot.counter_.get());
   auto* counter_metric = metric->mutable_counter();
   if (report_counters_as_deltas_) {
     counter_metric->set_value(counter_snapshot.delta_);
@@ -96,10 +94,8 @@ void MetricsFlusher::flushCounter(io::prometheus::client::MetricFamily& metrics_
 
 void MetricsFlusher::flushGauge(io::prometheus::client::MetricFamily& metrics_family,
                                 const Stats::Gauge& gauge, int64_t snapshot_time_ms) const {
-  metrics_family.set_type(io::prometheus::client::MetricType::GAUGE);
-  metrics_family.set_name(gauge.name());
-  auto* metric = metrics_family.add_metric();
-  metric->set_timestamp_ms(snapshot_time_ms);
+  auto* metric = populateMetricsFamily(metrics_family, io::prometheus::client::MetricType::GAUGE,
+                                       snapshot_time_ms, gauge);
   auto* gauge_metric = metric->mutable_gauge();
   gauge_metric->set_value(gauge.value());
 }
@@ -113,10 +109,9 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& summar
   // performance.
 
   // Add summary information for histograms.
-  summary_metrics_family.set_type(io::prometheus::client::MetricType::SUMMARY);
-  summary_metrics_family.set_name(envoy_histogram.name());
-  auto* summary_metric = summary_metrics_family.add_metric();
-  summary_metric->set_timestamp_ms(snapshot_time_ms);
+  auto* summary_metric =
+      populateMetricsFamily(summary_metrics_family, io::prometheus::client::MetricType::SUMMARY,
+                            snapshot_time_ms, envoy_histogram);
   auto* summary = summary_metric->mutable_summary();
   const Stats::HistogramStatistics& hist_stats = envoy_histogram.intervalStatistics();
   for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
@@ -126,10 +121,9 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& summar
   }
 
   // Add bucket information for histograms.
-  histogram_metrics_family.set_type(io::prometheus::client::MetricType::HISTOGRAM);
-  histogram_metrics_family.set_name(envoy_histogram.name());
-  auto* histogram_metric = histogram_metrics_family.add_metric();
-  histogram_metric->set_timestamp_ms(snapshot_time_ms);
+  auto* histogram_metric =
+      populateMetricsFamily(histogram_metrics_family, io::prometheus::client::MetricType::HISTOGRAM,
+                            snapshot_time_ms, envoy_histogram);
   auto* histogram = histogram_metric->mutable_histogram();
   histogram->set_sample_count(hist_stats.sampleCount());
   histogram->set_sample_sum(hist_stats.sampleSum());
@@ -138,6 +132,31 @@ void MetricsFlusher::flushHistogram(io::prometheus::client::MetricFamily& summar
     bucket->set_upper_bound(hist_stats.supportedBuckets()[i]);
     bucket->set_cumulative_count(hist_stats.computedBuckets()[i]);
   }
+}
+
+io::prometheus::client::Metric*
+MetricsFlusher::populateMetricsFamily(io::prometheus::client::MetricFamily& metrics_family,
+                                      io::prometheus::client::MetricType type,
+                                      int64_t snapshot_time_ms, const Stats::Metric& metric) const {
+  metrics_family.set_type(type);
+  auto* prometheus_metric = metrics_family.add_metric();
+  prometheus_metric->set_timestamp_ms(snapshot_time_ms);
+
+  if (emit_labels_) {
+    // TODO(snowp): Look into the perf implication of this. We need to take a lock on the symbol
+    // table to stringify the StatNames, which could result in some lock contention. Consider
+    // caching the conversion between stat handle to extracted tags.
+    metrics_family.set_name(metric.tagExtractedName());
+    for (const auto& tag : metric.tags()) {
+      auto* label = prometheus_metric->add_label();
+      label->set_name(tag.name_);
+      label->set_value(tag.value_);
+    }
+  } else {
+    metrics_family.set_name(metric.name());
+  }
+
+  return prometheus_metric;
 }
 } // namespace MetricsService
 } // namespace StatSinks

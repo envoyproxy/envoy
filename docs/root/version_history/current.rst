@@ -36,5 +36,7 @@ Removed Config or Runtime
 New Features
 ------------
 
+* metric service: added support for sending metric tags as labels. This can be enabled by setting the :ref:`emit_tags_as_labels <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels>` field to true.
+
 Deprecated
 ----------
