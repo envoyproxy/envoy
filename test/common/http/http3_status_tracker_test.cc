@@ -60,7 +60,6 @@ TEST_F(Http3StatusTrackerTest, MarkBrokenThenExpires) {
 }
 
 TEST_F(Http3StatusTrackerTest, MarkBrokenWithBackoff) {
-  // markBroken will only be called when the timer is not enabled.
   EXPECT_CALL(*timer_, enabled()).WillRepeatedly(Return(false));
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
@@ -95,7 +94,6 @@ TEST_F(Http3StatusTrackerTest, MarkBrokenWithBackoff) {
 }
 
 TEST_F(Http3StatusTrackerTest, MarkBrokenWithBackoffMax) {
-  // markBroken will only be called when the time is not enabled.
   EXPECT_CALL(*timer_, enabled()).WillRepeatedly(Return(false));
 
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5 * 60 * 1000), nullptr));
