@@ -40,9 +40,11 @@ public:
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
-
-    tls_.set([this](Envoy::Event::Dispatcher&) {
-      return std::make_shared<ThreadLocalCache>(jwt_provider_, time_source_);
+    bool enable_jwt_cache = jwt_provider_.enable_jwt_cache();
+    int jwt_cache_size = jwt_provider_.jwt_cache_size();
+    tls_.set([enable_jwt_cache, jwt_cache_size](Envoy::Event::Dispatcher& dispatcher) {
+      return std::make_shared<ThreadLocalCache>(enable_jwt_cache, jwt_cache_size,
+                                                dispatcher.timeSource());
     });
 
     const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true, api);
@@ -80,9 +82,8 @@ public:
 
 private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCache(const JwtProvider& jwt_provider, TimeSource& time_source) {
-      jwt_cache_ = JwtCache::create(jwt_provider.enable_jwt_cache(), jwt_provider.jwt_cache_size(),
-                                    time_source);
+    ThreadLocalCache(bool enable_jwt_cache, int jwt_cache_size, TimeSource& time_source) {
+      jwt_cache_ = JwtCache::create(enable_jwt_cache, jwt_cache_size, time_source);
     }
 
     // The jwks object.
