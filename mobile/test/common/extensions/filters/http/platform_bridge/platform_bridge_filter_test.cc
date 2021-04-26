@@ -2001,6 +2001,56 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
       "yes");
 }
 
+TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingPassthrough) {
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
+  platform_filter.static_context = &invocations;
+  platform_filter.init_filter = [](const void* context) -> const void* {
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
+    invocations->init_filter_calls++;
+    return invocations;
+  };
+  platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
+                                          const void* context) -> envoy_filter_headers_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    EXPECT_EQ(c_headers.length, 1);
+    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_FALSE(end_stream);
+    invocations->on_request_headers_calls++;
+    release_envoy_headers(c_headers);
+    return {kEnvoyFilterHeadersStatusStopIteration, envoy_noheaders};
+  };
+  platform_filter.on_resume_request = [](envoy_headers* pending_headers, envoy_data*,
+                                         envoy_headers*, bool,
+                                         const void* context) -> envoy_filter_resume_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->on_resume_request_calls++;
+    return {kEnvoyFilterResumeStatusResumeIteration, pending_headers, nullptr, nullptr};
+  };
+
+  setUpFilter(R"EOF(
+platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
+)EOF",
+              &platform_filter);
+  EXPECT_EQ(invocations.init_filter_calls, 1);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(invocations.on_request_headers_calls, 1);
+
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  filter_->resumeDecoding();
+  resume_post_cb();
+  EXPECT_EQ(invocations.on_resume_request_calls, 1);
+}
+
 } // namespace
 } // namespace PlatformBridge
 } // namespace HttpFilters
