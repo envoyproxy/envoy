@@ -15,9 +15,9 @@ namespace Tracing {
  * protocol requests and provides Tracer Driver with common methods for obtaining and setting the
  * Tracing context.
  */
-class TracingContext {
+class TraceContext {
 public:
-  virtual ~TracingContext() = default;
+  virtual ~TraceContext() = default;
 
   /**
    * Get tracing context value by key.
@@ -26,17 +26,16 @@ public:
    * const lowercase string.
    * @return The optional context value of string_view type.
    */
-  virtual absl::optional<absl::string_view>
-  getTracingContext(const absl::string_view key) const PURE;
+  virtual absl::optional<absl::string_view> getTraceContext(const absl::string_view key) const PURE;
 
   /**
    * Set new tracing context key/value pair.
    *
    * @param key The context key of string view type. The context key should be a string view of a
-   * const lowercase string with a longer lifetime than the current TracingContext object.
+   * const lowercase string with a longer lifetime than the current TraceContext object.
    * @return The optional context value of string_view type.
    */
-  virtual void setTracingContext(const absl::string_view key, const absl::string_view value) PURE;
+  virtual void setTraceContext(const absl::string_view key, const absl::string_view value) PURE;
 };
 
 } // namespace Tracing

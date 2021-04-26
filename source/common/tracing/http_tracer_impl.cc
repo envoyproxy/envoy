@@ -321,7 +321,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
     return default_value_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto result = ctx.tracing_context->getTracingContext(name_.get());
+  const auto result = ctx.tracing_context->getTraceContext(name_.get());
   return result.has_value() ? result.value() : default_value_;
 }
 

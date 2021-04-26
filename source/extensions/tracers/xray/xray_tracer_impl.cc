@@ -63,7 +63,7 @@ Driver::Driver(const XRayConfiguration& config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Tracing::TracingContext& tracing_context,
+                                   Tracing::TraceContext& trace_context,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
@@ -78,7 +78,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   UNREFERENCED_PARAMETER(config);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto header = tracing_context.getTracingContext(absl::string_view(XRayTraceHeader));
+  const auto header = trace_context.getTraceContext(absl::string_view(XRayTraceHeader));
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
   if (header.has_value()) {
@@ -100,9 +100,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   if (!should_trace.has_value()) {
     const SamplingRequest request{
-        tracing_context.getTracingContext(Http::Headers::get().HostLegacy.get()).value_or(""),
-        tracing_context.getTracingContext(Http::Headers::get().Method.get()).value_or(""),
-        tracing_context.getTracingContext(Http::Headers::get().Method.get()).value_or("")};
+        trace_context.getTraceContext(Http::Headers::get().HostLegacy.get()).value_or(""),
+        trace_context.getTraceContext(Http::Headers::get().Method.get()).value_or(""),
+        trace_context.getTraceContext(Http::Headers::get().Method.get()).value_or("")};
 
     should_trace = sampling_strategy_->shouldTrace(request);
   }

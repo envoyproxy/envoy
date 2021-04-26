@@ -481,14 +481,14 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
-  absl::optional<absl::string_view> getTracingContext(const absl::string_view key) const override {
+  absl::optional<absl::string_view> getTraceContext(const absl::string_view key) const override {
     auto result = HeaderMap::GetResult(const_cast<RequestHeaderMapImpl*>(this)->getExisting(key));
     if (!result.empty()) {
       return result[0]->value().getStringView();
     }
     return absl::nullopt;
   }
-  void setTracingContext(const absl::string_view key, const absl::string_view value) override {
+  void setTraceContext(const absl::string_view key, const absl::string_view value) override {
     Http::LowerCaseString low_case_key{key};
     setCopy(low_case_key, value);
   }

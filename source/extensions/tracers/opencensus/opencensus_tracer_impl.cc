@@ -58,7 +58,7 @@ using Constants = ConstSingleton<ConstantValues>;
 class Span : public Tracing::Span {
 public:
   Span(const Tracing::Config& config, const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-       Tracing::TracingContext& tracing_context, const std::string& operation_name,
+       Tracing::TraceContext& trace_context, const std::string& operation_name,
        SystemTime start_time, const Tracing::Decision tracing_decision);
 
   // Used by spawnChild().
@@ -69,7 +69,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Tracing::TracingContext& tracing_context) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
@@ -86,8 +86,7 @@ private:
 };
 
 ::opencensus::trace::Span
-startSpanHelper(const std::string& name, bool traced,
-                const Tracing::TracingContext& tracing_context,
+startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContext& trace_context,
                 const envoy::config::trace::v3::OpenCensusConfig& oc_config) {
   // Determine if there is a parent context.
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
@@ -96,7 +95,7 @@ startSpanHelper(const std::string& name, bool traced,
     bool found = false;
     switch (incoming) {
     case OpenCensusConfig::TRACE_CONTEXT: {
-      const auto header = tracing_context.getTracingContext(Constants::get().TRACEPARENT.get());
+      const auto header = trace_context.getTraceContext(Constants::get().TRACEPARENT.get());
       if (header.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
@@ -106,7 +105,7 @@ startSpanHelper(const std::string& name, bool traced,
     }
 
     case OpenCensusConfig::GRPC_TRACE_BIN: {
-      const auto header = tracing_context.getTracingContext(Constants::get().GRPC_TRACE_BIN.get());
+      const auto header = trace_context.getTraceContext(Constants::get().GRPC_TRACE_BIN.get());
       if (header.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
@@ -118,7 +117,7 @@ startSpanHelper(const std::string& name, bool traced,
 
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT: {
       const auto header =
-          tracing_context.getTracingContext(Constants::get().X_CLOUD_TRACE_CONTEXT.get());
+          trace_context.getTraceContext(Constants::get().X_CLOUD_TRACE_CONTEXT.get());
       if (header.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
@@ -132,25 +131,22 @@ startSpanHelper(const std::string& name, bool traced,
       absl::string_view b3_span_id;
       absl::string_view b3_sampled;
       absl::string_view b3_flags;
-      const auto h_b3_trace_id =
-          tracing_context.getTracingContext(Constants::get().X_B3_TRACEID.get());
+      const auto h_b3_trace_id = trace_context.getTraceContext(Constants::get().X_B3_TRACEID.get());
       if (h_b3_trace_id.has_value()) {
         // This is an implicitly untrusted header, so only the first value is used.
         b3_trace_id = h_b3_trace_id.value();
       }
-      const auto h_b3_span_id =
-          tracing_context.getTracingContext(Constants::get().X_B3_SPANID.get());
+      const auto h_b3_span_id = trace_context.getTraceContext(Constants::get().X_B3_SPANID.get());
       if (h_b3_span_id.has_value()) {
         // This is an implicitly untrusted header, so only the first value is used.
         b3_span_id = h_b3_span_id.value();
       }
-      const auto h_b3_sampled =
-          tracing_context.getTracingContext(Constants::get().X_B3_SAMPLED.get());
+      const auto h_b3_sampled = trace_context.getTraceContext(Constants::get().X_B3_SAMPLED.get());
       if (h_b3_sampled.has_value()) {
         // This is an implicitly untrusted header, so only the first value is used.
         b3_sampled = h_b3_sampled.value();
       }
-      const auto h_b3_flags = tracing_context.getTracingContext(Constants::get().X_B3_FLAGS.get());
+      const auto h_b3_flags = trace_context.getTraceContext(Constants::get().X_B3_FLAGS.get());
       if (h_b3_flags.has_value()) {
         // This is an implicitly untrusted header, so only the first value is used.
         b3_flags = h_b3_flags.value();
@@ -186,9 +182,9 @@ startSpanHelper(const std::string& name, bool traced,
 
 Span::Span(const Tracing::Config& config,
            const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-           Tracing::TracingContext& tracing_context, const std::string& operation_name,
+           Tracing::TraceContext& trace_context, const std::string& operation_name,
            SystemTime /*start_time*/, const Tracing::Decision tracing_decision)
-    : span_(startSpanHelper(operation_name, tracing_decision.traced, tracing_context, oc_config)),
+    : span_(startSpanHelper(operation_name, tracing_decision.traced, trace_context, oc_config)),
       oc_config_(oc_config) {
   span_.AddAttribute("OperationName", config.operationName() == Tracing::OperationName::Ingress
                                           ? "Ingress"
@@ -212,36 +208,36 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 
 void Span::finishSpan() { span_.End(); }
 
-void Span::injectContext(Tracing::TracingContext& tracing_context) {
+void Span::injectContext(Tracing::TraceContext& trace_context) {
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   const auto& ctx = span_.context();
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
     case OpenCensusConfig::TRACE_CONTEXT:
-      tracing_context.setTracingContext(Constants::get().TRACEPARENT.get(),
-                                        ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
+      trace_context.setTraceContext(Constants::get().TRACEPARENT.get(),
+                                    ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
       break;
 
     case OpenCensusConfig::GRPC_TRACE_BIN: {
       std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
       val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
-      tracing_context.setTracingContext(Constants::get().GRPC_TRACE_BIN.get(), val);
+      trace_context.setTraceContext(Constants::get().GRPC_TRACE_BIN.get(), val);
       break;
     }
 
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT:
-      tracing_context.setTracingContext(
+      trace_context.setTraceContext(
           Constants::get().X_CLOUD_TRACE_CONTEXT.get(),
           ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx));
       break;
 
     case OpenCensusConfig::B3:
-      tracing_context.setTracingContext(Constants::get().X_B3_TRACEID.get(),
-                                        ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));
-      tracing_context.setTracingContext(Constants::get().X_B3_SPANID.get(),
-                                        ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
-      tracing_context.setTracingContext(Constants::get().X_B3_SAMPLED.get(),
-                                        ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
+      trace_context.setTraceContext(Constants::get().X_B3_TRACEID.get(),
+                                    ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));
+      trace_context.setTraceContext(Constants::get().X_B3_SPANID.get(),
+                                    ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
+      trace_context.setTraceContext(Constants::get().X_B3_SAMPLED.get(),
+                                    ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
       // OpenCensus's trace context propagation doesn't produce the
       // "X-B3-Flags:" header.
       break;
@@ -387,10 +383,10 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Tracing::TracingContext& tracing_context,
+                                   Tracing::TraceContext& trace_context,
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
-  return std::make_unique<Span>(config, oc_config_, tracing_context, operation_name, start_time,
+  return std::make_unique<Span>(config, oc_config_, trace_context, operation_name, start_time,
                                 tracing_decision);
 }
 

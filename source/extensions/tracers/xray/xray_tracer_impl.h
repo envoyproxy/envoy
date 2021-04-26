@@ -17,8 +17,7 @@ public:
   Driver(const XRay::XRayConfiguration& config,
          Server::Configuration::TracerFactoryContext& context);
 
-  Tracing::SpanPtr startSpan(const Tracing::Config& config,
-                             Tracing::TracingContext& tracing_context,
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const std::string& operation_name, Envoy::SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 

@@ -819,7 +819,7 @@ public:
 class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders>,
-      public Tracing::TracingContext {
+      public Tracing::TraceContext {
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)

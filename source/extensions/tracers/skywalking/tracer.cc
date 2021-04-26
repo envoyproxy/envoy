@@ -44,11 +44,11 @@ void Span::finishSpan() {
   parent_tracer_.sendSegment(segment_context_);
 }
 
-void Span::injectContext(Tracing::TracingContext& tracing_context) {
-  tracing_context.setTracingContext(
+void Span::injectContext(Tracing::TraceContext& trace_context) {
+  trace_context.setTraceContext(
       skywalkingPropagationHeaderKey().get(),
       segment_context_->createSW8HeaderValue(std::string(
-          tracing_context.getTracingContext(Http::Headers::get().HostLegacy.get()).value_or(""))));
+          trace_context.getTraceContext(Http::Headers::get().HostLegacy.get()).value_or(""))));
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name, SystemTime) {

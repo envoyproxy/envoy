@@ -33,7 +33,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestam, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Tracing::TracingContext& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool do_sample) override;

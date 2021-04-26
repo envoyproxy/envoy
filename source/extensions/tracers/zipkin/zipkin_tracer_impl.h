@@ -71,7 +71,7 @@ public:
 
   void log(SystemTime timestamp, const std::string& event) override;
 
-  void injectContext(Tracing::TracingContext& tracing_context) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -121,7 +121,7 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TracingContext& tracing_context,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 

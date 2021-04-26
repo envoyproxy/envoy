@@ -24,7 +24,7 @@ enum class OperationName { Ingress, Egress };
  * The context for the custom tag to obtain the tag value.
  */
 struct CustomTagContext {
-  const TracingContext* tracing_context;
+  const TraceContext* tracing_context;
   const StreamInfo::StreamInfo* stream_info;
 };
 
@@ -119,7 +119,7 @@ public:
    * (implementation-specific) trace.
    * @param tracing_context the tracing context to which propagation context will be added
    */
-  virtual void injectContext(TracingContext& tracing_context) PURE;
+  virtual void injectContext(TraceContext& tracing_context) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.
@@ -173,7 +173,7 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, TracingContext& tracing_context,
+  virtual SpanPtr startSpan(const Config& config, TraceContext& tracing_context,
                             const std::string& operation_name, SystemTime start_time,
                             const Tracing::Decision tracing_decision) PURE;
 };
