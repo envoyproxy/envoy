@@ -37,6 +37,10 @@ public:
   void onDatagramsDropped(uint32_t dropped) final {
     udp_stats_.downstream_rx_datagram_dropped_.add(dropped);
   }
+  size_t numReadsExpectedPerEventLoop() const final {
+    // This will be capped by UDP listener limit anyway.
+    return std::numeric_limits<size_t>::max();
+  }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }

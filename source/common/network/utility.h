@@ -61,12 +61,17 @@ public:
    * the size of datagrams received, they will be dropped.
    */
   virtual uint64_t maxDatagramSize() const PURE;
+
+  /**
+   * A estimated number of reads needed to process enough packets in each READ event.
+   */
+  virtual size_t numReadsExpectedPerEventLoop() const PURE;
 };
 
 static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;
 static const uint64_t NUM_DATAGRAMS_PER_GRO_RECEIVE = 16;
 static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
-static const uint64_t MAX_NUM_READS_PER_EVENT_LOOP = 1;
+static const uint64_t MAX_NUM_READS_PER_EVENT_LOOP = 100;
 
 /**
  * Wrapper which resolves UDP socket proto config with defaults.
