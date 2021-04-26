@@ -332,7 +332,7 @@ public:
   virtual void post(Network::UdpRecvData&& data) PURE;
 
   /**
-   * A estimated number of reads needed by this callback to enough packets to process in each READ
+   * An estimated number of reads needed by this callback to enough packets to process in each READ
    * event.
    */
   virtual size_t numReadsExpectedPerEventLoop() const PURE;

@@ -728,8 +728,10 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
       udp_packet_processor.onDatagramsDropped(delta);
     }
     --i;
-  } while (i > 0);
-  return std::move(Api::ioCallUint64ResultNoError().err_);
+    if (i == 0) {
+      return std::move(result.err_);
+    }
+  } while (true);
 }
 
 ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(

@@ -63,7 +63,7 @@ public:
   virtual uint64_t maxDatagramSize() const PURE;
 
   /**
-   * A estimated number of reads needed to process enough packets in each READ event.
+   * An estimated number of reads needed to process enough packets in each READ event.
    */
   virtual size_t numReadsExpectedPerEventLoop() const PURE;
 };
@@ -373,7 +373,7 @@ public:
 
   /**
    * Read some packets from a given UDP socket and pass the packet to a given
-   * UdpPacketProcessor. Only make NUM_READS_PER_EVENT_LOOP read system calls.
+   * UdpPacketProcessor. Only make MAX_NUM_READS_PER_EVENT_LOOP read system calls.
    * @param handle is the UDP socket to read from.
    * @param local_address is the socket's local address used to populate port.
    * @param udp_packet_processor is the callback to receive the packets.
@@ -381,7 +381,7 @@ public:
    * @param prefer_gro supplies whether to use GRO if the OS supports it.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel.
    * Return the io error encountered or nullptr if no io error but read stopped
-   * because of NUM_READS_PER_EVENT_LOOP.
+   * because of MAX_NUM_READS_PER_EVENT_LOOP.
    *
    * TODO(mattklein123): Allow the number of packets read to be limited for fairness. Currently
    *                     this function will always return an error, even if EAGAIN. In the future
