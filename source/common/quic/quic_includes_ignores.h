@@ -1,7 +1,7 @@
 #pragma once
 
 // NOLINT(namespace-envoy)
-// A wrapper of QUICHE includes which supresses some compilation warnings thrown from QUICHE.
+// A wrapper of QUICHE includes which suppresses some compilation warnings thrown from QUICHE.
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
