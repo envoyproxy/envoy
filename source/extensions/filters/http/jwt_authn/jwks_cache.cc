@@ -26,8 +26,6 @@ namespace {
 // Default cache expiration time in 5 minutes.
 constexpr int PubkeyCacheExpirationSec = 600;
 
-using JwksSharedPtr = std::shared_ptr<::google::jwt_verify::Jwks>;
-
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api,
@@ -65,9 +63,9 @@ public:
 
   bool isExpired() const override { return time_source_.monotonicTime() >= tls_->expire_; }
 
-  const ::google::jwt_verify::Jwks* setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) override {
+  const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) override {
     // convert unique_ptr to shared_ptr
-    JwksSharedPtr shared_jwks(jwks.release());
+    JwksConstSharedPtr shared_jwks(jwks.release());
     tls_->jwks_ = shared_jwks;
     tls_->expire_ = getRemoteJwksExpirationTime();
     return shared_jwks.get();
@@ -76,15 +74,14 @@ public:
 private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     // The jwks object.
-    JwksSharedPtr jwks_;
+    JwksConstSharedPtr jwks_;
     // The pubkey expiration time.
     MonotonicTime expire_;
   };
 
   // Set jwks shared_ptr to all threads.
-  void setJwksToAllThreads(::google::jwt_verify::JwksPtr&& jwks,
-                           std::chrono::steady_clock::time_point expire) {
-    JwksSharedPtr shared_jwks(jwks.release());
+  void setJwksToAllThreads(JwksConstPtr&& jwks, std::chrono::steady_clock::time_point expire) {
+    JwksConstSharedPtr shared_jwks(jwks.release());
     tls_.runOnAllThreads([shared_jwks, expire](OptRef<ThreadLocalCache> obj) {
       obj->jwks_ = shared_jwks;
       obj->expire_ = expire;

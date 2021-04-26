@@ -16,6 +16,9 @@ namespace JwtAuthn {
 class JwksCache;
 using JwksCachePtr = std::unique_ptr<JwksCache>;
 
+using JwksConstPtr = std::unique_ptr<const ::google::jwt_verify::Jwks>;
+using JwksConstSharedPtr = std::shared_ptr<const ::google::jwt_verify::Jwks>;
+
 /**
  * Interface to access all configured Jwt rules and their cached Jwks objects.
  * It only caches Jwks specified in the config.
@@ -57,8 +60,7 @@ public:
     virtual bool isExpired() const PURE;
 
     // Set a remote Jwks.
-    virtual const ::google::jwt_verify::Jwks*
-    setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) PURE;
+    virtual const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
