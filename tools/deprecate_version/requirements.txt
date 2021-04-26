@@ -38,9 +38,9 @@ idna==2.10 \
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   requests
-pygithub==1.54.1 \
-    --hash=sha256:300bc16e62886ca6537b0830e8f516ea4bc3ef12d308e0c5aff8bdbd099173d4 \
-    --hash=sha256:87afd6a67ea582aa7533afdbf41635725f13d12581faed7e3e04b1579c0c0627
+pygithub==1.55 \
+    --hash=sha256:2caf0054ea079b71e539741ae56c5a95e073b81fa472ce222e81667381b9601b \
+    --hash=sha256:1bbfff9372047ff3f21d5cd8e07720f3dbfdaf6462fcaed9d815f528f1ba7283
     # via -r tools/deprecate_version/requirements.txt
 pyjwt==1.7.1 \
     --hash=sha256:5c6eca3c2940464d106b99ba83b00c6add741c9becaec087fb7ccdefea71350e \
