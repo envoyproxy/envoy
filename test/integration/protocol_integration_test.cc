@@ -2304,23 +2304,4 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_500_after_100", "false");
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  ASSERT_TRUE(fake_upstream_connection_->close());
-
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-    EXPECT_FALSE(response->complete());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    EXPECT_FALSE(response->complete());
-  }
-}
-
 } // namespace Envoy
