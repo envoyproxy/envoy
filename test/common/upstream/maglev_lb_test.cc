@@ -141,11 +141,8 @@ TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
-  auto chc = envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig();
-  chc.set_use_hostname_for_hashing(true);
-  common_config_.set_allocated_consistent_hashing_lb_config(&chc);
+  common_config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
   init(7);
-  common_config_.release_consistent_hashing_lb_config();
 
   EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
   EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
@@ -179,11 +176,8 @@ TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
-  auto chc = envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig();
-  chc.set_use_hostname_for_hashing(true);
-  common_config_.set_allocated_consistent_hashing_lb_config(&chc);
+  common_config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
   init(7);
-  common_config_.release_consistent_hashing_lb_config();
 
   EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
   EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
