@@ -41,8 +41,8 @@ public:
   ~TracerFactory() override = default;
 
   /**
-   * Create a particular tracer driver implementation. If the implementation is unable to produce
-   * an tracer driver with the provided parameters, it should throw an EnvoyException in the case
+   * Create a particular trace driver implementation. If the implementation is unable to produce
+   * a trace driver with the provided parameters, it should throw an EnvoyException in the case
    * of general error or a Json::Exception if the json configuration is erroneous. The returned
    * pointer should always be valid.
    *

@@ -317,7 +317,7 @@ RequestHeaderCustomTag::RequestHeaderCustomTag(
       default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (!ctx.tracing_context) {
+  if (ctx.tracing_context == nullptr) {
     return default_value_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
@@ -365,7 +365,7 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
 
 const envoy::config::core::v3::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  if (!ctx.stream_info) {
+  if (ctx.stream_info == nullptr) {
     return nullptr;
   }
   const StreamInfo::StreamInfo& info = *ctx.stream_info;

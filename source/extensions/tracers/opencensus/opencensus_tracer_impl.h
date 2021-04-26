@@ -13,7 +13,7 @@ namespace Tracers {
 namespace OpenCensus {
 
 /**
- * OpenCensus tracing driver.
+ * OpenCensus trace driver.
  */
 class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {
 public:
