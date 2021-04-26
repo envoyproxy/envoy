@@ -34,5 +34,7 @@ Removed Config or Runtime
 New Features
 ------------
 
+* udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.
+
 Deprecated
 ----------
