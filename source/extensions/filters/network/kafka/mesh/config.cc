@@ -9,6 +9,8 @@
 #ifndef WIN32
 #include "extensions/filters/network/kafka/mesh/upstream_config.h"
 #include "extensions/filters/network/kafka/mesh/filter.h"
+#else
+#include "envoy/common/exception.h"
 #endif
 
 namespace Envoy {
@@ -23,7 +25,7 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
     const KafkaMeshProtoConfig& config, Server::Configuration::FactoryContext& context) {
 
 #ifdef WIN32
-  throw ExceptionUtil::throwEnvoyException("Kafka mesh filter is not ready for Windows");
+  throw EnvoyException("Kafka mesh filter is not ready for Windows");
 #else
   const UpstreamKafkaConfigurationSharedPtr configuration =
       std::make_shared<UpstreamKafkaConfigurationImpl>(config);
