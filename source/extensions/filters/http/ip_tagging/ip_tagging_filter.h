@@ -34,24 +34,86 @@ namespace IpTagging {
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
 using IPTagsProto =
     Protobuf::RepeatedPtrField<::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>;
+
+
+/**
+ * Class that manages setting all the stats for this filter.
+ */
+
+class IpTaggingFilterStats {
+
+public:
+  IpTaggingFilterStats(Stats::Scope& scope, const std::string& stat_prefix);
+
+  void incHit(absl::string_view tag) {
+    incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
+  }
+
+  void setTags(absl::string_view tag) {
+    stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
+  }
+
+  void incNoHit() { incCounter(no_hit_); }
+  void incTotal() { incCounter(total_); }
+
+  ~IpTaggingFilterStats();
+
+private:
+  void incCounter(Stats::StatName name);
+
+  Stats::Scope& scope_;
+  Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName stats_prefix_;
+  const Stats::StatName no_hit_;
+  const Stats::StatName total_;
+  const Stats::StatName unknown_tag_;
+};
+
+/**
+ * Class that holds both stats and Trie together
+ */
+
+class LcTrieWithStats {
+
+public:
+  LcTrieWithStats(std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
+                   Stats::Scope& scope, const std::string& stats_prefix);
+
+  std::vector<std::string> resolveTagsForIpAddress(Network::Address::InstanceConstSharedPtr& Ipaddress);
+
+  ~LcTrieWithStats();
+
+private:
+  Network::LcTrie::LcTrie<std::string> trie_;
+  IpTaggingFilterStats filter_stats_;
+};
+
 /**
  * Coordinates with the Filesystem::Watcher and when that reports a change, load up
  * the change and updates it's internal settings.
  */
 class TagSetWatcher {
 private:
-  class Registry;
+  using map_type =
+      absl::flat_hash_map<std::string, std::weak_ptr<TagSetWatcher>, absl::Hash<absl::string_view>>;
+
 
 public:
   static std::shared_ptr<TagSetWatcher>
-  create(Server::Configuration::FactoryContext& factory_context, std::string filename);
+  create(Server::Configuration::FactoryContext& factory_context, std::string filename, Stats::Scope& scope, const std::string& stat_prefix);
 
   TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
-                Event::Dispatcher& dispatcher, Api::Api& api, std::string filename);
+                Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
+                Stats::Scope& scope, const std::string& stat_prefix);
 
   TagSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
       : TagSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
                       std::move(filename)) {}
+
+  std::shared_ptr<TagSetWatcher> getOrCreate(Server::Configuration::FactoryContext& factory_context,
+                                             std::string filename, Stats::Scope& scope, const std::string& stat_prefix);
+
+  void remove(TagSetWatcher& watcher) noexcept; 
 
   ~TagSetWatcher();
 
@@ -66,10 +128,13 @@ private:
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
 
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
+  Network::LcTrie::LcTrie<std::string>
   fileContentsAsTagSet_(absl::string_view contents) const;
 
   IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
+
+  mutable Thread::MutexBasicLockable mtx_;
+  map_type map_ ABSL_GUARDED_BY(mtx_);
 
   Api::Api& api_;
   std::string filename_;
@@ -77,32 +142,10 @@ private:
   std::uint64_t content_hash_ = 0;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   Server::Configuration::FactoryContext& factory_context_;
-  Registry* registry_ = nullptr; // Set by registry.
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+  std::shared_ptr<LcTrieWithStats> triestat_;
 
 protected:
   bool yaml;
-};
-
-/**
- * The purpose of the registry is to create a single watcher for a file.
- */
-class TagSetWatcher::Registry {
-private:
-  using map_type =
-      absl::flat_hash_map<std::string, std::weak_ptr<TagSetWatcher>, absl::Hash<absl::string_view>>;
-
-public:
-  std::shared_ptr<TagSetWatcher> getOrCreate(Server::Configuration::FactoryContext& factory_context,
-                                             std::string filename);
-
-  void remove(TagSetWatcher& watcher) noexcept;
-
-  static Registry& singleton();
-
-private:
-  mutable Thread::MutexBasicLockable mtx_;
-  map_type map_ ABSL_GUARDED_BY(mtx_);
 };
 
 /**

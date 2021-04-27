@@ -14,6 +14,57 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
+
+IpTaggingFilterStats::IpTaggingFilterStats(Stats::Scope& scope, const std::string& stat_prefix)
+    : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
+      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
+      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
+}
+
+void IpTaggingFilterStats::incCounter(Stats::StatName name) {
+  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
+
+IpTaggingFilterStats::~IpTaggingFilterStats() = default;
+
+LcTrieWithStats::LcTrieWithStats(std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
+    Stats::Scope& scope, const std::string& stats_prefix)
+    : trie_(trie), filter_stats_(scope, stats_prefix) {
+
+  std::vector<std::string> all_tags;
+  std::transform(
+      trie.begin(), trie.end(),
+      std::back_inserter(all_tags),
+      [](const auto& pair) {
+        return pair.first;
+      });
+
+  for (const std::string& tag : all_tags) {
+    filter_stats_.setTags(tag);
+  }
+}
+
+std::vector<std::string> LcTrieWithStats::resolveTagsForIpAddress(
+    Network::Address::InstanceConstSharedPtr& Ipaddress) {
+
+  std::vector<std::string> tags = trie_.getData(Ipaddress);
+
+  if (!tags.empty()) {
+    for (const std::string& tag : tags) {
+      filter_stats_.incHit(tag);
+    }
+  }
+  else {
+    filter_stats_.incNoHit();
+  }
+  filter_stats_.incTotal();
+  return tags;
+}
+
+LcTrieWithStats::~LcTrieWithStats() = default;
+
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
@@ -34,7 +85,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   if (!config.path().empty()) {
-    watcher_ = TagSetWatcher::create(factory_context, config.path());
+    watcher_ = TagSetWatcher::create(factory_context, config.path(), scope, stat_prefix);
 
   } else if (!config.ip_tags().empty()) {
     const IPTagsProto tags = config.ip_tags();
@@ -81,15 +132,17 @@ IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
 // Check the registry and either return a watcher for a file or create one
 std::shared_ptr<TagSetWatcher>
 TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
-                      std::string filename) {
-  return Registry::singleton().getOrCreate(factory_context, std::move(filename));
+                      std::string filename, Stats::Scope& scope, const std::string& stat_prefix ) {
+  return getOrCreate(factory_context, std::move(filename), scope, stat_prefix);
 }
 
 TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
-                             Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
+                             Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
+                             Stats::Scope& scope, const std::string& stat_prefix)
     : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()),
       factory_context_(factory_context),
-      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
+      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)),
+      triestat_(scope, stat_prefix) {
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
   watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
                      [this]([[maybe_unused]] std::uint32_t event) { maybeUpdate_(); });
@@ -99,8 +152,8 @@ TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_cont
 
 // remove the watcher from the registry
 TagSetWatcher::~TagSetWatcher() {
-  if (registry_ != nullptr)
-    registry_->remove(*this);
+  if (watcher_ != nullptr)
+    watcher_->remove(*this);
 }
 
 // read the file from filesystem, load the content and only update if the hash has changed.
@@ -115,7 +168,7 @@ void TagSetWatcher::maybeUpdate_(bool force) {
 }
 
 void TagSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> new_values =
+  Network::LcTrie::LcTrie<std::string> new_values =
       fileContentsAsTagSet_(contents);
 
   new_values.swap(trie_); // Fastest way to replace the values.
@@ -136,7 +189,7 @@ IpTagFileProto TagSetWatcher::protoFromFileContents_(absl::string_view contents)
 }
 
 // take proto content and convert it into LcTrie
-std::unique_ptr<Network::LcTrie::LcTrie<std::string>>
+Network::LcTrie::LcTrie<std::string>
 TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
 
   IpTagFileProto proto_content = protoFromFileContents_(contents);
@@ -144,12 +197,12 @@ TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
       IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
 
-  return std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+  return tag_data;
 }
 
 std::shared_ptr<TagSetWatcher>
-TagSetWatcher::Registry::getOrCreate(Server::Configuration::FactoryContext& factory_context,
-                                     std::string filename) {
+TagSetWatcher::getOrCreate(Server::Configuration::FactoryContext& factory_context,
+                           std::string filename, Stats::Scope& scope, const std::string& stat_prefix) {
   Thread::LockGuard lock(mtx_);
 
   auto& ptr_ref = map_[filename];
@@ -157,12 +210,12 @@ TagSetWatcher::Registry::getOrCreate(Server::Configuration::FactoryContext& fact
   if (ptr != nullptr)
     return ptr;
 
-  ptr_ref = ptr = std::make_shared<TagSetWatcher>(factory_context, std::move(filename));
+  ptr_ref = ptr = std::make_shared<TagSetWatcher>(factory_context, std::move(filename), scope, stat_prefix);
   ptr->registry_ = this;
   return ptr;
 }
 
-void TagSetWatcher::Registry::remove(TagSetWatcher& watcher) noexcept {
+void TagSetWatcher::remove(TagSetWatcher& watcher) noexcept {
   Thread::LockGuard lock(mtx_);
 
   // This is safe, even if the registered watcher is not the same
@@ -170,11 +223,6 @@ void TagSetWatcher::Registry::remove(TagSetWatcher& watcher) noexcept {
   // The registry only promotes sharing, but if the wrong watcher is
   // erased, it simply means it won't be shared anymore.
   map_.erase(watcher.filename());
-}
-
-TagSetWatcher::Registry& TagSetWatcher::Registry::singleton() {
-  static Registry impl;
-  return impl;
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
