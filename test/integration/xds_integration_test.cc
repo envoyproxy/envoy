@@ -628,11 +628,12 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest,
   while (!client_conn_0->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+  // Wait for the filter chain removal start. Ideally we have `drain_time_` to detect the
+  // value 1. Increase the drain_time_ at the beginning of the test if the test is flaky.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+  // Wait for the filter chain removal at worker thread. When the value drops from 1, all pending
+  // removal at the worker is completed.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
-  // The last step of the filter chain removal is invoked at worker threads. It's a guaranteed to be
-  // delivered but it's a fire and forget action. We wait 1 second to increase the possibility to be
-  // fired.
-  std::this_thread::sleep_for(std::chrono::seconds(1)); // NO_CHECK_FORMAT(real_time)
 }
 } // namespace
 } // namespace Envoy
