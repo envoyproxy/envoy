@@ -129,11 +129,12 @@ IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
   return tag_data;
 }
 
-// Check the registry and either return a watcher for a file or create one
 std::shared_ptr<TagSetWatcher>
 TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
                       std::string filename, Stats::Scope& scope, const std::string& stat_prefix ) {
-  return getOrCreate(factory_context, std::move(filename), scope, stat_prefix);
+
+  auto ptr = std::make_shared<TagSetWatcher>(factory_context, std::move(filename), scope, stat_prefix);
+  return ptr;
 }
 
 TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
@@ -150,12 +151,8 @@ TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_cont
   maybeUpdate_(true);
 }
 
-// remove the watcher from the registry
-TagSetWatcher::~TagSetWatcher() {
-  if (watcher_ != nullptr)
-    watcher_->remove(*this);
-}
-
+TagSetWatcher::~TagSetWatcher() = default;
+ 
 // read the file from filesystem, load the content and only update if the hash has changed.
 void TagSetWatcher::maybeUpdate_(bool force) {
   std::string contents = api_.fileSystem().fileReadToEnd(filename_);
@@ -198,31 +195,6 @@ TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
       IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
 
   return tag_data;
-}
-
-std::shared_ptr<TagSetWatcher>
-TagSetWatcher::getOrCreate(Server::Configuration::FactoryContext& factory_context,
-                           std::string filename, Stats::Scope& scope, const std::string& stat_prefix) {
-  Thread::LockGuard lock(mtx_);
-
-  auto& ptr_ref = map_[filename];
-  auto ptr = ptr_ref.lock();
-  if (ptr != nullptr)
-    return ptr;
-
-  ptr_ref = ptr = std::make_shared<TagSetWatcher>(factory_context, std::move(filename), scope, stat_prefix);
-  ptr->registry_ = this;
-  return ptr;
-}
-
-void TagSetWatcher::remove(TagSetWatcher& watcher) noexcept {
-  Thread::LockGuard lock(mtx_);
-
-  // This is safe, even if the registered watcher is not the same
-  // (which is not something that can happen).
-  // The registry only promotes sharing, but if the wrong watcher is
-  // erased, it simply means it won't be shared anymore.
-  map_.erase(watcher.filename());
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {

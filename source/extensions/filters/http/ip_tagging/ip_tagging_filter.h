@@ -93,10 +93,6 @@ private:
  * the change and updates it's internal settings.
  */
 class TagSetWatcher {
-private:
-  using map_type =
-      absl::flat_hash_map<std::string, std::weak_ptr<TagSetWatcher>, absl::Hash<absl::string_view>>;
-
 
 public:
   static std::shared_ptr<TagSetWatcher>
@@ -109,11 +105,6 @@ public:
   TagSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
       : TagSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
                       std::move(filename)) {}
-
-  std::shared_ptr<TagSetWatcher> getOrCreate(Server::Configuration::FactoryContext& factory_context,
-                                             std::string filename, Stats::Scope& scope, const std::string& stat_prefix);
-
-  void remove(TagSetWatcher& watcher) noexcept; 
 
   ~TagSetWatcher();
 
@@ -132,9 +123,6 @@ private:
   fileContentsAsTagSet_(absl::string_view contents) const;
 
   IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
-
-  mutable Thread::MutexBasicLockable mtx_;
-  map_type map_ ABSL_GUARDED_BY(mtx_);
 
   Api::Api& api_;
   std::string filename_;
