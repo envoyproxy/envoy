@@ -38,9 +38,7 @@ public:
   // Look up a flag by name.
   Flag* findFlag(absl::string_view name) const;
 
-  Flag* findReloadableFlag(absl::string_view name) const;
-
-  void resetAllReloadedValue();
+  void updateReloadableFlags(const absl::flat_hash_map<std::string, bool>& quiche_flags_override);
 
 private:
   FlagRegistry();
@@ -61,7 +59,6 @@ public:
   // Reset flag to default value.
   virtual void resetValue() = 0;
 
-  // Reset flag's reloaded state
   virtual void resetReloadedValue() = 0;
 
   // Return flag name.
@@ -109,14 +106,17 @@ public:
     reloaded_value_ = value;
   }
 
-  void resetReloadedValue() override { has_reloaded_value_ = false; }
+  void resetReloadedValue() override {
+    absl::MutexLock lock(&mutex_);
+    has_reloaded_value_ = false;
+  }
 
 private:
   mutable absl::Mutex mutex_;
   T value_ ABSL_GUARDED_BY(mutex_);
   T default_value_;
-  bool has_reloaded_value_ = false;
-  T reloaded_value_;
+  bool has_reloaded_value_ ABSL_GUARDED_BY(mutex_) = false;
+  T reloaded_value_ ABSL_GUARDED_BY(mutex_);
 };
 
 // SetValueFromString specializations

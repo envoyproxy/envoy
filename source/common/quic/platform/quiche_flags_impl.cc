@@ -61,16 +61,15 @@ Flag* FlagRegistry::findFlag(absl::string_view name) const {
   return (it != flags_.end()) ? it->second : nullptr;
 }
 
-Flag* FlagRegistry::findReloadableFlag(absl::string_view name) const {
-  ENVOY_BUG(absl::StartsWith(name, EnvoyQuicheReloadableFlagPrefix), "Flag is not reloadable");
-  name = name.substr(EnvoyFeaturePrefix.length());
-  auto it = flags_.find(name);
-  return (it != flags_.end()) ? it->second : nullptr;
-}
-
-void FlagRegistry::resetAllReloadedValue() {
-  for (auto it : flags_) {
-    it.second->resetReloadedValue();
+void FlagRegistry::updateReloadableFlags(
+    const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
+  for (auto& kv : flags_) {
+    if (quiche_flags_override.find(kv.first) != quiche_flags_override.end()) {
+      static_cast<TypedFlag<bool>*>(kv.second)->setReloadedValue(
+          quiche_flags_override.at(kv.first));
+    } else {
+      kv.second->resetReloadedValue();
+    }
   }
 }
 

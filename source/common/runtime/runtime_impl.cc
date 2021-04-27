@@ -44,20 +44,16 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 
 // TODO(12923): Document the Quiche reloadable flag setup.
 void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
+  absl::flat_hash_map<std::string, bool> quiche_flags_override;
   auto quiche_flag_map = quiche::FlagRegistry::getInstance();
-  quiche_flag_map.resetAllReloadedValue();
   for (const auto& it : flag_map) {
     if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
         it.second.bool_value_.has_value()) {
-      auto* res = quiche_flag_map.findReloadableFlag(it.first);
-      if (!res) {
-        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                            "Unable to find quiche reloadable flag {}", it.first);
-        continue;
-      }
-      static_cast<quiche::TypedFlag<bool>*>(res)->setReloadedValue(it.second.bool_value_.value());
+      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
+          it.second.bool_value_.value();
     }
   }
+  quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 }
 
 } // namespace
