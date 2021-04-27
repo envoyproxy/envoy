@@ -13,13 +13,10 @@ envoy_cc_library(
     deps = [
         "//library/common/thread:lock_guard_lib",
         "//library/common/types:c_types_lib",
-        "@envoy//include/envoy/buffer:buffer_interface",
         "@envoy//include/envoy/event:deferred_deletable",
         "@envoy//include/envoy/event:dispatcher_interface",
-        "@envoy//include/envoy/http:api_listener_interface",
         "@envoy//source/common/common:lock_guard_lib",
         "@envoy//source/common/common:minimal_logger_lib",
-        "@envoy//source/common/common:thread_lib",
         "@envoy//source/common/common:thread_synchronizer_lib",
     ],
 )

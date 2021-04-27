@@ -4,7 +4,6 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/common/logger.h"
-#include "common/common/thread.h"
 #include "common/common/thread_synchronizer.h"
 
 #include "library/common/types/c_types.h"
