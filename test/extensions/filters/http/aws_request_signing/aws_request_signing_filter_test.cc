@@ -18,7 +18,6 @@ namespace {
 using Common::Aws::MockSigner;
 using ::testing::An;
 using ::testing::InSequence;
-using ::testing::Matcher;
 using ::testing::NiceMock;
 using ::testing::StrictMock;
 

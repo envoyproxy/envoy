@@ -26,7 +26,6 @@ using ::testing::An;
 using ::testing::ElementsAre;
 using ::testing::InSequence;
 using ::testing::Invoke;
-using ::testing::Matcher;
 using ::testing::Pair;
 using ::testing::Return;
 using ::testing::ReturnRef;
