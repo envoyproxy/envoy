@@ -407,9 +407,9 @@ TEST_P(WasmNetworkFilterTest, PanicOnDownstreamData) {
   filter().onCreate(); // Create context without calling OnNewConnection.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onData(fake_downstream_data, false));
 
-  // Should close downstream.
+  // Should close both up and down streams.
   EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
-  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
 }
 
 TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
@@ -426,8 +426,8 @@ TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
   filter().onCreate(); // Create context without calling OnNewConnection.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onWrite(fake_downstream_data, false));
 
-  // Should close upstream.
-  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  // Should close both up and down streams.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
   EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
 }
 
