@@ -325,9 +325,8 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *active_connection->connection_, filter_chain->networkFilterFactories());
   if (empty_filter_chain) {
-    ENVOY_CONN_LOG(debug, "closing connection from {}: no filters",
-                   active_connection->connection_->addressProvider().remoteAddress()->asString(),
-                   *active_connection->connection_);
+    ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *active_connection->connection_,
+                   active_connection->connection_->addressProvider().remoteAddress()->asString());
     active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 
