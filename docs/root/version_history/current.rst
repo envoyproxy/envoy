@@ -19,6 +19,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
 * xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.
 * zipkin: fix timestamp serializaiton in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
@@ -35,6 +36,8 @@ Removed Config or Runtime
 
 New Features
 ------------
+
+* metric service: added support for sending metric tags as labels. This can be enabled by setting the :ref:`emit_tags_as_labels <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels>` field to true.
 
 Deprecated
 ----------

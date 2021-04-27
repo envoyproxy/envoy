@@ -33,7 +33,7 @@ A few notes about the example configurations:
   templates for different instances of this.
 * Tracing is configured for `LightStep <https://lightstep.com/>`_. To
   disable this or enable `Zipkin <https://zipkin.io>`_ or `Datadog <https://datadoghq.com>`_ tracing, delete or
-  change the :ref:`tracing configuration <envoy_api_file_envoy/config/trace/v2/trace.proto>` accordingly.
+  change the :ref:`tracing configuration <envoy_v3_api_file_envoy/config/trace/v3/trace.proto>` accordingly.
 * The configuration demonstrates the use of a :ref:`global rate limiting service
   <arch_overview_global_rate_limit>`. To disable this delete the :ref:`rate limit configuration
   <config_rate_limit_service>`.
