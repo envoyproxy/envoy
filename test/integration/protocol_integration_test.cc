@@ -1573,11 +1573,25 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
   testLargeRequestHeaders(95, 1, 60, 100);
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
+  EXCLUDE_DOWNSTREAM_HTTP3
+  EXCLUDE_UPSTREAM_HTTP3;
+  // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
+  testLargeRequestHeaders(2048, 1, 1024, 100);
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3; // requires configurable header limits.
-  // Send one 95 kB header with limit 96 kB and 100 headers.
-  testLargeRequestHeaders(95, 1, 96, 100);
+  // Send one 100 kB header with limit 8192 kB (8 MB) and 100 headers.
+  testLargeRequestHeaders(100, 1, 8192, 100);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
+  EXCLUDE_DOWNSTREAM_HTTP3
+  EXCLUDE_UPSTREAM_HTTP3;
+  // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
+  testLargeRequestHeaders(100, 70, 8192, 100);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {
