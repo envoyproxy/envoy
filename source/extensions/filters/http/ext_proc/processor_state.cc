@@ -30,7 +30,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
     message_timer_->disableTimer();
 
     if (body_mode_ == ProcessingMode::BUFFERED) {
-      if (complete_body_delivered_) {
+      if (complete_body_available_) {
         // If we get here, then all the body data came in before the header message
         // was complete, and the server wants the body. So, don't continue filter
         // processing, but send the buffered request body now.
@@ -44,7 +44,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
       return true;
     }
 
-    if (send_trailers_ && trailers_delivered_) {
+    if (send_trailers_ && trailers_available_) {
       // Trailers came in while we were waiting for this response, and the server
       // is not interested in the body, so send them now.
       filter_.sendTrailers(*this, *trailers_);
@@ -70,7 +70,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
     callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
 
-    if (send_trailers_ && trailers_delivered_) {
+    if (send_trailers_ && trailers_available_) {
       // Trailers came in while we were waiting for this response, and the server
       // asked to see them -- send them now.
       filter_.sendTrailers(*this, *trailers_);

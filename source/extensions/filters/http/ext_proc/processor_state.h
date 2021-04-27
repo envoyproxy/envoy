@@ -31,8 +31,8 @@ public:
   };
 
   explicit ProcessorState(Filter& filter)
-      : filter_(filter), watermark_requested_(false), complete_body_delivered_(false),
-        trailers_delivered_(false) {}
+      : filter_(filter), watermark_requested_(false), complete_body_available_(false),
+        trailers_available_(false) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -40,9 +40,9 @@ public:
   CallbackState callbackState() const { return callback_state_; }
   void setCallbackState(CallbackState state) { callback_state_ = state; }
 
-  bool completeBodyDelivered() const { return complete_body_delivered_; }
-  void setCompleteBodyDelivered(bool d) { complete_body_delivered_ = d; }
-  void setTrailersDelivered(bool d) { trailers_delivered_ = d; }
+  bool completeBodyAvailable() const { return complete_body_available_; }
+  void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
+  void setTrailersAvailable(bool d) { trailers_available_ = d; }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -92,9 +92,9 @@ protected:
   bool watermark_requested_ : 1;
 
   // If true, then the filter received the complete body
-  bool complete_body_delivered_ : 1;
+  bool complete_body_available_ : 1;
   // If true, then the filter received the trailers
-  bool trailers_delivered_ : 1;
+  bool trailers_available_ : 1;
 
   // If true, the server wants to see the headers
   bool send_headers_ : 1;

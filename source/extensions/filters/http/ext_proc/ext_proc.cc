@@ -88,7 +88,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state, Http::HeaderMap& he
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   if (end_stream) {
-    decoding_state_.setCompleteBodyDelivered(true);
+    decoding_state_.setCompleteBodyAvailable(true);
   }
 
   if (!decoding_state_.sendHeaders()) {
@@ -104,7 +104,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data,
                                       bool end_stream) {
   if (end_stream) {
-    state.setCompleteBodyDelivered(true);
+    state.setCompleteBodyAvailable(true);
   }
 
   bool just_added_trailers = false;
@@ -116,7 +116,7 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& d
     // later.
     ENVOY_LOG(trace, "Creating new, empty trailers");
     new_trailers = state.addTrailers();
-    state.setTrailersDelivered(true);
+    state.setTrailersAvailable(true);
     just_added_trailers = true;
   }
 
@@ -203,9 +203,9 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& trailers) {
-  bool body_delivered = state.completeBodyDelivered();
-  state.setCompleteBodyDelivered(true);
-  state.setTrailersDelivered(true);
+  bool body_delivered = state.completeBodyAvailable();
+  state.setCompleteBodyAvailable(true);
+  state.setTrailersAvailable(true);
   state.setTrailers(&trailers);
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
@@ -256,7 +256,7 @@ FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
   if (end_stream) {
-    encoding_state_.setCompleteBodyDelivered(true);
+    encoding_state_.setCompleteBodyAvailable(true);
   }
 
   if (processing_complete_ || !encoding_state_.sendHeaders()) {
