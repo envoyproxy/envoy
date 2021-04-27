@@ -24,7 +24,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hash_lib",
         "//source/common/singleton:const_singleton",
-        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 

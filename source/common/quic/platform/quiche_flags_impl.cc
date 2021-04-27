@@ -8,6 +8,8 @@
 
 #include <set>
 
+#include "common/common/assert.h"
+
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -55,11 +57,21 @@ void FlagRegistry::resetFlags() const {
 }
 
 Flag* FlagRegistry::findFlag(absl::string_view name) const {
-  if (absl::StartsWith(name, EnvoyQuicheFlagPrefix)) {
-    name = name.substr(EnvoyFeaturePrefix.length());
-  }
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;
+}
+
+Flag* FlagRegistry::findReloadableFlag(absl::string_view name) const {
+  ENVOY_BUG(absl::StartsWith(name, EnvoyQuicheReloadableFlagPrefix), "Flag is not reloadable");
+  name = name.substr(EnvoyFeaturePrefix.length());
+  auto it = flags_.find(name);
+  return (it != flags_.end()) ? it->second : nullptr;
+}
+
+void FlagRegistry::resetAllReloadedValue() {
+  for (auto it : flags_) {
+    it.second->resetReloadedValue();
+  }
 }
 
 template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str) {

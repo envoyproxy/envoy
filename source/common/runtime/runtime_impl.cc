@@ -42,20 +42,23 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
   stats.deprecated_feature_seen_since_process_start_.inc();
 }
 
-#ifdef ENVOY_ENABLE_QUIC
-void refreshQuicReloadableFlags(const Snapshot::EntryMap& flag_map) {
+// TODO(12923): Document the Quiche reloadable flag setup.
+void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
+  auto quiche_flag_map = quiche::FlagRegistry::getInstance();
+  quiche_flag_map.resetAllReloadedValue();
   for (const auto& it : flag_map) {
-    if (absl::StartsWith(it.first, quiche::EnvoyQuicheFlagPrefix) &&
+    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
         it.second.bool_value_.has_value()) {
-      auto* res = quiche::FlagRegistry::getInstance().findFlag(it.first);
+      auto* res = quiche_flag_map.findReloadableFlag(it.first);
       if (!res) {
+        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                            "Unable to find quiche reloadable flag {}", it.first);
         continue;
       }
-      static_cast<quiche::TypedFlag<bool>*>(res)->setValue(it.second.bool_value_.value());
+      static_cast<quiche::TypedFlag<bool>*>(res)->setReloadedValue(it.second.bool_value_.value());
     }
   }
 }
-#endif
 
 } // namespace
 
@@ -535,7 +538,7 @@ void LoaderImpl::loadNewSnapshot() {
   });
 
 #ifdef ENVOY_ENABLE_QUIC
-  refreshQuicReloadableFlags(ptr->values());
+  refreshQuicheReloadableFlags(ptr->values());
 #endif
 
   {

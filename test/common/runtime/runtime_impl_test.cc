@@ -196,14 +196,6 @@ TEST_F(DiskLoaderImplTest, All) {
   // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
-#ifdef ENVOY_ENABLE_QUIC
-  EXPECT_EQ(
-      true,
-      snapshot->runtimeFeatureEnabled(
-          "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false"));
-  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
-#endif
-
   // Deprecation
   EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
                        "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", false));
@@ -552,6 +544,29 @@ TEST_F(StaticLoaderImplTest, All) {
   EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", 50));
   testNewOverrides(*loader_, store_);
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
+  // Test that Quiche flags can be overwritten via Envoy runtime config.
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false: true
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: false
+  )EOF");
+  setup();
+  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_true));
+
+  // Test 2 behaviors:
+  // 1. Removing overwritten config will make the flag fallback to default value.
+  // 2. Quiche flags can be overwritten again.
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: true
+  )EOF");
+  setup();
+  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_true));
+}
+#endif
 
 // Validate proto parsing sanity.
 TEST_F(StaticLoaderImplTest, ProtoParsing) {
