@@ -12,11 +12,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "quic_includes_ignores_lib",
-    hdrs = ["quic_includes_ignores.h"],
-)
-
-envoy_cc_library(
     name = "envoy_quic_alarm_lib",
     srcs = ["envoy_quic_alarm.cc"],
     hdrs = ["envoy_quic_alarm.h"],
@@ -186,7 +181,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
-        ":quic_includes_ignores_lib",
         ":quic_network_connection_lib",
         ":send_buffer_monitor_lib",
         "//include/envoy/event:dispatcher_interface",
@@ -279,7 +273,6 @@ envoy_cc_library(
     hdrs = ["envoy_quic_server_connection.h"],
     tags = ["nofips"],
     deps = [
-        ":quic_includes_ignores_lib",
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
         "//source/common/quic:envoy_quic_utils_lib",
@@ -296,7 +289,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_packet_writer_lib",
-        ":quic_includes_ignores_lib",
         ":quic_network_connection_lib",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/network:socket_option_factory_lib",

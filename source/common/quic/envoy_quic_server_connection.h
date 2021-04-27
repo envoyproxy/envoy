@@ -7,10 +7,17 @@
 
 #include "server/connection_handler_impl.h"
 
-// Use QUICHE_INCLUDE_[1...N] to include needed QUICHE headers before including
-// quic_includes_ignores.h
-#define QUICHE_INCLUDE_1 "quiche/quic/core/quic_connection.h"
-#include "common/quic/quic_includes_ignores.h"
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/core/quic_connection.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Quic {
