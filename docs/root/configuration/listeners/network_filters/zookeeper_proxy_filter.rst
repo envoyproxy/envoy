@@ -23,41 +23,8 @@ Configuration
 The ZooKeeper proxy filter should be chained with the TCP proxy filter as shown
 in the configuration snippet below:
 
-.. code-block:: yaml
-
-  listeners:
-    - name: main
-      address:
-        socket_address:
-          address: 127.0.0.1  # Host that zookeeper clients should connect to.
-          port_value: 12181   # Port that zookeeper clients should connect to.
-      filter_chains:
-      - filters:
-        - name: envoy.filters.network.zookeeper_proxy
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy
-            stat_prefix: zookeeper
-        - name: envoy.filters.network.tcp_proxy
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-            stat_prefix: tcp
-            cluster: local_zk_server
-  clusters:
-    - name: local_zk_server
-      connect_timeout: 120s
-      type: LOGICAL_DNS
-      lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
-      load_assignment:
-        cluster_name: local_zk_server
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: 127.0.0.1
-                      port_value: 2181
-
+.. literalinclude:: _include/zookeeper-proxy-filter.yaml
+    :language: yaml
 
 .. _config_network_filters_zookeeper_proxy_stats:
 
