@@ -202,6 +202,23 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
 void ThreadLocalStoreImpl::shutdownThreading() {
   // This will block both future cache fills as well as cache flushes.
   shutting_down_ = true;
+
+  auto scope_ids = std::make_shared<std::vector<uint64_t>>();
+  auto central_caches = std::make_shared<std::vector<CentralCacheEntrySharedPtr>>();
+  {
+    Thread::LockGuard lock(lock_);
+    *scope_ids = std::move(scopes_to_cleanup_);
+    scopes_to_cleanup_.clear();
+    *central_caches = std::move(central_cache_entries_to_cleanup_);
+    central_cache_entries_to_cleanup_.clear();
+  }
+
+  if (tls_cache_) {
+    tls_cache_->runOnAllThreads(
+        [scope_ids](OptRef<TlsCache> tls_cache) { tls_cache->eraseScopes(*scope_ids); },
+        [central_caches]() { /* Holds onto central_caches until all tls caches are clear */ });
+  }
+
   Thread::LockGuard lock(hist_mutex_);
   for (ParentHistogramImpl* histogram : histogram_set_) {
     histogram->setShuttingDown(true);
@@ -344,8 +361,10 @@ void ThreadLocalStoreImpl::clearScopesFromCaches() {
     auto central_caches = std::make_shared<std::vector<CentralCacheEntrySharedPtr>>();
     {
       Thread::LockGuard lock(lock_);
-      scope_ids->swap(scopes_to_cleanup_);
-      central_caches->swap(central_cache_entries_to_cleanup_);
+      *scope_ids = std::move(scopes_to_cleanup_);
+      scopes_to_cleanup_.clear();
+      *central_caches = std::move(central_cache_entries_to_cleanup_);
+      central_cache_entries_to_cleanup_.clear();
     }
 
     tls_cache_->runOnAllThreads(

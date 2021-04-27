@@ -499,7 +499,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ("scope1.c1", c1->name());
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
-  EXPECT_CALL(tls_, runOnAllThreads(_, _));
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
 
@@ -1766,9 +1766,11 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   EXPECT_EQ(0, store_->histograms().size());
   EXPECT_EQ(0, numTlsHistograms());
 
-  store_->shutdownThreading();
+  main_dispatcher_->post([this]() { store_->shutdownThreading(); });
 
-  store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
+  main_dispatcher_->post([this]() {
+    store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
+  });
 }
 
 } // namespace Stats
