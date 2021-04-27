@@ -582,7 +582,8 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
 }
 
 // Verify that the listener in place update will accomplish anyway if the listener is removed.
-TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, Foo) {
+TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest,
+       TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
   // The in place listener update takes 2 seconds. We will remove the listener.
   drain_time_ = std::chrono::seconds(2);
   // 1. Start the first in place listener update.

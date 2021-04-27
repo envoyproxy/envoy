@@ -1047,7 +1047,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
   dispatcher_.clearDeferredDeleteList();
   // Make sure the error leads to no listener timer created.
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
-  // Make sure we never try to match the filer chain since listener filter doesn't complete.
+  // Make sure we never try to match the filter chain since listener filter doesn't complete.
   EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
 
   EXPECT_CALL(*listener, onDestroy());
@@ -1210,7 +1210,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
   MockFunction<void()> on_filter_chain_removed;
   {
-    // Listener removal in the same poll cycle but later than filer chain removal.
+    // Listener removal in the same poll cycle but later than filter chain removal.
     handler_->removeFilterChains(listener_tag, filter_chains,
                                  [&on_filter_chain_removed]() { on_filter_chain_removed.Call(); });
   }
