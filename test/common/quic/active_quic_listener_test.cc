@@ -362,8 +362,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
 
 TEST_P(ActiveQuicListenerTest, ConfigureReasonableInitialFlowControlWindow) {
   // These initial flow control windows should be accepted by both Google QUIC and IETF QUIC.
-  connection_window_size_ = 1024 * 64;
-  stream_window_size_ = 1024 * 32;
+  connection_window_size_ = 64 * 1024;
+  stream_window_size_ = 32 * 1024;
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);

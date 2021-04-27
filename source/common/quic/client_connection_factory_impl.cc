@@ -51,10 +51,12 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
 
   ASSERT(!info_impl->supported_versions_.empty());
   // QUICHE client session always use the 1st version to start handshake.
+  // TODO(alyssawilk) pass in ClusterInfo::perConnectionBufferLimitBytes() for
+  // send_buffer_limit instead of using 0.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
-      dispatcher, 0);
+      dispatcher, /*send_buffer_limit=*/0);
   ret->Initialize();
   return ret;
 }
