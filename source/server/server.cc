@@ -501,8 +501,6 @@ void InstanceImpl::initialize(const Options& options,
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
                               stats_store_.createScope("listener.admin."));
-    ENVOY_LOG(info, "admin address: {}",
-              admin_->socket().addressProvider().localAddress()->asString());
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
