@@ -228,8 +228,7 @@ message Route {
     DirectResponseAction direct_response = 7;
 
     // [#not-implemented-hide:]
-    // A filter-defined action (e.g., it could dynamically generate the
-    // RouteAction).
+    // A filter-defined action (e.g., it could dynamically generate the RouteAction).
     // [#comment: TODO(samflattery): Remove cleanup in route_fuzz_test.cc when
     // implemented]
     FilterAction filter_action = 17;
