@@ -122,8 +122,8 @@ message ExtAuthz {
   // Specifies if HTTP status codes for gRPC calls reflect gRPC status
   // https://github.com/envoyproxy/envoy/issues/11079
   //
-  // When this field is true, Envoy will send an HTTP response code appropriate to
-  // the response seen
+  // When this field is true, Envoy's HTTP response will reflect the called
+  // service's GRPC status on deny.
   bool retain_http_status_on_grpc_deny = 15;
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
