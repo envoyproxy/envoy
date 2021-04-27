@@ -840,7 +840,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
   EXPECT_CALL(stream_info, setResponseCodeDetails("wasm_fail_stream"));
   EXPECT_CALL(decoder_callbacks, resetStream());
 
-  EXPECT_EQ(context->onRequestHeaders(10, false), proxy_wasm::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(context->onRequestHeaders(10, false),
+            proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
