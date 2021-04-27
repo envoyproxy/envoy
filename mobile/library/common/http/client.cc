@@ -47,7 +47,8 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   if (!error_code_header.empty()) {
     envoy_error_code_t error_code;
     bool check = absl::SimpleAtoi(error_code_header[0]->value().getStringView(), &error_code);
-    RELEASE_ASSERT(check, "parse error reading error code");
+    RELEASE_ASSERT(
+        check, fmt::format("[S{}] parse error reading error code", direct_stream_.stream_handle_));
     error_code_ = error_code;
 
     const auto error_message_header = headers.get(InternalHeaders::get().ErrorMessage);
@@ -319,11 +320,16 @@ Client::DirectStreamSharedPtr Client::getStream(envoy_stream_t stream) {
 }
 
 void Client::removeStream(envoy_stream_t stream_handle) {
-  RELEASE_ASSERT(dispatcher_.isThreadSafe(),
-                 "stream removeStream must be performed on the dispatcher_'s thread.");
+  RELEASE_ASSERT(
+      dispatcher_.isThreadSafe(),
+      fmt::format("[S{}] stream removeStream must be performed on the dispatcher_'s thread.",
+                  stream_handle));
   Client::DirectStreamSharedPtr direct_stream = getStream(stream_handle);
-  RELEASE_ASSERT(direct_stream,
-                 "removeStream is a private method that is only called with stream ids that exist");
+  RELEASE_ASSERT(
+      direct_stream,
+      fmt::format(
+          "[S{}] removeStream is a private method that is only called with stream ids that exist",
+          stream_handle));
 
   // The DirectStream should live through synchronous code that already has a reference to it.
   // Hence why it is scheduled for deferred deletion. If this was all that was needed then it
