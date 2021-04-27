@@ -251,7 +251,6 @@ TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
-  EXCLUDE_UPSTREAM_HTTP3; // No H3 support yet.
   use_alpn_ = true;
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
