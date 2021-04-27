@@ -23,8 +23,7 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - run: |
-          # /test/kotlin/integration is excluded since it is run on a separate job
-          bazelisk query //test/kotlin/...
+          bazelisk test --test_output=all --build_tests_only //test/kotlin/...
         name: 'Run Kotlin library tests'
   javatestsmac:
     name: java_tests_mac
@@ -42,8 +41,7 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - run: |
-          # /test/kotlin/integration is excluded since it is run on a separate job
-          bazelisk query //test/java/...
+          bazelisk test --test_output=all --build_tests_only  //test/java/...
         name: 'Run Java library tests'
   kotlintestslinux:
     # Only kotlin tests are executed since with linux:
