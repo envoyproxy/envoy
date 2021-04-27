@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -118,6 +119,11 @@ public:
    * @return the address used to connect to the host.
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
+
+  /**
+   * @return the address used to connect to the host.
+   */
+  virtual const std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
 
   /**
    * @return host specific stats.
