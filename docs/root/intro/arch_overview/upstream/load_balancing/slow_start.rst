@@ -11,15 +11,23 @@ Slow start mode is a mechanism that affects load balancing weight of upstream en
 Currently, slow start is supported in Round Robin and Least Request load balancer types.
 
 Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.slow_start_window>` (in seconds), so that if endpoint “cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode. 
-During slow start window, load balancing weight of a particular endpoint will be scaled with :ref:`time bias parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.time_bias>`, e.g.:
-`weight = load_balancing_weight * time_bias * time_factor`.
-Time factor is value that increases as time progresses, and is calculated like:
-`time_factor = (1 / slow_start_window_seconds) * endpoint_create_duration_seconds`
+During slow start window, load balancing weight of a particular endpoint will be scaled with :ref:`time bias parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.time_bias>`
+and :ref:`aggression parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.aggression>`, e.g.:
+`new_weight = weight * time_bias * (time_since_start_seconds / slow_start_window_seconds) ^ (1 / aggression)`.
 
-The longer slow start window is the less traffic would be sent to endpoint as time advances within slow start window.
+Time bias linearly increases endpoint weight, the smaller the value is, the less traffic would be sent to endpoint that is within slow start window.
+As time progresses, more and more traffic would be send to endpoint within slow start window.
+Aggression parameter non-linearly affects endpoint weight and represents the speed of ramp-up.
+By tuning aggression parameter, one could achieve polynomial and exponential speed for traffic increase.
+Below simulation demonstartes how various values for aggression affect distribution of weights for endpoint in slow start mode:
+
+
+.. image:: /_static/slow_start_aggression.svg
+   :width: 80%
+   :align: center
 
 Whenever a slow start window duration elapses, upstream endpoint exits slow start mode and gets regular amount of traffic acccording to load balanacing algorithm.
-Its load balancing weight will no longer be scaled with runtime bias. Endpoint could also exit slow start mode in case it leaves the cluster.
+Its load balancing weight will no longer be scaled with runtime bias and aggression. Endpoint could also exit slow start mode in case it leaves the cluster.
 
 To reiterate, endpoint enters slow start mode when:
   * If no active healthcheck is configured per cluster, immediately if its cluster membership duration is within slow start window.
@@ -32,7 +40,7 @@ Endpoint exits slow start mode when:
   * It does not pass an active healcheck configured per cluster.
     Endpoint could further re-enter slow start, if it passes an active healtcheck and its creation time is within slow start window.
 
-Below is example of how requests would be distributed across endpoints with Round Robin Loadbalancer, slow start window of 10 seconds, no active healcheck and 0.5 time bias.
+Below is example of how requests would be distributed across endpoints with Round Robin Loadbalancer, slow start window of 10 seconds, no active healcheck, 0.5 time bias and 1.0 aggression.
 Endpoint E1 has statically configured initial weight of X and endpoint E2 weight of Y, the actual numerical values are of no significance for this example.
 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
