@@ -829,16 +829,14 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = false;
 }
 
+// TODO(alyssawilk) update sendLocalReply interface.
 void FilterManager::sendLocalReply(
-    bool old_was_grpc_request, Code code, absl::string_view body,
+    bool, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
-  bool is_grpc_request = old_was_grpc_request;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
-    is_grpc_request = state_.is_grpc_request_;
-  }
+  const bool is_grpc_request = state_.is_grpc_request_;
 
   stream_info_.setResponseCodeDetails(details);
 
