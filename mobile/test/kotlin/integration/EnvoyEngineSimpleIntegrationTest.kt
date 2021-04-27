@@ -10,6 +10,7 @@ class EnvoyEngineSimpleIntegrationTest {
   init {
     JniLibrary.loadTestLibrary()
   }
+
   @Test
   fun `ensure engine build and termination succeeds with no errors`() {
     val engine = EngineBuilder().build()
