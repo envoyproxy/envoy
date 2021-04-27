@@ -69,7 +69,7 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 0
   listeners:
-    name: listener_0
+  - name: listener_0
     address:
       socket_address:
         address: 127.0.0.1

@@ -1163,6 +1163,11 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   handler_.reset();
 }
 
+// `removeListeners` and `removeFilterChains` are posted from main thread. The two post actions are
+// triggered by two timers. In some corner cases, the two timers have the same expiration time
+// point. Thus `removeListeners` may be executed prior to `removeFilterChains`. This test case
+// verifies that the work threads remove the listener and filter chains successfully under the above
+// sequence.
 TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
   InSequence s;
   uint64_t listener_tag = 1;
@@ -1192,8 +1197,11 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
 
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   EXPECT_CALL(*access_log_, log(_, _, _, _));
-  handler_->removeListeners(listener_tag);
 
+  {
+    // Filter chain removal in the same poll cycle but earlier.
+    handler_->removeListeners(listener_tag);
+  }
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
@@ -1201,9 +1209,11 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
 
   const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
   MockFunction<void()> on_filter_chain_removed;
-  handler_->removeFilterChains(listener_tag, filter_chains,
-                               [&on_filter_chain_removed]() { on_filter_chain_removed.Call(); });
-
+  {
+    // Listener removal in the same poll cycle but later than filer chain removal.
+    handler_->removeFilterChains(listener_tag, filter_chains,
+                                 [&on_filter_chain_removed]() { on_filter_chain_removed.Call(); });
+  }
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   // on_filter_chain_removed must be deferred called.
   EXPECT_CALL(on_filter_chain_removed, Call());

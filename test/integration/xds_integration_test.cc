@@ -124,6 +124,18 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_1
+  - name: another_listener_to_avoid_worker_thread_routine_exit
+    address:
+      socket_address:
+        address: "127.0.0.1"
+        port_value: 0
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
 )EOF") {}
 
   void initialize() override {
@@ -567,6 +579,59 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
     filter_chain->mutable_filters(0)->set_name("grewgragra");
   });
   EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'grewgragra'");
+}
+
+// Verify that the listener in place update will accomplish anyway if the listener is removed.
+TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, Foo) {
+  // The in place listener update takes 2 seconds. We will remove the listener.
+  drain_time_ = std::chrono::seconds(2);
+  // 1. Start the first in place listener update.
+  setUpstreamCount(2);
+  initialize();
+  std::string response_0;
+  auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
+  client_conn_0->waitForConnection();
+  FakeRawConnectionPtr fake_upstream_connection_0;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
+
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->RemoveLast();
+      });
+  new_config_helper.setLds("1");
+
+  // 2. Remove the tcp listener. At some extreme cases this removal will be stacked with the the
+  // previous update in the same timer expiration cycle.
+  ConfigHelper new_config_helper1(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper1.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->Swap(
+            bootstrap.mutable_static_resources()->mutable_listeners(1));
+        bootstrap.mutable_static_resources()->mutable_listeners()->RemoveLast();
+      });
+  new_config_helper1.setLds("2");
+
+  std::string observed_data_0;
+  ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
+  EXPECT_EQ("hello", observed_data_0);
+
+  ASSERT_TRUE(fake_upstream_connection_0->write("world"));
+  while (response_0.find("world") == std::string::npos) {
+    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  client_conn_0->close();
+  while (!client_conn_0->closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  // The last step of the filter chain removal is invoked at worker threads. It's a guaranteed to be
+  // delivered but it's a fire and forget action. We wait 1 second to increase the possibility to be
+  // fired.
+  std::this_thread::sleep_for(std::chrono::seconds(1)); // NO_CHECK_FORMAT(real_time)
 }
 } // namespace
 } // namespace Envoy
