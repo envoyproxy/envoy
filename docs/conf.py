@@ -71,8 +71,9 @@ blob_sha = os.environ['ENVOY_BLOB_SHA']
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx_tabs.tabs',
-    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe', 'powershell_lexer'
+    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'intersphinx_custom',
+    'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe',
+    'powershell_lexer'
 ]
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
@@ -286,3 +287,38 @@ htmlhelp_basename = 'envoydoc'
 #  - not sure how diffing will work with main merging in PRs - might need
 #    to be injected dynamically, somehow
 rediraffe_redirects = "redirects.txt"
+
+intersphinx_mapping = {
+    'v1.5.0': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', None),
+    'v1.6.0': ('https://www.envoyproxy.io/docs/envoy/v1.6.0', None),
+    'v1.7.0': ('https://www.envoyproxy.io/docs/envoy/v1.7.1', None),
+    'v1.8.0': ('https://www.envoyproxy.io/docs/envoy/v1.8.0', None),
+    'v1.9.0': ('https://www.envoyproxy.io/docs/envoy/v1.9.0', None),
+    'v1.9.1': ('https://www.envoyproxy.io/docs/envoy/v1.9.1', None),
+    'v1.10.0': ('https://www.envoyproxy.io/docs/envoy/v1.10.0', None),
+    'v1.11.0': ('https://www.envoyproxy.io/docs/envoy/v1.11.0', None),
+    'v1.11.1': ('https://www.envoyproxy.io/docs/envoy/v1.11.1', None),
+    'v1.11.2': ('https://www.envoyproxy.io/docs/envoy/v1.11.2', None),
+    'v1.12.0': ('https://www.envoyproxy.io/docs/envoy/v1.12.0', None),
+    'v1.12.2': ('https://www.envoyproxy.io/docs/envoy/v1.12.2', None),
+    'v1.12.3': ('https://www.envoyproxy.io/docs/envoy/v1.12.3', None),
+    'v1.12.4': ('https://www.envoyproxy.io/docs/envoy/v1.12.4', None),
+    'v1.12.5': ('https://www.envoyproxy.io/docs/envoy/v1.12.5', None),
+    'v1.12.6': ('https://www.envoyproxy.io/docs/envoy/v1.12.6', None),
+    'v1.13.0': ('https://www.envoyproxy.io/docs/envoy/v1.13.0', None),
+    'v1.13.1': ('https://www.envoyproxy.io/docs/envoy/v1.13.1', None),
+    'v1.13.2': ('https://www.envoyproxy.io/docs/envoy/v1.13.2', None),
+    'v1.13.3': ('https://www.envoyproxy.io/docs/envoy/v1.13.3', None),
+    'v1.14.0': ('https://www.envoyproxy.io/docs/envoy/v1.14.0', None),
+    'v1.14.2': ('https://www.envoyproxy.io/docs/envoy/v1.14.2', None),
+    'v1.14.3': ('https://www.envoyproxy.io/docs/envoy/v1.14.3', None),
+    'v1.14.7': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', None),
+    'v1.15.0': ('https://www.envoyproxy.io/docs/envoy/v1.15.0', None),
+    'v1.15.4': ('https://www.envoyproxy.io/docs/envoy/v1.15.4', None),
+    'v1.16.0': ('https://www.envoyproxy.io/docs/envoy/v1.16.0', None),
+    'v1.16.3': ('https://www.envoyproxy.io/docs/envoy/v1.16.3', None),
+    'v1.17.0': ('https://www.envoyproxy.io/docs/envoy/v1.17.0', None),
+    'v1.17.1': ('https://www.envoyproxy.io/docs/envoy/v1.17.1', None),
+    'v1.17.2': ('https://www.envoyproxy.io/docs/envoy/v1.17.2', None),
+    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None)
+}
