@@ -480,7 +480,7 @@ HeaderMap::GetResult HeaderMapImpl::get(const LowerCaseString& key) const {
   return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key.get()));
 }
 
-HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const absl::string_view key) {
+HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(absl::string_view key) {
   // Attempt a trie lookup first to see if the user is requesting an O(1) header. This may be
   // relatively common in certain header matching / routing patterns.
   // TODO(mattklein123): Add inline handle support directly to the header matcher code to support
@@ -612,7 +612,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   return **entry;
 }
 
-size_t HeaderMapImpl::remove(const absl::string_view key) {
+size_t HeaderMapImpl::remove(absl::string_view key) {
   const size_t old_size = headers_.size();
   auto lookup = staticLookup(key);
   if (lookup.has_value()) {

@@ -26,7 +26,7 @@ public:
    * const lowercase string.
    * @return The optional context value of string_view type.
    */
-  virtual absl::optional<absl::string_view> getTraceContext(const absl::string_view key) const PURE;
+  virtual absl::optional<absl::string_view> getTraceContext(absl::string_view key) const PURE;
 
   /**
    * Set new tracing context key/value pair.
@@ -35,7 +35,7 @@ public:
    * const lowercase string with a longer lifetime than the current TraceContext object.
    * @return The optional context value of string_view type.
    */
-  virtual void setTraceContext(const absl::string_view key, const absl::string_view value) PURE;
+  virtual void setTraceContext(absl::string_view key, absl::string_view value) PURE;
 };
 
 } // namespace Tracing

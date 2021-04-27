@@ -851,7 +851,7 @@ public:
     }
   }
 
-  absl::optional<absl::string_view> getTraceContext(const absl::string_view key) const override {
+  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
     auto iter = context_map_.find(std::string(key));
     if (iter == context_map_.end()) {
       return absl::nullopt;
@@ -859,7 +859,7 @@ public:
     return iter->second;
   }
 
-  void setTraceContext(const absl::string_view key, const absl::string_view value) override {
+  void setTraceContext(absl::string_view key, absl::string_view value) override {
     context_map_[std::string(key)] = std::string(value);
   }
 
@@ -1081,11 +1081,11 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 
-  absl::optional<absl::string_view> getTraceContext(const absl::string_view key) const override {
+  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
     ASSERT(header_map_);
     return header_map_->getTraceContext(key);
   }
-  void setTraceContext(const absl::string_view key, const absl::string_view value) override {
+  void setTraceContext(absl::string_view key, absl::string_view value) override {
     ASSERT(header_map_);
     header_map_->setTraceContext(key, value);
   }
