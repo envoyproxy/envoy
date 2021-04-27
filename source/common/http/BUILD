@@ -150,6 +150,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "alternate_protocols",
+    srcs = ["alternate_protocols.cc"],
+    hdrs = ["alternate_protocols.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_grid",
     srcs = ["conn_pool_grid.cc"],
     hdrs = ["conn_pool_grid.h"],
