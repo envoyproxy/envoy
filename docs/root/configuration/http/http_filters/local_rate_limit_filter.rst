@@ -19,7 +19,7 @@ If the local rate limit token bucket is checked, and there are no tokens availab
 configured to be returned.
 
 :ref:`Request headers
-<envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.request_headers_to_add>` can be
+<envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.request_headers_to_add_when_not_enforced>` can be
 configured to be added to forwarded requests to the upstream when the local rate limit filter is enabled but not enforced.
 
 .. note::

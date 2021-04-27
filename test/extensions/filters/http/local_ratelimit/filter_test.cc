@@ -34,7 +34,7 @@ response_headers_to_add:
     header:
       key: x-test-rate-limit
       value: 'true'
-request_headers_to_add:
+request_headers_to_add_when_not_enforced:
   - append: false
     header:
       key: x-local-ratelimited

@@ -66,7 +66,7 @@ message LocalRateLimit {
   // Specifies a list of HTTP headers that should be added to each request that
   // has been rate limited and is also forwarded upstream. This can only occur when the
   // filter is enabled but not enforced.
-  repeated config.core.v3.HeaderValueOption request_headers_to_add = 10
+  repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 10
       [(validate.rules).repeated = {max_items: 10}];
 
   // Specifies a list of HTTP headers that should be added to each response for requests that
