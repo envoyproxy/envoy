@@ -272,8 +272,6 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   idle_timeout_ = (std::chrono::milliseconds(10));
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
-      .WillByDefault(Return(std::chrono::milliseconds(0)));
   Event::MockTimer* idle_timer = setUpTimer();
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   setup(false, "");
@@ -352,8 +350,6 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   max_connection_duration_ = (std::chrono::milliseconds(10));
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
-      .WillByDefault(Return(std::chrono::milliseconds(0)));
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
   setup(false, "");
