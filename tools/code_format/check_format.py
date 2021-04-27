@@ -164,7 +164,7 @@ DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
-RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
+RELOADABLE_FLAG_REGEX = re.compile(".*(...)(envoy.reloadable_features.[^ ]*)\s.*")
 INVALID_REFLINK = re.compile(".* ref:.*")
 OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
 # C++17 feature, lacks sufficient support across various libraries / compilers.
@@ -527,13 +527,12 @@ class FormatChecker:
             if invalid_reflink_match:
                 report_error("Found text \" ref:\". This should probably be \" :ref:\"\n%s" % line)
 
-            # make sure flags are surrounded by ``s
+            # make sure flags are surrounded by ``s (ie "inline literal")
             flag_match = RELOADABLE_FLAG_REGEX.match(line)
             if flag_match:
-                if not flag_match.groups()[0].startswith(' `'):
+                if not flag_match.groups()[0].startswith(' ``'):
                     report_error(
-                        "Flag `%s` should be enclosed in a single set of back ticks"
-                        % flag_match.groups()[1])
+                        "Flag %s should be enclosed in double back ticks" % flag_match.groups()[1])
 
             if line.startswith("* "):
                 if not ends_with_period(prior_line):
