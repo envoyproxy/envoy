@@ -113,20 +113,20 @@ public:
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
       return *health_checker_;
-    } else {
-      static HealthCheckHostMonitorNullImpl* null_health_checker =
-          new HealthCheckHostMonitorNullImpl();
-      return *null_health_checker;
     }
+
+    static HealthCheckHostMonitorNullImpl* null_health_checker =
+        new HealthCheckHostMonitorNullImpl();
+    return *null_health_checker;
   }
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
-    } else {
-      static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
-          new Outlier::DetectorHostMonitorNullImpl();
-      return *null_outlier_detector;
     }
+
+    static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
+        new Outlier::DetectorHostMonitorNullImpl();
+    return *null_outlier_detector;
   }
   HostStats& stats() const override { return stats_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
@@ -147,6 +147,21 @@ public:
   MonotonicTime creationTime() const override { return creation_time_; }
 
 protected:
+  void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
+
+  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) {
+    health_check_address_ = address;
+  }
+
+  void setHealthCheckerImpl(HealthCheckHostMonitorPtr&& health_checker) {
+    health_checker_ = std::move(health_checker);
+  }
+
+  void setOutlierDetectorImpl(Outlier::DetectorHostMonitorPtr&& outlier_detector) {
+    outlier_detector_ = std::move(outlier_detector);
+  }
+
+private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
   const std::string health_checks_hostname_;
@@ -188,7 +203,7 @@ public:
   // Upstream::Host
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
   counters() const override {
-    return stats_.counters();
+    return stats().counters();
   }
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -200,18 +215,19 @@ public:
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
-    return stats_.gauges();
+    return stats().gauges();
   }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
 
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
-    health_checker_ = std::move(health_checker);
+    setHealthCheckerImpl(std::move(health_checker));
   }
   void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
-    outlier_detector_ = std::move(outlier_detector);
+    setOutlierDetectorImpl(std::move(outlier_detector));
   }
+
   Host::Health health() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
