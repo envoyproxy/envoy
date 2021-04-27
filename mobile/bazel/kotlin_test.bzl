@@ -31,7 +31,7 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = []):
 # A basic macro to make it easier to declare and run kotlin tests which depend on a JNI lib
 # This will create the native .so binary (for linux) and a .jnilib (for OS X) look up
 def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = []):
-    lib_name = native_lib_name(native_deps[0])
+    lib_name = native_lib_name(native_deps[0])[3:]
     _internal_kt_test(
         name,
         srcs,
@@ -64,7 +64,7 @@ def envoy_mobile_kt_test(name, srcs, deps = []):
 
 # A basic macro to run android based (robolectric) tests with native dependencies
 def envoy_mobile_android_test(name, srcs, deps = [], native_deps = []):
-    lib_name = native_lib_name(native_deps[0])
+    lib_name = native_lib_name(native_deps[0])[3:]
     native.android_library(
         name = name + "_test_lib",
         custom_package = "io.envoyproxy.envoymobile.test",

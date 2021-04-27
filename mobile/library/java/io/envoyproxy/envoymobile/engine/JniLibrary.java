@@ -17,9 +17,7 @@ public class JniLibrary {
   // WARNING: This should only be used for testing.
   public static void loadTestLibrary() {
     if (System.getProperty("envoy_jni_library_name") != null) {
-      envoyLibraryName = System.getProperty("os.name").startsWith("Linux")
-                             ? System.getProperty("envoy_jni_library_name").substring(3)
-                             : System.getProperty("envoy_jni_library_name");
+      envoyLibraryName = System.getProperty("envoy_jni_library_name");
     }
   }
 
