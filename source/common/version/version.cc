@@ -41,17 +41,7 @@ bool VersionInfo::sslFipsCompliant() {
   bool fipsCompliant = false;
   if (VersionInfo::sslVersion() == fips_ssl_version) {
     fipsCompliant = true;
-    std::cout << "From Code --> In BORINGSSL_FIPS\n";
-    std::cout << "From Code --> SSL Version:" << VersionInfo::sslVersion();
-  } else {
-    std::cout << "From Code --> In non-fips\n";
-    std::cout << "From Code --> SSL Version:" << VersionInfo::sslVersion();
   }
-#ifdef BORINGSSL_FIPS
-  std::cout << "\n From Code --> In ifdef block BORINGSSL_FIPS\n";
-#else
-  std::cout << "\n From Code --> In non-fips\n";
-#endif
   return fipsCompliant;
 }
 

@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+const std::string fips_ssl_version = "BoringSSL-FIPS";
 
 // Class for accessing private members of the VersionInfo class.
 class VersionInfoTestPeer {
@@ -35,12 +36,11 @@ TEST(VersionTest, BuildVersion) {
             fields.at(BuildVersionMetadataKeys::get().RevisionStatus).string_value());
   EXPECT_EQ(VersionInfoTestPeer::buildType(),
             fields.at(BuildVersionMetadataKeys::get().BuildType).string_value());
-#ifdef BORINGSSL_FIPS
-  std::cout << "From Test --> In ifdef block BORINGSSL_FIPS\n";
-#else
-  std::cout << "From Test --> In non-fips\n";
-#endif
-  EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
+  if (VersionInfoTestPeer::sslVersion() == fips_ssl_version) {
+    EXPECT_TRUE(VersionInfoTestPeer::sslFipsCompliant());
+  } else {
+    EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
+  }
   EXPECT_EQ(VersionInfoTestPeer::sslVersion(),
             fields.at(BuildVersionMetadataKeys::get().SslVersion).string_value());
 }
@@ -52,12 +52,11 @@ TEST(VersionTest, MakeBuildVersionWithLabel) {
   EXPECT_EQ(3, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
   EXPECT_GE(fields.size(), 1);
-#ifdef BORINGSSL_FIPS
-  std::cout << "From Test --> In ifdef block BORINGSSL_FIPS\n";
-#else
-  std::cout << "From Test --> In non-fips\n";
-#endif
-  EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
+  if (VersionInfoTestPeer::sslVersion() == fips_ssl_version) {
+    EXPECT_TRUE(VersionInfoTestPeer::sslFipsCompliant());
+  } else {
+    EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
+  }
   EXPECT_EQ("foo-bar", fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
 }
 
