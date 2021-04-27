@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -46,7 +48,7 @@ message LightstepConfig {
     string access_token_file = 2 [(validate.rules).string = {min_len: 1}];
 
     // Access token to the `LightStep <https://lightstep.com/>`_ API.
-    string access_token = 4 [(validate.rules).string = {min_len: 1}];
+    core.v3.DataSource access_token = 4;
   }
 
   // Propagation modes to use by LightStep's tracer.

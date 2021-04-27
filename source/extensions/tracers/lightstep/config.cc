@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
+#include "common/config/datasource.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
@@ -31,7 +32,8 @@ Tracing::HttpTracerSharedPtr LightstepTracerFactory::createHttpTracerTyped(
     break;
   }
   case envoy::config::trace::v3::LightstepConfig::AccessTokenSettingCase::kAccessToken:
-    opts->access_token = proto_config.access_token();
+    opts->access_token = Config::DataSource::read(proto_config.access_token(), true,
+                                                  context.serverFactoryContext().api());
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

@@ -58,7 +58,8 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracerAccessToken) {
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v3.LightstepConfig
       collector_cluster: fake_cluster
-      access_token: fake_token
+      access_token:
+        inline_string: fake_token
    )EOF";
   envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
