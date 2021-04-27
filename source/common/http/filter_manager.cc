@@ -889,7 +889,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_)
+            if (streamInfo().route_entry_) {
               streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
