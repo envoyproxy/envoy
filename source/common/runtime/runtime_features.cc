@@ -75,6 +75,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_upstream_wait_connect_response",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.improved_stream_limit_handling",
+    "envoy.reloadable_features.internal_address",
     "envoy.reloadable_features.internal_redirects_with_body",
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",

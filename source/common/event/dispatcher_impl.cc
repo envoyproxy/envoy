@@ -27,6 +27,9 @@
 #include "common/network/udp_listener_impl.h"
 #include "common/runtime/runtime_features.h"
 
+// internal address
+#include "extensions/io_socket/user_space/io_handle_impl.h"
+
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -151,6 +154,32 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        Network::TransportSocketPtr&& transport_socket,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(isThreadSafe());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
+      address->type() == Network::Address::Type::EnvoyInternal) {
+    Network::IoHandlePtr io_handle_client;
+    Network::IoHandlePtr io_handle_server;
+
+    std::tie(io_handle_client, io_handle_server) =
+        Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
+
+    auto internal_listener =
+        getInternalListenerManagerForTest().value().get().findByAddress(address);
+
+    auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
+        *this, std::move(io_handle_client), address, source_address, std::move(transport_socket),
+        options);
+    auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
+        std::move(io_handle_server), address, source_address);
+    if (internal_listener.has_value()) {
+      // TODO: also check if disabled
+      internal_listener.value().get().onAccept(std::move(accepted_socket));
+    } else {
+
+      // injected error into client_conn;
+      client_conn->close(Network::ConnectionCloseType::NoFlush);
+    }
+    return client_conn;
+  }
   return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
                                                          std::move(transport_socket), options);
 }
