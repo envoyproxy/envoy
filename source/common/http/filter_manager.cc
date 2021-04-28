@@ -9,7 +9,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -889,9 +888,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_ &&
-                Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+            if (streamInfo().route_entry_) {
               streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
@@ -930,9 +927,7 @@ void FilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_ &&
-                Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+            if (streamInfo().route_entry_) {
               streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
