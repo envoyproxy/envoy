@@ -315,8 +315,6 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
 
   processValidChloPacket(peer_addr);
-  // Shutdown() to close the connection.
-  envoy_quic_dispatcher_.Shutdown();
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {

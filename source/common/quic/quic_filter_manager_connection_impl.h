@@ -185,6 +185,7 @@ private:
   // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
+  absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
 };
 
 } // namespace Quic

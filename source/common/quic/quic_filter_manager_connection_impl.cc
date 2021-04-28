@@ -62,13 +62,13 @@ bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
-  if (quicConnection() == nullptr) {
+  if (network_connection_ == nullptr) {
     // Already detached from quic connection.
     return;
   }
   if (!initialized_) {
     // Delay close till the first OnCanWrite() call.
-    delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
+    close_type_during_initialize_ = type;
     return;
   }
   const bool delayed_close_timeout_configured = delayed_close_timeout_.count() > 0;
@@ -140,6 +140,10 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
 
 void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
   if (!inDelayedClose()) {
+    if (close_type_during_initialize_.has_value()) {
+      close(close_type_during_initialize_.value());
+      close_type_during_initialize_ = absl::nullopt;
+    }
     return;
   }
   if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
