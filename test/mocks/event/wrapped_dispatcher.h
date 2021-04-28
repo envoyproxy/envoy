@@ -83,7 +83,7 @@ public:
   }
 
   Network::InternalListenerManagerOptRef getInternalListenerManagerForTest() override {
-    return impl.getInternalListenerManagerForTest();
+    return impl_.getInternalListenerManagerForTest();
   }
 
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }
