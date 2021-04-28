@@ -562,6 +562,41 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
   return cluster_load_assignment;
 }
 
+envoy::config::endpoint::v3::ClusterLoadAssignment
+ConfigHelper::buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                                 const std::string& leds_collection_name,
+                                                 envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+        leds_cluster_locality_config:
+          leds_config:
+            resource_api_version: {}
+            ads: {{}}
+          leds_collection_name: {}
+    )EOF",
+                                        name, apiVersionStr(api_version), leds_collection_name),
+                            cluster_load_assignment, shouldBoost(api_version));
+  return cluster_load_assignment;
+}
+
+envoy::config::endpoint::v3::LbEndpoint
+ConfigHelper::buildLbEndpoint(const std::string& address, uint32_t port,
+                              envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::endpoint::v3::LbEndpoint) lb_endpoint;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      endpoint:
+        address:
+          socket_address:
+            address: {}
+            port_value: {}
+    )EOF",
+                                        address, port),
+                            lb_endpoint, shouldBoost(api_version));
+  return lb_endpoint;
+}
+
 envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
                                 const std::string& filter_chains,

@@ -165,6 +165,14 @@ public:
       const std::string& name, const std::string& ip_version, uint32_t port,
       envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
 
+  static envoy::config::endpoint::v3::ClusterLoadAssignment buildClusterLoadAssignmentWithLeds(
+      const std::string& name, const std::string& leds_collection_name,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::endpoint::v3::LbEndpoint buildLbEndpoint(
+      const std::string& address, uint32_t port,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
   static envoy::config::listener::v3::Listener buildBaseListener(
       const std::string& name, const std::string& address, const std::string& filter_chains = "",
       envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);

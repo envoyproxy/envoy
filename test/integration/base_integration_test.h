@@ -221,24 +221,52 @@ public:
                                const std::vector<std::string>& aliases,
                                const bool api_downgrade = false) {
 
-    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
-    response.set_system_version_info("system_version_info_this_is_a_test");
-    response.set_type_url(type_url);
+    std::vector<envoy::service::discovery::v3::Resource> added_or_updated_resources;
     for (const auto& message : added_or_updated) {
-      auto* resource = response.add_resources();
+      envoy::service::discovery::v3::Resource resource;
       ProtobufWkt::Any temp_any;
       if (api_downgrade) {
         temp_any.PackFrom(API_DOWNGRADE(message));
-        resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
+        resource.mutable_resource()->PackFrom(API_DOWNGRADE(message));
       } else {
         temp_any.PackFrom(message);
-        resource->mutable_resource()->PackFrom(message);
+        resource.mutable_resource()->PackFrom(message);
       }
-      resource->set_name(intResourceName(message));
-      resource->set_version(version);
+      resource.set_name(intResourceName(message));
+      resource.set_version(version);
       for (const auto& alias : aliases) {
-        resource->add_aliases(alias);
+        resource.add_aliases(alias);
       }
+      added_or_updated_resources.emplace_back(resource);
+    }
+
+    return createExplicitResourcesDeltaDiscoveryResponse(type_url, added_or_updated_resources,
+                                                         removed);
+  }
+
+  // Sends a DeltaDiscoveryResponse with a given list of added resources.
+  // Note that the resources are expected to be of the same type, and match type_url.
+  void sendExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed) {
+    auto response =
+        createExplicitResourcesDeltaDiscoveryResponse(type_url, added_or_updated, removed);
+    xds_stream_->sendGrpcMessage(response);
+  }
+
+  // Creates a DeltaDiscoveryResponse with a given list of added resources.
+  // Note that the resources are expected to be of the same type, and match type_url.
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated_resources,
+      const std::vector<std::string>& removed) {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+    response.set_system_version_info("system_version_info_this_is_a_test");
+    response.set_type_url(type_url);
+    for (const auto& resource : added_or_updated_resources) {
+      *(response.add_resources()) = resource;
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
     static int next_nonce_counter = 0;

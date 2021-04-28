@@ -1666,6 +1666,75 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   makeSingleRequest();
 }
 
+// TODO(adisuissa): Add a test with static cluster and load assignment, but dynamic endpoints.
+// Basic CDS/EDS/LEDS update that warms and makes active a single cluster.
+TEST_P(XdsTpAdsIntegrationTest, BasicWithLeds) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      envoy::config::core::v3::ApiVersion::V3);
+  const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(
+      envoy::config::core::v3::ApiVersion::V3);
+
+  // Receive CDS request, and send a cluster with EDS.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {},
+                                      {"xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                       "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                                      {}, true));
+  const std::string cluster_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                   "baz?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster_resource = buildCluster(cluster_name);
+  const std::string endpoints_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz";
+  cluster_resource.mutable_eds_cluster_config()->set_service_name(endpoints_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {cluster_resource},
+                                                             {}, "1");
+
+  // Receive EDS request, and send ClusterLoadAssignment with one locality, that uses LEDS.
+  const auto leds_resource_prefix =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/";
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {}, {endpoints_name}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {},
+      {buildClusterLoadAssignmentWithLeds(endpoints_name, absl::StrCat(leds_resource_prefix, "*"))},
+      {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+
+  // Receive LEDS request, and send 2 endpoints.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix, "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {}));
+  const auto endpoint1_name = absl::StrCat(leds_resource_prefix, "endpoint_0",
+                                           "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  const auto endpoint2_name = absl::StrCat(leds_resource_prefix, "endpoint_1",
+                                           "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  sendExplicitResourcesDeltaDiscoveryResponse(
+      Config::TypeUrl::get().LbEndpoint,
+      {buildLbEndpointResource(endpoint1_name, "2"), buildLbEndpointResource(endpoint2_name, "2")},
+      {});
+
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+
+  // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {},
+                              {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                               "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                              {}));
+
+  // Receive the LEDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "2", {}, {}, {}));
+}
+
 // Some v2 ADS integration tests, these validate basic v2 support but are not complete, they reflect
 // tests that have historically been worth validating on both v2 and v3. They will be removed in Q1.
 class AdsClusterV2Test : public AdsIntegrationTest {
