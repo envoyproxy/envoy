@@ -21,7 +21,7 @@ TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory
                                            uint32_t delayed_buffer_size, const std::string& token)
     : tracing_stats_(stats), client_(factory->create()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "TraceSegmentReportService.collect")),
+          "skywalking.v3.TraceSegmentReportService.collect")),
       random_generator_(random_generator), token_(token),
       delayed_buffer_size_(delayed_buffer_size) {
 
@@ -42,9 +42,9 @@ void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metad
   }
 }
 
-void TraceSegmentReporter::report(SegmentContextPtr segment_context) {
-  ASSERT(segment_context);
-  auto request = segment_context->createSegmentObject();
+void TraceSegmentReporter::report(TracingContextPtr tracing_context) {
+  ASSERT(tracing_context);
+  auto request = tracing_context->createSegmentObject();
   ENVOY_LOG(trace, "Try to report segment to SkyWalking Server:\n{}", request.DebugString());
 
   if (stream_ != nullptr) {
