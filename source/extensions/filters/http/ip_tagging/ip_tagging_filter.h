@@ -35,7 +35,6 @@ using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTaggi
 using IPTagsProto =
     Protobuf::RepeatedPtrField<::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>;
 
-
 /**
  * Class that manages setting all the stats for this filter.
  */
@@ -76,10 +75,12 @@ private:
 class LcTrieWithStats {
 
 public:
-  LcTrieWithStats(std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
-                   Stats::Scope& scope, const std::string& stats_prefix);
+  LcTrieWithStats(
+      std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
+      Stats::Scope& scope, const std::string& stats_prefix);
 
-  std::vector<std::string> resolveTagsForIpAddress(Network::Address::InstanceConstSharedPtr& Ipaddress);
+  std::vector<std::string>
+  resolveTagsForIpAddress(Network::Address::InstanceConstSharedPtr& Ipaddress);
 
   ~LcTrieWithStats();
 
@@ -96,19 +97,21 @@ class TagSetWatcher {
 
 public:
   static std::shared_ptr<TagSetWatcher>
-  create(Server::Configuration::FactoryContext& factory_context, std::string filename, Stats::Scope& scope, const std::string& stat_prefix);
+  create(Server::Configuration::FactoryContext& factory_context, std::string filename,
+         Stats::Scope& scope, const std::string& stat_prefix);
 
   TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
                 Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
                 Stats::Scope& scope, const std::string& stat_prefix);
 
-  TagSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
+  TagSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename,
+                Stats::Scope& scope, const std::string& stat_prefix)
       : TagSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
                       std::move(filename)) {}
 
+
   ~TagSetWatcher();
 
-  const Network::LcTrie::LcTrie<std::string>& get() const { return *trie_; }
   const std::string& filename() { return filename_; }
 
 private:
@@ -119,14 +122,15 @@ private:
   void maybeUpdate_(bool force = false);
   void update_(absl::string_view content, std::uint64_t hash);
 
-  Network::LcTrie::LcTrie<std::string>
-  fileContentsAsTagSet_(absl::string_view contents) const;
+  std::shared_ptr<LcTrieWithStats> fileContentsAsTagSet_(absl::string_view contents) const;
 
   IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
 
   Api::Api& api_;
   std::string filename_;
   std::string extension_;
+  Stats::Scope& scope_;
+  const std::string stat_prefix_;
   std::uint64_t content_hash_ = 0;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   Server::Configuration::FactoryContext& factory_context_;
@@ -154,20 +158,6 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
 
-  const Network::LcTrie::LcTrie<std::string>& trie() const {
-    if (watcher_ != nullptr) {
-      return watcher_->get();
-    } else {
-      return *trie_;
-    }
-  }
-
-  void incHit(absl::string_view tag) {
-    incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
-  }
-  void incNoHit() { incCounter(no_hit_); }
-  void incTotal() { incCounter(total_); }
-
   static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
   IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);
 
@@ -189,15 +179,9 @@ private:
   void incCounter(Stats::StatName name);
 
   const FilterRequestType request_type_;
-  Stats::Scope& scope_;
   Runtime::Loader& runtime_;
-  Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
-  const Stats::StatName no_hit_;
-  const Stats::StatName total_;
-  const Stats::StatName unknown_tag_;
   std::shared_ptr<const TagSetWatcher> watcher_;
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+  std::shared_ptr<LcTrieWithStats> triestat_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;

@@ -14,13 +14,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-
 IpTaggingFilterStats::IpTaggingFilterStats(Stats::Scope& scope, const std::string& stat_prefix)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
-}
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {}
 
 void IpTaggingFilterStats::incCounter(Stats::StatName name) {
   Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
@@ -29,34 +27,33 @@ void IpTaggingFilterStats::incCounter(Stats::StatName name) {
 
 IpTaggingFilterStats::~IpTaggingFilterStats() = default;
 
-LcTrieWithStats::LcTrieWithStats(std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
+LcTrieWithStats::LcTrieWithStats(
+    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
     Stats::Scope& scope, const std::string& stats_prefix)
     : trie_(trie), filter_stats_(scope, stats_prefix) {
 
   std::vector<std::string> all_tags;
-  std::transform(
-      trie.begin(), trie.end(),
-      std::back_inserter(all_tags),
-      [](const auto& pair) {
-        return pair.first;
-      });
+  std::transform(trie.begin(), trie.end(), std::back_inserter(all_tags),
+                 [](const auto& pair) { return pair.first; });
 
   for (const std::string& tag : all_tags) {
     filter_stats_.setTags(tag);
   }
 }
 
-std::vector<std::string> LcTrieWithStats::resolveTagsForIpAddress(
-    Network::Address::InstanceConstSharedPtr& Ipaddress) {
+std::vector<std::string>
+LcTrieWithStats::resolveTagsForIpAddress(Network::Address::InstanceConstSharedPtr& Ipaddress) {
 
   std::vector<std::string> tags = trie_.getData(Ipaddress);
 
   if (!tags.empty()) {
+    // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
+    // If there are use cases with a large set of tags, a way to opt into these stats
+    // should be exposed and other observability options like logging tags need to be implemented.
     for (const std::string& tag : tags) {
       filter_stats_.incHit(tag);
     }
-  }
-  else {
+  } else {
     filter_stats_.incNoHit();
   }
   filter_stats_.incTotal();
@@ -69,11 +66,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     Envoy::Server::Configuration::FactoryContext& factory_context)
-    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-      stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
-      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
+    : request_type_(requestTypeEnum(config.request_type())), runtime_(runtime) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs
@@ -91,7 +84,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     const IPTagsProto tags = config.ip_tags();
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
         IpTaggingFilterSetTagData(tags);
-    trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+    triestat_ = std::make_shared<LcTrieWithStats>(tag_data, scope, stat_prefix);
 
   } else {
     throw EnvoyException(
@@ -122,18 +115,15 @@ IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
     }
 
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-#if 0 // TODO: re-enable this, somewhere
-    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
-#endif
   }
   return tag_data;
 }
 
 std::shared_ptr<TagSetWatcher>
-TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
-                      std::string filename, Stats::Scope& scope, const std::string& stat_prefix ) {
+TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context, std::string filename,
+                      Stats::Scope& scope, const std::string& stat_prefix) {
 
-  auto ptr = std::make_shared<TagSetWatcher>(factory_context, std::move(filename), scope, stat_prefix);
+  auto ptr =  std::make_shared<TagSetWatcher>(factory_context, std::move(filename), scope, stat_prefix);
   return ptr;
 }
 
@@ -141,9 +131,9 @@ TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_cont
                              Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
                              Stats::Scope& scope, const std::string& stat_prefix)
     : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()),
-      factory_context_(factory_context),
-      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)),
-      triestat_(scope, stat_prefix) {
+      factory_context_(factory_context), scope_(scope), stat_prefix_(stat_prefix),
+      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
+
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
   watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
                      [this]([[maybe_unused]] std::uint32_t event) { maybeUpdate_(); });
@@ -151,8 +141,6 @@ TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_cont
   maybeUpdate_(true);
 }
 
-TagSetWatcher::~TagSetWatcher() = default;
- 
 // read the file from filesystem, load the content and only update if the hash has changed.
 void TagSetWatcher::maybeUpdate_(bool force) {
   std::string contents = api_.fileSystem().fileReadToEnd(filename_);
@@ -165,10 +153,9 @@ void TagSetWatcher::maybeUpdate_(bool force) {
 }
 
 void TagSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
-  Network::LcTrie::LcTrie<std::string> new_values =
-      fileContentsAsTagSet_(contents);
+  std::shared_ptr<LcTrieWithStats> new_values = fileContentsAsTagSet_(contents);
 
-  new_values.swap(trie_); // Fastest way to replace the values.
+  new_values.swap(triestat_); // Fastest way to replace the values.
   content_hash_ = hash;
 }
 
@@ -185,8 +172,8 @@ IpTagFileProto TagSetWatcher::protoFromFileContents_(absl::string_view contents)
   return ipf;
 }
 
-// take proto content and convert it into LcTrie
-Network::LcTrie::LcTrie<std::string>
+// take proto content and convert it into LcTrie with stats
+std::shared_ptr<LcTrieWithStats>
 TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
 
   IpTagFileProto proto_content = protoFromFileContents_(contents);
@@ -194,13 +181,10 @@ TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
       IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
 
-  return tag_data;
+  return std::make_shared<LcTrieWithStats>(tag_data, scope_, stat_prefix_);
 }
 
-void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
-}
+TagSetWatcher::~TagSetWatcher() = default;
 
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
 
@@ -219,26 +203,10 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
-  std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
+  // TODO
+  // We must clear the route cache or else we can't match on x-envoy-ip-tags.
+  callbacks_->clearRouteCache();
 
-  if (!tags.empty()) {
-    const std::string tags_join = absl::StrJoin(tags, ",");
-    headers.appendEnvoyIpTags(tags_join, ",");
-
-    // We must clear the route cache or else we can't match on x-envoy-ip-tags.
-    callbacks_->clearRouteCache();
-
-    // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
-    // If there are use cases with a large set of tags, a way to opt into these stats
-    // should be exposed and other observability options like logging tags need to be implemented.
-    for (const std::string& tag : tags) {
-      config_->incHit(tag);
-    }
-  } else {
-    config_->incNoHit();
-  }
-  config_->incTotal();
   return Http::FilterHeadersStatus::Continue;
 }
 
