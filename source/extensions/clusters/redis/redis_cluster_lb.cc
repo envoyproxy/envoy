@@ -12,7 +12,7 @@ bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSl
   }
 
   for (auto const& replica : rhs.replicas_) {
-    if (replicas_.find(replica) == replicas_.end()) {
+    if (replicas_.find(replica.first) == replicas_.end()) {
       return false;
     }
   }
@@ -53,7 +53,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsPtr&& slot
       primary_and_replicas->push_back(primary_host->second);
 
       for (auto const& replica : slot.replicas()) {
-        auto replica_host = all_hosts.find(replica->asString());
+        auto replica_host = all_hosts.find(replica.first);
         ASSERT(replica_host != all_hosts.end(),
                "we expect all address to be found in the updated_hosts");
         replicas->push_back(replica_host->second);

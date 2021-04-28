@@ -37,22 +37,11 @@ public:
   int64_t start() const { return start_; }
   int64_t end() const { return end_; }
   Network::Address::InstanceConstSharedPtr primary() const { return primary_; }
-  struct Hash {
-    size_t operator()(const Network::Address::InstanceConstSharedPtr& address) const {
-      return absl::Hash<std::string>()(address->asString());
-    }
-  };
-  struct Eq {
-    bool operator()(const Network::Address::InstanceConstSharedPtr& lhs,
-                    const Network::Address::InstanceConstSharedPtr& rhs) const {
-      return *lhs == *rhs;
-    }
-  };
-  const absl::flat_hash_set<Network::Address::InstanceConstSharedPtr, Hash, Eq>& replicas() const {
+  const std::map<std::string, Network::Address::InstanceConstSharedPtr>& replicas() const {
     return replicas_;
   }
   void addReplica(Network::Address::InstanceConstSharedPtr replica_address) {
-    replicas_.insert(std::move(replica_address));
+    replicas_.emplace(replica_address->asString(), std::move(replica_address));
   }
 
   bool operator==(const ClusterSlot& rhs) const;
@@ -61,7 +50,7 @@ private:
   int64_t start_;
   int64_t end_;
   Network::Address::InstanceConstSharedPtr primary_;
-  absl::flat_hash_set<Network::Address::InstanceConstSharedPtr, Hash, Eq> replicas_;
+  std::map<std::string, Network::Address::InstanceConstSharedPtr> replicas_;
 };
 
 using ClusterSlotsPtr = std::unique_ptr<std::vector<ClusterSlot>>;
