@@ -275,7 +275,6 @@ The following command operators are supported:
 %REQUEST_TX_DURATION%
   HTTP
     Total duration in milliseconds of the request from the last byte received to the last byte out
-  
 
   TCP
     Not implemented ("-").
