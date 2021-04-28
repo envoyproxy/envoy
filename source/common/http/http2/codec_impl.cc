@@ -16,6 +16,7 @@
 #include "common/common/dump_state_utils.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
@@ -80,6 +81,15 @@ int reasonToReset(StreamResetReason reason) {
 }
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+
+ReceivedSettingsImpl::ReceivedSettingsImpl(const nghttp2_settings& settings) {
+  for (uint32_t i = 0; i < settings.niv; ++i) {
+    if (settings.iv[i].settings_id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
+      concurrent_stream_limit_ = settings.iv[i].value;
+      break;
+    }
+  }
+}
 
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
@@ -557,7 +567,13 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
-  decoder().decodeMetadata(std::move(metadata_map_ptr));
+  // Empty metadata maps should not be decoded.
+  if (metadata_map_ptr->empty()) {
+    ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);
+    parent_.stats_.metadata_empty_frames_.inc();
+  } else {
+    decoder().decodeMetadata(std::move(metadata_map_ptr));
+  }
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
@@ -637,14 +653,6 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
 }
 
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
@@ -780,8 +788,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // was the current time when the ping was sent. This can be useful while debugging
     // to match the ping and ack.
     uint64_t data;
-    static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
-    memcpy(&data, frame->ping.opaque_data, sizeof(data));
+    safeMemcpy(&data, &(frame->ping.opaque_data));
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
 
     onKeepaliveResponse();
@@ -803,7 +810,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    onSettingsForTest(frame->settings);
+    onSettings(frame->settings);
   }
 
   StreamImpl* stream = getStream(frame->hd.stream_id);
@@ -998,7 +1005,10 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
         // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
         // about). In other cases we treat invalid frames as a protocol error and just kill
         // the connection.
-        reason = StreamResetReason::LocalReset;
+
+        // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
+        // depending whether the connection is upstream or downstream.
+        reason = getMessagingErrorResetReason();
       } else {
         if (error_code == NGHTTP2_REFUSED_STREAM) {
           reason = StreamResetReason::RemoteRefusedStreamReset;
@@ -1081,6 +1091,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
     return 0;
   }
 
+  // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
     stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);
@@ -1607,6 +1618,17 @@ ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
   return ProtocolConstraints::ReleasorProc([]() {});
 }
 
+StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
+  StreamResetReason reason = StreamResetReason::LocalReset;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
+    reason = StreamResetReason::ProtocolError;
+    connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  }
+
+  return reason;
+}
+
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
     Random::RandomGenerator& random_generator,
@@ -1687,17 +1709,9 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  return ConnectionImpl::innerDispatch(data);
+  return ConnectionImpl::dispatch(data);
 }
 
 absl::optional<int>

@@ -72,9 +72,10 @@ public:
     return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port, backlog_size)};
   }
 
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb) override {
-    return Network::UdpListenerPtr{createUdpListener_(socket, cb)};
+  Network::UdpListenerPtr
+  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+                    const envoy::config::core::v3::UdpSocketConfig& config) override {
+    return Network::UdpListenerPtr{createUdpListener_(socket, cb, config)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -100,8 +101,10 @@ public:
 
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
     auto schedulable_cb = Event::SchedulableCallbackPtr{createSchedulableCallback_(cb)};
-    // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
-    ASSERT(schedulable_cb != nullptr);
+    if (!allow_null_callback_) {
+      // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
+      ASSERT(schedulable_cb != nullptr);
+    }
     return schedulable_cb;
   }
 
@@ -137,7 +140,8 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                bool bind_to_port, uint32_t backlog_size));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
+              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+               const envoy::config::core::v3::UdpSocketConfig& config));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
@@ -160,6 +164,7 @@ public:
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
+  bool allow_null_callback_{};
 
 private:
   const std::string name_;

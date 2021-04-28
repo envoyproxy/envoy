@@ -53,6 +53,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
@@ -77,7 +78,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
-        "//source/common/network:udp_default_writer_config",
+        "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
@@ -299,7 +300,6 @@ envoy_cc_test(
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
-        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -353,6 +353,7 @@ envoy_cc_fuzz_test(
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:gcc_build": [],
         "//conditions:default": envoy_all_extensions(),
     }),
 )

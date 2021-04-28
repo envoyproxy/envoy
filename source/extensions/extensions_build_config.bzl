@@ -7,6 +7,8 @@ EXTENSIONS = {
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
+    "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
+    "envoy.access_loggers.stream":                      "//source/extensions/access_loggers/stream:config",
     "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
@@ -36,6 +38,7 @@ EXTENSIONS = {
     #
     # WASM
     #
+
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
 
     #
@@ -43,6 +46,18 @@ EXTENSIONS = {
     #
 
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+
+    #
+    # Input Matchers
+    #
+
+    "envoy.matching.input_matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
+
+    #
+    # Generic Inputs
+    #
+
+    "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
 
     #
     # HTTP filters
@@ -57,6 +72,7 @@ EXTENSIONS = {
     "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
     "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
+    "envoy.filters.http.composite":                     "//source/extensions/filters/http/composite:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
@@ -112,7 +128,6 @@ EXTENSIONS = {
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
-    # WiP
     "envoy.filters.network.kafka_broker":               "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
     "envoy.filters.network.local_ratelimit":            "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
@@ -169,15 +184,8 @@ EXTENSIONS = {
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
-    # WiP
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
-
-    #
-    # Listener
-    #
-
-    "envoy.listener.quic":                              "//source/extensions/quic_listeners/quiche:quic_factory_lib",
 
     #
     # Transport sockets
@@ -187,7 +195,6 @@ EXTENSIONS = {
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
 
     #
@@ -213,6 +220,7 @@ EXTENSIONS = {
     #
     # Internal redirect predicates
     #
+
     "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
     "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
@@ -220,6 +228,7 @@ EXTENSIONS = {
     #
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
+
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
 
@@ -255,6 +264,12 @@ EXTENSIONS = {
     #
 
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+
+    #
+    # HTTP header formatters
+    #
+
+    "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

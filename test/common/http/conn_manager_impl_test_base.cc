@@ -14,8 +14,8 @@ namespace Http {
 HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
     : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
-          access_log_path_, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-          log_manager_)}},
+          Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
+          Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                       POOL_HISTOGRAM(fake_stats_))},
@@ -93,11 +93,11 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
   // NOTE: The length/repetition in this routine allows InSequence to work correctly in an outer
   // scope.
   for (int i = 0; i < num_decoder_filters * num_requests; i++) {
-    decoder_filters_.push_back(new MockStreamDecoderFilter());
+    decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
   }
 
   for (int i = 0; i < num_encoder_filters * num_requests; i++) {
-    encoder_filters_.push_back(new MockStreamEncoderFilter());
+    encoder_filters_.push_back(new NiceMock<MockStreamEncoderFilter>());
   }
 
   InSequence s;

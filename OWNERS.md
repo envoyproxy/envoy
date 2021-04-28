@@ -10,7 +10,7 @@ routing PRs, questions, etc. to the right place.
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * APIs, xDS, UDPA, gRPC, configuration, security, Python, and Bash.
+  * xDS APIs, configuration and control plane.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
@@ -37,6 +37,8 @@ routing PRs, questions, etc. to the right place.
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
+  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liason.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
 

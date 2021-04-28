@@ -53,6 +53,7 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_root_id() = "some_long_root_id";
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(test);
+  plugin_config.mutable_vm_config()->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "vm_key",
@@ -78,18 +79,26 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   }
 }
 
-#if defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8)
 #define B(_t)                                                                                      \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, V8SpeedTest_##_t, std::string(#_t),                 \
-                    std::string("v8"));                                                            \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WavmSpeedTest_##_t, std::string(#_t),               \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("v8"));
+#elif defined(ENVOY_WASM_WAVM)
+#define B(_t)                                                                                      \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
+                    std::string("null"));                                                          \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("wavm"));
+#elif defined(ENVOY_WASM_WASMTIME)
+#define B(_t)                                                                                      \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
+                    std::string("null"));                                                          \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("wasmtime"));
 #else
 #define B(_t)                                                                                      \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, V8SpeedTest_##_t, std::string(#_t),                 \
-                    std::string("v8"));                                                            \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));
 #endif

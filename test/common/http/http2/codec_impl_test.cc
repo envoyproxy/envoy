@@ -497,7 +497,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   response_encoder_->encodeHeaders(continue_headers, true);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
   setupDefaultConnectionMocks();
   auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
   EXPECT_TRUE(status.ok());
@@ -569,7 +569,7 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   response_encoder_->encodeHeaders(continue_headers, true);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
   setupDefaultConnectionMocks();
   auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
   EXPECT_TRUE(status.ok());
@@ -632,7 +632,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   response_encoder_->encodeHeaders(response_headers, false);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
   setupDefaultConnectionMocks();
   auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
@@ -2176,15 +2176,14 @@ TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
 }
 
 TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
-  // Raising the limit past this triggers some unexpected nghttp2 error.
-  // Further debugging required to increase past ~96 KiB.
-  max_request_headers_kb_ = 96;
+  max_request_headers_kb_ = 8192;
+  max_request_headers_count_ = 150;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  std::string long_string = std::string(1024, 'q');
-  for (int i = 0; i < 95; i++) {
+  std::string long_string = std::string(63 * 1024, 'q');
+  for (int i = 0; i < 129; i++) {
     request_headers.addCopy(std::to_string(i), long_string);
   }
 

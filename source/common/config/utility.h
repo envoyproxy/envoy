@@ -195,6 +195,7 @@ public:
   static envoy::config::core::v3::ApiVersion
   getAndCheckTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
+    ASSERT(Thread::MainThread::isMainThread());
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
         transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
       Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
@@ -205,7 +206,8 @@ public:
           "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
         throw DeprecatedMajorVersionException(warning);
       }
     }
@@ -456,7 +458,7 @@ public:
    * @throws EnvoyException if there is a mismatch between design and configuration.
    */
   static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
-                                      const char* filter_chain_type, bool is_terminal_filter,
+                                      const std::string& filter_chain_type, bool is_terminal_filter,
                                       bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
       ExceptionUtil::throwEnvoyException(

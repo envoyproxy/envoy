@@ -44,6 +44,11 @@ public:
   virtual const Network::Connection* connection() const PURE;
 
   /**
+   * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
    * called if the filter has previously returned StopIteration from one of the DecoderFilter
    * methods. The connection manager will callbacks to the next filter in the chain. Further note
@@ -98,6 +103,17 @@ public:
    * @return StreamInfo for logging purposes.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Response decoder metadata created by the connection manager.
+   */
+  virtual MessageMetadataSharedPtr responseMetadata() PURE;
+
+  /**
+   * @return Signal indicating whether or not the response decoder encountered a successful/void
+   * reply.
+   */
+  virtual bool responseSuccess() PURE;
 };
 
 /**

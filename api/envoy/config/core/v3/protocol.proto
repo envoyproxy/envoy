@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -22,6 +24,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message TcpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.TcpProtocolOptions";
+}
+
+// QUIC protocol options which apply to both downstream and upstream connections.
+message QuicProtocolOptions {
+  // Maximum number of streams that the client can negotiate per connection. 100
+  // if not specified.
+  google.protobuf.UInt32Value max_concurrent_streams = 1;
 }
 
 message UpstreamHttpProtocolOptions {
@@ -111,6 +120,7 @@ message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
 
+  // [#next-free-field: 9]
   message HeaderKeyFormat {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat";
@@ -129,6 +139,11 @@ message Http1ProtocolOptions {
       // Note that while this results in most headers following conventional casing, certain headers
       // are not covered. For example, the "TE" header will be formatted as "Te".
       ProperCaseWords proper_case_words = 1;
+
+      // Configuration for stateful formatter extensions that allow using received headers to
+      // affect the output of encoding headers. E.g., preserving case during proxying.
+      // [#extension-category: envoy.http.stateful_header_formatters]
+      TypedExtensionConfig stateful_formatter = 8;
     }
   }
 
@@ -237,6 +252,10 @@ message Http2ProtocolOptions {
   // For upstream connections, this also limits how many streams Envoy will initiate concurrently
   // on a single connection. If the limit is reached, Envoy may queue requests or establish
   // additional connections (as allowed per circuit breaker limits).
+  //
+  // This acts as an upper bound: Envoy will lower the max concurrent streams allowed on a given
+  // connection based on upstream settings. Config dumps will reflect the configured upper bound,
+  // not the per-connection negotiated limits.
   google.protobuf.UInt32Value max_concurrent_streams = 2
       [(validate.rules).uint32 = {lte: 2147483647 gte: 1}];
 
@@ -343,7 +362,8 @@ message Http2ProtocolOptions {
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
   //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
-  bool stream_error_on_invalid_http_messaging = 12 [deprecated = true];
+  bool stream_error_on_invalid_http_messaging = 12
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Allows invalid HTTP messaging and headers. When this option is disabled (default), then
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
@@ -398,8 +418,15 @@ message GrpcProtocolOptions {
 
 // [#not-implemented-hide:]
 //
-// A message which allows using HTTP/3 as an upstream protocol.
-//
-// Eventually this will include configuration for tuning HTTP/3.
+// A message which allows using HTTP/3.
 message Http3ProtocolOptions {
+  QuicProtocolOptions quic_protocol_options = 1;
+
+  // Allows invalid HTTP messaging and headers. When this option is disabled (default), then
+  // the whole HTTP/3 connection is terminated upon receiving invalid HEADERS frame. However,
+  // when this option is enabled, only the offending stream is terminated.
+  //
+  // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 2;
 }

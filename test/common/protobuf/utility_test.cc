@@ -54,7 +54,7 @@ public:
                          Stats::Gauge::ImportMode::NeverImport)) {
     if (allow_deprecated_v2_api) {
       Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
           {"envoy.features.enable_all_deprecated_features", "true"},
       });
     }
@@ -1201,10 +1201,14 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
             "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
 }
 
-TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlException) {
+TEST(LoadFromYamlExceptionTest, BadConversion) {
   std::string bad_yaml = R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: /dev/null
   address:
     socket_address:
       address: {{ ntop_ip_loopback_address }}
@@ -1212,6 +1216,20 @@ admin:
 )EOF";
 
   EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "bad conversion");
+  EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
+                             "Unexpected YAML exception");
+}
+
+TEST(LoadFromYamlExceptionTest, ParserException) {
+  std::string bad_yaml = R"EOF(
+systemLog:
+    destination: file
+    path:"G:\file\path"
+storage:
+    dbPath:"G:\db\data"
+)EOF";
+
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "illegal map value");
   EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
                              "Unexpected YAML exception");
 }
@@ -1259,7 +1277,7 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
   }
   {
     ProtobufWkt::BytesValue source;
-    source.set_value({0x01, 0x02, 0x03});
+    source.set_value("\x01\x02\x03");
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     EXPECT_EQ(MessageUtil::anyToBytes(source_any), "\x01\x02\x03");

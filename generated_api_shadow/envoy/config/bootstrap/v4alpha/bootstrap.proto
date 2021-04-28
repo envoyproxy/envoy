@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v4alpha;
 
+import "envoy/config/accesslog/v4alpha/accesslog.proto";
 import "envoy/config/cluster/v4alpha/cluster.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
@@ -20,6 +21,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -182,7 +184,8 @@ message Bootstrap {
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
   // Deprecated in favor of *watchdogs* which has finer granularity.
-  Watchdog hidden_envoy_deprecated_watchdog = 8 [deprecated = true];
+  Watchdog hidden_envoy_deprecated_watchdog = 8
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
@@ -194,7 +197,8 @@ message Bootstrap {
   // .. attention::
   //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
   //  <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.Tracing.provider>`.
-  trace.v4alpha.Tracing hidden_envoy_deprecated_tracing = 9 [deprecated = true];
+  trace.v4alpha.Tracing hidden_envoy_deprecated_tracing = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
@@ -291,13 +295,20 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
+// [#next-free-field: 6]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Admin";
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the administration server.
+  repeated accesslog.v4alpha.AccessLog access_log = 5;
 
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
   // :ref:`address <envoy_api_field_config.bootstrap.v4alpha.Admin.address>` is set.
-  string access_log_path = 1;
+  // Deprecated in favor of *access_log* which offers more options.
+  string hidden_envoy_deprecated_access_log_path = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The cpu profiler output path for the administration server. If no profile
   // path is specified, the default is ‘/var/log/envoy/envoy.prof’.

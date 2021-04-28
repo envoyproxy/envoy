@@ -43,7 +43,7 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
                                                  {"x-envoy-kill-request", "true"}};
 
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "");
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 // Request crash Envoy controlled via response.
@@ -70,7 +70,8 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResp
   Http::TestResponseHeaderMapImpl kill_response_headers = default_response_headers_;
   kill_response_headers.addCopy("x-envoy-kill-request", "true");
 
-  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, kill_response_headers, 1024), "");
+  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, kill_response_headers, 1024),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
@@ -93,7 +94,7 @@ typed_config:
                                                  {"x-custom-kill-request", "true"}};
 
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "");
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledWhenHeaderIsMissing) {

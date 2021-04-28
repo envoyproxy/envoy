@@ -181,7 +181,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
 }
 
 TEST_F(RouterTest, ClusterNotFound) {
-  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
+  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -2933,11 +2933,11 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  // Now trigger a 502 in response to the first request.
+  // Now trigger a 503 in response to the first request.
   Http::ResponseHeaderMapPtr bad_response_headers2(
-      new Http::TestResponseHeaderMapImpl{{":status", "502"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(502));
+              putHttpResponseCode(503));
 
   // We should not call shouldRetryHeaders() because you never retry the same
   // request twice.
@@ -2945,7 +2945,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value(), "502");
+        EXPECT_EQ(headers.Status()->value(), "503");
       }));
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
@@ -4045,7 +4045,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
 
 // Verifies that the initial host is select with max host count of one, but during retries
 // RetryPolicy will be consulted.
-TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
+TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
   router_.reject_all_hosts_ = true;
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -4259,7 +4259,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
   enableRedirects();
-
   sendRequest(false);
 
   EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
@@ -4275,7 +4274,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
   enableRedirects();
-
   sendRequest();
 
   redirect_headers_->removeLocation();
@@ -4290,9 +4288,12 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
-  enableRedirects();
+TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabledLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_redirects_with_body", "false"}});
 
+  enableRedirects();
   sendRequest();
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
@@ -4307,14 +4308,43 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
                     .value());
 }
 
+TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
+  enableRedirects();
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, true));
+
+  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  Buffer::OwnedImpl response_data("1234567890");
+  response_decoder_->decodeData(response_data, false);
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+  EXPECT_EQ(1, callbacks_.streamInfo()
+                   .filterState()
+                   ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   .value());
+}
+
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   enableRedirects();
-
   sendRequest();
 
   redirect_headers_->setLocation("https://www.foo.com");
 
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
@@ -4326,14 +4356,12 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
 
 TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
   enableRedirects();
-
   sendRequest();
 
   redirect_headers_->setLocation("http://www.foo.com/some/path");
 
   auto mock_predicate = std::make_shared<NiceMock<MockInternalRedirectPredicate>>();
 
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
@@ -4360,7 +4388,6 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4385,7 +4412,6 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 
   redirect_headers_->setLocation("https://www.foo.com");
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4405,7 +4431,6 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
 
   redirect_headers_->setLocation("http://www.foo.com");
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
               isCrossSchemeRedirectAllowed())
       .WillOnce(Return(true));
@@ -4688,8 +4713,8 @@ private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
 };
 
-// Verifies that we propagate the upstream connection filter state to the upstream request filter
-// state.
+// Verifies that we propagate the upstream connection filter state to the upstream and downstream
+// request filter state.
 TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -4721,10 +4746,12 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   EXPECT_TRUE(filter_state_verified);
+  EXPECT_TRUE(callbacks_.streamInfo().upstreamFilterState()->hasDataWithName("upstream data"));
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {
@@ -5351,6 +5378,16 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10000)));
+    Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                           {"grpc-timeout", "6666666666666H"}};
+    FilterUtility::finalTimeout(route, headers, true, true, false, false);
+    EXPECT_EQ("10000", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("10000m", headers.get_("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-expected-rq-timeout-ms", "8"}};
     // Make ingress envoy respect `x-envoy-expected-rq-timeout-ms` header.
@@ -5424,14 +5461,58 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 }
 
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
+  TestScopedRuntime scoped_runtime;
+
+  // With no scheme and x-forwarded-proto, set scheme based on encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With invalid x-forwarded-proto, still use scheme.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto("foo");
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // Use valid x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Trust scheme over x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setScheme(Http::Headers::get().SchemeValues.Https);
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, false, false);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // New logic uses downstream crypto
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Legacy logic uses upstream crypto
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_downstream_scheme", "false"}});
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }

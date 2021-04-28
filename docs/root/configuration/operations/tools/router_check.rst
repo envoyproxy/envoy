@@ -100,7 +100,7 @@ input
   random_value
     *(optional, integer)* An integer used to identify the target for weighted cluster selection
     and as a factor for the routing engine to decide whether a runtime based route takes effect.
-    The default value of random_value is 0. For routes with runtime fraction numerators of 0, 
+    The default value of random_value is 0. For routes with runtime fraction numerators of 0,
     the route checker tool changes the numerators to 1 so they can be tested with random_value
     set to 0 to simulate the route being enabled and random_value set to any int >= 1 to
     simulate the route being disabled.
@@ -168,7 +168,7 @@ validate
     and "date" fields, as well as custom headers set in the input or by the route. The header fields are checked
     after all other test cases. Thus, the header fields checked will be those of the redirected or rewritten
     routes when applicable.
-    - Matchers are specified as :ref:`HeaderMatchers <envoy_api_msg_route.HeaderMatcher>`, and behave the same way.
+    - Matchers are specified as :ref:`HeaderMatchers <envoy_v3_api_msg_config.route.v3.headermatcher>`, and behave the same way.
 
 Coverage
 --------
