@@ -287,19 +287,6 @@ exact_match: a,b
   )EOF"));
   // Make sure that an exact match on "a,b" does in fact work.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
-
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http_match_on_all_headers", "false"}});
-  // Flipping runtime to false should make "a,b" no longer match because we will match on the first
-  // header only.
-  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
-
-  header_data[0] = std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(R"EOF(
-name: match-header
-exact_match: a
-  )EOF"));
-  // With runtime off, exact match on "a" should pass.
-  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
 }
 
 TEST(MatchHeadersTest, MustMatchAllHeaderData) {

@@ -71,7 +71,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.hash_multiple_header_values",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
-    "envoy.reloadable_features.http_match_on_all_headers",
     "envoy.reloadable_features.http_set_copy_replace_all_headers",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http_upstream_wait_connect_response",

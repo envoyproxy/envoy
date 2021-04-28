@@ -122,9 +122,7 @@ HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::Lowe
   if (header_value.empty()) {
     // Empty for clarity. Avoid handling the empty case in the block below if the runtime feature
     // is disabled.
-  } else if (header_value.size() == 1 ||
-             !Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.http_match_on_all_headers")) {
+  } else if (header_value.size() == 1) {
     result.result_ = header_value[0]->value().getStringView();
   } else {
     return getAllOfHeaderAsString(header_value, separator);

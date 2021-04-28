@@ -31,6 +31,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.allow_500_after_100`` runtime guard and the legacy code path.
 * http: removed ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` for disabling closing HTTP/1.1 connections on error. Connection-closing can still be disabled by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>`.
 * http: removed ``envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2``; Envoy will now always send GOAWAY to HTTP2 downstreams when the :ref:`disable_keepalive <config_overload_manager_overload_actions>` overload action is active.
+* http: removed ``envoy.reloadable_features.http_match_on_all_headers`` runtime guard and legacy code paths.
 * http: removed ``envoy.reloadable_features.unify_grpc_handling`` runtime guard and legacy code paths.
 * tls: removed ``envoy.reloadable_features.tls_use_io_handle_bio`` runtime guard and legacy code path.
 
