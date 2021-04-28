@@ -703,6 +703,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.lastDownstreamRxByteReceived();
         });
+  } else if (field_name == "REQUEST_TX_DURATION") {
+    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.lastUpstreamTxByteSent();
+        });
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
