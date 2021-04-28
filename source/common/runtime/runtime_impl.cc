@@ -43,9 +43,9 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 }
 
 // TODO(12923): Document the Quiche reloadable flag setup.
+#ifdef ENVOY_ENABLE_QUIC
 void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
   absl::flat_hash_map<std::string, bool> quiche_flags_override;
-  auto quiche_flag_map = quiche::FlagRegistry::getInstance();
   for (const auto& it : flag_map) {
     if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
         it.second.bool_value_.has_value()) {
@@ -55,6 +55,7 @@ void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
   }
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 }
+#endif
 
 } // namespace
 
