@@ -551,10 +551,14 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false: true
     envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: false
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_spdy_testonly_default_false: false
   )EOF");
+  SetQuicReloadableFlag(spdy_testonly_default_false, true);
+  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
   setup();
   EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_EQ(false, GetQuicReloadableFlag(spdy_testonly_default_false));
 
   // Test 2 behaviors:
   // 1. Removing overwritten config will make the flag fallback to default value.
@@ -565,6 +569,7 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
   setup();
   EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
 }
 #endif
 

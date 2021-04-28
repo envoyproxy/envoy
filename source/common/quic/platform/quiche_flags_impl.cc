@@ -64,9 +64,9 @@ Flag* FlagRegistry::findFlag(absl::string_view name) const {
 void FlagRegistry::updateReloadableFlags(
     const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
   for (auto& kv : flags_) {
-    if (quiche_flags_override.find(kv.first) != quiche_flags_override.end()) {
-      static_cast<TypedFlag<bool>*>(kv.second)->setReloadedValue(
-          quiche_flags_override.at(kv.first));
+    const auto it = quiche_flags_override.find(kv.first);
+    if (it != quiche_flags_override.end()) {
+      static_cast<TypedFlag<bool>*>(kv.second)->setReloadedValue(it->second);
     } else {
       kv.second->resetReloadedValue();
     }
