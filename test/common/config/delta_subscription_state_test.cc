@@ -19,6 +19,7 @@
 using testing::NiceMock;
 using testing::Throw;
 using testing::UnorderedElementsAre;
+using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
 namespace Config {
@@ -28,14 +29,17 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 
 class DeltaSubscriptionStateTestBase : public testing::Test {
 protected:
-  DeltaSubscriptionStateTestBase(const std::string& type_url)
+  DeltaSubscriptionStateTestBase(
+      const std::string& type_url, const bool wildcard,
+      const absl::flat_hash_set<std::string> initial_resources = {"name1", "name2", "name3"})
       : timer_(new Event::MockTimer(&dispatcher_)),
-        state_(type_url, callbacks_, local_info_, dispatcher_) {
-    state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
+        state_(type_url, callbacks_, local_info_, dispatcher_, wildcard) {
+    state_.updateSubscriptionInterest(initial_resources, {});
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(),
-                UnorderedElementsAre("name1", "name2", "name3"));
+                // UnorderedElementsAre("name1", "name2", "name3"));
+                UnorderedElementsAreArray(initial_resources.cbegin(), initial_resources.cend()));
   }
 
   UpdateAck deliverDiscoveryResponse(
@@ -94,7 +98,13 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
 
 class DeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
 public:
-  DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl) {}
+  DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, false) {}
+};
+
+// Delta subscription state of a wildcard subscription request.
+class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
+public:
+  WildcardDeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, true, {}) {}
 };
 
 // Basic gaining/losing interest in resources should lead to subscription updates.
@@ -307,9 +317,10 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
   }
 }
 
-// Upon a reconnection, the server is supposed to assume a blank slate for the Envoy's state
-// (hence the need for initial_resource_versions). The resource_names_subscribe of the first
-// message must therefore be every resource the Envoy is interested in.
+// For non-wildcard subscription, upon a reconnection, the server is supposed to assume a
+// blank slate for the Envoy's state (hence the need for initial_resource_versions).
+// The resource_names_subscribe of the first message must therefore be every resource the
+// Envoy is interested in.
 //
 // resource_names_unsubscribe, on the other hand, is always blank in the first request - even if,
 // in between the last request of the last stream and the first request of the new stream, Envoy
@@ -326,13 +337,37 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
-  // name2: yes do include: we're interested and we have a version of it.
+  // name2: yes do include: we are interested, its non-wildcard, and we have a version of it.
   // name3: yes do include: even though we don't have a version of it, we are interested.
   // name4: yes do include: we are newly interested. (If this wasn't a stream reconnect, only
-  // name4
-  //                        would belong in this subscribe field).
+  //        name4 would belong in this subscribe field).
   EXPECT_THAT(cur_request.resource_names_subscribe(),
               UnorderedElementsAre("name2", "name3", "name4"));
+  EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
+}
+
+// For wildcard subscription, upon a reconnection, the server is supposed to assume a
+// blank slate for the Envoy's state (hence the need for initial_resource_versions), and
+// the resource_names_subscribe and resource_names_unsubscribe must be empty (as is expected
+// of every wildcard first message). This is true even if in between the last request of the
+// last stream and the first request of the new stream, Envoy gained or lost interest in a
+// resource. The subscription & unsubscription implicitly takes effect by simply requesting a
+// wildcard subscription in the newly reconnected stream.
+TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  EXPECT_CALL(*timer_, disableTimer());
+  deliverDiscoveryResponse(add1_2, {}, "debugversion1");
+
+  state_.updateSubscriptionInterest({"name3"}, {"name1"});
+  state_.markStreamFresh(); // simulate a stream reconnection
+  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include: we lost interest.
+  // name2: do not include: we are interested, but for wildcard it shouldn't be provided.
+  // name4: do not include: although we are newly interested, an initial wildcard request
+  //        must be with no resources.
+  EXPECT_TRUE(cur_request.resource_names_subscribe().empty());
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
@@ -484,7 +519,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
 class VhdsDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
 public:
   VhdsDeltaSubscriptionStateTest()
-      : DeltaSubscriptionStateTestBase("envoy.config.route.v3.VirtualHost") {}
+      : DeltaSubscriptionStateTestBase("envoy.config.route.v3.VirtualHost", false) {}
 };
 
 TEST_F(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
