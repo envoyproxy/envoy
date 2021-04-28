@@ -32,7 +32,7 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
           POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.skywalking."))},
       tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
   loadConfig(proto_config.client_config(), context.serverFactoryContext());
-  segment_context_factory_ = createSegmentContextFactory(config_);
+  tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
   auto& factory_context = context.serverFactoryContext();
   tls_slot_ptr_->set([proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
     TracerPtr tracer = std::make_unique<Tracer>(std::make_unique<TraceSegmentReporter>(
@@ -49,28 +49,28 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision decision) {
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
-  SegmentContextPtr segment_context;
+  TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.
   auto propagation_header = request_headers.get(skywalkingPropagationHeaderKey());
   if (propagation_header.empty()) {
-    segment_context = segment_context_factory_->create();
+    tracing_context = tracing_context_factory_->create();
     // Sampling status is always true on SkyWalking. But with disabling skip_analysis,
     // this span can't be analyzed.
     if (!decision.traced) {
-      segment_context->setSkipAnalysis();
+      tracing_context->setSkipAnalysis();
     }
   } else {
     auto header_value_string = propagation_header[0]->value().getStringView();
     try {
       SpanContextPtr span_context = createSpanContext(header_value_string);
-      segment_context = segment_context_factory_->create(span_context);
+      tracing_context = tracing_context_factory_->create(span_context);
     } catch (TracerException& e) {
       ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());
       return std::make_unique<Tracing::NullSpan>();
     }
   }
 
-  return tracer.startSpan(config, start_time, operation_name, segment_context, nullptr);
+  return tracer.startSpan(config, start_time, operation_name, tracing_context, nullptr);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,
