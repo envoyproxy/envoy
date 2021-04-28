@@ -162,22 +162,9 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
 
-  TagResolverFn tagResolver(const Network::Address::InstanceConstSharedPtr& address) {
-    TagResolverFn resolver;
-    if (watcher_ != nullptr) {
-      resolver = [watcher_](const Network::Address::InstanceConstSharedPtr& address) {
-        return watcher_->get()->resolveTagsForIpAddress(address);
-      };
-    } else {
-      resolver = [triestat_](const Network::Address::InstanceConstSharedPtr& address) {
-        return triestat_->resolveTagsForIpAddress(address);
-      };
-    }
-    return resolver;
-  }
-
   static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
   IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);
+  TagResolverFn getResolver() { return resolver_; };
 
 private:
   static FilterRequestType requestTypeEnum(
@@ -200,6 +187,7 @@ private:
   Runtime::Loader& runtime_;
   std::shared_ptr<const TagSetWatcher> watcher_;
   std::shared_ptr<LcTrieWithStats> triestat_;
+  TagResolverFn resolver_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;

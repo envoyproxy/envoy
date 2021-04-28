@@ -154,6 +154,7 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
       Network::Utility::parseInternetAddress("1.2.3.5");
   EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
+
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
 

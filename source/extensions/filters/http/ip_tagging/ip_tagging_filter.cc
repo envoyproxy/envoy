@@ -80,11 +80,21 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.path().empty()) {
     watcher_ = TagSetWatcher::create(factory_context, config.path(), scope, stat_prefix);
 
+    std::shared_ptr<const TagSetWatcher> watcherPtr = watcher_;
+    resolver_ = [watcherPtr](const Network::Address::InstanceConstSharedPtr& address) {
+      return watcherPtr->get()->resolveTagsForIpAddress(address);
+    };
+
   } else if (!config.ip_tags().empty()) {
     const IPTagsProto tags = config.ip_tags();
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
         IpTaggingFilterSetTagData(tags);
     triestat_ = std::make_shared<LcTrieWithStats>(tag_data, scope, stat_prefix);
+
+    std::shared_ptr<LcTrieWithStats> trieStatPtr = triestat_;
+    resolver_ = [trieStatPtr](const Network::Address::InstanceConstSharedPtr& address) {
+      return trieStatPtr->resolveTagsForIpAddress(address);
+    };
 
   } else {
     throw EnvoyException(
@@ -204,8 +214,11 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
+  std::vector<std::string> tags = config_->getResolver()(callbacks_->streamInfo().downstreamRemoteAddress());
+  if (!tags.empty()) {
   headers.appendEnvoyIpTags(
-      absl::StrJoin(config_->tagResolver(callbacks_->streamInfo().downstreamRemoteAddress()), ","));
+      absl::StrJoin(tags, ","), ",");
+  }
 
   // We must clear the route cache or else we can't match on x-envoy-ip-tags.
   callbacks_->clearRouteCache();
