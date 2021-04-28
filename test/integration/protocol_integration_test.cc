@@ -1572,7 +1572,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-  EXCLUDE_DOWNSTREAM_HTTP3
+  EXCLUDE_DOWNSTREAM_HTTP3;
   EXCLUDE_UPSTREAM_HTTP3;
   // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
   testLargeRequestHeaders(2048, 1, 1024, 100);
@@ -1584,6 +1584,10 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
+  // Fail under TSAN. Quic blackhole detection fired and closed the connection with
+  // QUIC_TOO_MANY_RTOS while waiting for upstream finishing transferring the large header. Observed
+  // long event loop.
+  EXCLUDE_DOWNSTREAM_HTTP3;
   // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
   testLargeRequestHeaders(100, 70, 8192, 100);
 }
