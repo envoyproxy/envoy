@@ -216,7 +216,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter ttlb_duration_format("REQUEST_TX_DURATION");
+    StreamInfoFormatter reqst_tx_duration_format("REQUEST_TX_DURATION");
 
     absl::optional<std::chrono::nanoseconds> dur_upstream = std::chrono::nanoseconds(10000000);
     EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
@@ -231,7 +231,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter ttlb_duration_format("REQUEST_TX_DURATION");
+    StreamInfoFormatter reqst_tx_duration_format("REQUEST_TX_DURATION");
 
     absl::optional<std::chrono::nanoseconds> dur_upstream;
     EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
