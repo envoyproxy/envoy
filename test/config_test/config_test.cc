@@ -194,6 +194,14 @@ uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
+#ifndef ENVOY_ENABLE_QUIC
+    if (filename.find("http3") != std::string::npos) {
+      ENVOY_LOG_MISC(info, "Skipping HTTP/3 config {}.\n", filename);
+      num_tested++;
+      continue;
+    }
+#endif
+
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     if (std::find_if(unsuported_win32_configs.begin(), unsuported_win32_configs.end(),
                      [filename](const absl::string_view& s) {
