@@ -13,17 +13,18 @@ Currently, slow start is supported in Round Robin and Least Request load balance
 Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.slow_start_window>` (in seconds), so that if endpoint “cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode. 
 During slow start window, load balancing weight of a particular endpoint will be scaled with :ref:`time bias parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.time_bias>`
 and :ref:`aggression parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.aggression>`, e.g.:
-`new_weight = weight * time_bias * (time_since_start_seconds / slow_start_window_seconds) ^ (1 / aggression)`.
+
+`new_weight = weight * time_bias * (max(time_since_start_seconds,1) / slow_start_window_seconds) ^ (1 / aggression)`.
 
 Time bias linearly increases endpoint weight, the smaller the value is, the less traffic would be sent to endpoint that is within slow start window.
 As time progresses, more and more traffic would be send to endpoint within slow start window.
-Aggression parameter non-linearly affects endpoint weight and represents the speed of ramp-up.
-By tuning aggression parameter, one could achieve polynomial and exponential speed for traffic increase.
-Below simulation demonstartes how various values for aggression affect distribution of weights for endpoint in slow start mode:
 
+Aggression parameter non-linearly affects endpoint weight and represents the speed of ramp-up.
+By tuning aggression parameter, one could achieve polynomial or exponential speed for traffic increase.
+Below simulation demonstartes how various values for aggression affect traffic ramp-up
 
 .. image:: /_static/slow_start_aggression.svg
-   :width: 80%
+   :width: 60%
    :align: center
 
 Whenever a slow start window duration elapses, upstream endpoint exits slow start mode and gets regular amount of traffic acccording to load balanacing algorithm.
@@ -43,21 +44,22 @@ Endpoint exits slow start mode when:
 Below is example of how requests would be distributed across endpoints with Round Robin Loadbalancer, slow start window of 10 seconds, no active healcheck, 0.5 time bias and 1.0 aggression.
 Endpoint E1 has statically configured initial weight of X and endpoint E2 weight of Y, the actual numerical values are of no significance for this example.
 
+(todo) update last column
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
 | Timestamp   | Event              | E1 in slow | E2 in slow | E1 LB     | E2 LB    | LB decision |
-|             |                    | start      | start      | weight    | weight   |             |
+| in seconds  |                    | start      | start      | weight    | weight   |             |
 +=============+====================+============+============+===========+==========+=============+
-| 1           |  E1 create         |    YES     |     --     |   0.5X    |    --    |     --      |
+| 1           |  E1 create         |    YES     |     --     |   0.05X   |    --    |     --      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 11          |  E2 create         |     NO     |    YES     |    X      |   0.5Y   |     --      |
+| 11          |  E2 create         |     NO     |    YES     |    X      |   0.05Y  |     --      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 12          | LB select endpoint |     NO     |    YES     |    X      |   0.5Y   |     E1      | 
+| 12          | LB select endpoint |     NO     |    YES     |    X      |   0.05Y  |     E1      | 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 13          | LB select endpoint |     NO     |    YES     |    X      |   0.5Y   |     E1      | 
+| 13          | LB select endpoint |     NO     |    YES     |    X      |   0.1Y   |     E1      | 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 14          | LB select endpoint |     NO     |    YES     |    X      |   0.5Y   |     E1      | 
+| 14          | LB select endpoint |     NO     |    YES     |    X      |   0.15Y  |     E1      | 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 15          |LB select endpoint  |     NO     |    YES     |    X      |   0.5Y   |     E2      | 
+| 15          |LB select endpoint  |     NO     |    YES     |    X      |   0.2Y   |     E2      | 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
 | 22          | LB select endpoint |     NO     |     NO     |    X      |    Y     |     E1      | 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+

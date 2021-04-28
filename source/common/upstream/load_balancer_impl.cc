@@ -791,16 +791,24 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
           host->health() == Upstream::Host::Health::Healthy) {
 
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : time_bias_;
+        aggression_ = aggression_runtime_ != nullptr ? aggression_runtime_->value() : 1.0;
 
         if (time_bias_ < 0.0) {
           ENVOY_LOG(warn, "upstream: invalid time bias supplied (runtime key {}), using 1.0",
                     time_bias_runtime_->runtimeKey());
           time_bias_ = 1.0;
         }
-        if (time_bias_ > 0.0 && host_create_duration.count() > 0) {
-          // Slow start window cannot be set 0 due to validation in api protos.
-          auto time_factor = (1.0 / slow_start_window_.count()) * host_create_duration.count();
-          host_weight = host_weight * time_bias_ * time_factor;
+        if (aggression_ < 0.0) {
+          ENVOY_LOG(warn, "upstream: invalid aggression supplied (runtime key {}), using 1.0",
+                    time_bias_runtime_->runtimeKey());
+          aggression_ = 1.0;
+        }
+        if (time_bias_ > 0.0 && aggression_ > 0.0) {
+          // Slow start window cannot be set to 0 due to validation in api protos.
+          auto time_factor =
+              std::max(std::chrono::milliseconds(1).count(), host_create_duration.count()) /
+              slow_start_window_.count();
+          host_weight = std::pow(host->weight() * time_bias_ * time_factor, 1.0 / aggression_);
         }
       }
       scheduler.edf_->add(host_weight, host);

@@ -517,7 +517,7 @@ message Cluster {
     message SlowStartConfig {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
-      
+
       // Size of slow start window in seconds, should be set to value greater than zero.
       // If set, the newly created host remains in slow start mode starting from its creation time
       // for the duration of slow start window.
@@ -535,9 +535,9 @@ message Cluster {
       // and will behave as if slow start is not enabled.
       // Once host exits slow start, its weight is no longer being scaled with time bias parameter.
       core.v3.RuntimeDouble time_bias = 3;
-      // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0, 
-      // so that endpoint would get lineraly increasing amount of traffic. 
-      // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly. 
+      // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
+      // so that endpoint would get lineraly increasing amount of traffic.
+      // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
       // By tuning this parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
       // Once host exits slow start, aggression no longer affects its weight.
       core.v3.RuntimeDouble aggression = 4;

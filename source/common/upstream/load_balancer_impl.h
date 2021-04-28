@@ -430,7 +430,9 @@ protected:
   // Slow start related configs
   const std::chrono::milliseconds slow_start_window_;
   double time_bias_{1.0};
+  double aggression_{1.0};
   const std::unique_ptr<Runtime::Double> time_bias_runtime_;
+  const std::unique_ptr<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   struct OrderByCreateDateDesc {
     bool operator()(const HostSharedPtr l, const HostSharedPtr r) const {
@@ -482,22 +484,24 @@ private:
           host.health() == Upstream::Host::Health::Healthy) {
 
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
+        aggression_ = aggression_runtime_ != nullptr ? aggression_runtime_->value() : 1.0;
 
         if (time_bias_ < 0.0) {
           time_bias_ = 1.0;
         }
-        if (time_bias_ > 0.0 && host_create_duration.count() > 0) {
-          // Slow start window cannot be set 0 due to validation in api protos.
-          auto time_factor = (1.0 / slow_start_window_.count()) * host_create_duration.count();
-          return host.weight() * time_bias_ * time_factor;
+        if (aggression_ < 0.0) {
+          aggression_ = 1.0;
         }
-        return host.weight() * time_bias_;
-      } else {
-        return host.weight();
+        if (time_bias_ > 0.0 && aggression_ > 0.0) {
+          // Slow start window cannot be set to 0 due to validation in api protos.
+          auto time_factor =
+              std::max(std::chrono::milliseconds(1).count(), host_create_duration.count()) /
+              slow_start_window_.count();
+          return std::pow(host.weight() * time_bias_ * time_factor, 1.0 / aggression_);
+        }
       }
-    } else {
-      return host.weight();
     }
+    return host.weight();
   }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {
