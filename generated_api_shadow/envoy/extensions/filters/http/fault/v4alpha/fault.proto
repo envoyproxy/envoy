@@ -54,7 +54,7 @@ message FaultAbort {
   type.v3.FractionalPercent percentage = 3;
 }
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message HTTPFault {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.fault.v3.HTTPFault";
@@ -141,4 +141,6 @@ message HTTPFault {
   // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
   // runtime. The default is: fault.http.abort.grpc_status
   string abort_grpc_status_runtime = 14;
+
+  bool disable_downstream_server_tracing = 15;
 }

@@ -74,6 +74,7 @@ public:
   const std::string& responseRateLimitPercentRuntime() const {
     return response_rate_limit_percent_runtime_;
   }
+  bool disable_downstream_server_tracing_{false};
 
 private:
   class RuntimeKeyValues {
@@ -96,6 +97,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
+
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
   const std::string delay_percent_runtime_;
   const std::string abort_percent_runtime_;

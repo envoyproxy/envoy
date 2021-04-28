@@ -76,6 +76,12 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
     response_rate_limit_ =
         std::make_unique<Filters::Common::Fault::FaultRateLimitConfig>(fault.response_rate_limit());
   }
+
+
+  if (fault.has_disable_downstream_server_tracing()) {
+    disable_downstream_server_tracing_ = fault.disable_downstream_server_tracing();
+  }
+
 }
 
 FaultFilterConfig::FaultFilterConfig(
@@ -89,8 +95,10 @@ FaultFilterConfig::FaultFilterConfig(
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
 void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
-  Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
-      .inc();
+  if (!settings_.disable_downstream_server_tracing_) {
+    Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
+        .inc();
+  }
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
