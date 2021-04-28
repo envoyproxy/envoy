@@ -127,6 +127,7 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return parent_.stream_id_; }
     const Network::Connection* connection() const override { return parent_.connection(); }
+    Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
     void continueDecoding() override;
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     TransportType downstreamTransportType() const override {
@@ -146,6 +147,8 @@ private:
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
+    MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
+    bool responseSuccess() override { return parent_.responseSuccess(); }
 
     ActiveRpc& parent_;
     ThriftFilters::DecoderFilterSharedPtr handle_;
@@ -204,6 +207,9 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     const Network::Connection* connection() const override;
+    Event::Dispatcher& dispatcher() override {
+      return parent_.read_callbacks_->connection().dispatcher();
+    }
     void continueDecoding() override { parent_.continueDecoding(); }
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
@@ -217,6 +223,8 @@ private:
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+    MessageMetadataSharedPtr responseMetadata() override { return response_decoder_->metadata_; }
+    bool responseSuccess() override { return response_decoder_->success_.value_or(false); }
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {

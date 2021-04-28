@@ -495,7 +495,10 @@ address:
 filter_chains:
 - filters:
   - name: envoy.filters.network.tcp_proxy
-    typed_config: {}
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+      stat_prefix: tcp
+      cluster: cluster
   - name: unknown_but_will_not_be_processed
     typed_config: {}
   )EOF";
@@ -539,7 +542,11 @@ public:
   }
 
   std::string name() const override { return "stats_test"; }
-  bool isTerminalFilter() override { return true; }
+
+  bool isTerminalFilterByProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return true;
+  }
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
@@ -2127,6 +2134,23 @@ filter_chains:
   manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.[__1]_10000.foo").value());
+}
+
+TEST_F(ListenerManagerImplTest, ListenerStatPrefix) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+filter_chains:
+- filters: []
+  )EOF";
+
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
+
+  EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.test_prefix.foo").value());
 }
 
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {

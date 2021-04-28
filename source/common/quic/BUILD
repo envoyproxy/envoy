@@ -20,7 +20,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
-        "@com_googlesource_quiche//:quic_core_alarm_interface_lib",
+        "@com_googlesource_quiche//:quic_core_alarm_lib",
         "@com_googlesource_quiche//:quic_core_clock_lib",
     ],
 )
@@ -33,7 +33,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_lib",
-        "@com_googlesource_quiche//:quic_core_alarm_factory_interface_lib",
+        "@com_googlesource_quiche//:quic_core_alarm_factory_lib",
         "@com_googlesource_quiche//:quic_core_arena_scoped_ptr_lib",
         "@com_googlesource_quiche//:quic_core_one_block_arena_lib",
     ],
@@ -61,7 +61,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
         "@com_googlesource_quiche//:quic_core_crypto_crypto_handshake_lib",
-        "@com_googlesource_quiche//:quic_core_crypto_proof_source_interface_lib",
+        "@com_googlesource_quiche//:quic_core_crypto_proof_source_lib",
         "@com_googlesource_quiche//:quic_core_data_lib",
         "@com_googlesource_quiche//:quic_core_versions_lib",
     ],
@@ -128,11 +128,13 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
+        ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
         ":send_buffer_monitor_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -187,6 +189,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/network:connection_base_lib",
         "//source/common/stream_info:stream_info_lib",
     ],
@@ -347,6 +350,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:codec_interface",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -367,6 +371,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
 )
@@ -397,7 +402,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
-        "@com_googlesource_quiche//:quic_core_packet_writer_interface_lib",
+        "@com_googlesource_quiche//:quic_core_packet_writer_lib",
     ],
 )
 

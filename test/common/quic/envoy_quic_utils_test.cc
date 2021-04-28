@@ -45,13 +45,20 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
   }
 }
 
+class MockHeaderValidator : public HeaderValidator {
+public:
+  ~MockHeaderValidator() override = default;
+  MOCK_METHOD(Http::HeaderUtility::HeaderValidationResult, validateHeader,
+              (const std::string& header_name, absl::string_view header_value));
+};
+
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   spdy::SpdyHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
   // "value1" and "value2" should be coalesced into one header by QUICHE and split again while
-  // converting to Envoy headers..
+  // converting to Envoy headers.
   headers_block.AppendValueOrAddHeader("key", "value1");
   headers_block.AppendValueOrAddHeader("key", "value2");
   auto envoy_headers = spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block);
@@ -70,9 +77,36 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   quic_headers.OnHeader(":scheme", "https");
   quic_headers.OnHeader("key", "value1");
   quic_headers.OnHeader("key", "value2");
+  quic_headers.OnHeader("key-to-drop", "");
   quic_headers.OnHeaderBlockEnd(0, 0);
-  auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers);
+  MockHeaderValidator validator;
+  EXPECT_CALL(validator, validateHeader(_, _))
+      .WillRepeatedly([](const std::string& header_name, absl::string_view) {
+        if (header_name == "key-to-drop") {
+          return Http::HeaderUtility::HeaderValidationResult::DROP;
+        }
+        return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
+      });
+  auto envoy_headers2 =
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
+
+  quic::QuicHeaderList quic_headers2;
+  quic_headers2.OnHeaderBlockStart();
+  quic_headers2.OnHeader(":authority", "www.google.com");
+  quic_headers2.OnHeader(":path", "/index.hml");
+  quic_headers2.OnHeader(":scheme", "https");
+  quic_headers2.OnHeader("invalid_key", "");
+  quic_headers2.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, validateHeader(_, _))
+      .WillRepeatedly([](const std::string& header_name, absl::string_view) {
+        if (header_name == "invalid_key") {
+          return Http::HeaderUtility::HeaderValidationResult::REJECT;
+        }
+        return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
+      });
+  EXPECT_EQ(nullptr,
+            quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers2, validator));
 }
 
 } // namespace Quic

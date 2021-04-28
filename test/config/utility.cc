@@ -78,7 +78,7 @@ static_resources:
                      Platform::null_device_path, Platform::null_device_path);
 }
 
-std::string ConfigHelper::baseUdpListenerConfig() {
+std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
   return fmt::format(R"EOF(
 admin:
   access_log:
@@ -106,11 +106,11 @@ static_resources:
     name: listener_0
     address:
       socket_address:
-        address: 0.0.0.0
+        address: {}
         port_value: 0
         protocol: udp
 )EOF",
-                     Platform::null_device_path);
+                     Platform::null_device_path, listen_address);
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -194,7 +194,7 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
 std::string ConfigHelper::quicHttpProxyConfig() {
-  return absl::StrCat(baseUdpListenerConfig(), fmt::format(R"EOF(
+  return absl::StrCat(baseUdpListenerConfig("127.0.0.1"), fmt::format(R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -226,7 +226,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     udp_listener_config:
       quic_options: {{}}
 )EOF",
-                                                           Platform::null_device_path));
+                                                                      Platform::null_device_path));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
@@ -713,6 +713,10 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
         new_protocol_options.mutable_auto_config()->mutable_http2_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http2_protocol_options());
       }
+      if (http3 || old_protocol_options.explicit_http_config().has_http3_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http3_protocol_options());
+      }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
               .PackFrom(new_protocol_options);
@@ -725,9 +729,9 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
     // The test certs are for *.lyft.com, so make sure SNI matches.
     tls_context.set_sni("foo.lyft.com");
     if (http3) {
-      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
       envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
       quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
       cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
     } else {
       cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
@@ -1062,6 +1066,30 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
   }
 }
 
+void ConfigHelper::configDownstreamTransportSocketWithTls(
+    envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+        configure_tls_context) {
+  for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
+    ASSERT(listener.filter_chains_size() > 0);
+    auto* filter_chain = listener.mutable_filter_chains(0);
+    auto* transport_socket = filter_chain->mutable_transport_socket();
+    if (listener.has_udp_listener_config() && listener.udp_listener_config().has_quic_options()) {
+      transport_socket->set_name("envoy.transport_sockets.quic");
+      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+          quic_transport_socket_config;
+      configure_tls_context(*quic_transport_socket_config.mutable_downstream_tls_context()
+                                 ->mutable_common_tls_context());
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    } else if (!listener.has_udp_listener_config()) {
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      configure_tls_context(*tls_context.mutable_common_tls_context());
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    }
+  }
+}
+
 void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -1078,20 +1106,16 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 }
 
 void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
-  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
-      quic_transport_socket_config;
-  auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
-  ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
-                              *tls_context->mutable_common_tls_context());
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
-      ASSERT(listener.filter_chains_size() > 0);
-      auto* filter_chain = listener.mutable_filter_chains(0);
-      auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
       listener.set_reuse_port(reuse_port);
     }
   }
+  configDownstreamTransportSocketWithTls(
+      bootstrap_,
+      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
+      });
 }
 
 bool ConfigHelper::setAccessLog(

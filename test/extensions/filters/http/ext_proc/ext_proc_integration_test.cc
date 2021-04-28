@@ -104,7 +104,7 @@ protected:
   }
 
   void verifyDownstreamResponse(IntegrationStreamDecoder& response, int status_code) {
-    response.waitForEndStream();
+    ASSERT_TRUE(response.waitForEndStream());
     EXPECT_TRUE(response.complete());
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
@@ -424,7 +424,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the response_headers message
-// by requesting to modify the request headers.
+// by requesting to modify the response headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -446,8 +446,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
 
 // Test the filter with a response body callback enabled using an
 // an ext_proc server that responds to the response_body message
-// by requesting to modify the response body.
-TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
+// by requesting to modify the response body and headers.
+TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -468,12 +468,47 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
     EXPECT_TRUE(body.end_of_stream());
     auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
     body_mut->set_body("Hello, World!");
+    auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
+    auto* header_add = header_mut->add_set_headers();
+    header_add->mutable_header()->set_key("x-testing-response-header");
+    header_add->mutable_header()->set_value("Yes");
     return true;
   });
 
   verifyDownstreamResponse(*response, 200);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-length", "13"));
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
   EXPECT_EQ("Hello, World!", response->body());
+}
+
+// Test the filter with a response body callback enabled using an
+// an ext_proc server that responds to the response_body message
+// by requesting to modify the response body and headers, using a response
+// big enough to require multiple chunks.
+TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnBigResponse) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 4000);
+  handleUpstreamRequestWithResponse(full_response, 1000);
+
+  processResponseHeadersMessage(false, absl::nullopt);
+  // Should get just one message with the body
+  processResponseBodyMessage(false, [](const HttpBody& body, BodyResponse& body_resp) {
+    EXPECT_TRUE(body.end_of_stream());
+    auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
+    auto* header_add = header_mut->add_set_headers();
+    header_add->mutable_header()->set_key("x-testing-response-header");
+    header_add->mutable_header()->set_value("Yes");
+    return true;
+  });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
 }
 
 // Test the filter with both body callbacks enabled and have the
@@ -627,9 +662,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
     immediate.set_details("Failed because you are not authorized");
   });
 
-  // The stream should have been reset here before the complete
-  // response was received.
-  response->waitForReset();
+  // Since we are stopping iteration on headers, and since the response is short,
+  // we actually get an error message here.
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
 // Send a request, but wait longer than the "message timeout" before sending a response

@@ -180,7 +180,7 @@ public:
 #define CHECK_STATE(active, pending, capacity)                                                     \
   EXPECT_EQ(state_.pending_streams_, pending);                                                     \
   EXPECT_EQ(state_.active_streams_, active);                                                       \
-  EXPECT_EQ(state_.connecting_stream_capacity_, capacity);
+  EXPECT_EQ(state_.connecting_and_connected_stream_capacity_, capacity);
 
   /**
    * Closes a test client.
@@ -1582,17 +1582,52 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithSettings) {
   ActiveTestRequest r2(*this, 0, false);
   CHECK_STATE(0 /*active*/, 2 /*pending*/, 4 /*capacity*/);
 
+  // Connect, so we can receive SETTINGS.
+  EXPECT_CALL(*test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&r1.inner_decoder_), ReturnRef(r1.inner_encoder_)))
+      .WillOnce(DoAll(SaveArgAddress(&r2.inner_decoder_), ReturnRef(r2.inner_encoder_)));
+  EXPECT_CALL(r1.callbacks_.pool_ready_, ready());
+  EXPECT_CALL(r2.callbacks_.pool_ready_, ready());
+  expectClientConnect(0);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 2 /*capacity*/);
+  expectClientConnect(1);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 2 /*capacity*/);
+
   // Now have the codecs receive SETTINGS frames limiting the streams per connection to one.
   // onSettings
   NiceMock<MockReceivedSettings> settings;
   settings.max_concurrent_streams_ = 1;
   test_clients_[0].codec_client_->onSettings(settings);
   test_clients_[1].codec_client_->onSettings(settings);
-  CHECK_STATE(0 /*active*/, 2 /*pending*/, 2 /*capacity*/);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 
   // Clean up.
-  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-  r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  pool_->drainConnections();
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, PreconnectWithGoaway) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
+
+  // With two requests per connection, and preconnect 1.5, the first request will
+  // only kick off 1 connection.
+  expectClientsCreate(1);
+  ActiveTestRequest r1(*this, 0, false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*capacity*/);
+
+  EXPECT_CALL(*test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&r1.inner_decoder_), ReturnRef(r1.inner_encoder_)));
+  EXPECT_CALL(r1.callbacks_.pool_ready_, ready());
+  expectClientConnect(0);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 1 /*capacity*/);
+
+  // Send a goaway. This does not currently trigger preconnect, but will update
+  // the capacity.
+  test_clients_[0].codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+
+  // Clean up.
   pool_->drainConnections();
   closeAllClients();
 }

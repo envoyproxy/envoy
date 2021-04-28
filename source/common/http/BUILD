@@ -150,6 +150,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "alternate_protocols",
+    srcs = ["alternate_protocols.cc"],
+    hdrs = ["alternate_protocols.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_grid",
     srcs = ["conn_pool_grid.cc"],
     hdrs = ["conn_pool_grid.h"],
@@ -436,6 +445,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
