@@ -125,7 +125,7 @@ TEST_P(PlatformBridgeIntegrationTest, MultipleFilters) {
   upstream_request_->encodeData(100, true);
 
   // Wait for frames to arrive downstream.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());

@@ -204,6 +204,7 @@ stats_sinks:
       "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
       transport_api_version: V3
       report_counters_as_deltas: true
+      emit_tags_as_labels: true
       grpc_service:
         envoy_grpc:
           cluster_name: stats
@@ -235,6 +236,8 @@ stats_config:
         - safe_regex:
             google_re2: {}
             regex: '^vhost.api.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|retry.*|time|timeout|total)'
+  use_all_default_tags:
+    false
 watchdog:
   megamiss_timeout: 60s
   miss_timeout: 60s

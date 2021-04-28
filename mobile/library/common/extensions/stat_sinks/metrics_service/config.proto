@@ -16,4 +16,10 @@ message EnvoyMobileMetricsServiceConfig {
   // If true, counters are reported as the delta between flushing intervals. Otherwise, the current
   // counter value is reported. Defaults to false.
   google.protobuf.BoolValue report_counters_as_deltas = 2;
+
+  // Placeholder for now. The plan is to use it in the same way as in upstream envoy.
+  // If true, metrics will have their tags emitted as labels on the metrics objects sent to the
+  // MetricsService, and the tag extracted name will be used instead of the full name, which may
+  // contain values used by the tag extractor or additional tags added during stats creation.
+  bool emit_tags_as_labels = 4;
 }
