@@ -224,9 +224,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
     EXPECT_EQ("15", reqst_tx_duration_format.format(request_headers, response_headers,
-                                                response_trailers, stream_info, body));
+                                                    response_trailers, stream_info, body));
     EXPECT_THAT(reqst_tx_duration_format.formatValue(request_headers, response_headers,
-                                                 response_trailers, stream_info, body),
+                                                     response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::numberValue(15.0)));
   }
 
@@ -239,9 +239,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
     EXPECT_EQ(absl::nullopt, reqst_tx_duration_format.format(request_headers, response_headers,
-                                                         response_trailers, stream_info, body));
+                                                             response_trailers, stream_info, body));
     EXPECT_THAT(reqst_tx_duration_format.formatValue(request_headers, response_headers,
-                                                 response_trailers, stream_info, body),
+                                                     response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
 

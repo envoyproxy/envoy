@@ -718,7 +718,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           if (received && sent) {
             result = sent.value() - received.value();
           }
-          
+
           return result;
         });
   } else if (field_name == "RESPONSE_TX_DURATION") {
