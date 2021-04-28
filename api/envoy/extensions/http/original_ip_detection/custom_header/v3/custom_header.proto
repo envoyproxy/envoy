@@ -30,7 +30,7 @@ message CustomHeaderConfig {
     // when detection fails. The default status is HTTP 403 Forbidden.
     //
     // .. note::
-    //   If this is set to < 400, the default status 403 will be used instead.
+    //   If this is set to < 400 or > 511, the default status 403 will be used instead.
     type.v3.HttpStatus status_on_error = 1;
 
     // If reject_request_if_detection_fails is set, this sets the HTTP body in the response
