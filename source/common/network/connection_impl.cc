@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
@@ -67,7 +68,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
                                StreamInfo::StreamInfo& stream_info, bool connected)
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      stream_info_(stream_info), filter_manager_(*this),
+      stream_info_(stream_info), filter_manager_(*this, *socket_),
       write_buffer_(dispatcher.getWatermarkFactory().create(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); },
@@ -210,6 +211,7 @@ Connection::State ConnectionImpl::state() const {
 void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
 void ConnectionImpl::setTransportSocketIsReadable() {
+  ASSERT(dispatcher_.isThreadSafe());
   // Remember that the transport requested read resumption, in case the resumption event is not
   // scheduled immediately or is "lost" because read was disabled.
   transport_wants_read_ = true;
@@ -300,6 +302,7 @@ void ConnectionImpl::noDelay(bool enable) {
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
+  ASSERT(dispatcher_.isThreadSafe());
   if (inDelayedClose() || !filterChainWantsData()) {
     return;
   }
@@ -419,6 +422,7 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
 bool ConnectionImpl::readEnabled() const {
   // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
+  ASSERT(dispatcher_.isThreadSafe());
   return read_disable_count_ == 0;
 }
 
@@ -436,6 +440,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
 
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through_filter_chain) {
   ASSERT(!end_stream || enable_half_close_);
+  ASSERT(dispatcher_.isThreadSafe());
 
   if (write_end_stream_) {
     // It is an API violation to write more data after writing end_stream, but a duplicate
@@ -783,7 +788,8 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
   }
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
-        dispatcher_.createTimer([this] { onTransportSocketConnectTimeout(); });
+        dispatcher_.createScaledTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
+                                      [this] { onTransportSocketConnectTimeout(); });
   }
   transport_socket_connect_timer_->enableTimer(timeout);
 }

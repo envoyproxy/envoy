@@ -50,7 +50,7 @@ message DeniedHttpResponse {
   type.v3.HttpStatus status = 1 [(validate.rules).message = {required: true}];
 
   // This field allows the authorization service to send HTTP response headers
-  // to the downstream client. Note that the `append` field in `HeaderValueOption` defaults to
+  // to the downstream client. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
   // false when used in this message.
   repeated config.core.v4alpha.HeaderValueOption headers = 2;
 
@@ -60,7 +60,7 @@ message DeniedHttpResponse {
 }
 
 // HTTP attributes for an OK response.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message OkHttpResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v3.OkHttpResponse";
@@ -71,7 +71,7 @@ message OkHttpResponse {
 
   // HTTP entity headers in addition to the original request headers. This allows the authorization
   // service to append, to add or to override headers from the original request before
-  // dispatching it to the upstream. Note that the `append` field in `HeaderValueOption` defaults to
+  // dispatching it to the upstream. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
   // false when used in this message. By setting the `append` field to `true`,
   // the filter will append the correspondent header value to the matched request header.
   // By leaving `append` as false, the filter will either add a new header, or override an existing
@@ -94,6 +94,11 @@ message OkHttpResponse {
   // authorization service as a comma separated list like so:
   // ``x-envoy-auth-headers-to-remove: one-auth-header, another-auth-header``.
   repeated string headers_to_remove = 5;
+
+  // This field allows the authorization service to send HTTP response headers
+  // to the downstream client on success. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
+  // defaults to false when used in this message.
+  repeated config.core.v4alpha.HeaderValueOption response_headers_to_add = 6;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.

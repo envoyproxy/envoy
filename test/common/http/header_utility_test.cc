@@ -287,19 +287,6 @@ exact_match: a,b
   )EOF"));
   // Make sure that an exact match on "a,b" does in fact work.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
-
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http_match_on_all_headers", "false"}});
-  // Flipping runtime to false should make "a,b" no longer match because we will match on the first
-  // header only.
-  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
-
-  header_data[0] = std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(R"EOF(
-name: match-header
-exact_match: a
-  )EOF"));
-  // With runtime off, exact match on "a" should pass.
-  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
 }
 
 TEST(MatchHeadersTest, MustMatchAllHeaderData) {
@@ -651,6 +638,18 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
 }
 
+TEST(HeaderIsValidTest, ShouldHaveNoBody) {
+  const std::vector<std::string> methods{{"CONNECT"}, {"GET"}, {"DELETE"}, {"TRACE"}, {"HEAD"}};
+
+  for (const auto& method : methods) {
+    TestRequestHeaderMapImpl headers{{":method", method}};
+    EXPECT_TRUE(HeaderUtility::requestShouldHaveNoBody(headers));
+  }
+
+  TestRequestHeaderMapImpl post{{":method", "POST"}};
+  EXPECT_FALSE(HeaderUtility::requestShouldHaveNoBody(post));
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestRequestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestRequestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};
@@ -699,6 +698,62 @@ TEST(RequiredHeaders, IsRemovableHeader) {
   EXPECT_TRUE(HeaderUtility::isRemovableHeader(""));
   EXPECT_TRUE(HeaderUtility::isRemovableHeader("hostname"));
   EXPECT_TRUE(HeaderUtility::isRemovableHeader("Content-Type"));
+}
+
+TEST(RequiredHeaders, IsModifiableHeader) {
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader(":path"));
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader("host"));
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader("Host"));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader(""));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader("hostname"));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader("Content-Type"));
+}
+
+TEST(ValidateHeaders, HeaderNameWithUnderscores) {
+  Stats::MockCounter dropped;
+  Stats::MockCounter rejected;
+  EXPECT_CALL(dropped, inc());
+  EXPECT_CALL(rejected, inc()).Times(0u);
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::DROP,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header_with_underscore", envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER,
+                dropped, rejected));
+
+  EXPECT_CALL(dropped, inc()).Times(0u);
+  EXPECT_CALL(rejected, inc());
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header_with_underscore",
+                envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST, dropped, rejected));
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header_with_underscore", envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+                dropped, rejected));
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header", envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST, dropped,
+                rejected));
+}
+
+TEST(ValidateHeaders, ContentLength) {
+  bool should_close_connection;
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
+            HeaderUtility::validateContentLength("1,1", true, should_close_connection));
+  EXPECT_FALSE(should_close_connection);
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("1,2", true, should_close_connection));
+  EXPECT_FALSE(should_close_connection);
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("1,2", false, should_close_connection));
+  EXPECT_TRUE(should_close_connection);
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("-1", false, should_close_connection));
+  EXPECT_TRUE(should_close_connection);
 }
 
 } // namespace Http

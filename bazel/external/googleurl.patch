@@ -1,0 +1,89 @@
+# TODO(dio): Consider to remove compiler specific part of this patch when we solely compile the
+# project using clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
+
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+index 0cd36dc..8c4cbd4 100644
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -7,10 +7,6 @@
+
+ #include "build/build_config.h"
+
+-#if defined(COMPILER_MSVC) && !defined(__clang__)
+-#error "Only clang-cl is supported on Windows, see https://crbug.com/988071"
+-#endif
+-
+ // Annotate a variable indicating it's ok if the variable is not used.
+ // (Typically used to silence a compiler warning when the assignment
+ // is important for some other reason.)
+@@ -55,8 +51,12 @@
+ // prevent code folding, see gurl_base::debug::Alias.
+ // Use like:
+ //   void NOT_TAIL_CALLED FooBar();
+-#if defined(__clang__) && __has_attribute(not_tail_called)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(not_tail_called)
+ #define NOT_TAIL_CALLED __attribute__((not_tail_called))
++#endif
++#endif
+ #else
+ #define NOT_TAIL_CALLED
+ #endif
+@@ -226,7 +226,9 @@
+ #endif
+ #endif
+
+-#if defined(__clang__) && __has_attribute(uninitialized)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(uninitialized)
+ // Attribute "uninitialized" disables -ftrivial-auto-var-init=pattern for
+ // the specified variable.
+ // Library-wide alternative is
+@@ -257,6 +259,8 @@
+ // E.g. platform, bot, benchmark or test name in patch description or next to
+ // the attribute.
+ #define STACK_UNINITIALIZED __attribute__((uninitialized))
++#endif
++#endif
+ #else
+ #define STACK_UNINITIALIZED
+ #endif
+
+# TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
+# library from the upstream Chromium project. This is tracked in:
+# https://github.com/envoyproxy/envoy/issues/14743.
+
+diff --git a/url/BUILD b/url/BUILD
+index f2ec8da..4e2d55b 100644
+--- a/url/BUILD
++++ b/url/BUILD
+@@ -52,3 +52,27 @@ cc_library(
+         "//polyfills",
+     ] + build_config.icuuc_deps,
+ )
++
++cc_library(
++    name = "envoy_url",
++    srcs = [
++       "url_canon.cc",
++       "url_canon_internal.cc",
++       "url_canon_path.cc",
++       "url_canon_stdstring.cc",
++    ],
++    hdrs = [
++       "third_party/mozilla/url_parse.h",
++       "url_canon.h",
++       "url_canon_internal.h",
++       "url_canon_stdstring.h",
++       "url_parse_internal.h",
++    ],
++    copts = build_config.default_copts,
++    visibility = ["//visibility:public"],
++    deps = [
++       "//base",
++       "//base/strings",
++       "//polyfills",
++    ]
++)

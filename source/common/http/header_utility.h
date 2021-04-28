@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "envoy/common/regex.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
@@ -111,6 +112,13 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
+   * Validates the provided scheme is valid (either http or https)
+   * @param scheme the scheme to validate
+   * @return bool true if the scheme is valid.
+   */
+  static bool schemeIsValid(const absl::string_view scheme);
+
+  /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
@@ -142,6 +150,8 @@ public:
    */
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
+
+  static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**
    * Add headers from one HeaderMap to another
@@ -193,6 +203,42 @@ public:
    * may not be removed.
    */
   static bool isRemovableHeader(absl::string_view header);
+
+  /**
+   * Returns true if a header may be safely modified without causing additional
+   * problems. Currently header names beginning with ":" and the "host" header
+   * may not be modified.
+   */
+  static bool isModifiableHeader(absl::string_view header);
+
+  enum class HeaderValidationResult {
+    ACCEPT = 0,
+    DROP,
+    REJECT,
+  };
+
+  /**
+   * Check if the given header_name has underscore.
+   * Return HeaderValidationResult and populate the given counters based on
+   * headers_with_underscores_action.
+   */
+  static HeaderValidationResult checkHeaderNameForUnderscores(
+      const std::string& header_name,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action,
+      Stats::Counter& dropped_headers_with_underscores,
+      Stats::Counter& requests_rejected_with_underscores_in_headers);
+
+  /**
+   * Check if header_value represents a valid value for HTTP content-length header.
+   * Return HeaderValidationResult and populate should_close_connection
+   * according to override_stream_error_on_invalid_http_message.
+   */
+  static HeaderValidationResult
+  validateContentLength(absl::string_view header_value,
+                        bool override_stream_error_on_invalid_http_message,
+                        bool& should_close_connection);
 };
+
 } // namespace Http
 } // namespace Envoy

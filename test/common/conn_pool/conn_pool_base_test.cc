@@ -12,6 +12,7 @@ namespace Envoy {
 namespace ConnectionPool {
 
 using testing::AnyNumber;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
@@ -73,7 +74,7 @@ public:
 #define CHECK_STATE(active, pending, capacity)                                                     \
   EXPECT_EQ(state_.pending_streams_, pending);                                                     \
   EXPECT_EQ(state_.active_streams_, active);                                                       \
-  EXPECT_EQ(state_.connecting_stream_capacity_, capacity)
+  EXPECT_EQ(state_.connecting_and_connected_stream_capacity_, capacity)
 
   uint32_t stream_limit_ = 100;
   uint32_t concurrent_streams_ = 1;
@@ -89,6 +90,15 @@ public:
   AttachContext context_;
   std::vector<ActiveClient*> clients_;
 };
+
+TEST_F(ConnPoolImplBaseTest, DumpState) {
+  std::stringstream out;
+  pool_.dumpState(out, 0);
+  std::string state = out.str();
+  EXPECT_THAT(state, HasSubstr("ready_clients_.size(): 0, busy_clients_.size(): 0, "
+                               "connecting_clients_.size(): 0, connecting_stream_capacity_: 0, "
+                               "num_active_streams_: 0"));
+}
 
 TEST_F(ConnPoolImplBaseTest, BasicPreconnect) {
   // Create more than one connection per new stream.

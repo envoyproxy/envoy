@@ -109,7 +109,7 @@ http_filters:
         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
     rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-                start(_, _));
+                start(_));
     outer_init_manager_.initialize(init_watcher_);
   }
 
@@ -187,8 +187,10 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Load the config and verified shared count.
+  // ConfigConstSharedPtr is shared between: RouteConfigUpdateReceiverImpl, rds_ (via tls_), and
+  // config local var below.
   ConfigConstSharedPtr config = rds_->config();
-  EXPECT_EQ(2, config.use_count());
+  EXPECT_EQ(3, config.use_count());
 
   // Third request.
   const std::string response2_json = R"EOF(
@@ -524,7 +526,7 @@ dynamic_route_configs:
   // Static + dynamic.
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_, _));
+              start(_));
   outer_init_manager_.initialize(init_watcher_);
 
   const std::string response1_json = R"EOF(
@@ -690,7 +692,7 @@ virtual_hosts:
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_, _));
+              start(_));
   outer_init_manager_.initialize(init_watcher_);
   EXPECT_CALL(init_watcher_, ready());
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
@@ -699,7 +701,7 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_, _));
+              start(_));
   outer_init_manager_.initialize(init_watcher_);
   envoy::config::route::v3::RouteConfiguration route_config;
   const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
@@ -731,7 +733,7 @@ dynamic_route_configs:
   // dynamic.
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_, _));
+              start(_));
   outer_init_manager_.initialize(init_watcher_);
 
   const std::string response1_yaml = R"EOF(

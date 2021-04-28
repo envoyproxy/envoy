@@ -22,6 +22,7 @@ enum HealthCheckFailureType {
   ACTIVE = 0;
   PASSIVE = 1;
   NETWORK = 2;
+  NETWORK_TIMEOUT = 3;
 }
 
 enum HealthCheckerType {

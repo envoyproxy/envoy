@@ -137,13 +137,26 @@ private:
   const ScopeTrackedObject* scope_;
 };
 
-ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), scale_factor_(1.0) {}
+ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(
+    Dispatcher& dispatcher, const ScaledTimerTypeMapConstSharedPtr& timer_minimums)
+    : dispatcher_(dispatcher),
+      timer_minimums_(timer_minimums != nullptr ? timer_minimums
+                                                : std::make_shared<ScaledTimerTypeMap>()),
+      scale_factor_(1.0) {}
 
 ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   // Scaled timers created by the manager shouldn't outlive it. This is
   // necessary but not sufficient to guarantee that.
   ASSERT(queues_.empty());
+}
+
+TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerType timer_type, TimerCb callback) {
+  const auto minimum_it = timer_minimums_->find(timer_type);
+  const Event::ScaledTimerMinimum minimum =
+      minimum_it != timer_minimums_->end()
+          ? minimum_it->second
+          : Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat::max()));
+  return createTimer(minimum, std::move(callback));
 }
 
 TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerMinimum minimum, TimerCb callback) {
@@ -212,7 +225,11 @@ void ScaledRangeTimerManagerImpl::removeTimer(ScalingTimerHandle handle) {
   handle.queue_.range_timers_.erase(handle.iterator_);
   // Don't keep around empty queues
   if (handle.queue_.range_timers_.empty()) {
-    queues_.erase(handle.queue_);
+    // Skip erasing the queue if we're in the middle of processing timers for the queue. The
+    // queue will be erased in `onQueueTimerFired` after the queue entries have been processed.
+    if (!handle.queue_.processing_timers_) {
+      queues_.erase(handle.queue_);
+    }
     return;
   }
 
@@ -242,12 +259,14 @@ void ScaledRangeTimerManagerImpl::onQueueTimerFired(Queue& queue) {
 
   // Pop and trigger timers until the one at the front isn't supposed to have expired yet (given the
   // current scale factor).
+  queue.processing_timers_ = true;
   while (!timers.empty() &&
          computeTriggerTime(timers.front(), queue.duration_, scale_factor_) <= now) {
     auto item = std::move(queue.range_timers_.front());
     queue.range_timers_.pop_front();
     item.timer_.trigger();
   }
+  queue.processing_timers_ = false;
 
   if (queue.range_timers_.empty()) {
     // Maintain the invariant that queues are never empty.

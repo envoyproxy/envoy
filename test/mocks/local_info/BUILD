@@ -16,6 +16,7 @@ envoy_cc_mock(
         "//include/envoy/local_info:local_info_interface",
         "//source/common/network:address_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/config:config_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

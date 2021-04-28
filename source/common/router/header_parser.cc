@@ -47,8 +47,10 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
   // will cause us to have to worry about interaction with other aspects of the
   // RouteAction, e.g. prefix rewriting. We also reject other :-prefixed
   // headers, since it seems dangerous and there doesn't appear a use case.
-  if (key[0] == ':') {
-    throw EnvoyException(":-prefixed headers may not be modified");
+  // Host is disallowed as it created confusing and inconsistent behaviors for
+  // HTTP/1 and HTTP/2. It could arguably be allowed on the response path.
+  if (!Http::HeaderUtility::isModifiableHeader(key)) {
+    throw EnvoyException(":-prefixed or host headers may not be modified");
   }
 
   absl::string_view format(header_value.value());
@@ -292,6 +294,26 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
       }
     }
   }
+}
+
+Http::HeaderTransforms
+HeaderParser::getHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+  Http::HeaderTransforms transforms;
+
+  for (const auto& [key, entry] : headers_to_add_) {
+    const std::string value = entry.formatter_->format(stream_info);
+    if (!value.empty()) {
+      if (entry.formatter_->append()) {
+        transforms.headers_to_append.push_back({key, value});
+      } else {
+        transforms.headers_to_overwrite.push_back({key, value});
+      }
+    }
+  }
+
+  transforms.headers_to_remove = headers_to_remove_;
+
+  return transforms;
 }
 
 } // namespace Router

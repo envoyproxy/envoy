@@ -106,7 +106,7 @@ struct Config {
         // set.
         //
         // This will flip to false after one release.
-        const bool runtime_feature_default = true;
+        const bool runtime_feature_default = false;
 
         const char* runtime_key = "envoy.deprecated_features.grpc_stats_filter_enable_"
                                   "stats_for_all_methods_by_default";

@@ -23,6 +23,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/json/json_loader.h"
 #include "common/local_reply/local_reply.h"
 #include "common/router/rds_impl.h"
@@ -106,7 +107,9 @@ public:
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
-  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
+    return request_id_extension_;
+  }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -183,12 +186,13 @@ private:
   void
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
-                int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-                const char* filter_chain_type, bool last_filter_in_current_config);
+                int i, const std::string& prefix, FilterFactoriesList& filter_factories,
+                const std::string& filter_chain_type, bool last_filter_in_current_config);
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-                             FilterFactoriesList& filter_factories, const char* filter_chain_type,
+                             FilterFactoriesList& filter_factories,
+                             const std::string& filter_chain_type,
                              bool last_filter_in_current_config);
   void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
                                      const FilterFactoriesList& filter_factories);
@@ -210,6 +214,7 @@ private:
   Http::ConnectionManagerStats stats_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
   const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
@@ -222,6 +227,7 @@ private:
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   Filter::Http::FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{

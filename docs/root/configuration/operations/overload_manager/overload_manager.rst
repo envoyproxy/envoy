@@ -19,7 +19,7 @@ requests when heap memory usage reaches 99%.
    resource_monitors:
      - name: "envoy.resource_monitors.fixed_heap"
        typed_config:
-         "@type": type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
          max_heap_size_bytes: 2147483648
    actions:
      - name: "envoy.overload_actions.disable_http_keepalive"
@@ -38,7 +38,7 @@ Resource monitors
 
 The overload manager uses Envoy's :ref:`extension <extending>` framework for defining
 resource monitors. Envoy's builtin resource monitors are listed
-:ref:`here <config_resource_monitors>`.
+:ref:`here <v3_config_resource_monitors>`.
 
 .. _config_overload_manager_triggers:
 

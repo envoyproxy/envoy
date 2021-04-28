@@ -18,27 +18,20 @@ namespace {
 static const int SecondsPerDay = 86400;
 } // namespace
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
-  // These filters have already been covered by this fuzzer.
-  // Will extend to cover other network filters one by one.
+  // Add filters that are in the process of being or are robust against untrusted downstream
+  // traffic.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
     const auto factories = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ExtAuthorization, NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RedisProxy, NetworkFilterNames::get().ClientSslAuth,
-        NetworkFilterNames::get().Echo, NetworkFilterNames::get().DirectResponse,
-        NetworkFilterNames::get().DubboProxy, NetworkFilterNames::get().SniCluster,
+        NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
-        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().ThriftProxy,
-        NetworkFilterNames::get().ZooKeeperProxy, NetworkFilterNames::get().SniDynamicForwardProxy,
-        NetworkFilterNames::get().KafkaBroker, NetworkFilterNames::get().RocketmqProxy,
+        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
         NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
-        NetworkFilterNames::get().MongoProxy, NetworkFilterNames::get().MySQLProxy
-        // TODO(jianwendong): add "NetworkFilterNames::get().Postgres" after it supports untrusted
-        // data.
-        // TODO(jianwendong): add fuzz test for "NetworkFilterNames::get().TcpProxy".
+        // TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
+        // NetworkFilterNames::get().TcpProxy,
     };
     // Check whether each filter is loaded into Envoy.
     // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
@@ -68,9 +61,11 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           const std::string empty_body{};
           const auto expected_headers =
               Filters::Common::ExtAuthz::TestCommon::makeHeaderValueOption({});
+          const auto expected_downstream_headers =
+              Filters::Common::ExtAuthz::TestCommon::makeHeaderValueOption({});
           auto check_response = Filters::Common::ExtAuthz::TestCommon::makeCheckResponse(
               Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body,
-              expected_headers);
+              expected_headers, expected_downstream_headers);
           // Give response to the grpc_client by calling onSuccess().
           grpc_client_impl->onSuccess(std::move(check_response), span_);
           return async_request_.get();

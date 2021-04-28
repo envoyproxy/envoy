@@ -11,19 +11,15 @@ Build
 
   build/binaries
   build/boringssl
+  build/speed
 
 API
 ---
 .. toctree::
   :maxdepth: 2
 
-  api/transition
-  api/envoy_v2_support
   api/envoy_v3
-  api/envoy_upgrade_v3
   api/extensions
-  api/control_plane_version_support
-  api/control_plane
   api/package_naming
   api/why_versioning
   api/incremental
@@ -60,7 +56,7 @@ Configuration
   configuration/level_two
   configuration/sni
   configuration/zone_aware_routing
-  configuration/zipkin_tracing
+  configuration/tracing
   configuration/flow_control
   configuration/timeouts
   configuration/deprecation

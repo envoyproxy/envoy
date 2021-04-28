@@ -19,7 +19,7 @@ gRPC streaming endpoints
 .. http:post:: /envoy.api.v2.ClusterDiscoveryService/StreamClusters
 .. http:post:: /envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters
 
-See :repo:`cds.proto <api/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
+See :repo:`cds.proto <api/envoy/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
 as a client when
 
 .. code-block:: yaml
@@ -260,7 +260,7 @@ is set in the :ref:`rds
 
 .. note::
 
-    The management server responding to these endpoints must respond with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+    The management server responding to these endpoints must respond with a :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.discoveryresponse>`
     along with a HTTP status of 200. Additionally, if the configuration that would be supplied has not changed (as indicated by the version
     supplied by the Envoy client) then the management server can respond with an empty body and a HTTP status of 304.
 
@@ -377,9 +377,9 @@ Currently the behavior when a TTL expires is that the resource is *removed* (as 
 previous version). As such, this feature should primarily be used for use cases where the absence of the resource
 is preferred instead of the temporary version, e.g. when using RTDS to apply a temporary runtime override.
 
-The TTL is specified on the :ref:`Resource <envoy_api_msg_Resource>` proto: for Delta xDS this is specified directly
+The TTL is specified on the :ref:`Resource <envoy_v3_api_msg_service.discovery.v3.resource>` proto: for Delta xDS this is specified directly
 within the response, while for SotW xDS the server may wrap individual resources listed in the response within a
-:ref:`Resource <envoy_api_msg_Resource>` in order to specify a TTL value.
+:ref:`Resource <envoy_v3_api_msg_service.discovery.v3.resource>` in order to specify a TTL value.
 
 The server can refresh or modify the TTL by issuing another response for the same version. In this case the resource
 itself does not have to be included.

@@ -94,7 +94,6 @@ static_resources:
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service2
       endpoints:

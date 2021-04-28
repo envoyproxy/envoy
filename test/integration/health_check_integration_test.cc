@@ -248,6 +248,53 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyHttp) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
+// Verify that immediate health check fail causes cluster exclusion.
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointImmediateHealthcheckFailHttp) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initHttpHealthCheck(cluster_idx);
+
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_excluded")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
+
+  // Endpoint responds to the health check with unhealthy status and immediate health check failure.
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"},
+                                      {"x-envoy-immediate-health-check-fail", "true"}},
+      false);
+  clusters_[cluster_idx].host_stream_->encodeData(1024, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_excluded", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
+
+  // Advance time to cause another health check. This should remove the cluster exclusion.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_excluded", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
+}
+
 // Tests that no HTTP health check response results in timeout and unhealthy endpoint.
 TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
   const uint32_t cluster_idx = 0;
@@ -368,7 +415,8 @@ TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayErroSingleEnd
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
-class TcpHealthCheckIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class TcpHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
+                                      public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HealthCheckIntegrationTestBase {
 public:
   TcpHealthCheckIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
@@ -450,7 +498,8 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
-class GrpcHealthCheckIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class GrpcHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
+                                       public testing::TestWithParam<Network::Address::IpVersion>,
                                        public HealthCheckIntegrationTestBase {
 public:
   GrpcHealthCheckIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}

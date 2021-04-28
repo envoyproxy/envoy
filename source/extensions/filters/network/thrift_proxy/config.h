@@ -82,6 +82,7 @@ public:
   ProtocolPtr createProtocol() override;
   Router::Config& routerConfig() override { return *this; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
+  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
 
 private:
   void processFilter(
@@ -96,6 +97,8 @@ private:
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
   const bool payload_passthrough_;
+
+  const uint64_t max_requests_per_connection_{};
 };
 
 } // namespace ThriftProxy

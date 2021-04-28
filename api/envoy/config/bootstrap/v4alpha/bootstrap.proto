@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v4alpha;
 
+import "envoy/config/accesslog/v4alpha/accesslog.proto";
 import "envoy/config/cluster/v4alpha/cluster.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
@@ -19,7 +20,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -181,6 +181,7 @@ message Bootstrap {
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
+  // [#extension-category: envoy.guarddog_actions]
   Watchdogs watchdogs = 27;
 
   // Configuration for the runtime configuration provider. If not
@@ -233,6 +234,7 @@ message Bootstrap {
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
+  // [#extension-category: envoy.bootstrap]
   repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
 
   // Specifies optional extensions instantiated at startup time and
@@ -277,13 +279,17 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
+// [#next-free-field: 6]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Admin";
 
-  // The path to write the access log for the administration server. If no
-  // access log is desired specify ‘/dev/null’. This is only required if
-  // :ref:`address <envoy_api_field_config.bootstrap.v4alpha.Admin.address>` is set.
-  string access_log_path = 1;
+  reserved 1;
+
+  reserved "access_log_path";
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the administration server.
+  repeated accesslog.v4alpha.AccessLog access_log = 5;
 
   // The cpu profiler output path for the administration server. If no profile
   // path is specified, the default is ‘/var/log/envoy/envoy.prof’.

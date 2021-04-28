@@ -59,7 +59,7 @@ public:
   virtual bool supportsPathlessHeaders() const { return false; }
 };
 
-class PerFilterConfigs {
+class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
                    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
@@ -83,6 +83,9 @@ public:
   // Router::DirectResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                const StreamInfo::StreamInfo&) const override {}
+  Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+    return {};
+  }
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
@@ -220,7 +223,6 @@ private:
   struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
                         Stats::Scope& scope, const VirtualClusterStatNames& stat_names);
-
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
@@ -486,6 +488,8 @@ public:
                               bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
+  Http::HeaderTransforms
+  responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override;
   const Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
@@ -509,6 +513,7 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  bool usingNewTimeouts() const override { return using_new_timeouts_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
   }
@@ -583,6 +588,10 @@ protected:
   void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
 
+  absl::optional<std::string>
+  currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
+                                            absl::string_view matched_path) const;
+
 private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
@@ -601,6 +610,10 @@ private:
       return parent_->clusterNotFoundResponseCode();
     }
 
+    absl::optional<std::string>
+    currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override {
+      return parent_->currentUrlPathAfterRewrite(headers);
+    }
     void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
@@ -609,6 +622,10 @@ private:
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
       return parent_->finalizeResponseHeaders(headers, stream_info);
+    }
+    Http::HeaderTransforms
+    responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->responseHeaderTransforms(stream_info);
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
@@ -628,6 +645,7 @@ private:
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
       return parent_->idleTimeout();
     }
+    bool usingNewTimeouts() const override { return parent_->usingNewTimeouts(); }
     absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
       return parent_->max_stream_duration_;
     }
@@ -734,6 +752,8 @@ private:
       response_headers_parser_->evaluateHeaders(headers, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
+    Http::HeaderTransforms
+    responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override;
 
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
 
@@ -803,8 +823,8 @@ private:
   const std::string port_redirect_;
   const std::string path_redirect_;
   const bool path_redirect_has_query_;
-  const bool enable_preserve_query_in_path_redirects_;
   const bool https_redirect_;
+  const bool using_new_timeouts_;
   const std::string prefix_rewrite_redirect_;
   const bool strip_query_;
   const HedgePolicyImpl hedge_policy_;
@@ -863,6 +883,10 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap& headers,
                          bool insert_envoy_original_path) const override;
 
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
 private:
   const std::string prefix_;
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
@@ -889,6 +913,10 @@ public:
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
                          bool insert_envoy_original_path) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
   const std::string path_;
@@ -917,6 +945,10 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap& headers,
                          bool insert_envoy_original_path) const override;
 
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
 private:
   Regex::CompiledMatcherPtr regex_;
   std::string regex_str_;
@@ -942,6 +974,10 @@ public:
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
   bool supportsPathlessHeaders() const override { return true; }
 };
@@ -1025,6 +1061,10 @@ public:
     return most_specific_header_mutations_wins_;
   }
 
+  uint32_t maxDirectResponseBodySizeBytes() const override {
+    return max_direct_response_body_size_bytes_;
+  }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1034,6 +1074,7 @@ private:
   Stats::SymbolTable& symbol_table_;
   const bool uses_vhds_;
   const bool most_specific_header_mutations_wins_;
+  const uint32_t max_direct_response_body_size_bytes_;
 };
 
 /**
@@ -1059,6 +1100,7 @@ public:
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
   bool mostSpecificHeaderMutationsWins() const override { return false; }
+  uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

@@ -17,16 +17,26 @@ envoy_cc_fuzz_test(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//test/fuzz:utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
+JSON_TEST_DEPS = [
+    "//source/common/json:json_loader_lib",
+    "//source/common/stats:isolated_store_lib",
+    "//test/test_common:utility_lib",
+]
+
 envoy_cc_test(
     name = "json_loader_test",
     srcs = ["json_loader_test.cc"],
-    deps = [
-        "//source/common/json:json_loader_lib",
-        "//source/common/stats:isolated_store_lib",
-        "//test/test_common:utility_lib",
-    ],
+    args = ["--runtime-feature-override-for-tests=envoy.reloadable_features.remove_legacy_json"],
+    deps = JSON_TEST_DEPS,
+)
+
+envoy_cc_test(
+    name = "json_loader_legacy_test",
+    srcs = ["json_loader_test.cc"],
+    deps = JSON_TEST_DEPS,
 )

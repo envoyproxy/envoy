@@ -32,11 +32,19 @@ TEST(XdsContextParamsTest, NodeAll) {
     baz: 42
   )EOF",
                             node);
-  const auto context_params = XdsContextParams::encode(
-      node,
-      {"id", "cluster", "user_agent_name", "user_agent_version", "locality.region", "locality.zone",
-       "locality.sub_zone", "metadata"},
-      {}, {}, {});
+  const std::vector<std::string> params_vec{"id",
+                                            "cluster",
+                                            "user_agent_name",
+                                            "user_agent_version",
+                                            "locality.region",
+                                            "locality.zone",
+                                            "locality.sub_zone",
+                                            "metadata"};
+  Protobuf::RepeatedPtrField<std::string> node_context_params{params_vec.cbegin(),
+                                                              params_vec.cend()};
+
+  const auto context_params = XdsContextParams::encodeResource(
+      XdsContextParams::encodeNodeContext(node, node_context_params), {}, {}, {});
   EXPECT_CONTEXT_PARAMS(
       context_params, Pair("xds.node.cluster", "some_cluster"), Pair("xds.node.id", "some_id"),
       Pair("xds.node.locality.sub_zone", "some_sub_zone"),
@@ -64,8 +72,12 @@ TEST(XdsContextParamsTest, NodeParameterSelection) {
     baz: 42
   )EOF",
                             node);
-  const auto context_params = XdsContextParams::encode(
-      node, {"cluster", "user_agent_version", "locality.region", "locality.sub_zone"}, {}, {}, {});
+  const std::vector<std::string> params_vec{"cluster", "user_agent_version", "locality.region",
+                                            "locality.sub_zone"};
+  Protobuf::RepeatedPtrField<std::string> node_context_params{params_vec.cbegin(),
+                                                              params_vec.cend()};
+  const auto context_params = XdsContextParams::encodeResource(
+      XdsContextParams::encodeNodeContext(node, node_context_params), {}, {}, {});
   EXPECT_CONTEXT_PARAMS(context_params, Pair("xds.node.cluster", "some_cluster"),
                         Pair("xds.node.locality.sub_zone", "some_sub_zone"),
                         Pair("xds.node.locality.region", "some_region"),
@@ -87,8 +99,12 @@ TEST(XdsContextParamsTest, NodeUserAgentBuildVersion) {
       baz: 42
   )EOF",
                             node);
-  const auto context_params = XdsContextParams::encode(
-      node, {"user_agent_build_version.version", "user_agent_build_version.metadata"}, {}, {}, {});
+  const std::vector<std::string> params_vec{"user_agent_build_version.version",
+                                            "user_agent_build_version.metadata"};
+  Protobuf::RepeatedPtrField<std::string> node_context_params{params_vec.cbegin(),
+                                                              params_vec.cend()};
+  const auto context_params = XdsContextParams::encodeResource(
+      XdsContextParams::encodeNodeContext(node, node_context_params), {}, {}, {});
   EXPECT_CONTEXT_PARAMS(context_params,
                         Pair("xds.node.user_agent_build_version.metadata.bar", "\"a\""),
                         Pair("xds.node.user_agent_build_version.metadata.baz", "42"),
@@ -106,7 +122,7 @@ TEST(XdsContextParamsTest, ResoureContextParams) {
     baz: "true"
   )EOF",
                             resource_context_params);
-  const auto context_params = XdsContextParams::encode({}, {}, resource_context_params, {}, {});
+  const auto context_params = XdsContextParams::encodeResource({}, resource_context_params, {}, {});
   EXPECT_CONTEXT_PARAMS(context_params, Pair("bar", "123"), Pair("baz", "true"),
                         Pair("foo", "\"some_string\""));
 }
@@ -114,7 +130,7 @@ TEST(XdsContextParamsTest, ResoureContextParams) {
 // Validate client feature capabilities context parameter transform.
 TEST(XdsContextParamsTest, ClientFeatureCapabilities) {
   const auto context_params =
-      XdsContextParams::encode({}, {}, {}, {"some.feature", "another.feature"}, {});
+      XdsContextParams::encodeResource({}, {}, {"some.feature", "another.feature"}, {});
   EXPECT_CONTEXT_PARAMS(context_params, Pair("xds.client_feature.another.feature", "true"),
                         Pair("xds.client_feature.some.feature", "true"));
 }
@@ -122,7 +138,7 @@ TEST(XdsContextParamsTest, ClientFeatureCapabilities) {
 // Validate per-resource well-known attributes transform.
 TEST(XdsContextParamsTest, ResourceWktAttribs) {
   const auto context_params =
-      XdsContextParams::encode({}, {}, {}, {}, {{"foo", "1"}, {"bar", "2"}});
+      XdsContextParams::encodeResource({}, {}, {}, {{"foo", "1"}, {"bar", "2"}});
   EXPECT_CONTEXT_PARAMS(context_params, Pair("xds.resource.foo", "1"),
                         Pair("xds.resource.bar", "2"));
 }
@@ -142,8 +158,12 @@ TEST(XdsContextParamsTest, Layering) {
     xds.node.cluster: another_cluster
   )EOF",
                             resource_context_params);
-  const auto context_params = XdsContextParams::encode(
-      node, {"id", "cluster"}, resource_context_params, {"id"}, {{"cluster", "huh"}});
+  const std::vector<std::string> params_vec{"id", "cluster"};
+  Protobuf::RepeatedPtrField<std::string> node_context_params{params_vec.cbegin(),
+                                                              params_vec.cend()};
+  const auto context_params = XdsContextParams::encodeResource(
+      XdsContextParams::encodeNodeContext(node, node_context_params), resource_context_params,
+      {"id"}, {{"cluster", "huh"}});
   EXPECT_CONTEXT_PARAMS(context_params, Pair("id", "another_id"),
                         Pair("xds.client_feature.id", "true"),
                         Pair("xds.node.cluster", "another_cluster"), Pair("xds.node.id", "some_id"),
