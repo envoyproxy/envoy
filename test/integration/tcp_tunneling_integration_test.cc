@@ -350,7 +350,14 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStrippingLegacy) {
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStripping) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) { hcm.set_strip_any_host_port(true); });
+              hcm) {
+        hcm.set_strip_any_host_port(true);
+        auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_request_headers_to_add()->Add();
+        auto* mutable_header = header_value_option->mutable_header();
+        mutable_header->set_key("Host-In-Envoy");
+        mutable_header->set_value("%REQ(:AUTHORITY)%");
+      });
 
   initialize();
 
@@ -370,11 +377,13 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStripping) {
   EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
   EXPECT_EQ(upstream_request_->headers().getHostValue(), "host:80");
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
+    EXPECT_TRUE(upstream_request_->headers().getProtocolValue().empty());
   } else {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
-              "bytestream");
+    EXPECT_EQ(upstream_request_->headers().getProtocolValue(), "bytestream");
   }
+  auto stripped_host = upstream_request_->headers().get(Http::LowerCaseString("host-in-envoy"));
+  ASSERT_EQ(stripped_host.size(), 1);
+  EXPECT_EQ(stripped_host[0]->value(), "host");
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);
