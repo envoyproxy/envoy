@@ -711,13 +711,14 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "REQUEST_TX_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          auto last_received = stream_info.lastDownstreamRxByteReceived();
-          auto last_sent = stream_info.lastDownstreamTxByteSent();
+          auto received = stream_info.lastDownstreamRxByteReceived();
+          auto sent = stream_info.lastDownstreamTxByteSent();
 
           absl::optional<std::chrono::nanoseconds> result;
-          if (last_received && last_sent) {
-            result = last_sent.value() - last_received.value();
+          if (received && sent) {
+            result = sent.value() - received.value();
           }
+          
           return result;
         });
   } else if (field_name == "RESPONSE_TX_DURATION") {
