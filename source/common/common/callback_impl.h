@@ -86,6 +86,7 @@ private:
 
 /**
  * Utility class for managing callbacks. Thread-safe.
+ * @see CallbackManager
  */
 template <typename... CallbackArgs> class ThreadSafeCallbackManager {
 public:

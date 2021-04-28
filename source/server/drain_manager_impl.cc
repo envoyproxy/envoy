@@ -76,13 +76,16 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   }
 
   // Call registered on-drain callbacks - with gradual delays
+  // Note: This will distribute drain events in the first 1/4th of the drain window
+  //       to ensure that we do not initiate draining with enough time for graceful
+  //       shutdowns.
   const MonotonicTime current_time = server_.dispatcher().timeSource().monotonicTime();
   const auto remaining_time =
       std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
   ASSERT(server_.options().drainTime() >= remaining_time);
 
   const auto time_step =
-      std::chrono::duration_cast<std::chrono::milliseconds>(remaining_time) / cbs_.size();
+      std::chrono::duration_cast<std::chrono::milliseconds>(remaining_time) / cbs_.size() / 4;
   uint32_t step_count = 0;
   cbs_.runCallbacksWith(
       [&](Common::ThreadSafeCallbackManager<std::chrono::milliseconds>::Callback cb) {
