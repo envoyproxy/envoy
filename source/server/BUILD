@@ -171,6 +171,7 @@ envoy_cc_library(
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:callback_impl_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],

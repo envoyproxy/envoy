@@ -407,6 +407,8 @@ envoy_cc_library(
     hdrs = ["callback_impl.h"],
     deps = [
         ":assert_lib",
+        ":lock_guard_lib",
+        ":thread_lib",
         "//include/envoy/common:callback",
     ],
 )

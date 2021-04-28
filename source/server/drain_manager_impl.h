@@ -1,14 +1,17 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 
 #include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 
 #include "common/common/logger.h"
+#include "common/common/callback_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -25,6 +28,7 @@ public:
 
   // Network::DrainDecision
   bool drainClose() const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) override;
 
   // Server::DrainManager
   void startDrainSequence(std::function<void()> drain_complete_cb) override;
@@ -38,6 +42,7 @@ private:
   std::atomic<bool> draining_{false};
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;
+  Common::ThreadSafeCallbackManager<std::chrono::milliseconds> cbs_;
 
   Event::TimerPtr parent_shutdown_timer_;
 };

@@ -52,15 +52,43 @@ bool DrainManagerImpl::drainClose() const {
          (server_.api().randomGenerator().random() % server_.options().drainTime().count());
 }
 
+Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) {
+  return cbs_.add(cb);
+}
+
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
   ASSERT(drain_complete_cb);
   ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
   draining_ = true;
+
+  // Schedule callback to run at end of drain time
   drain_tick_timer_ = server_.dispatcher().createTimer(drain_complete_cb);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
   drain_deadline_ = server_.dispatcher().timeSource().monotonicTime() + drain_delay;
+
+  // Call registered on-drain callbacks - immediately
+  if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
+    std::chrono::milliseconds no_delay{0};
+    cbs_.runCallbacks(no_delay);
+    return;
+  }
+
+  // Call registered on-drain callbacks - with gradual delays
+  const MonotonicTime current_time = server_.dispatcher().timeSource().monotonicTime();
+  const auto remaining_time =
+      std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
+  ASSERT(server_.options().drainTime() >= remaining_time);
+
+  const auto time_step =
+      std::chrono::duration_cast<std::chrono::milliseconds>(remaining_time) / cbs_.size();
+  uint32_t step_count = 0;
+  cbs_.runCallbacksWith(
+      [&](Common::ThreadSafeCallbackManager<std::chrono::milliseconds>::Callback cb) {
+        cb(time_step * step_count);
+        step_count++;
+      });
 }
 
 void DrainManagerImpl::startParentShutdownSequence() {
