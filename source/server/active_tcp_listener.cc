@@ -7,6 +7,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/assert.h"
 #include "common/event/deferred_task.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
@@ -214,7 +215,7 @@ void ActiveTcpSocket::newConnection() {
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   if (listenerConnectionLimitReached()) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr);
+    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
     ENVOY_LOG(trace, "closing connection from {}: listener connection limit reached for {}",
               socket->addressProvider().remoteAddress()->asString(), config_->name());
     socket->close();
@@ -293,7 +294,7 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr);
+    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
     ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
               socket->addressProvider().remoteAddress()->asString());
     stats_.no_filter_chain_match_.inc();
@@ -320,7 +321,7 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
                               parent_.dispatcher().timeSource(), std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
 
-  RELEASE_ASSERT(active_connection->connection_->addressProvider().remoteAddress() != nullptr);
+  RELEASE_ASSERT(active_connection->connection_->addressProvider().remoteAddress() != nullptr, "");
 
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *active_connection->connection_, filter_chain->networkFilterFactories());
