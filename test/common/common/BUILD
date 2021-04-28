@@ -390,9 +390,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_test",
     srcs = ["version_test.cc"],
-    copts = envoy_select_boringssl(
-        ["-DENVOY_SSL_FIPS"],
-    ),
+    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     external_deps = [
         "abseil_strings",
     ],
