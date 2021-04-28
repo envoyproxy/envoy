@@ -81,7 +81,7 @@ public:
     // stream will be spuriously unblocked and call OnDataAvailable(). This call shouldn't take any
     // effect because any available data should have been processed already upon arrival or they
     // were blocked by some condition other than flow control, i.e. Qpack decoding.
-    async_stream_blockage_change_->scheduleCallbackCurrentIteration();
+    async_stream_blockage_change_->scheduleCallbackNextIteration();
   }
 
   void addCallbacks(Http::StreamCallbacks& callbacks) override {
