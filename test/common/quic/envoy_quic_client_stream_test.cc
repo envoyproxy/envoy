@@ -588,7 +588,7 @@ TEST_P(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
         EXPECT_EQ("200", headers->getStatusValue());
         quic_stream_->readDisable(true);
       }));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+  if (quic_version_.UsesHttp3()) {
     EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
     std::string payload = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
     quic::QuicStreamFrame frame(stream_id_, true, 0, payload);

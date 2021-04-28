@@ -159,10 +159,9 @@ private:
   EnvoyQuicSimulatedWatermarkBuffer send_buffer_simulation_;
 
   QuicFilterManagerConnectionImpl& filter_manager_connection_;
-  // Used to block or unblock stream at the end of current event loop. QUICHE
-  // doesn't like stream blockage state change in its own call stack. And Envoy upstream doesn't
-  // like quic stream to be unblocked in its callstack either because the stream will push data
-  // right away.
+  // Used to block or unblock stream in the next event loop. QUICHE doesn't like stream blockage
+  // state change in its own call stack. And Envoy upstream doesn't like quic stream to be unblocked
+  // in its callstack either because the stream will push data right away.
   Event::SchedulableCallbackPtr async_stream_blockage_change_;
 };
 
