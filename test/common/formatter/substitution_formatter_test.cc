@@ -223,9 +223,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     absl::optional<std::chrono::nanoseconds> dur_downstream = std::chrono::nanoseconds(25000000);
     EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
-    EXPECT_EQ("15", ttlb_duration_format.format(request_headers, response_headers,
+    EXPECT_EQ("15", reqst_tx_duration_format.format(request_headers, response_headers,
                                                 response_trailers, stream_info, body));
-    EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
+    EXPECT_THAT(reqst_tx_duration_format.formatValue(request_headers, response_headers,
                                                  response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::numberValue(15.0)));
   }
@@ -238,9 +238,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     absl::optional<std::chrono::nanoseconds> dur_downstream;
     EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
-    EXPECT_EQ(absl::nullopt, ttlb_duration_format.format(request_headers, response_headers,
+    EXPECT_EQ(absl::nullopt, reqst_tx_duration_format.format(request_headers, response_headers,
                                                          response_trailers, stream_info, body));
-    EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
+    EXPECT_THAT(reqst_tx_duration_format.formatValue(request_headers, response_headers,
                                                  response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
