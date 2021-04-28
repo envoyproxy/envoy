@@ -129,6 +129,12 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
 }
 
 void EnvoyQuicServerStream::switchStreamBlockState() {
+  // From when the callback got scheduled till now, readDisable() might have blocked and unblocked
+  // the stream multiple times, but those actions haven't taken any effect yet, and only the last
+  // state of read_disable_counter_ determines whether to unblock or block the quic stream.
+  // Unlike Envoy readDisable() the quic stream gets blocked/unblocked based on the most recent
+  // call. So a stream will be blocked upon SetBlockedUntilFlush() no matter how many times
+  // SetUnblocked() was called before, and vice versa.
   if (read_disable_counter_ > 0) {
     sequencer()->SetBlockedUntilFlush();
   } else {
