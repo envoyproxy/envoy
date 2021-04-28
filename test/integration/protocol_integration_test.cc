@@ -500,7 +500,6 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
 }
 
 TEST_P(ProtocolIntegrationTest, Retry) {
-  EXCLUDE_UPSTREAM_HTTP3; // flakes with CHECK failed: (max_plaintext_size_) >= (PacketSize()).
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -552,7 +551,6 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
-  EXCLUDE_UPSTREAM_HTTP3; // flakes with CHECK failed: (max_plaintext_size_) >= (PacketSize()).
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -610,7 +608,6 @@ TEST_P(ProtocolIntegrationTest, RetryStreaming) {
 // sure that Envoy cleans up stream state correctly when doing a retry with
 // complete response but incomplete request.
 TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
-  EXCLUDE_UPSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -730,7 +727,6 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
 // downstream response, and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
-  EXCLUDE_UPSTREAM_HTTP3;
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
   host.set_include_attempt_count_in_response(true);
@@ -780,7 +776,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
     // TODO(alyssawilk) investigate why this combination doesn't work.
     return;
   }
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // Timed out waiting for new stream.
   const Upstream::HealthyLoad healthy_priority_load({0u, 100u});
   const Upstream::DegradedLoad degraded_priority_load({0u, 100u});
   NiceMock<Upstream::MockRetryPriority> retry_priority(healthy_priority_load,
@@ -853,7 +849,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
 // the same host. With a total of two upstream hosts, this should result in us continuously sending
 // requests to the same host.
 TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
-  EXCLUDE_UPSTREAM_HTTP3;
   TestHostPredicateFactory predicate_factory;
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
@@ -1578,11 +1573,25 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
   testLargeRequestHeaders(95, 1, 60, 100);
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
+  EXCLUDE_DOWNSTREAM_HTTP3
+  EXCLUDE_UPSTREAM_HTTP3;
+  // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
+  testLargeRequestHeaders(2048, 1, 1024, 100);
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3; // requires configurable header limits.
-  // Send one 95 kB header with limit 96 kB and 100 headers.
-  testLargeRequestHeaders(95, 1, 96, 100);
+  // Send one 100 kB header with limit 8192 kB (8 MB) and 100 headers.
+  testLargeRequestHeaders(100, 1, 8192, 100);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
+  EXCLUDE_DOWNSTREAM_HTTP3
+  EXCLUDE_UPSTREAM_HTTP3;
+  // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
+  testLargeRequestHeaders(100, 70, 8192, 100);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {
@@ -2304,25 +2313,6 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-}
-
-TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_500_after_100", "false");
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  ASSERT_TRUE(fake_upstream_connection_->close());
-
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-    EXPECT_FALSE(response->complete());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    EXPECT_FALSE(response->complete());
-  }
 }
 
 } // namespace Envoy
