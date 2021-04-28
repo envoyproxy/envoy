@@ -27,9 +27,8 @@ void IpTaggingFilterStats::incCounter(Stats::StatName name) {
 
 IpTaggingFilterStats::~IpTaggingFilterStats() = default;
 
-LcTrieWithStats::LcTrieWithStats(
-    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
-    Stats::Scope& scope, const std::string& stats_prefix)
+LcTrieWithStats::LcTrieWithStats(const TrieVector& trie, Stats::Scope& scope,
+                                 const std::string& stats_prefix)
     : trie_(trie), filter_stats_(scope, stats_prefix) {
 
   std::vector<std::string> all_tags;
@@ -37,7 +36,7 @@ LcTrieWithStats::LcTrieWithStats(
                  [](const auto& pair) { return pair.first; });
 
   for (const std::string& tag : all_tags) {
-    filter_stats_.setTags(tag);
+    filter_stats_.checkTag(tag);
   }
 }
 
@@ -78,20 +77,19 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   if (!config.path().empty()) {
-    watcher_ = TagSetWatcher::create(factory_context, config.path(), scope, stat_prefix);
+    std::shared_ptr<const TagSetWatcher> watcherPtr =
+        TagSetWatcher::create(factory_context, config.path(), scope, stat_prefix);
 
-    std::shared_ptr<const TagSetWatcher> watcherPtr = watcher_;
     resolver_ = [watcherPtr](const Network::Address::InstanceConstSharedPtr& address) {
       return watcherPtr->get()->resolveTagsForIpAddress(address);
     };
 
   } else if (!config.ip_tags().empty()) {
     const IPTagsProto tags = config.ip_tags();
-    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
-        IpTaggingFilterSetTagData(tags);
-    triestat_ = std::make_shared<LcTrieWithStats>(tag_data, scope, stat_prefix);
+    TrieVector tag_data = IpTaggingFilterSetTagData(tags);
 
-    std::shared_ptr<LcTrieWithStats> trieStatPtr = triestat_;
+    std::shared_ptr<LcTrieWithStats> trieStatPtr =
+        std::make_shared<LcTrieWithStats>(tag_data, scope, stat_prefix);
     resolver_ = [trieStatPtr](const Network::Address::InstanceConstSharedPtr& address) {
       return trieStatPtr->resolveTagsForIpAddress(address);
     };
@@ -102,10 +100,9 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 }
 
-std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
+TrieVector IpTaggingFilterConfig::IpTaggingFilterSetTagData(const IPTagsProto& ip_tags) {
 
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+  TrieVector tag_data;
   tag_data.reserve(ip_tags.size());
 
   for (const auto& ip_tag : ip_tags) {
@@ -143,7 +140,7 @@ TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_cont
                              Stats::Scope& scope, const std::string& stat_prefix)
     : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()), scope_(scope),
       stat_prefix_(stat_prefix), factory_context_(factory_context),
-      yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
+      yaml_(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
 
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
   watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
@@ -163,34 +160,32 @@ void TagSetWatcher::maybeUpdate_(bool force) {
     update_(std::move(contents), hash);
 }
 
-void TagSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
+void TagSetWatcher::update_(const std::string& contents, std::uint64_t hash) {
   std::shared_ptr<LcTrieWithStats> new_values = fileContentsAsTagSet_(contents);
 
-  new_values.swap(triestat_); // Fastest way to replace the values.
+  triestat_ = std::move(new_values);
   content_hash_ = hash;
 }
 
 // Validate and parse both yaml and json file content to proto.
-IpTagFileProto TagSetWatcher::protoFromFileContents_(absl::string_view contents) const {
-  const std::string file_content = std::string(contents);
+IpTagFileProto TagSetWatcher::protoFromFileContents_(const std::string& contents) const {
   IpTagFileProto ipf;
 
-  if (yaml) {
-    MessageUtil::loadFromYaml(file_content, ipf, protoValidator());
+  if (yaml_) {
+    MessageUtil::loadFromYaml(contents, ipf, protoValidator());
   } else {
-    MessageUtil::loadFromJson(file_content, ipf, protoValidator());
+    MessageUtil::loadFromJson(contents, ipf, protoValidator());
   }
   return ipf;
 }
 
 // take proto content and convert it into LcTrie with stats
 std::shared_ptr<LcTrieWithStats>
-TagSetWatcher::fileContentsAsTagSet_(absl::string_view contents) const {
+TagSetWatcher::fileContentsAsTagSet_(const std::string& contents) const {
 
   IpTagFileProto proto_content = protoFromFileContents_(contents);
 
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
-      IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
+  TrieVector tag_data = IpTaggingFilterConfig::IpTaggingFilterSetTagData(proto_content.ip_tags());
 
   return std::make_shared<LcTrieWithStats>(tag_data, scope_, stat_prefix_);
 }
@@ -214,14 +209,14 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
-  std::vector<std::string> tags = config_->getResolver()(callbacks_->streamInfo().downstreamRemoteAddress());
+  std::vector<std::string> tags =
+      config_->getResolver()(callbacks_->streamInfo().downstreamRemoteAddress());
   if (!tags.empty()) {
-  headers.appendEnvoyIpTags(
-      absl::StrJoin(tags, ","), ",");
-  }
+    headers.appendEnvoyIpTags(absl::StrJoin(tags, ","), ",");
 
-  // We must clear the route cache or else we can't match on x-envoy-ip-tags.
-  callbacks_->clearRouteCache();
+    // We must clear the route cache or else we can't match on x-envoy-ip-tags.
+    callbacks_->clearRouteCache();
+  }
 
   return Http::FilterHeadersStatus::Continue;
 }

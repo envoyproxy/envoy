@@ -34,6 +34,9 @@ namespace IpTagging {
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
 using IPTagsProto =
     Protobuf::RepeatedPtrField<::envoy::extensions::filters::http::ip_tagging::v3::IPTagging_IPTag>;
+using TrieVector = std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>;
+using TagResolverFn =
+    std::function<std::vector<std::string>(const Network::Address::InstanceConstSharedPtr&)>;
 
 /**
  * Class that manages setting all the stats for this filter.
@@ -48,11 +51,12 @@ public:
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
   }
 
-  void setTags(absl::string_view tag) {
+  void checkTag(absl::string_view tag) {
     stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
   }
 
   void incNoHit() { incCounter(no_hit_); }
+
   void incTotal() { incCounter(total_); }
 
   ~IpTaggingFilterStats();
@@ -75,9 +79,7 @@ private:
 class LcTrieWithStats {
 
 public:
-  LcTrieWithStats(
-      std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>& trie,
-      Stats::Scope& scope, const std::string& stats_prefix);
+  LcTrieWithStats(const TrieVector& trie, Stats::Scope& scope, const std::string& stats_prefix);
 
   std::vector<std::string>
   resolveTagsForIpAddress(const Network::Address::InstanceConstSharedPtr& Ipaddress);
@@ -121,28 +123,23 @@ private:
   }
 
   void maybeUpdate_(bool force = false);
-  void update_(absl::string_view content, std::uint64_t hash);
 
-  std::shared_ptr<LcTrieWithStats> fileContentsAsTagSet_(absl::string_view contents) const;
+  void update_(const std::string& contents, std::uint64_t hash);
 
-  IpTagFileProto protoFromFileContents_(absl::string_view contents) const;
+  std::shared_ptr<LcTrieWithStats> fileContentsAsTagSet_(const std::string& contents) const;
+
+  IpTagFileProto protoFromFileContents_(const std::string& contents) const;
 
   Api::Api& api_;
   std::string filename_;
-  std::string extension_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   Stats::Scope& scope_;
   const std::string stat_prefix_;
   std::uint64_t content_hash_ = 0;
-  Server::Configuration::FactoryContext& factory_context_;
   std::shared_ptr<LcTrieWithStats> triestat_;
-
-protected:
-  bool yaml;
+  Server::Configuration::FactoryContext& factory_context_;
+  bool yaml_;
 };
-
-using TagResolverFn =
-    std::function<std::vector<std::string>(const Network::Address::InstanceConstSharedPtr&)>;
 
 /**
  * Type of requests the filter should apply to.
@@ -160,10 +157,11 @@ public:
                         Envoy::Server::Configuration::FactoryContext& factory_context);
 
   Runtime::Loader& runtime() { return runtime_; }
+
   FilterRequestType requestType() const { return request_type_; }
 
-  static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-  IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);
+  static TrieVector IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);
+
   TagResolverFn getResolver() { return resolver_; };
 
 private:
@@ -185,8 +183,6 @@ private:
 
   const FilterRequestType request_type_;
   Runtime::Loader& runtime_;
-  std::shared_ptr<const TagSetWatcher> watcher_;
-  std::shared_ptr<LcTrieWithStats> triestat_;
   TagResolverFn resolver_;
 };
 
