@@ -97,13 +97,13 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   setupTraceSegmentReporter("{}");
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(23333));
 
-  SegmentContextPtr segment_context =
+  TracingContextPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE");
-  CurrentSegmentSpanPtr parent_store =
+  TracingSpanPtr parent_store =
       SkyWalkingTestHelper::createSpanStore(segment_context, nullptr, "PARENT");
 
   // Skip reporting the first child span.
-  CurrentSegmentSpanPtr first_child_sptore =
+  TracingSpanPtr first_child_sptore =
       SkyWalkingTestHelper::createSpanStore(segment_context, parent_store, "CHILD", false);
 
   // Create second child span.
@@ -119,7 +119,7 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // Create a segment context with no previous span context.
-  SegmentContextPtr second_segment_context =
+  TracingContextPtr second_segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "SECOND_SEGMENT", "");
   SkyWalkingTestHelper::createSpanStore(second_segment_context, nullptr, "PARENT");
 
@@ -136,9 +136,9 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
   setupTraceSegmentReporter("{}");
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(23333));
 
-  SegmentContextPtr segment_context =
+  TracingContextPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE");
-  CurrentSegmentSpanPtr parent_store =
+  TracingSpanPtr parent_store =
       SkyWalkingTestHelper::createSpanStore(segment_context, nullptr, "PARENT");
   SkyWalkingTestHelper::createSpanStore(segment_context, parent_store, "CHILD");
 
@@ -186,9 +186,9 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
 
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(23333));
 
-  SegmentContextPtr segment_context =
+  TracingContextPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE");
-  CurrentSegmentSpanPtr parent_store =
+  TracingSpanPtr parent_store =
       SkyWalkingTestHelper::createSpanStore(segment_context, nullptr, "PARENT");
   SkyWalkingTestHelper::createSpanStore(segment_context, parent_store, "CHILD");
 
@@ -231,7 +231,7 @@ TEST_F(TraceSegmentReporterTest, CallAsyncCallbackAndNothingTodo) {
   setupTraceSegmentReporter("{}");
   reporter_->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
   reporter_->onReceiveTrailingMetadata(std::make_unique<Http::TestResponseTrailerMapImpl>());
-  reporter_->onReceiveMessage(std::make_unique<Commands>());
+  reporter_->onReceiveMessage(std::make_unique<skywalking::v3::Commands>());
 }
 
 } // namespace

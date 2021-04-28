@@ -88,11 +88,11 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     Span* span = dynamic_cast<Span*>(org_span.get());
     ASSERT(span);
 
-    EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->service());
-    EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->serviceInstance());
+    EXPECT_EQ("FAKE_FAKE_FAKE", span->tracingContext()->service());
+    EXPECT_EQ("FAKE_FAKE_FAKE", span->tracingContext()->serviceInstance());
 
     // Tracing decision will be overwrite by skip analysis flag in propagation headers.
-    EXPECT_FALSE(span->segmentContext()->skipAnalysis());
+    EXPECT_FALSE(span->tracingContext()->skipAnalysis());
 
     // Since the sampling flag is false, no segment data is reported.
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
@@ -112,7 +112,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     Span* span = dynamic_cast<Span*>(org_span.get());
     ASSERT(span);
 
-    EXPECT_FALSE(span->segmentContext()->skipAnalysis());
+    EXPECT_FALSE(span->tracingContext()->skipAnalysis());
 
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
@@ -147,7 +147,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     Span* new_span = dynamic_cast<Span*>(span.get());
     ASSERT(new_span);
 
-    EXPECT_TRUE(new_span->segmentContext()->skipAnalysis());
+    EXPECT_TRUE(new_span->tracingContext()->skipAnalysis());
 
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
@@ -175,8 +175,8 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
   Span* span = dynamic_cast<Span*>(org_span.get());
   ASSERT(span);
 
-  EXPECT_EQ(test_string, span->segmentContext()->service());
-  EXPECT_EQ(test_string, span->segmentContext()->serviceInstance());
+  EXPECT_EQ(test_string, span->tracingContext()->service());
+  EXPECT_EQ(test_string, span->tracingContext()->serviceInstance());
 }
 
 } // namespace

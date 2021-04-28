@@ -81,7 +81,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   {
     Span* span = dynamic_cast<Span*>(org_span.get());
 
-    EXPECT_TRUE(span->spanEntity()->spanType() == SpanType::Entry);
+    EXPECT_TRUE(span->spanEntity()->spanType() == skywalking::v3::SpanType::Entry);
     EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
     span->setOperation("FakeStringAndNothingToDo");
     span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
@@ -130,7 +130,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     Span* first_child_span = dynamic_cast<Span*>(org_first_child_span.get());
 
-    EXPECT_TRUE(first_child_span->spanEntity()->spanType() == SpanType::Exit);
+    EXPECT_TRUE(first_child_span->spanEntity()->spanType() == skywalking::v3::SpanType::Exit);
 
     EXPECT_FALSE(first_child_span->spanEntity()->skipAnalysis());
     EXPECT_EQ(1, first_child_span->spanEntity()->spanId());
