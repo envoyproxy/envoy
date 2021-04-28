@@ -25,6 +25,8 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:timespan_lib",
+        "//source/common/common:shared_token_bucket_impl_lib",
         "//source/extensions/filters/http/common:stream_rate_limiter_lib",
         "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -35,6 +37,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.http",
     security_posture = "unknown",
     deps = [
         ":bandwidth_limit_lib",

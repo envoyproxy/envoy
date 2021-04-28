@@ -10,16 +10,16 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/common/assert.h"
-#include "common/common/token_bucket_impl.h"
+#include "common/common/shared_token_bucket_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/router/header_parser.h"
 #include "common/runtime/runtime_protos.h"
 
-#include "extensions/filters/http/common/stream_rate_limiter.h"
-
 #include "absl/synchronization/mutex.h"
+#include "extensions/filters/http/common/stream_rate_limiter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,18 +29,26 @@ namespace BandwidthLimitFilter {
 /**
  * All bandwidth limit stats. @see stats_macros.h
  */
-#define ALL_BANDWIDTH_LIMIT_STATS(COUNTER)                                                         \
-  COUNTER(enabled)                                                                                 \
-  COUNTER(enforced)                                                                                \
-  COUNTER(bandwidth_limited)                                                                       \
-  COUNTER(bandwidth_usage)                                                                         \
-  COUNTER(ok)
+#define ALL_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE, HISTOGRAM)                   \
+  COUNTER(decode_enabled)                                                      \
+  COUNTER(encode_enabled)                                                      \
+  COUNTER(decode_enforced)                                                     \
+  COUNTER(encode_enforced)                                                     \
+  GAUGE(decode_pending, Accumulate)                                            \
+  GAUGE(encode_pending, Accumulate)                                            \
+  GAUGE(decode_incoming_size, Accumulate)                                      \
+  GAUGE(encode_incoming_size, Accumulate)                                      \
+  GAUGE(decode_allowed_size, Accumulate)                                       \
+  GAUGE(encode_allowed_size, Accumulate)                                       \
+  HISTOGRAM(decode_transfer_duration, Milliseconds)                            \
+  HISTOGRAM(encode_transfer_duration, Milliseconds)
 
 /**
  * Struct definition for all bandwidth limit stats. @see stats_macros.h
  */
 struct BandwidthLimitStats {
-  ALL_BANDWIDTH_LIMIT_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_BANDWIDTH_LIMIT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                            GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -48,77 +56,88 @@ struct BandwidthLimitStats {
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
-  using EnableMode =
-      envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit_EnableMode;
+  using EnableMode = envoy::extensions::filters::http::bandwidth_limit::
+      v3alpha::BandwidthLimit_EnableMode;
 
-  static constexpr uint64_t MaxFillRate = 32;
-
-  FilterConfig(
-      const envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit& config,
-      Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
-      bool per_route = false);
+  FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::
+                   v3alpha::BandwidthLimit &config,
+               Stats::Scope &scope, Runtime::Loader &runtime,
+               TimeSource &time_source, bool per_route = false);
   ~FilterConfig() override = default;
-  Runtime::Loader& runtime() { return runtime_; }
-  BandwidthLimitStats& stats() const { return stats_; }
-  Stats::Scope& scope() { return scope_; }
-  TimeSource& timeSource() { return time_source_; }
+  Runtime::Loader &runtime() { return runtime_; }
+  BandwidthLimitStats &stats() const { return stats_; }
+  Stats::Scope &scope() { return scope_; }
+  TimeSource &timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
   uint64_t limit() const { return limit_kbps_; }
   EnableMode enable_mode() const { return enable_mode_; };
-  std::shared_ptr<TokenBucketImpl> tokenBucket() { return token_bucket_; }
-  const std::shared_ptr<TokenBucketImpl> tokenBucket() const { return token_bucket_; }
-  uint64_t fill_rate() const { return fill_rate_; }
+  std::shared_ptr<SharedTokenBucketImpl> tokenBucket() { return token_bucket_; }
+  const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const {
+    return token_bucket_;
+  }
+  std::chrono::milliseconds fill_interval() const { return fill_interval_; }
 
 private:
   friend class FilterTest;
 
-  static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  static BandwidthLimitStats generateStats(const std::string &prefix,
+                                           Stats::Scope &scope);
 
   mutable BandwidthLimitStats stats_;
-  Runtime::Loader& runtime_;
-  Stats::Scope& scope_;
-  TimeSource& time_source_;
+  Runtime::Loader &runtime_;
+  Stats::Scope &scope_;
+  TimeSource &time_source_;
   const uint64_t limit_kbps_;
   const EnableMode enable_mode_;
-  const uint64_t fill_rate_;
-  absl::Mutex mutex_;
+  const std::chrono::milliseconds fill_interval_;
   // Filter chain's shared token bucket
-  std::shared_ptr<TokenBucketImpl> token_bucket_ ABSL_GUARDED_BY(mutex_);
+  std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
- * HTTP bandwidth limit filter. Depending on the route configuration, this filter calls consults
- * with local token bucket before allowing further filter iteration.
+ * HTTP bandwidth limit filter. Depending on the route configuration, this
+ * filter calls consults with local token bucket before allowing further filter
+ * iteration.
  */
-class BandwidthLimiter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
+class BandwidthLimiter : public Http::StreamFilter,
+                         Logger::Loggable<Logger::Id::filter> {
 public:
   BandwidthLimiter(FilterConfigSharedPtr config) : config_(config) {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap &,
+                                          bool) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance &data,
+                                    bool end_stream) override;
+  Http::FilterTrailersStatus
+  decodeTrailers(Http::RequestTrailerMap &trailers) override;
 
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+  void setDecoderFilterCallbacks(
+      Http::StreamDecoderFilterCallbacks &callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus
+  encode100ContinueHeaders(Http::ResponseHeaderMap &) override {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap &,
+                                          bool) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance &data,
+                                    bool end_stream) override;
+  Http::FilterTrailersStatus
+  encodeTrailers(Http::ResponseTrailerMap &) override;
 
-  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap &) override {
     return Http::FilterMetadataStatus::Continue;
   }
 
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+  void setEncoderFilterCallbacks(
+      Http::StreamEncoderFilterCallbacks &callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
 
@@ -127,13 +146,20 @@ public:
 
 private:
   friend class FilterTest;
-  const FilterConfig* getConfig() const;
+  const FilterConfig *getConfig() const;
 
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  void updateStatsOnDecodeFinish();
+  void updateStatsOnEncodeFinish();
+
+  Http::StreamDecoderFilterCallbacks *decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks *encoder_callbacks_{};
   FilterConfigSharedPtr config_;
-  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> ingress_limiter_;
-  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> egress_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>
+      decode_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>
+      encode_limiter_;
+  Stats::TimespanPtr decode_latency_;
+  Stats::TimespanPtr encode_latency_;
 };
 
 } // namespace BandwidthLimitFilter
