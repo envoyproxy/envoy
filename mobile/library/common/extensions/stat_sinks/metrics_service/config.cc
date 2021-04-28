@@ -33,7 +33,8 @@ Stats::SinkPtr EnvoyMobileMetricsServiceSinkFactory::createStatsSink(
       envoymobile::extensions::stat_sinks::metrics_service::EnvoyMobileStreamMetricsMessage,
       envoymobile::extensions::stat_sinks::metrics_service::EnvoyMobileStreamMetricsResponse>>(
       grpc_metrics_streamer,
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false));
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false),
+      sink_config.emit_tags_as_labels());
 }
 
 ProtobufTypes::MessagePtr EnvoyMobileMetricsServiceSinkFactory::createEmptyConfigProto() {
