@@ -435,18 +435,19 @@ public:
           // link time.
           src_listener_config.add_listener_filters()->set_name(
               "envoy.filters.listener.original_dst");
-          auto& dst_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
-          dst_listener_config = src_listener_config;
-          dst_listener_config.mutable_use_original_dst()->set_value(false);
-          dst_listener_config.clear_listener_filters();
-          dst_listener_config.mutable_bind_to_port()->set_value(false);
-          dst_listener_config.set_name("balanced_target_listener");
-          dst_listener_config.mutable_connection_balance_config()->mutable_exact_balance();
+          auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
+          virtual_listener_config = src_listener_config;
+          virtual_listener_config.mutable_use_original_dst()->set_value(false);
+          virtual_listener_config.clear_listener_filters();
+          virtual_listener_config.mutable_bind_to_port()->set_value(false);
+          virtual_listener_config.set_name("balanced_target_listener");
+          virtual_listener_config.mutable_connection_balance_config()->mutable_exact_balance();
 
-          // 127.0.0.2 is defined in FakeOriginalDstListenerFilter.
-          *dst_listener_config.mutable_address()->mutable_socket_address()->mutable_address() =
+          // 127.0.0.2 is defined in FakeOriginalDstListenerFilter. This virtual listener does not
+          // listen on a passive socket so it's safe to use any ip address.
+          *virtual_listener_config.mutable_address()->mutable_socket_address()->mutable_address() =
               "127.0.0.2";
-          dst_listener_config.mutable_address()->mutable_socket_address()->set_port_value(80);
+          virtual_listener_config.mutable_address()->mutable_socket_address()->set_port_value(80);
         });
     BaseIntegrationTest::initialize();
   }
