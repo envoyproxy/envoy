@@ -2,9 +2,9 @@ package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
+import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
-
 import java.util.Map;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
@@ -14,15 +14,18 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   private static final int ENVOY_FAILURE = 1;
 
   private final long engineHandle;
-  private EnvoyOnEngineRunning onEngineRunning = () -> { return null; };
+  private EnvoyOnEngineRunning onEngineRunning;
+  private EnvoyLogger logger;
 
   /**
    * @param runningCallback Called when the engine finishes its async startup and begins running.
+   * @param logger          The logging interface.
    */
-  public EnvoyEngineImpl(EnvoyOnEngineRunning runningCallback) {
+  public EnvoyEngineImpl(EnvoyOnEngineRunning runningCallback, EnvoyLogger logger) {
     JniLibrary.load();
     this.onEngineRunning = runningCallback;
-    this.engineHandle = JniLibrary.initEngine(runningCallback);
+    this.logger = logger;
+    this.engineHandle = JniLibrary.initEngine(onEngineRunning, logger);
   }
 
   /**

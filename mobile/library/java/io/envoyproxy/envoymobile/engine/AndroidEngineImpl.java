@@ -2,6 +2,7 @@ package io.envoyproxy.envoymobile.engine;
 
 import android.content.Context;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
+import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
@@ -14,8 +15,9 @@ public class AndroidEngineImpl implements EnvoyEngine {
   /**
    * @param runningCallback Called when the engine finishes its async startup and begins running.
    */
-  public AndroidEngineImpl(Context context, EnvoyOnEngineRunning runningCallback) {
-    this.envoyEngine = new EnvoyEngineImpl(runningCallback);
+  public AndroidEngineImpl(Context context, EnvoyOnEngineRunning runningCallback,
+                           EnvoyLogger logger) {
+    this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger);
     AndroidJniLibrary.load(context);
     AndroidNetworkMonitor.load(context, envoyEngine);
   }
@@ -41,7 +43,10 @@ public class AndroidEngineImpl implements EnvoyEngine {
     return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }
 
-  public void terminate() { envoyEngine.terminate(); }
+  @Override
+  public void terminate() {
+    envoyEngine.terminate();
+  }
 
   @Override
   public int recordCounterInc(String elements, Map<String, String> tags, int count) {
