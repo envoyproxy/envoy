@@ -148,7 +148,6 @@ TEST_P(WasmVmTest, V8Code) {
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
   EXPECT_TRUE(wasm_vm->load(code, GetParam()));
 
-  // Sanity checks for the expected test file.
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm->clone() != nullptr);
 }
