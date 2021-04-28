@@ -18,9 +18,12 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#extension: envoy.transport_sockets.starttls]
 
 // StartTls transport socket addresses situations when a protocol starts in clear-text and
-// negotiates an in-band switch to TLS. StartTls transport socket is protocol agnostic and requires
-// a network filter which understands protocol exchange and a state machine to signal to the StartTls
-// transport socket when a switch to TLS is required.
+// negotiates an in-band switch to TLS. StartTls transport socket is protocol agnostic. In the
+// case of downstream StartTls a network filter is required which understands protocol exchange
+// and a state machine to signal to the StartTls transport socket when a switch to TLS is
+// required. Similarly, upstream StartTls requires the owner of an upstream transport socket to
+// manage the state machine necessary to properly coordinate negotiation with the upstream and
+// signal to the transport socket when a switch to secure transport is required.
 
 // Configuration for a downstream StartTls transport socket.
 // StartTls transport socket wraps two sockets:
