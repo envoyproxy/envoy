@@ -1621,6 +1621,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
