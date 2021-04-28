@@ -13,6 +13,7 @@ HTTP filters
   buffer_filter
   cdn_loop_filter
   compressor_filter
+  composite_filter
   cors_filter
   csrf_filter
   decompressor_filter

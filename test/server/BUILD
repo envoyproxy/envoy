@@ -300,7 +300,6 @@ envoy_cc_test(
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
-        "//source/common/quic:quic_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -354,6 +353,7 @@ envoy_cc_fuzz_test(
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:gcc_build": [],
         "//conditions:default": envoy_all_extensions(),
     }),
 )

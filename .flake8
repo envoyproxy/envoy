@@ -1,0 +1,8 @@
+
+[flake8]
+
+# TODO(phlax): ignore less
+ignore = W503,W504,E121,E126,E241,E125,E127,E129,E251,E265,E303,E306,E402,E501,E502,E711,E713,E722,E741,F523,F541,F841,N803,N806,N817,W605
+
+# TODO(phlax): exclude less
+exclude = build_docs,.git,generated,test,examples,venv

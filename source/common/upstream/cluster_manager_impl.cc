@@ -28,7 +28,6 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/http/http3/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
@@ -45,6 +44,11 @@
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/http/conn_pool_grid.h"
+#include "common/http/http3/conn_pool.h"
+#endif
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -54,6 +58,18 @@ void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
   if (to_add != nullptr) {
     Network::Socket::appendOptions(options, to_add);
   }
+}
+
+// Helper function to make sure each protocol in expected_protocols is present
+// in protocols (only used for an ASSERT in debug builds)
+bool contains(const std::vector<Http::Protocol>& protocols,
+              const std::vector<Http::Protocol>& expected_protocols) {
+  for (auto protocol : expected_protocols) {
+    if (std::find(protocols.begin(), protocols.end(), protocol) == protocols.end()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 } // namespace
@@ -874,8 +890,8 @@ void ClusterManagerImpl::maybePreconnect(
     // We anticipate the incoming stream here, because maybePreconnect is called
     // before a new stream is established.
     if (!ConnectionPool::ConnPoolImplBase::shouldConnect(
-            state.pending_streams_, state.active_streams_, state.connecting_stream_capacity_,
-            peekahead_ratio, true)) {
+            state.pending_streams_, state.active_streams_,
+            state.connecting_and_connected_stream_capacity_, peekahead_ratio, true)) {
       return;
     }
     ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
@@ -1502,14 +1518,25 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
     ClusterConnectivityState& state) {
-  if (protocols.size() == 2) {
-    ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
-           (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11));
+  if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+    ASSERT(contains(protocols,
+                    {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
+#ifdef ENVOY_ENABLE_QUIC
+    Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
+    return std::make_unique<Http::ConnectivityGrid>(
+        dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
+        state, source, std::chrono::milliseconds(300), coptions);
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
+  }
+  if (protocols.size() >= 2) {
+    ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
                                                          priority, options,
                                                          transport_socket_options, state);
   }
-
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
@@ -1517,8 +1544,14 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+#ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state, source);
+#else
+    UNREFERENCED_PARAMETER(source);
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
   return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,

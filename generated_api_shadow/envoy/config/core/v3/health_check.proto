@@ -124,10 +124,14 @@ message HealthCheck {
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
 
-    string hidden_envoy_deprecated_service_name = 5 [deprecated = true];
+    string hidden_envoy_deprecated_service_name = 5
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-    bool hidden_envoy_deprecated_use_http2 = 7
-        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+    bool hidden_envoy_deprecated_use_http2 = 7 [
+      deprecated = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   message TcpHealthCheck {
@@ -191,7 +195,8 @@ message HealthCheck {
     oneof config_type {
       google.protobuf.Any typed_config = 3;
 
-      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+      google.protobuf.Struct hidden_envoy_deprecated_config = 2
+          [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
     }
   }
 

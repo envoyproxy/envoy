@@ -1,20 +1,20 @@
 #pragma once
 
 #include <functional>
+#include <string>
+#include <vector>
 
-#include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/local_info/local_info.h"
-#include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
 #include "common/config/subscription_base.h"
+#include "common/protobuf/protobuf.h"
+#include "common/upstream/cds_api_helper.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -23,8 +23,7 @@ namespace Upstream {
  * CDS API implementation that fetches via Subscription.
  */
 class CdsApiImpl : public CdsApi,
-                   Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
-                   Logger::Loggable<Logger::Id::upstream> {
+                   Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster> {
 public:
   static CdsApiPtr create(const envoy::config::core::v3::ConfigSource& cds_config,
                           const xds::core::v3::ResourceLocator* cds_resources_locator,
@@ -36,7 +35,7 @@ public:
   void setInitializedCb(std::function<void()> callback) override {
     initialize_callback_ = callback;
   }
-  const std::string versionInfo() const override { return system_version_info_; }
+  const std::string versionInfo() const override { return helper_.versionInfo(); }
 
 private:
   // Config::SubscriptionCallbacks
@@ -52,11 +51,11 @@ private:
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
 
+  CdsApiHelper helper_;
   ClusterManager& cm_;
-  Config::SubscriptionPtr subscription_;
-  std::string system_version_info_;
-  std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
+  Config::SubscriptionPtr subscription_;
+  std::function<void()> initialize_callback_;
 };
 
 } // namespace Upstream

@@ -217,7 +217,7 @@ void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num
   // Upstream connection should be disconnected
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Downstream client should receive 502 since upstream did not send response headers yet
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("502", response->headers().getStatusValue());
   if (!flood_stat.empty()) {
     EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
@@ -1243,7 +1243,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
                                                Http2Frame::HeadersFlags::None);
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("502", response->headers().getStatusValue());
   EXPECT_EQ(1,
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
@@ -1266,7 +1266,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
       Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
@@ -1304,7 +1304,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
 
   // Make sure upstream and downstream got RST_STREAM from the server.
   ASSERT_TRUE(upstream_request_->waitForReset());
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("502", response->headers().getStatusValue());
 
   // Send another request from downstream on the same connection, and make sure
@@ -1315,7 +1315,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
       Http2Frame::makeHeadersFrameWithStatus("200", Http2Frame::makeClientStreamId(1));
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf2.begin(), buf2.end())));
 
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("200", response2->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
@@ -1351,7 +1351,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
   }
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1,
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
@@ -1376,7 +1376,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
   }
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("502", response->headers().getStatusValue());
   EXPECT_EQ(1,
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
@@ -1417,7 +1417,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneOpenStream) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Downstream client should get stream reset since upstream sent headers but did not complete the
   // stream
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(
       1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
 }
@@ -1435,7 +1435,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneClosedStream) {
   // Send response header and end the stream
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   auto frame = Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
@@ -1475,7 +1475,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnStreamIdleTimeout) {
   // Verify that when RST_STREAM overflows upstream queue it is handled correctly
   // by causing upstream connection to be disconnected.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   //  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
@@ -1546,7 +1546,7 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
   // Upstream connection should be disconnected
   // Downstream client should receive 503 since upstream did not send response headers yet
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   // Verify that the flood check was triggered.
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_flood")->value());

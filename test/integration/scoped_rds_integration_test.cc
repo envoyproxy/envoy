@@ -301,7 +301,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=xyz-route"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
@@ -372,7 +372,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo-route"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
   // Add a new scope foo_scope4.
@@ -387,7 +387,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=xyz-route"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   // Get 404 because RDS hasn't pushed route configuration "foo_route4" yet.
   // But scope is found and the Router::NullConfigImpl is returned.
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
@@ -433,7 +433,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
@@ -608,7 +608,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=bar"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 }
@@ -658,7 +658,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 }
@@ -714,7 +714,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=bar"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 }

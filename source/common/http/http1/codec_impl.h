@@ -229,7 +229,7 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
-  bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
+  bool sendStrict1xxAnd204Headers() { return send_strict_1xx_and_204_headers_; }
 
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
@@ -280,7 +280,8 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool strict_1xx_and_204_headers_ : 1;
+  const bool require_strict_1xx_and_204_headers_ : 1;
+  const bool send_strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
 
@@ -320,15 +321,6 @@ private:
   virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
     return false;
   }
-
-  /**
-   * An inner dispatch call that executes the dispatching logic. While exception removal is in
-   * migration (#10878), this function may either throw an exception or return an error status.
-   * Exceptions are caught and translated to their corresponding statuses in the outer level
-   * dispatch.
-   * TODO(#10878): Remove this when exception removal is complete.
-   */
-  Http::Status innerDispatch(Buffer::Instance& data);
 
   /**
    * Dispatch a memory span.

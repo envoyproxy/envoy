@@ -284,7 +284,7 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, address_, socket_factory_, options,
+  return {createConnection(dispatcher, cluster(), address(), transportSocketFactory(), options,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -314,8 +314,8 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
 
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
-                            : socket_factory_;
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), factory, nullptr,
+                            : transportSocketFactory();
+  return {createConnection(dispatcher, cluster(), healthCheckAddress(), factory, nullptr,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -925,16 +925,21 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return {downstream_protocol.value()};
-  } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
-    ASSERT(!(features_ & Upstream::ClusterInfo::Features::HTTP3));
-    return {Http::Protocol::Http2, Http::Protocol::Http11};
-  } else {
-    if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
-      return {Http::Protocol::Http3};
-    }
-    return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
-                                                                 : Http::Protocol::Http11};
   }
+
+  if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    if (!(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
+      return {Http::Protocol::Http2, Http::Protocol::Http11};
+    }
+    return {Http::Protocol::Http3, Http::Protocol::Http2, Http::Protocol::Http11};
+  }
+
+  if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
+    return {Http::Protocol::Http3};
+  }
+
+  return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                               : Http::Protocol::Http11};
 }
 
 ClusterImplBase::ClusterImplBase(
@@ -971,11 +976,17 @@ ClusterImplBase::ClusterImplBase(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
   }
-  // TODO(#12829) clean up (e.g. move tests out of extensions) once QUIC is no longer an extension.
-  if ((info_->features() & ClusterInfoImpl::Features::HTTP3) &&
-      (cluster.transport_socket().name() != "envoy.transport_sockets.quic")) {
-    throw EnvoyException(fmt::format("HTTP3 requires a QuicUpstreamTransport tranport socket: {}",
-                                     cluster.name(), cluster.DebugString()));
+
+  if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
+#if defined(ENVOY_ENABLE_QUIC)
+    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+      throw EnvoyException(
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
+                      cluster.DebugString()));
+    }
+#else
+    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+#endif
   }
 
   // Create the default (empty) priority set before registering callbacks to
@@ -1248,6 +1259,10 @@ Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
 
 Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
+}
+
+Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
 }
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(

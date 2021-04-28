@@ -227,6 +227,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:delegating_route_utility_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -415,10 +416,12 @@ envoy_cc_test(
     ],
 )
 
+# TODO(alyssawilk): The conn pool grid should work correctly without H3. Circle back and figure
+# out the right way of handling the lack of H3 in the build.
 envoy_cc_test(
     name = "conn_pool_grid_test",
-    srcs = ["conn_pool_grid_test.cc"],
-    deps = [
+    srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
+    deps = envoy_select_enable_http3([
         ":common_lib",
         "//source/common/http:conn_pool_grid",
         "//test/common/upstream:utility_lib",
@@ -431,11 +434,21 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
-    ] + envoy_select_enable_http3([
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",
     ]),
+)
+
+envoy_cc_test(
+    name = "alternate_protocols_test",
+    srcs = ["alternate_protocols_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols",
+        "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
 )
 
 envoy_proto_library(
