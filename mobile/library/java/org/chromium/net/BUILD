@@ -1,4 +1,3 @@
-load("@build_bazel_rules_android//android:rules.bzl", "android_library")
 load("@rules_jvm_external//:defs.bzl", "artifact")
 
 licenses(["notice"])  # Apache 2

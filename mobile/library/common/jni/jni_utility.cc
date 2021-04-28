@@ -61,6 +61,11 @@ envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data) {
   return {data_length, native_bytes, free, native_bytes};
 }
 
+jstring native_data_to_string(JNIEnv* env, envoy_data data) {
+  jstring jstrBuf = env->NewStringUTF(const_cast<char*>(reinterpret_cast<const char*>(data.bytes)));
+  return jstrBuf;
+}
+
 jbyteArray native_data_to_array(JNIEnv* env, envoy_data data) {
   jbyteArray j_data = env->NewByteArray(data.length);
   void* critical_data = env->GetPrimitiveArrayCritical(j_data, nullptr);

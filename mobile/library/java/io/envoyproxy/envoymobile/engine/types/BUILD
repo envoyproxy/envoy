@@ -9,6 +9,7 @@ java_library(
         "EnvoyHTTPFilter.java",
         "EnvoyHTTPFilterCallbacks.java",
         "EnvoyHTTPFilterFactory.java",
+        "EnvoyLogger.java",
         "EnvoyOnEngineRunning.java",
         "EnvoyStatus.java",
         "EnvoyStringAccessor.java",

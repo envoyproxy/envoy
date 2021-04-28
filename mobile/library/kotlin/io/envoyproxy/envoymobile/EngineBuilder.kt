@@ -20,7 +20,8 @@ open class EngineBuilder(
   private val configuration: BaseConfiguration = Standard()
 ) {
   protected var onEngineRunning: (() -> Unit) = {}
-  private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl(onEngineRunning) }
+  protected var logger: ((String) -> Unit)? = null
+  private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl(onEngineRunning, logger) }
   private var logLevel = LogLevel.INFO
   private var statsDomain = "0.0.0.0"
   private var connectTimeoutSeconds = 30
@@ -150,6 +151,17 @@ open class EngineBuilder(
    */
   fun setOnEngineRunning(closure: () -> Unit): EngineBuilder {
     this.onEngineRunning = closure
+    return this
+  }
+
+  /**
+   * Set a closure to be called when the engine's logger logs.
+   * @param closure: The closure to be called.
+   *
+   * @return This builder.
+   */
+  fun setLogger(closure: (String) -> Unit): EngineBuilder {
+    this.logger = closure
     return this
   }
 
