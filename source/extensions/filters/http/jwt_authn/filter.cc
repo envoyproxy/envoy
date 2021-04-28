@@ -38,23 +38,6 @@ std::string generateRcDetails(absl::string_view error_msg) {
                       absl::StrJoin(absl::StrSplit(error_msg, ' '), "_"), "}");
 }
 
-std::string buildUri(const Http::RequestHeaderMap& request_headers,
-                            const uint32_t max_path_length) {
-  if (!request_headers.Path()) {
-    return "";
-  }
-  absl::string_view path(request_headers.EnvoyOriginalPath()
-                             ? request_headers.getEnvoyOriginalPathValue()
-                             : request_headers.getPathValue());
-
-  if (path.length() > max_path_length) {
-    path = path.substr(0, max_path_length);
-  }
-
-  return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
-                      request_headers.getHostValue(), path);
-}
-
 } // namespace
 
 Filter::Filter(FilterConfigSharedPtr config)
@@ -104,7 +87,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (verifier == nullptr) {
     onComplete(Status::Ok);
   } else {
-    original_uri_ = buildUri(headers, 256);
+    original_uri_ = Http::Utility::buildOriginalUri(headers, 256);
     // Verify the JWT token, onComplete() will be called when completed.
     context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
     verifier->verify(context_);
@@ -137,12 +120,12 @@ void Filter::onComplete(const Status& status) {
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(
-        code, ::google::jwt_verify::getStatusString(status), 
+        code, ::google::jwt_verify::getStatusString(status),
         [uri = this->original_uri_](Http::ResponseHeaderMap& headers) {
           headers.setCopy(Http::LowerCaseString("www-authenticate"),
                           absl::StrCat("Bearer realm=\"", uri, "\""));
-        }, absl::nullopt,
-        generateRcDetails(::google::jwt_verify::getStatusString(status)));
+        },
+        absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();
