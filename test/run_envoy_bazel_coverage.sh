@@ -64,6 +64,9 @@ else
 fi
 
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
+# Also run integration tests with the new HTTP/1.1 parser.
+# TODO(asraa): Remove when http-parser is removed.
+bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" --define use_new_http1_parser_in_integration_tests=true test/integration/...
 
 # Collecting profile and testlogs
 [[ -z "${ENVOY_BUILD_PROFILE}" ]] || cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
