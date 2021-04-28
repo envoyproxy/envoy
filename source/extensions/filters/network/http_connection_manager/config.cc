@@ -299,7 +299,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
   request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
 
-  // Check if IP detection extensions were configured, otherwise fallback to XFF.
+  // Check if IP detection extensions were configured, otherwise fall back to XFF.
   auto ip_detection_extensions = config.original_ip_detection_extensions();
   if (ip_detection_extensions.empty()) {
     envoy::extensions::http::original_ip_detection::xff::v3::XffConfig xff_config;
@@ -706,7 +706,7 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   if (config.tracing().has_provider()) {
     return &config.tracing().provider();
   }
-  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();
