@@ -80,7 +80,7 @@ public:
       Stats::Scope& scope, const std::string& stats_prefix);
 
   std::vector<std::string>
-  resolveTagsForIpAddress(Network::Address::InstanceConstSharedPtr& Ipaddress);
+  resolveTagsForIpAddress(const Network::Address::InstanceConstSharedPtr& Ipaddress);
 
   ~LcTrieWithStats();
 
@@ -107,12 +107,13 @@ public:
   TagSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename,
                 Stats::Scope& scope, const std::string& stat_prefix)
       : TagSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
-                      std::move(filename)) {}
-
+                      std::move(filename), scope, stat_prefix) {}
 
   ~TagSetWatcher();
 
   const std::string& filename() { return filename_; }
+
+  std::shared_ptr<LcTrieWithStats> get() const { return triestat_; }
 
 private:
   Envoy::ProtobufMessage::ValidationVisitor& protoValidator() const {
@@ -129,16 +130,19 @@ private:
   Api::Api& api_;
   std::string filename_;
   std::string extension_;
+  std::unique_ptr<Filesystem::Watcher> watcher_;
   Stats::Scope& scope_;
   const std::string stat_prefix_;
   std::uint64_t content_hash_ = 0;
-  std::unique_ptr<Filesystem::Watcher> watcher_;
   Server::Configuration::FactoryContext& factory_context_;
   std::shared_ptr<LcTrieWithStats> triestat_;
 
 protected:
   bool yaml;
 };
+
+using TagResolverFn =
+    std::function<std::vector<std::string>(const Network::Address::InstanceConstSharedPtr&)>;
 
 /**
  * Type of requests the filter should apply to.
@@ -157,6 +161,20 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
+
+  TagResolverFn tagResolver(const Network::Address::InstanceConstSharedPtr& address) {
+    TagResolverFn resolver;
+    if (watcher_ != nullptr) {
+      resolver = [watcher_](const Network::Address::InstanceConstSharedPtr& address) {
+        return watcher_->get()->resolveTagsForIpAddress(address);
+      };
+    } else {
+      resolver = [triestat_](const Network::Address::InstanceConstSharedPtr& address) {
+        return triestat_->resolveTagsForIpAddress(address);
+      };
+    }
+    return resolver;
+  }
 
   static std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
   IpTaggingFilterSetTagData(const IPTagsProto& ip_tags);

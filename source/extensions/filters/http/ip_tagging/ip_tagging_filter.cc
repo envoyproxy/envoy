@@ -41,8 +41,8 @@ LcTrieWithStats::LcTrieWithStats(
   }
 }
 
-std::vector<std::string>
-LcTrieWithStats::resolveTagsForIpAddress(Network::Address::InstanceConstSharedPtr& Ipaddress) {
+std::vector<std::string> LcTrieWithStats::resolveTagsForIpAddress(
+    const Network::Address::InstanceConstSharedPtr& Ipaddress) {
 
   std::vector<std::string> tags = trie_.getData(Ipaddress);
 
@@ -123,15 +123,16 @@ std::shared_ptr<TagSetWatcher>
 TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context, std::string filename,
                       Stats::Scope& scope, const std::string& stat_prefix) {
 
-  auto ptr =  std::make_shared<TagSetWatcher>(factory_context, std::move(filename), scope, stat_prefix);
+  auto ptr =
+      std::make_shared<TagSetWatcher>(factory_context, std::move(filename), scope, stat_prefix);
   return ptr;
 }
 
 TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
                              Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
                              Stats::Scope& scope, const std::string& stat_prefix)
-    : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()),
-      factory_context_(factory_context), scope_(scope), stat_prefix_(stat_prefix),
+    : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()), scope_(scope),
+      stat_prefix_(stat_prefix), factory_context_(factory_context),
       yaml(absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml)) {
 
   const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
@@ -203,7 +204,9 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO
+  headers.appendEnvoyIpTags(
+      absl::StrJoin(config_->tagResolver(callbacks_->streamInfo().downstreamRemoteAddress()), ","));
+
   // We must clear the route cache or else we can't match on x-envoy-ip-tags.
   callbacks_->clearRouteCache();
 
