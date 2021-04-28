@@ -41,16 +41,16 @@ echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
 # projects that want to run coverage on a different/combined target.
 # Command-line arguments take precedence over ${COVERAGE_TARGET}.
 if [[ $# -gt 0 ]]; then
-  COVERAGE_TARGETS=("$@")
+  COVERAGE_ARGS=("$@")
 elif [[ -n "${COVERAGE_TARGET}" ]]; then
-  COVERAGE_TARGETS=("${COVERAGE_TARGET}")
+  COVERAGE_ARGS=("${COVERAGE_TARGET}")
 else
-  COVERAGE_TARGETS=(//test/...)
+  COVERAGE_ARGS=(//test/...)
 fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
   # Filter targets to just fuzz tests.
-  _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
+  _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_ARGS[*]})")
   COVERAGE_TARGETS=()
   while read -r line; do COVERAGE_TARGETS+=("$line"); done \
       <<< "$_targets"
@@ -58,15 +58,23 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
       "--config=fuzz-coverage"
       "--test_tag_filters=-nocoverage")
 else
+  COVERAGE_TARGETS=$COVERAGE_ARGS
   BAZEL_BUILD_OPTIONS+=(
       "--config=test-coverage"
       "--test_tag_filters=-nocoverage,-fuzz_target")
 fi
 
+# TODO(asraa): Remove when http-parser removed.
+# Gather integration targets for new parser.
+_integration_targets=$(bazel query "filter('.*integration.*',${COVERAGE_ARGS[*]})")
+INTEGRATION_TARGETS=()
+while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
+  <<< "$_integration_targets"
+
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 # Also run integration tests with the new HTTP/1.1 parser.
 # TODO(asraa): Remove when http-parser is removed.
-bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" --define use_new_http1_parser_in_integration_tests=true test/integration/...
+bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" --define use_new_http1_parser_in_integration_tests=true "${INTEGRATION_TARGETS[@]}"
 
 # Collecting profile and testlogs
 [[ -z "${ENVOY_BUILD_PROFILE}" ]] || cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
