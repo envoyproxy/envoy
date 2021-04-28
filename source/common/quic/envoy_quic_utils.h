@@ -46,7 +46,7 @@ public:
   static constexpr absl::string_view remote_refused = "http3.remote_refuse";
   // The peer reset the stream.
   static constexpr absl::string_view remote_reset = "http3.remote_reset";
-  // Too many trailers were sent
+  // Too many trailers were sent.
   static constexpr absl::string_view too_many_trailers = "http3.too_many_trailers";
   // Too many headers were sent.
   static constexpr absl::string_view too_many_headers = "http3.too_many_headers";
