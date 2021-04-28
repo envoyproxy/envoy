@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.s2a.v3alpha;
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
