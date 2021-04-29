@@ -5,11 +5,23 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/core/quic_connection.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/http/http3/codec_stats.h"
 #include "common/network/connection_impl_base.h"
-#include "common/quic/envoy_quic_connection.h"
+#include "common/quic/quic_network_connection.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "common/quic/send_buffer_monitor.h"
 #include "common/stream_info/stream_info_impl.h"
@@ -24,8 +36,9 @@ namespace Quic {
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
                                         public SendBufferMonitor {
 public:
-  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
-                                  uint32_t send_buffer_limit);
+  QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
+                                  const quic::QuicConnectionId& connection_id,
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
   ~QuicFilterManagerConnectionImpl() override = default;
 
   // Network::FilterManager
@@ -56,10 +69,10 @@ public:
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
   const Network::SocketAddressSetter& addressProvider() const override {
-    return quic_connection_->connectionSocket()->addressProvider();
+    return network_connection_->connectionSocket()->addressProvider();
   }
   Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return quic_connection_->connectionSocket()->addressProviderSharedPtr();
+    return network_connection_->connectionSocket()->addressProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
@@ -69,20 +82,20 @@ public:
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
     Network::ConnectionImplBase::setConnectionStats(stats);
-    quic_connection_->setConnectionStats(stats);
+    network_connection_->setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
-    if (quic_connection_ != nullptr && quic_connection_->connected()) {
+    if (!initialized_ || (quicConnection() != nullptr && quicConnection()->connected())) {
       return Network::Connection::State::Open;
     }
     return Network::Connection::State::Closed;
   }
   bool connecting() const override {
-    if (quic_connection_ != nullptr && !quic_connection_->IsHandshakeComplete()) {
-      return true;
+    if (initialized_ && (quicConnection() == nullptr || quicConnection()->IsHandshakeComplete())) {
+      return false;
     }
-    return false;
+    return true;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
@@ -138,11 +151,16 @@ protected:
 
   virtual bool hasDataToWrite() PURE;
 
-  EnvoyQuicConnection* quic_connection_{nullptr};
+  // Returns a QuicConnection interface if initialized_ is true, otherwise nullptr.
+  virtual const quic::QuicConnection* quicConnection() const = 0;
+  virtual quic::QuicConnection* quicConnection() = 0;
+
+  QuicNetworkConnection* network_connection_{nullptr};
 
   absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
   absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
       http3_options_;
+  bool initialized_{false};
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
@@ -167,6 +185,7 @@ private:
   // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
+  absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
 };
 
 } // namespace Quic
