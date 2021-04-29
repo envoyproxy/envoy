@@ -530,6 +530,7 @@ message Cluster {
       // and will behave as if slow start is not enabled.
       // Once host exits slow start, its weight is no longer being scaled with time bias parameter.
       core.v3.RuntimeDouble time_bias = 3;
+
       // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
       // so that endpoint would get lineraly increasing amount of traffic.
       // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.

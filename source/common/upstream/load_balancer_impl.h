@@ -494,10 +494,10 @@ private:
         }
         if (time_bias_ > 0.0 && aggression_ > 0.0) {
           // Slow start window cannot be set to 0 due to validation in api protos.
-          auto time_factor =
-              std::max(std::chrono::milliseconds(1).count(), host_create_duration.count()) /
-              slow_start_window_.count();
-          return std::pow(host.weight() * time_bias_ * time_factor, 1.0 / aggression_);
+          auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
+                                                          host_create_duration.count())) /
+                             slow_start_window_.count();
+          return host.weight() * time_bias_ * std::pow(time_factor, 1.0 / aggression_);
         }
       }
     }

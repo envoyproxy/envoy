@@ -1,6 +1,7 @@
 #include "common/upstream/load_balancer_impl.h"
 
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -784,34 +785,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
-      auto host_weight = hostWeight(*host);
-      auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-          time_source_.monotonicTime() - host->creationTime());
-      if (host_create_duration < slow_start_window_ &&
-          host->health() == Upstream::Host::Health::Healthy) {
-
-        time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : time_bias_;
-        aggression_ = aggression_runtime_ != nullptr ? aggression_runtime_->value() : 1.0;
-
-        if (time_bias_ < 0.0) {
-          ENVOY_LOG(warn, "upstream: invalid time bias supplied (runtime key {}), using 1.0",
-                    time_bias_runtime_->runtimeKey());
-          time_bias_ = 1.0;
-        }
-        if (aggression_ < 0.0) {
-          ENVOY_LOG(warn, "upstream: invalid aggression supplied (runtime key {}), using 1.0",
-                    time_bias_runtime_->runtimeKey());
-          aggression_ = 1.0;
-        }
-        if (time_bias_ > 0.0 && aggression_ > 0.0) {
-          // Slow start window cannot be set to 0 due to validation in api protos.
-          auto time_factor =
-              std::max(std::chrono::milliseconds(1).count(), host_create_duration.count()) /
-              slow_start_window_.count();
-          host_weight = std::pow(host->weight() * time_bias_ * time_factor, 1.0 / aggression_);
-        }
-      }
-      scheduler.edf_->add(host_weight, host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
