@@ -18,6 +18,7 @@ Minor Behavior Changes
   (do not send 1xx or 204 responses with these headers). Both are true by default.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+* access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
 
 
 Bug Fixes
