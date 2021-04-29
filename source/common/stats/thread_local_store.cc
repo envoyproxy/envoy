@@ -203,20 +203,12 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   // This will block both future cache fills as well as cache flushes.
   shutting_down_ = true;
 
-  auto scope_ids = std::make_shared<std::vector<uint64_t>>();
-  auto central_caches = std::make_shared<std::vector<CentralCacheEntrySharedPtr>>();
+  // We can't call runOnAllThreads here as global threading has already been shutdown.
+  // It is okay to simply clear the scopes and central cache entires to cleanup. 
   {
     Thread::LockGuard lock(lock_);
-    *scope_ids = std::move(scopes_to_cleanup_);
     scopes_to_cleanup_.clear();
-    *central_caches = std::move(central_cache_entries_to_cleanup_);
     central_cache_entries_to_cleanup_.clear();
-  }
-
-  if (tls_cache_) {
-    tls_cache_->runOnAllThreads(
-        [scope_ids](OptRef<TlsCache> tls_cache) { tls_cache->eraseScopes(*scope_ids); },
-        [central_caches]() { /* Holds onto central_caches until all tls caches are clear */ });
   }
 
   Thread::LockGuard lock(hist_mutex_);
@@ -287,10 +279,9 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    // Switch to batching of clearing scopes as mentioned in:
-    // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
-    // This greatly reduces the overhead of VHDS updates when there are tens of thousands of
-    // VirtualHosts.
+    // Switch to batching of clearing scopes. This greatly reduces the overhead when there are
+    // tens of thousands of scopes to clear in a short period. i.e.: VHDS updates with tens of thousands
+    // of VirtualHosts
     bool need_post = scopes_to_cleanup_.empty();
     scopes_to_cleanup_.push_back(scope->scope_id_);
     central_cache_entries_to_cleanup_.push_back(scope->central_cache_);
