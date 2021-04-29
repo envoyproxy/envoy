@@ -26,7 +26,7 @@ then
 fi
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
-[[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
+[[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=false
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
 [[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.5
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
@@ -58,7 +58,7 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
       "--config=fuzz-coverage"
       "--test_tag_filters=-nocoverage")
 else
-  COVERAGE_TARGETS=$COVERAGE_ARGS
+  COVERAGE_TARGETS=${COVERAGE_ARGS[*]}
   BAZEL_BUILD_OPTIONS+=(
       "--config=test-coverage"
       "--test_tag_filters=-nocoverage,-fuzz_target")
@@ -72,9 +72,6 @@ while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
   <<< "$_integration_targets"
 
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
-# Also run integration tests with the new HTTP/1.1 parser.
-# TODO(asraa): Remove when http-parser is removed.
-bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" --define use_new_http1_parser_in_integration_tests=true "${INTEGRATION_TARGETS[@]}"
 
 # Collecting profile and testlogs
 [[ -z "${ENVOY_BUILD_PROFILE}" ]] || cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/coverage.profile.gz" || true
@@ -88,7 +85,13 @@ mkdir -p "${COVERAGE_DIR}"
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 
-COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
+# Also run integration tests with the new HTTP/1.1 parser.
+# TODO(asraa): Remove when http-parser is removed.
+bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" --define use_new_http1_parser_in_integration_tests=true "${INTEGRATION_TARGETS[@]}"
+COVERAGE_DATA2="${COVERAGE_DIR}/coverage2.dat"
+cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA2}"
+
+COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" "${COVERAGE_DATA2}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
 COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
 if [ "${FUZZ_COVERAGE}" == "true" ]
