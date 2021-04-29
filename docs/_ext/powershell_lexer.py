@@ -1,4 +1,4 @@
-from pygments.lexers import get_lexer_by_name, PowerShellLexer
+from pygments.lexers import PowerShellLexer
 
 
 def setup(app):
