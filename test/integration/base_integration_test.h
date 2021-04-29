@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/server/process_context.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/version_converter.h"
@@ -43,26 +43,18 @@ struct ApiFilesystemConfig {
  */
 class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
-  using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
 
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
-  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::httpProxyConfig())
-      : BaseIntegrationTest(version, config) {}
   // Creates a test fixture with a specified |upstream_address| function that provides the IP and
   // port to use.
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
   virtual ~BaseIntegrationTest() = default;
-
-  // TODO(jmarantz): Remove this once
-  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
-  static TestTimeSystemPtr realTime() { return TestTimeSystemPtr(); }
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -80,13 +72,14 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
-  void setNewCodecs() { config_helper_.setNewCodecs(); }
 
-  FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
+  FakeHttpConnection::Type upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
-                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr);
+                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
+                    Network::Address::InstanceConstSharedPtr source_address =
+                        Network::Address::InstanceConstSharedPtr());
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -125,6 +118,9 @@ public:
 
   std::string listener_access_log_name_;
 
+  // Last node received on an xDS stream from the server.
+  envoy::config::core::v3::Node last_node_;
+
   // Functions for testing reloadable config (xDS)
   void createXdsUpstream();
   void createXdsConnection();
@@ -138,20 +134,18 @@ public:
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
   // compareDiscoveryRequest() and sendDiscoveryResponse(), but the SotW/delta-specific versions are
   // available if you're writing a SotW/delta-specific test.
-  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
-  // it.
   AssertionResult compareDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names,
       const std::vector<std::string>& expected_resource_names_added,
-      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = true,
+      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             const bool api_downgrade = true) {
+                             const bool api_downgrade = false) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
     } else {
@@ -177,18 +171,16 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
-  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
-  // it.
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names, bool expect_node = true,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, const bool api_downgrade = true) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+                                 const std::string& version, const bool api_downgrade = false) {
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
@@ -207,7 +199,7 @@ public:
   void sendDeltaDiscoveryResponse(const std::string& type_url,
                                   const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
-                                  const std::string& version, const bool api_downgrade = true) {
+                                  const std::string& version, const bool api_downgrade = false) {
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
                                api_downgrade);
   }
@@ -216,20 +208,20 @@ public:
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
-                             const bool api_downgrade = true) {
+                             const bool api_downgrade = false) {
     auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
                                                     aliases, api_downgrade);
     stream->sendGrpcMessage(response);
   }
 
   template <class T>
-  envoy::api::v2::DeltaDiscoveryResponse
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases,
-                               const bool api_downgrade = true) {
+                               const bool api_downgrade = false) {
 
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
@@ -242,7 +234,7 @@ public:
         temp_any.PackFrom(message);
         resource->mutable_resource()->PackFrom(message);
       }
-      resource->set_name(TestUtility::xdsResourceName(temp_any));
+      resource->set_name(intResourceName(message));
       resource->set_version(version);
       for (const auto& alias : aliases) {
         resource->add_aliases(alias);
@@ -255,6 +247,16 @@ public:
   }
 
 private:
+  template <class T> std::string intResourceName(const T& m) {
+    // gcc doesn't allow inline template function to be specialized, using a constexpr if to
+    // workaround.
+    if constexpr (std::is_same_v<T, envoy::config::endpoint::v3::ClusterLoadAssignment>) {
+      return m.cluster_name();
+    } else {
+      return m.name();
+    }
+  }
+
   Event::GlobalTimeSystem time_system_;
 
 public:
@@ -289,8 +291,100 @@ public:
                                                  *dispatcher_);
   }
 
+  /**
+   * Helper to create ConnectionDriver.
+   *
+   * @param port the port to connect to.
+   * @param write_request_cb callback used to send data.
+   * @param data_callback the callback on the received data.
+   * @param transport_socket transport socket to use for the client connection
+   **/
+  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+      uint32_t port, RawConnectionDriver::DoWriteCallback write_request_cb,
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
+      Network::TransportSocketPtr transport_socket = nullptr) {
+    return std::make_unique<RawConnectionDriver>(port, write_request_cb, data_callback, version_,
+                                                 *dispatcher_, std::move(transport_socket));
+  }
+
+  // Helper to create FakeUpstream.
+  // Creates a fake upstream bound to the specified unix domain socket path.
+  std::unique_ptr<FakeUpstream> createFakeUpstream(const std::string& uds_path,
+                                                   FakeHttpConnection::Type type) {
+    FakeUpstreamConfig config = upstream_config_;
+    config.upstream_protocol_ = type;
+    return std::make_unique<FakeUpstream>(uds_path, config);
+  }
+  // Creates a fake upstream bound to the specified |address|.
+  std::unique_ptr<FakeUpstream>
+  createFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                     FakeHttpConnection::Type type) {
+    FakeUpstreamConfig config = upstream_config_;
+    config.upstream_protocol_ = type;
+    return std::make_unique<FakeUpstream>(address, config);
+  }
+  // Creates a fake upstream bound to INADDR_ANY and there is no specified port.
+  std::unique_ptr<FakeUpstream> createFakeUpstream(FakeHttpConnection::Type type) {
+    FakeUpstreamConfig config = upstream_config_;
+    config.upstream_protocol_ = type;
+    return std::make_unique<FakeUpstream>(0, version_, config);
+  }
+  std::unique_ptr<FakeUpstream>
+  createFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                     FakeHttpConnection::Type type) {
+    FakeUpstreamConfig config = upstream_config_;
+    config.upstream_protocol_ = type;
+    return std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config);
+  }
+  // Helper to add FakeUpstream.
+  // Add a fake upstream bound to the specified unix domain socket path.
+  void addFakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(uds_path, type));
+  }
+  // Add a fake upstream bound to the specified |address|.
+  void addFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                       FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(address, type));
+  }
+  // Add a fake upstream bound to INADDR_ANY and there is no specified port.
+  void addFakeUpstream(FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(type));
+  }
+  void addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                       FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(std::move(transport_socket_factory), type));
+  }
+
 protected:
+  void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
+    upstream_config_.udp_fake_upstream_ = config;
+  }
   bool initialized() const { return initialized_; }
+
+  // Right now half-close is set globally, not separately for upstream and
+  // downstream.
+  void enableHalfClose(bool value) { upstream_config_.enable_half_close_ = value; }
+
+  bool enableHalfClose() { return upstream_config_.enable_half_close_; }
+
+  const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
+  void setMaxRequestHeadersKb(uint32_t value) { upstream_config_.max_request_headers_kb_ = value; }
+  void setMaxRequestHeadersCount(uint32_t value) {
+    upstream_config_.max_request_headers_count_ = value;
+  }
+  void setHeadersWithUnderscoreAction(
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction value) {
+    upstream_config_.headers_with_underscores_action_ = value;
+  }
+
+  void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
+    ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
+    proxy_buffer_factory_ = proxy_buffer_factory;
+  }
+
+  void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
+    upstream_config_.http2_options_.MergeFrom(options);
+  }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
@@ -330,7 +424,9 @@ protected:
   bool create_xds_upstream_{false};
   bool tls_xds_upstream_{false};
   bool use_lds_{true}; // Use the integration framework's LDS set up.
+  bool upstream_tls_{false};
 
+  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 
@@ -358,11 +454,6 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  bool enable_half_close_{false};
-
-  // Whether the default created fake upstreams are UDP listeners.
-  bool udp_fake_upstream_{false};
-
   // True if test will use a fixed RNG value.
   bool deterministic_{};
 
@@ -374,11 +465,19 @@ protected:
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
 
+  // Use a v2 bootstrap.
+  bool v2_bootstrap_{false};
+
 private:
-  // The type for the Envoy-to-backend connection
-  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  friend class MixedUpstreamIntegrationTest;
+
+  // Configuration for the fake upstream.
+  FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.
   bool initialized_{};
+  // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
+  // the proxy uses the default watermark buffer factory to create buffers.
+  Buffer::WatermarkFactorySharedPtr proxy_buffer_factory_;
 };
 
 } // namespace Envoy

@@ -358,6 +358,9 @@ following features are available:
   :ref:`config_http_conn_man_headers_x-envoy-force-trace` and
   :ref:`config_http_conn_man_headers_x-client-trace-id` headers.
 
+See the architecture overview on
+:ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
+
 .. _config_http_conn_man_headers_x-ot-span-context:
 
 x-ot-span-context
@@ -460,6 +463,25 @@ The integer value indicates the sampling decision that has been made for this tr
 A value of 0 indicates that the trace should not be collected, and a value of 1
 requests that spans are sampled and reported.
 
+.. _config_http_conn_man_headers_sw8:
+
+sw8
+----------
+
+The *sw8* HTTP header is used by the SkyWalking tracer in Envoy. It contains the key
+tracing context for the SkyWalking tracer and is used to establish the relationship between
+the tracing spans of downstream and Envoy. See more on SkyWalking tracing
+`here <https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md>`__.
+
+.. _config_http_conn_man_headers_x-amzn-trace-id:
+
+x-amzn-trace-id
+---------------
+
+The *x-amzn-trace-id* HTTP header is used by the AWS X-Ray tracer in Envoy. The trace ID,
+parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
+`here <https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader>`__.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
@@ -469,7 +491,7 @@ Custom request/response headers can be added to a request/response at the weight
 route, virtual host, and/or global route configuration level. See the
 :ref:`v3 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` API documentation.
 
-No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
+Neither *:-prefixed* pseudo-headers nor the Host: header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
 :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
 :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`, and
@@ -496,7 +518,7 @@ Supported variable names are:
     .. note::
 
       This may not be the physical remote address of the peer if the address has been inferred from
-      :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -595,11 +617,17 @@ Supported variable names are:
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_start>`.
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_end>`.
 
 %HOSTNAME%
     The system hostname.

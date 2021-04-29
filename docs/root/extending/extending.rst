@@ -24,6 +24,9 @@ types including:
 * :ref:`Watchdog action <envoy_v3_api_msg_config.bootstrap.v3.Watchdog.WatchdogAction>`
 * :ref:`Internal redirect policy <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
 * :ref:`Compression libraries <arch_overview_compression_libraries>`
+* :ref:`Bootstrap extensions <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.bootstrap_extensions>`
+* :ref:`Fatal actions <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.fatal_actions>`
+* :ref:`Formatters <config_access_log_command_operators>`
 
 As of this writing there is no high level extension developer documentation. The
 :repo:`existing extensions <source/extensions>` are a good way to learn what is possible.

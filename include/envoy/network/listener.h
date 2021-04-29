@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -16,14 +17,13 @@
 #include "envoy/network/udp_packet_writer_handler.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/interval_value.h"
+
 namespace Envoy {
 namespace Network {
 
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
-
-using UdpListenerWorkerRouterOptRef =
-    absl::optional<std::reference_wrapper<UdpListenerWorkerRouter>>;
 
 /**
  * ListenSocketFactory is a member of ListenConfig to provide listen socket.
@@ -61,6 +61,36 @@ public:
 using ListenSocketFactorySharedPtr = std::shared_ptr<ListenSocketFactory>;
 
 /**
+ * Configuration for a UDP listener.
+ */
+class UdpListenerConfig {
+public:
+  virtual ~UdpListenerConfig() = default;
+
+  /**
+   * @return factory for creating a listener.
+   */
+  virtual ActiveUdpListenerFactory& listenerFactory() PURE;
+
+  /**
+   * @return factory for writing to a UDP socket.
+   */
+  virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
+
+  /**
+   * @return the UdpListenerWorkerRouter for this listener.
+   */
+  virtual UdpListenerWorkerRouter& listenerWorkerRouter() PURE;
+
+  /**
+   * @return the configuration for the listener.
+   */
+  virtual const envoy::config::listener::v3::UdpListenerConfig& config() PURE;
+};
+
+using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
+
+/**
  * A configuration for an individual listener.
  */
 class ListenerConfig {
@@ -94,8 +124,7 @@ public:
   /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
-   *         configuration is set, false otherwise. Note that this flag is deprecated and will be
-   *         removed from the v2 API.
+   *         configuration is set, false otherwise.
    */
   virtual bool handOffRestoredDestinationConnections() const PURE;
 
@@ -135,22 +164,9 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return factory pointer if listening on UDP socket, otherwise return
-   * nullptr.
+   * @return the UDP configuration for the listener IFF it is a UDP listener.
    */
-  virtual ActiveUdpListenerFactory* udpListenerFactory() PURE;
-
-  /**
-   * @return factory if writing on UDP socket, otherwise return
-   * nullopt.
-   */
-  virtual UdpPacketWriterFactoryOptRef udpPacketWriterFactory() PURE;
-
-  /**
-   * @return the ``UdpListenerWorkerRouter`` for this listener. This will
-   * be non-empty iff this is a UDP listener.
-   */
-  virtual UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() PURE;
+  virtual UdpListenerConfigOptRef udpListenerConfig() PURE;
 
   /**
    * @return traffic direction of the listener.
@@ -197,10 +213,14 @@ public:
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 
+  enum class RejectCause {
+    GlobalCxLimit,
+    OverloadAction,
+  };
   /**
    * Called when a new connection is rejected.
    */
-  virtual void onReject() PURE;
+  virtual void onReject(RejectCause cause) PURE;
 };
 
 /**
@@ -257,6 +277,12 @@ public:
    * @param data UdpRecvData from the underlying socket.
    */
   virtual void onData(UdpRecvData&& data) PURE;
+
+  /**
+   * Called whenever datagrams are dropped due to overflow or truncation.
+   * @param dropped supplies the number of dropped datagrams.
+   */
+  virtual void onDatagramsDropped(uint32_t dropped) PURE;
 
   /**
    * Called when the underlying socket is ready for read, before onData() is
@@ -324,6 +350,12 @@ public:
    * Enable accepting new connections.
    */
   virtual void enable() PURE;
+
+  /**
+   * Set the fraction of incoming connections that will be closed immediately
+   * after being opened.
+   */
+  virtual void setRejectFraction(UnitFloat reject_fraction) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;
@@ -368,9 +400,6 @@ public:
 
   /**
    * Make this listener readable at the beginning of the next event loop.
-   *
-   * @note: it may become readable during the current loop if feature
-   * ``envoy.reloadable_features.activate_fds_next_event_loop`` is disabled.
    */
   virtual void activateRead() PURE;
 };

@@ -6,7 +6,6 @@ ABI
 ACK
 ACL
 AES
-AFAICT
 ALPN
 ALS
 AMZ
@@ -15,10 +14,10 @@ API
 ARN
 ASAN
 ASCII
+ASM
 ASSERTs
 AST
 AWS
-Allowlisted
 BACKTRACE
 BSON
 BPF
@@ -28,18 +27,26 @@ CDN
 CDS
 CEL
 DSR
+EBADF
+ENOTCONN
+EPIPE
 HEXDIG
 HEXDIGIT
-LTT
 OWS
+Preconnecting
+STATNAME
+SkyWalking
 TIDs
+WASI
 ceil
+CCM
 CHACHA
 CHLO
 CHMOD
 CHLOS
 CHLOs
 CIDR
+CITT
 CLA
 CLI
 CMSG
@@ -52,19 +59,18 @@ CPU
 CQ
 CRC
 CRL
-CRLFs
 CRT
 CSDS
 CSRF
 CSS
 CSV
 CTX
-CTXs
 CVC
 CVE
 CX
 Cxx
 CYGWIN
+DCP
 DER
 DESC
 DFATAL
@@ -72,34 +78,24 @@ DGRAM
 DLOG
 DNS
 DQUOTE
-DRYs
 DS
 DST
 DW
 DWORD
-EADDRINUSE
-EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
+ECDS
 ECDSA
-ECDSAs
-ECMP
 ECONNREFUSED
 EDESTRUCTION
 EDF
-EINPROGRESS
 EINVAL
 ELB
-EMSGSIZE
-ENOTFOUND
-ENOTSUP
+ENOENT
 ENV
 EOF
 EOS
-EOY
-EPOLLOUT
-EPOLLRDHUP
 EQ
 ERANGE
 EV
@@ -122,6 +118,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+guarddog
 GC
 GCC
 GCE
@@ -194,6 +191,7 @@ MD
 MERCHANTABILITY
 MGET
 MQ
+MSDN
 MSET
 MSVC
 MTLS
@@ -207,6 +205,7 @@ NBSP
 NDEBUG
 NEXTHDR
 NGHTTP
+NLOHMANN
 NOAUTH
 NOCHECKRESP
 NODELAY
@@ -221,6 +220,7 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OID
 OK
 OOM
 OOMs
@@ -249,6 +249,7 @@ Postgre
 Postgres
 Prereq
 QDCOUNT
+QPACK
 QUIC
 QoS
 RAII
@@ -304,6 +305,7 @@ SPIFFE
 SPKI
 SQL
 SR
+SRCDIR
 SRDS
 SRV
 SS
@@ -313,6 +315,7 @@ STL
 STRLEN
 STS
 SVG
+SVID
 Symbolizer
 TBD
 TCLAP
@@ -325,6 +328,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TP
 TPM
 TSAN
 TSI
@@ -360,7 +364,6 @@ WRR
 WS
 WSA
 WSABUF
-WSAEINVAL
 WSS
 Welford's
 Wi
@@ -377,6 +380,7 @@ absl
 accesslog
 accessor
 accessors
+ackless
 acks
 acls
 addr
@@ -386,6 +390,7 @@ alignas
 alignof
 alloc
 alloca
+allocatable
 allocator
 allowlist
 allowlisted
@@ -402,6 +407,7 @@ argv
 artisanal
 ary
 asctime
+asm
 async
 atoi
 atomicity
@@ -426,6 +432,7 @@ backtracing
 balancer
 balancers
 barbaz
+basename
 baz
 bazel
 behaviour
@@ -445,6 +452,7 @@ bools
 boringssl
 borks
 broadcasted
+brotli
 buf
 buflen
 bugprone
@@ -481,7 +489,7 @@ ci
 ciphersuite
 ciphersuites
 circllhist
-CITT
+clientcert
 cloneable
 cloneability
 cmd
@@ -514,6 +522,7 @@ coverity
 cplusplus
 cpuset
 creds
+cRLSign
 crypto
 cryptographic
 cryptographically
@@ -548,6 +557,7 @@ deflater
 deletable
 deleter
 delim
+denylist
 deque
 deprecations
 dereference
@@ -570,7 +580,9 @@ dgst
 dir
 dirname
 djb
+downcalls
 downcasted
+downcased
 downstreams
 drainable
 dtor
@@ -581,6 +593,7 @@ dynamodb
 emplace
 emplaced
 emscripten
+emsdk
 enablement
 encodings
 endian
@@ -591,6 +604,7 @@ enqueued
 enqueues
 enum
 enums
+environ
 epoll
 errno
 etag
@@ -612,9 +626,11 @@ failover
 fallbacks
 fastbuild
 favicon
+fbs
 fcntl
 fd
 fds
+fdstat
 filename
 filenames
 fileno
@@ -622,6 +638,8 @@ filesystem
 firefox
 fixdate
 fixup
+flatbuffer
+flatc
 fmt
 fmtlib
 fn
@@ -698,6 +716,7 @@ inlined
 inlining
 inobservability
 inotify
+inserter
 instantiation
 instantiations
 interpretable
@@ -727,6 +746,8 @@ kv
 kvs
 lala
 latencies
+ld
+ldd
 len
 lenenc
 lexically
@@ -760,6 +781,7 @@ lua
 lyft
 maglev
 malloc
+marshaller
 matchable
 matcher
 matchers
@@ -804,6 +826,7 @@ mysql
 namelen
 nameserver
 namespace
+namespaced
 namespaces
 namespacing
 nan
@@ -817,6 +840,7 @@ noncopyable
 nonresponsive
 noop
 nop
+npos
 nthreads
 ntohl
 ntop
@@ -864,6 +888,7 @@ passphrase
 passthrough
 pathname
 pausable
+pausedness
 pcall
 pcap
 pclose
@@ -875,6 +900,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix
@@ -892,6 +918,10 @@ precompile
 precompiled
 precompute
 precomputed
+preconnect
+preconnected
+preconnecting
+preconnects
 predeclared
 prefetch
 prefetched
@@ -900,6 +930,7 @@ preflight
 preorder
 prepend
 prepended
+prepends
 prev
 probabilistically
 proc
@@ -940,6 +971,7 @@ readonly
 readv
 realloc
 rebalanced
+rebalancer
 rebalancing
 rebuffer
 rebuilder
@@ -988,6 +1020,7 @@ resolvers
 responder
 restarter
 resync
+ret
 retransmitting
 retriable
 retriggers
@@ -1017,6 +1050,7 @@ sched
 schedulable
 schemas
 scopekey
+sd
 secp
 sendmsg
 sendmmsg
@@ -1051,11 +1085,13 @@ src
 ssize
 stackdriver
 stacktrace
+starttls
 startup
 stateful
 statsd
 stderr
 stdev
+stdin
 stdout
 stmt
 str
@@ -1130,6 +1166,7 @@ timeval
 tmp
 tmpfile
 tokenize
+tokenized
 tokenizes
 tokenizing
 toolchain
@@ -1200,6 +1237,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wasmtime
 websocket
 wepoll
 whitespace
@@ -1211,6 +1249,7 @@ workspace
 writev
 xDS
 xDSes
+xdstp
 xeon
 xform
 xhtml

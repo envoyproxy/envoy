@@ -5,7 +5,8 @@
 #include "common/common/logger.h"
 #include "common/memory/stats.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/symbol_table_creator.h"
+
+#include "test/test_common/global.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -13,6 +14,29 @@
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
+
+class TestSymbolTableHelper {
+public:
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return symbol_table_; }
+
+private:
+  SymbolTableImpl symbol_table_;
+};
+
+// Symbol table wrapper that instantiates a shared, reference-counted, global
+// symbol table. This is needed by the mocking infrastructure, as Envoy mocks
+// are constructed without any context, but StatNames that are symbolized from
+// one mock may need to be entered into stat storage in another one. Thus they
+// must be connected by global state.
+class TestSymbolTable {
+public:
+  SymbolTable& operator*() { return global_.get().symbolTable(); }
+  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
+  SymbolTable* operator->() { return &global_.get().symbolTable(); }
+  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
+  Envoy::Test::Global<TestSymbolTableHelper> global_;
+};
 
 /**
  * Calls fn for a sampling of plausible stat names given a number of clusters.
@@ -75,6 +99,11 @@ private:
   const size_t memory_at_construction_;
 };
 
+class SymbolTableProvider {
+public:
+  TestSymbolTable global_symbol_table_;
+};
+
 // Helper class to use in lieu of an actual Stats::Store for doing lookups by
 // name. The intent is to remove the deprecated Scope::counter(const
 // std::string&) methods, and always use this class for accessing stats by
@@ -88,9 +117,9 @@ private:
 // use the StatName as a key, we must use strings in tests to avoid forcing
 // the tests to construct the StatName using the same pattern of dynamic
 // and symbol strings as production.
-class TestStore : public IsolatedStoreImpl {
+class TestStore : public SymbolTableProvider, public IsolatedStoreImpl {
 public:
-  TestStore() = default;
+  TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
@@ -163,18 +192,6 @@ private:
           upper_bound);                                                                            \
     }                                                                                              \
   } while (false)
-
-class SymbolTableCreatorTestPeer {
-public:
-  ~SymbolTableCreatorTestPeer() { SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
-
-  void setUseFakeSymbolTables(bool use_fakes) {
-    SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
-  }
-
-private:
-  const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
-};
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to
 // the same number. The serialized number is also returned, which can be

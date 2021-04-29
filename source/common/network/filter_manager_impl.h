@@ -5,6 +5,7 @@
 
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/linked_object.h"
 
@@ -100,11 +101,13 @@ public:
  */
 class FilterManagerImpl {
 public:
-  FilterManagerImpl(FilterManagerConnection& connection) : connection_(connection) {}
+  FilterManagerImpl(FilterManagerConnection& connection, const Socket& socket)
+      : connection_(connection), socket_(socket) {}
 
   void addWriteFilter(WriteFilterSharedPtr filter);
   void addFilter(FilterSharedPtr filter);
   void addReadFilter(ReadFilterSharedPtr filter);
+  void removeReadFilter(ReadFilterSharedPtr filter);
   bool initializeReadFilters();
   void onRead();
   FilterStatus onWrite();
@@ -115,6 +118,7 @@ private:
         : parent_(parent), filter_(filter) {}
 
     Connection& connection() override { return parent_.connection_; }
+    const Socket& socket() override { return parent_.socket_; }
     void continueReading() override { parent_.onContinueReading(this, parent_.connection_); }
     void injectReadDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
       FixedReadBufferSource buffer_source{data, end_stream};
@@ -139,6 +143,7 @@ private:
         : parent_(parent), filter_(std::move(filter)) {}
 
     Connection& connection() override { return parent_.connection_; }
+    const Socket& socket() override { return parent_.socket_; }
     void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
       FixedWriteBufferSource buffer_source{data, end_stream};
       parent_.onResumeWriting(this, buffer_source);
@@ -156,6 +161,7 @@ private:
   void onResumeWriting(ActiveWriteFilter* filter, WriteBufferSource& buffer_source);
 
   FilterManagerConnection& connection_;
+  const Socket& socket_;
   Upstream::HostDescriptionConstSharedPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<ActiveWriteFilterPtr> downstream_filters_;

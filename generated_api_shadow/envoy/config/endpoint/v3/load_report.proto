@@ -129,14 +129,14 @@ message ClusterStats {
         "envoy.api.v2.endpoint.ClusterStats.DroppedRequests";
 
     // Identifier for the policy specifying the drop.
-    string category = 1 [(validate.rules).string = {min_bytes: 1}];
+    string category = 1 [(validate.rules).string = {min_len: 1}];
 
     // Total number of deliberately dropped requests for the category.
     uint64 dropped_count = 2;
   }
 
   // The name of the cluster.
-  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The eds_cluster_config service_name of the cluster.
   // It's possible that two clusters send the same service_name to EDS,

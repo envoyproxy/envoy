@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
@@ -66,25 +67,20 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
-                                      const Http::RequestHeaderMap& request_headers) {
+Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_info) {
   // Exclude health check requests immediately.
   if (stream_info.healthCheck()) {
     return {Reason::HealthCheck, false};
   }
 
-  Http::TraceStatus trace_status =
-      stream_info.getRequestIDExtension()->getTraceStatus(request_headers);
-
-  switch (trace_status) {
-  case Http::TraceStatus::Client:
-    return {Reason::ClientForced, true};
-  case Http::TraceStatus::Forced:
-    return {Reason::ServiceForced, true};
-  case Http::TraceStatus::Sampled:
-    return {Reason::Sampling, true};
-  case Http::TraceStatus::NoTrace:
-    return {Reason::NotTraceableRequestId, false};
+  const Tracing::Reason trace_reason = stream_info.traceReason();
+  switch (trace_reason) {
+  case Reason::ClientForced:
+  case Reason::ServiceForced:
+  case Reason::Sampling:
+    return {trace_reason, true};
+  default:
+    return {trace_reason, false};
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -173,7 +169,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
         Tracing::Tags::get().HttpProtocol,
         Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
-    const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
+    const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
 
     if (remote_address->type() == Network::Address::Type::Ip) {
       const auto remote_ip = remote_address->ip();
@@ -235,6 +231,8 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
 
   if (nullptr != stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName,
+                stream_info.upstreamHost()->cluster().observabilityName());
   }
 
   // Post response data.
@@ -322,8 +320,9 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   if (!ctx.request_headers) {
     return default_value_;
   }
-  const Http::HeaderEntry* entry = ctx.request_headers->get(name_);
-  return entry ? entry->value().getStringView() : default_value_;
+  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
+  const auto entry = ctx.request_headers->get(name_);
+  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
@@ -351,10 +350,10 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     span.setTag(tag(), value.string_value());
     return;
   case ProtobufWkt::Value::kListValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.list_value()));
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.list_value()));
     return;
   case ProtobufWkt::Value::kStructValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.struct_value()));
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.struct_value()));
     return;
   default:
     break;

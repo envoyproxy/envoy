@@ -37,6 +37,7 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/grpc:status",
         "//include/envoy/network:address_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/http:status_lib",
     ],
 )
@@ -78,6 +79,7 @@ envoy_cc_library(
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:status",
+        "//include/envoy/matcher:matcher_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stream_info:stream_info_interface",
@@ -102,6 +104,7 @@ envoy_cc_library(
         "abseil_inlined_vector",
     ],
     deps = [
+        ":header_formatter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
     ],
@@ -137,5 +140,14 @@ envoy_cc_library(
     hdrs = ["request_id_extension.h"],
     deps = [
         ":header_map_interface",
+        "//include/envoy/tracing:trace_reason_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_formatter_interface",
+    hdrs = ["header_formatter.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
     ],
 )

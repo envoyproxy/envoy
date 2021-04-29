@@ -2,7 +2,6 @@
 
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/stat_merger.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/test_common/utility.h"
@@ -303,43 +302,10 @@ TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
   EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,,,world"));
 }
 
-TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
-  init(std::make_unique<FakeSymbolTableImpl>());
-
-  for (uint32_t i = 1; i < 256; ++i) {
-    char ch = static_cast<char>(i);
-    absl::string_view one_char(&ch, 1);
-    EXPECT_EQ(0, dynamicEncodeDecodeTest(absl::StrCat("D:", one_char))) << "dynamic=" << one_char;
-    EXPECT_EQ(0, dynamicEncodeDecodeTest(one_char)) << "symbolic=" << one_char;
-  }
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:dynamic"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello...world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.D:world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("one.D:two.three.D:four.D:five.six.D:seven,eight.nine"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:one,two,three"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..D:world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..D:world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("aV.D:,b"));
-
-  // TODO(#10008): these tests fail because fake/real symbol tables
-  // deal with empty components differently.
-  // EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,,world"));
-  // EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,,,world"));
-}
-
 class StatMergerThreadLocalTest : public testing::Test {
 protected:
-  SymbolTablePtr symbol_table_{SymbolTableCreator::makeSymbolTable()};
-  AllocatorImpl alloc_{*symbol_table_};
+  SymbolTableImpl symbol_table_;
+  AllocatorImpl alloc_{symbol_table_};
   ThreadLocalStoreImpl store_{alloc_};
 };
 

@@ -113,11 +113,11 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
 
 // Test that using ?include_eds parameter adds EDS to the config dump.
 TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  cluster_map.emplace(cluster.info_->name_, cluster);
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
 
@@ -186,11 +186,11 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
 
 // Test EDS config dump while multiple localities and priorities exist
 TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  cluster_map.emplace(cluster.info_->name_, cluster);
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
 
@@ -398,11 +398,11 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
 // We add both static and dynamic endpoint config to the dump, but expect only
 // dynamic in the JSON with ?resource=dynamic_endpoint_configs.
 TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster_1;
-  cluster_map.emplace(cluster_1.info_->name_, cluster_1);
+  cluster_maps.active_clusters_.emplace(cluster_1.info_->name_, cluster_1);
 
   ON_CALL(*cluster_1.info_, addedViaApi()).WillByDefault(Return(true));
 
@@ -419,7 +419,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster_2;
   cluster_2.info_->name_ = "fake_cluster_2";
-  cluster_map.emplace(cluster_2.info_->name_, cluster_2);
+  cluster_maps.active_clusters_.emplace(cluster_2.info_->name_, cluster_2);
 
   ON_CALL(*cluster_2.info_, addedViaApi()).WillByDefault(Return(false));
 

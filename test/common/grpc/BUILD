@@ -82,7 +82,6 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:headers_lib",
-        "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:global_lib",
     ],
@@ -133,6 +132,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:assert_lib",
         "//test/mocks/secret:secret_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -149,6 +149,7 @@ envoy_cc_test_library(
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
         "//source/common/http/http2:conn_pool_lib",
+        "//source/common/router:context_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
@@ -183,5 +184,15 @@ envoy_cc_test_library(
     deps = [
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "google_async_client_cache_test",
+    srcs = ["google_async_client_cache_test.cc"],
+    deps = [
+        "//source/common/grpc:google_async_client_cache",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:global_lib",
     ],
 )

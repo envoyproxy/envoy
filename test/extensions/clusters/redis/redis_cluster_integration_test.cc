@@ -20,7 +20,11 @@ namespace {
 const std::string& listenerConfig() {
   CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -36,7 +40,7 @@ static_resources:
       filters:
         name: redis
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
           stat_prefix: redis_stats
           prefix_routes:
             catch_all_route:
@@ -118,7 +122,7 @@ const std::string& testConfigWithAuth() {
   CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
           auth_password: { inline_string: somepassword }
 )EOF");
 }
@@ -171,7 +175,8 @@ public:
     });
 
     on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
-      mock_rng_ = dynamic_cast<Random::MockRandomGenerator*>(&(test_server.server().random()));
+      mock_rng_ = dynamic_cast<Random::MockRandomGenerator*>(
+          &(test_server.server().api().randomGenerator()));
       // Abort now if we cannot downcast the server's random number generator pointer.
       ASSERT_TRUE(mock_rng_ != nullptr);
       // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.

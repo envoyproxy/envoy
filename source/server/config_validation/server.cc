@@ -24,14 +24,16 @@ bool validateConfig(const Options& options,
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
                               component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     return false;
   }
 }
@@ -44,18 +46,18 @@ ValidationInstance::ValidationInstance(
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
                                              !options.ignoreUnknownDynamicFields()),
-      stats_store_(store),
-      api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
+      stats_store_(store), api_(new Api::ValidationImpl(thread_factory, store, time_system,
+                                                        file_system, random_generator_)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system),
-      server_contexts_(*this) {
-  try {
-    initialize(options, local_address, component_factory);
-  } catch (const EnvoyException& e) {
+      http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
+      time_system_(time_system), server_contexts_(*this) {
+  TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
+  END_TRY
+  catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     shutdown();
@@ -81,17 +83,17 @@ void ValidationInstance::initialize(const Options& options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
-
   bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),
-      options.serviceNodeName());
+      stats().symbolTable(), bootstrap.node(), bootstrap.node_context_params(), local_address,
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_);
+      messageValidationContext().staticValidationVisitor(), *api_, options_);
+  Configuration::InitialImpl initial_config(bootstrap, options, *this);
+  admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
@@ -99,9 +101,9 @@ void ValidationInstance::initialize(const Options& options,
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      grpc_context_, accessLogManager(), singletonManager(), time_system_);
+      admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
+      localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
+      grpc_context_, router_context_, accessLogManager(), singletonManager(), options);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
@@ -116,6 +118,7 @@ void ValidationInstance::shutdown() {
     config_.clusterManager()->shutdown();
   }
   thread_local_.shutdownThread();
+  dispatcher_->shutdown();
 }
 
 } // namespace Server

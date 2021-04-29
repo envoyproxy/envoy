@@ -1,0 +1,59 @@
+health_check_config {
+  timeout {
+    seconds: 1
+  }
+  interval {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+    value: 2
+  }
+  alt_port {
+    value: 2
+  }
+  grpc_health_check {
+    service_name: "service"
+  }
+  initial_jitter {
+    seconds: 1
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+      }
+      status: 200
+    }
+    tcp_respond {
+    }
+    grpc_respond {
+      grpc_respond_headers {
+        headers {
+          headers {
+            key: ":status"
+            value: "200"
+          }
+          headers {
+            key: "content-type"
+            value: "application/grpc"
+          }
+          headers {
+            key: ":status"
+            value: "200"
+          }
+        }
+        status: 200
+      }
+      grpc_respond_bytes {
+        grpc_respond_unstructured_bytes {
+          data: "\005\000\000\000"
+        }
+        chunk_size_for_structured_response: 3
+      }
+    }
+  }
+}

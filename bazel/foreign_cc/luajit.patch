@@ -1,5 +1,5 @@
 diff --git a/src/Makefile b/src/Makefile
-index f56465d..5d91fa7 100644
+index e65b55e..f0a61dd 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -27,7 +27,7 @@ NODOTABIVER= 51
@@ -33,38 +33,35 @@ index f56465d..5d91fa7 100644
  #
  # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
  #XCFLAGS+= -DLUAJIT_DISABLE_JIT
-@@ -111,7 +111,7 @@ XCFLAGS=
- #XCFLAGS+= -DLUAJIT_NUMMODE=2
- #
- # Enable GC64 mode for x64.
--#XCFLAGS+= -DLUAJIT_ENABLE_GC64
-+XCFLAGS+= -DLUAJIT_ENABLE_GC64
- #
- ##############################################################################
-
-@@ -587,7 +587,7 @@ endif
-
+@@ -591,7 +591,7 @@ endif
+ 
  Q= @
  E= @echo
 -#Q=
 +Q=
  #E= @:
-
+ 
  ##############################################################################
-EOF
---- a/src/msvcbuild.bat	2020-08-13 18:42:05.667354300 +0000
-+++ b/src/msvcbuild.bat	2020-08-13 19:03:25.092297900 +0000
-@@ -14,7 +14,7 @@
+diff --git a/src/msvcbuild.bat b/src/msvcbuild.bat
+index ae035dc..0e7eac9 100644
+--- a/src/msvcbuild.bat
++++ b/src/msvcbuild.bat
+@@ -13,9 +13,7 @@
  @if not defined INCLUDE goto :FAIL
  
  @setlocal
+-@rem Add more debug flags here, e.g. DEBUGCFLAGS=/DLUA_USE_APICHECK
+-@set DEBUGCFLAGS=
 -@set LJCOMPILE=cl /nologo /c /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline
 +@set LJCOMPILE=cl /nologo /c /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline /DLUAJIT_ENABLE_LUA52COMPAT
  @set LJLINK=link /nologo
  @set LJMT=mt /nologo
  @set LJLIB=lib /nologo /nodefaultlib
-@@ -25,7 +25,7 @@
+@@ -24,10 +22,9 @@
+ @set DASC=vm_x64.dasc
+ @set LJDLLNAME=lua51.dll
  @set LJLIBNAME=lua51.lib
+-@set BUILDTYPE=release
  @set ALL_LIB=lib_base.c lib_math.c lib_bit.c lib_string.c lib_table.c lib_io.c lib_os.c lib_package.c lib_debug.c lib_jit.c lib_ffi.c
  
 -%LJCOMPILE% host\minilua.c
@@ -72,7 +69,7 @@ EOF
  @if errorlevel 1 goto :BAD
  %LJLINK% /out:minilua.exe minilua.obj
  @if errorlevel 1 goto :BAD
-@@ -48,7 +48,7 @@
+@@ -51,7 +48,7 @@ if exist minilua.exe.manifest^
  minilua %DASM% -LN %DASMFLAGS% -o host\buildvm_arch.h %DASC%
  @if errorlevel 1 goto :BAD
  
@@ -81,16 +78,19 @@ EOF
  @if errorlevel 1 goto :BAD
  %LJLINK% /out:buildvm.exe buildvm*.obj
  @if errorlevel 1 goto :BAD
-@@ -72,24 +72,35 @@
+@@ -75,26 +72,35 @@ buildvm -m folddef -o lj_folddef.h lj_opt_fold.c
  
  @if "%1" neq "debug" goto :NODEBUG
  @shift
--@set LJCOMPILE=%LJCOMPILE% /Zi
+-@set BUILDTYPE=debug
+-@set LJCOMPILE=%LJCOMPILE% /Zi %DEBUGCFLAGS%
+-@set LJLINK=%LJLINK% /opt:ref /opt:icf /incremental:no
 +@set LJCOMPILE=%LJCOMPILE% /O0 /Z7
- @set LJLINK=%LJLINK% /debug /opt:ref /opt:icf /incremental:no
++@set LJLINK=%LJLINK% /debug /opt:ref /opt:icf /incremental:no
 +@set LJCRTDBG=d
 +@goto :ENDDEBUG
  :NODEBUG
+-@set LJLINK=%LJLINK% /%BUILDTYPE%
 +@set LJCOMPILE=%LJCOMPILE% /O2 /Z7
 +@set LJLINK=%LJLINK% /release /incremental:no
 +@set LJCRTDBG=
@@ -122,7 +122,7 @@ EOF
  @if errorlevel 1 goto :BAD
 diff --git a/build.py b/build.py
 new file mode 100755
-index 0000000..9c71271
+index 0000000..3eb74ff
 --- /dev/null
 +++ b/build.py
 @@ -0,0 +1,56 @@
@@ -168,7 +168,7 @@ index 0000000..9c71271
 +    dst_dir = os.getcwd() + "/luajit"
 +    shutil.copytree(src_dir, os.path.basename(src_dir))
 +    os.chdir(os.path.basename(src_dir) + "/src")
-+    os.system('msvcbuild.bat gc64 ' + os.getenv('WINDOWS_DBG_BUILD', '') + ' static')
++    os.system('msvcbuild.bat ' + os.getenv('WINDOWS_DBG_BUILD', '') + ' static')
 +    os.makedirs(dst_dir + "/lib", exist_ok=True)
 +    shutil.copy("lua51.lib", dst_dir + "/lib")
 +    os.makedirs(dst_dir + "/include/luajit-2.1", exist_ok=True)

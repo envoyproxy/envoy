@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/json_escape_string.h"
 #include "common/common/lock_guard.h"
 
 #include "absl/strings/ascii.h"
@@ -202,7 +203,18 @@ void Registry::setLogLevel(spdlog::level::level_enum log_level) {
 
 void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
-    logger.logger_->set_pattern(log_format);
+    auto formatter = std::make_unique<spdlog::pattern_formatter>();
+    formatter
+        ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
+            CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
+        .set_pattern(log_format);
+
+    // Escape log payload as JSON string when it sees "%j".
+    formatter
+        ->add_flag<CustomFlagFormatter::EscapeMessageJsonString>(
+            CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
+        .set_pattern(log_format);
+    logger.logger_->set_formatter(std::move(formatter));
   }
 }
 
@@ -217,5 +229,28 @@ Logger* Registry::logger(const std::string& log_name) {
   return logger_to_return;
 }
 
+namespace CustomFlagFormatter {
+
+void EscapeMessageNewLine::format(const spdlog::details::log_msg& msg, const std::tm&,
+                                  spdlog::memory_buf_t& dest) {
+  const std::string escaped = absl::StrReplaceAll(
+      absl::string_view(msg.payload.data(), msg.payload.size()), replacements());
+  dest.append(escaped.data(), escaped.data() + escaped.size());
+}
+
+void EscapeMessageJsonString::format(const spdlog::details::log_msg& msg, const std::tm&,
+                                     spdlog::memory_buf_t& dest) {
+
+  absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
+  const uint64_t required_space = JsonEscaper::extraSpace(payload);
+  if (required_space == 0) {
+    dest.append(payload.data(), payload.data() + payload.size());
+    return;
+  }
+  const std::string escaped = JsonEscaper::escapeString(payload, required_space);
+  dest.append(escaped.data(), escaped.data() + escaped.size());
+}
+
+} // namespace CustomFlagFormatter
 } // namespace Logger
 } // namespace Envoy

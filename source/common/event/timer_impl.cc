@@ -37,15 +37,18 @@ TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispat
       this);
 }
 
-void TimerImpl::disableTimer() { event_del(&raw_event_); }
+void TimerImpl::disableTimer() {
+  ASSERT(dispatcher_.isThreadSafe());
+  event_del(&raw_event_);
+}
 
-void TimerImpl::enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* object) {
+void TimerImpl::enableTimer(const std::chrono::milliseconds d, const ScopeTrackedObject* object) {
   timeval tv;
   TimerUtils::durationToTimeval(d, tv);
   internalEnableTimer(tv, object);
 }
 
-void TimerImpl::enableHRTimer(const std::chrono::microseconds& d,
+void TimerImpl::enableHRTimer(const std::chrono::microseconds d,
                               const ScopeTrackedObject* object = nullptr) {
   timeval tv;
   TimerUtils::durationToTimeval(d, tv);
@@ -53,6 +56,7 @@ void TimerImpl::enableHRTimer(const std::chrono::microseconds& d,
 }
 
 void TimerImpl::internalEnableTimer(const timeval& tv, const ScopeTrackedObject* object) {
+  ASSERT(dispatcher_.isThreadSafe());
   object_ = object;
 
   if (!activate_timers_next_event_loop_ && tv.tv_sec == 0 && tv.tv_usec == 0) {
@@ -62,7 +66,10 @@ void TimerImpl::internalEnableTimer(const timeval& tv, const ScopeTrackedObject*
   }
 }
 
-bool TimerImpl::enabled() { return 0 != evtimer_pending(&raw_event_, nullptr); }
+bool TimerImpl::enabled() {
+  ASSERT(dispatcher_.isThreadSafe());
+  return 0 != evtimer_pending(&raw_event_, nullptr);
+}
 
 } // namespace Event
 } // namespace Envoy

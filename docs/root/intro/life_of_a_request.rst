@@ -118,99 +118,8 @@ It's helpful to focus on one at a time, so this example covers the following:
 
 We assume a static bootstrap configuration file for simplicity:
 
-.. code-block:: yaml
-
-  static_resources:
-    listeners:
-    # There is a single listener bound to port 443.
-    - name: listener_https
-      address:
-        socket_address:
-          protocol: TCP
-          address: 0.0.0.0
-          port_value: 443
-      # A single listener filter exists for TLS inspector.
-      listener_filters:
-      - name: "envoy.filters.listener.tls_inspector"
-        typed_config: {}
-      # On the listener, there is a single filter chain that matches SNI for acme.com.
-      filter_chains:
-      - filter_chain_match:
-          # This will match the SNI extracted by the TLS Inspector filter.
-          server_names: ["acme.com"]
-        # Downstream TLS configuration.
-        transport_socket:
-          name: envoy.transport_sockets.tls
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-            common_tls_context:
-              tls_certificates:
-              - certificate_chain: { filename: "certs/servercert.pem" }
-                private_key: { filename: "certs/serverkey.pem" }
-        filters:
-        # The HTTP connection manager is the only network filter.
-        - name: envoy.filters.network.http_connection_manager
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-            stat_prefix: ingress_http
-            use_remote_address: true
-            http2_protocol_options:
-              max_concurrent_streams: 100
-            # File system based access logging.
-            access_log:
-              - name: envoy.access_loggers.file
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-                  path: "/var/log/envoy/access.log"
-            # The route table, mapping /foo to some_service.
-            route_config:
-              name: local_route
-              virtual_hosts:
-              - name: local_service
-                domains: ["acme.com"]
-                routes:
-                - match:
-                    path: "/foo"
-                  route:
-                    cluster: some_service
-        # CustomFilter and the HTTP router filter are the HTTP filter chain.
-        http_filters:
-            - name: some.customer.filter
-            - name: envoy.filters.http.router
-    clusters:
-    - name: some_service
-      connect_timeout: 5s
-      # Upstream TLS configuration.
-      transport_socket:
-        name: envoy.transport_sockets.tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-      load_assignment:
-        cluster_name: some_service
-        # Static endpoint assignment.
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 10.1.2.10
-                  port_value: 10002
-          - endpoint:
-              address:
-                socket_address:
-                  address: 10.1.2.11
-                  port_value: 10002
-      http2_protocol_options:
-        max_concurrent_streams: 100
-    - name: some_statsd_sink
-      connect_timeout: 5s
-      # The rest of the configuration for statsd sink cluster.
-  # statsd sink.
-  stats_sinks:
-     - name: envoy.stat_sinks.statsd
-       typed_config:
-         "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
-         tcp_cluster_name: some_statsd_cluster
+.. literalinclude:: _include/life-of-a-request.yaml
+    :language: yaml
 
 High level architecture
 -----------------------
@@ -525,8 +434,9 @@ When ``decodeHeaders()`` is invoked on the :ref:`router <arch_overview_http_rout
 route selection is finalized and a cluster is picked. The HCM selects a route from its
 ``RouteConfiguration`` at the start of HTTP filter chain execution. This is referred to as the
 *cached route*. Filters may modify headers and cause a new route to be selected, by asking HCM to
-clear the route cache and requesting HCM to reevaluate the route selection. When the router filter
-is invoked, the route is finalized. The selected route’s configuration will point at an upstream
+clear the route cache and requesting HCM to reevaluate the route selection. Filters may also
+directly set this cached route selection via a `setRoute` callback. When the router filter is
+invoked, the route is finalized. The selected route’s configuration will point at an upstream
 cluster name. The router filter then asks the `ClusterManager` for an HTTP :ref:`connection pool
 <arch_overview_conn_pool>` for the cluster. This involves load balancing and the connection pool,
 discussed in the next section.
@@ -598,7 +508,7 @@ downstream transport socket extensions.
 
 The request, consisting of headers, and optional body and trailers, is proxied upstream, and the
 response is proxied downstream. The response passes through the HTTP and network filters in the
-:ref:`opposite order <arch_overview_http_filters_ordering>`. from the request.
+:ref:`opposite order <arch_overview_http_filters_ordering>` from the request.
 
 Various callbacks for decoder/encoder request lifecycle events will be invoked in HTTP filters, e.g.
 when response trailers are being forwarded or the request body is streamed. Similarly, read/write
@@ -615,7 +525,7 @@ response header/body with end-stream set are received. This is handled in
 It is possible for a request to terminate early. This may be due to (but not limited to):
 
 * Request timeout.
-* Upstream endpoint steam reset.
+* Upstream endpoint stream reset.
 * HTTP filter stream reset.
 * Circuit breaking.
 * Unavailability of upstream resources, e.g. missing a cluster for a route.

@@ -8,14 +8,16 @@
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/config/api_version.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
@@ -45,7 +47,7 @@ using ::testing::ReturnRef;
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : api_(Api::createApiForTest(stats_store_)),
+    : api_(Api::createApiForTest(stats_store_, time_system_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher("test_thread",
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
@@ -65,11 +67,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
-  ENVOY_LOG_MISC(debug, "Using new codecs");
-  setNewCodecs();
-#endif
+  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -92,11 +90,12 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
-  connection->enableHalfClose(enable_half_close_);
+  connection->enableHalfClose(enableHalfClose());
   return connection;
 }
 
 void BaseIntegrationTest::initialize() {
+  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
@@ -106,15 +105,55 @@ void BaseIntegrationTest::initialize() {
   createEnvoy();
 }
 
+Network::TransportSocketFactoryPtr BaseIntegrationTest::createUpstreamTlsContext() {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string yaml = absl::StrFormat(
+      R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain: { filename: "%s" }
+    private_key: { filename: "%s" }
+  validation_context:
+    trusted_ca: { filename: "%s" }
+)EOF",
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  TestUtility::loadFromYaml(yaml, tls_context);
+  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
+  }
+  if (upstream_config_.upstream_protocol_ != FakeHttpConnection::Type::HTTP3) {
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
+    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+  } else {
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+    quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+
+    std::vector<std::string> server_names;
+    auto& config_factory = Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(
+        "envoy.transport_sockets.quic");
+    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names);
+  }
+}
+
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    Network::TransportSocketFactoryPtr factory =
+        upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(new AutonomousUpstream(
-          endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
+          std::move(factory), endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
-                                                    enable_half_close_, udp_fake_upstream_));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(std::move(factory), endpoint, upstreamConfig()));
     }
   }
 }
@@ -133,6 +172,8 @@ void BaseIntegrationTest::createEnvoy() {
     std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     config_helper_.addConfigModifier(
         [lds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_resource_api_version(
+              envoy::config::core::v3::V3);
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
         });
   }
@@ -146,14 +187,14 @@ void BaseIntegrationTest::createEnvoy() {
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) lds;
+    envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
       ProtobufWkt::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
-    TestEnvironment::writeStringToFileForTest(lds_path, MessageUtil::getJsonStringFromMessage(lds),
-                                              true);
+    TestEnvironment::writeStringToFileForTest(
+        lds_path, MessageUtil::getJsonStringFromMessageOrDie(lds), true);
 
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.
@@ -175,24 +216,58 @@ void BaseIntegrationTest::createEnvoy() {
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
-  upstream_protocol_ = protocol;
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  upstream_config_.upstream_protocol_ = protocol;
+  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          cluster->mutable_http2_protocol_options();
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   } else {
-    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP3, "");
+    setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
+    upstream_tls_ = true;
+    config_helper_.configureUpstreamTls(false, true);
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          // Docker doesn't allow writing to the v6 address returned by
+          // Network::Utility::getLocalAddress.
+          if (version_ == Network::Address::IpVersion::v6) {
+            auto* bind_config_address = bootstrap.mutable_static_resources()
+                                            ->mutable_clusters(0)
+                                            ->mutable_upstream_bind_config()
+                                            ->mutable_source_address();
+            bind_config_address->set_address("::1");
+            bind_config_address->set_port_value(0);
+          }
+
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http3_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
   }
 }
 
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
-                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                       Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options);
+                                                enableHalfClose(), options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -239,7 +314,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       registerPort(*port_it, listen_addr->ip()->port());
     }
   }
-  const auto admin_addr = test_server_->server().admin().socket().localAddress();
+  const auto admin_addr = test_server_->server().admin().socket().addressProvider().localAddress();
   if (admin_addr->type() == Network::Address::Type::Ip) {
     registerPort("admin", admin_addr->ip()->port());
   }
@@ -258,13 +333,16 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, use_real_stats_);
+      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
+      v2_bootstrap_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
-    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    // Using 2x default timeout to cover for slow TLS implementations (no inline asm) on slow
+    // computers (e.g., Raspberry Pi) that sometimes time out on TLS listeners here.
+    Event::TestTimeSystem::RealTimeBound bound(2 * TestUtility::DefaultTimeout);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
@@ -349,7 +427,7 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
   for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    std::string contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
       return contents.substr(index);
@@ -365,8 +443,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     return;
   }
   if (tls_xds_upstream_ == false) {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
@@ -382,10 +459,9 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2);
   }
-  xds_upstream_ = fake_upstreams_[1].get();
+  xds_upstream_ = fake_upstreams_.back().get();
 }
 
 void BaseIntegrationTest::createXdsConnection() {
@@ -417,47 +493,6 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
   }
 }
 
-AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
-    const std::string& expected_type_url, const std::string& expected_version,
-    const std::vector<std::string>& expected_resource_names, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
-  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-
-  if (expect_node) {
-    EXPECT_TRUE(discovery_request.has_node());
-    EXPECT_FALSE(discovery_request.node().id().empty());
-    EXPECT_FALSE(discovery_request.node().cluster().empty());
-  } else {
-    EXPECT_FALSE(discovery_request.has_node());
-  }
-
-  if (expected_type_url != discovery_request.type_url()) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
-                                             discovery_request.type_url(), expected_type_url);
-  }
-  if (!(expected_error_code == discovery_request.error_detail().code())) {
-    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
-                                             discovery_request.error_detail().code(),
-                                             expected_error_code);
-  }
-  EXPECT_TRUE(
-      IsSubstring("", "", expected_error_substring, discovery_request.error_detail().message()));
-  const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
-                                                discovery_request.resource_names().cend());
-  if (expected_resource_names != resource_names) {
-    return AssertionFailure() << fmt::format(
-               "resources {} do not match expected {} in {}", absl::StrJoin(resource_names, ","),
-               absl::StrJoin(expected_resource_names, ","), discovery_request.DebugString());
-  }
-  if (expected_version != discovery_request.version_info()) {
-    return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
-                                             discovery_request.version_info(), expected_version,
-                                             discovery_request.DebugString());
-  }
-  return AssertionSuccess();
-}
-
 AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
                             absl::string_view name) {
   if (set1 == set2) {
@@ -472,6 +507,48 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
     failure << x << ", ";
   }
   return failure << "}";
+}
+
+AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
+    const std::string& expected_type_url, const std::string& expected_version,
+    const std::vector<std::string>& expected_resource_names, bool expect_node,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+  envoy::service::discovery::v3::DiscoveryRequest discovery_request;
+  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+
+  if (expect_node) {
+    EXPECT_TRUE(discovery_request.has_node());
+    EXPECT_FALSE(discovery_request.node().id().empty());
+    EXPECT_FALSE(discovery_request.node().cluster().empty());
+  } else {
+    EXPECT_FALSE(discovery_request.has_node());
+  }
+  last_node_.CopyFrom(discovery_request.node());
+
+  if (expected_type_url != discovery_request.type_url()) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
+                                             discovery_request.type_url(), expected_type_url);
+  }
+  if (!(expected_error_code == discovery_request.error_detail().code())) {
+    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
+                                             discovery_request.error_detail().code(),
+                                             expected_error_code);
+  }
+  EXPECT_TRUE(
+      IsSubstring("", "", expected_error_substring, discovery_request.error_detail().message()));
+  const std::set<std::string> resource_names_in_request(discovery_request.resource_names().cbegin(),
+                                                        discovery_request.resource_names().cend());
+  if (auto resource_name_result = compareSets(
+          std::set<std::string>(expected_resource_names.cbegin(), expected_resource_names.cend()),
+          resource_names_in_request, "Sotw resource names")) {
+    return resource_name_result;
+  }
+  if (expected_version != discovery_request.version_info()) {
+    return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
+                                             discovery_request.version_info(), expected_version,
+                                             discovery_request.DebugString());
+  }
+  return AssertionSuccess();
 }
 
 AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
@@ -497,13 +574,14 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) request;
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.
   if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
     return AssertionFailure() << "Weird node field";
   }
+  last_node_.CopyFrom(request.node());
   if (request.type_url() != expected_type_url) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
                                              request.type_url(), expected_type_url);

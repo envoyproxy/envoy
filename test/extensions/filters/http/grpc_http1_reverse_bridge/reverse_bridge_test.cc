@@ -532,9 +532,6 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
     buffer.add("abcdefgh", 8);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
     EXPECT_EQ("fgh", buffer.toString());
-    EXPECT_CALL(decoder_callbacks_, streamInfo());
-    EXPECT_CALL(decoder_callbacks_.stream_info_,
-                setResponseCodeDetails(absl::string_view("grpc_bridge_content_type_wrong")));
   }
 
   {
@@ -549,15 +546,14 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 
   Http::TestResponseHeaderMapImpl headers({{":status", "400"}});
-  EXPECT_EQ(Http::FilterHeadersStatus::ContinueAndEndStream,
-            filter_->encodeHeaders(headers, false));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
-  EXPECT_THAT(
-      headers,
-      HeaderValueOf(
-          Http::Headers::get().GrpcMessage,
-          "envoy reverse bridge: upstream responded with no content-type header, status code 400"));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::OK,
+          "envoy reverse bridge: upstream responded with no content-type header, status code 400",
+          _, absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)), _));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
 }
 
 // Tests that a gRPC is downgraded to application/x-protobuf and that if the response
@@ -583,9 +579,6 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
     buffer.add("abcdefgh", 8);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
     EXPECT_EQ("fgh", buffer.toString());
-    EXPECT_CALL(decoder_callbacks_, streamInfo());
-    EXPECT_CALL(decoder_callbacks_.stream_info_,
-                setResponseCodeDetails(absl::string_view("grpc_bridge_content_type_wrong")));
   }
 
   {
@@ -601,13 +594,15 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
 
   Http::TestResponseHeaderMapImpl headers(
       {{":status", "400"}, {"content-type", "application/json"}});
-  EXPECT_EQ(Http::FilterHeadersStatus::ContinueAndEndStream,
-            filter_->encodeHeaders(headers, false));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage,
-                                     "envoy reverse bridge: upstream responded with unsupported "
-                                     "content-type application/json, status code 400"));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::OK,
+          "envoy reverse bridge: upstream responded with unsupported "
+          "content-type application/json, status code 400",
+          _, absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)), _));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
 }
 
 // Tests that the filter passes a GRPC request through without modification because it is disabled

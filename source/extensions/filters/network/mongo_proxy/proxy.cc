@@ -38,7 +38,8 @@ using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager,
                      TimeSource& time_source)
     : time_source_(time_source) {
-  file_ = log_manager.createAccessLog(file_name);
+  file_ = log_manager.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
 }
 
 void AccessLog::logMessage(const Message& message, bool full,
@@ -366,11 +367,11 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
   }
 
   if (event == Network::ConnectionEvent::RemoteClose && !active_query_list_.empty()) {
-    stats_.cx_destroy_local_with_active_rq_.inc();
+    stats_.cx_destroy_remote_with_active_rq_.inc();
   }
 
   if (event == Network::ConnectionEvent::LocalClose && !active_query_list_.empty()) {
-    stats_.cx_destroy_remote_with_active_rq_.inc();
+    stats_.cx_destroy_local_with_active_rq_.inc();
   }
 }
 

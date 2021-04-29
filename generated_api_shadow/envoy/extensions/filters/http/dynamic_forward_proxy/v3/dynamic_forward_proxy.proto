@@ -55,6 +55,10 @@ message PerRouteConfig {
     // :ref:`HCM host rewrite header <envoy_api_field_config.route.v3.RouteAction.auto_host_rewrite>`
     // given that the value set here would be used for DNS lookups whereas the value set in the HCM
     // would be used for host header forwarding which is not the desired outcome.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     string host_rewrite_header = 2;
   }
 }

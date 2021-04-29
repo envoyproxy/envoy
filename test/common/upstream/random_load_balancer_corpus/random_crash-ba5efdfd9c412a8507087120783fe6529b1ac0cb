@@ -1,0 +1,38 @@
+load_balancer_test_case {
+common_lb_config {
+  healthy_panic_threshold {
+    value: 2.12199579096527e-314
+  }
+  locality_weighted_lb_config {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+actions {
+  preconnect {
+  }
+}
+actions {
+  preconnect {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+actions {
+  choose_host {
+  }
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 2
+    random_bytestring: 1
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 9007199259945536
+    random_bytestring: 1
+}
+seed_for_prng: 6
+}

@@ -2,6 +2,7 @@
 
 #include <sys/stat.h>
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -11,6 +12,10 @@
 
 namespace Envoy {
 namespace Api {
+
+struct EnvoyTcpInfo {
+  std::chrono::microseconds tcpi_rtt;
+};
 
 class OsSysCalls {
 public:
@@ -27,9 +32,14 @@ public:
   virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
 
   /**
+   * This interface is based on Windows `WSAIoctl`. It becomes equivalent with the POSIX interface
+   * with `in_buffer` as `argp` and the rest of the parameters ignored.
    * @see ioctl (man 2 ioctl)
+   * @see WSAIoctl (MSDN)
    */
-  virtual SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp) PURE;
+  virtual SysCallIntResult ioctl(os_fd_t sockfd, unsigned long control_code, void* in_buffer,
+                                 unsigned long in_buffer_len, void* out_buffer,
+                                 unsigned long out_buffer_len, unsigned long* bytes_returned) PURE;
 
   /**
    * @see writev (man 2 writev)
@@ -170,6 +180,16 @@ public:
    * @see man 2 accept. The fds returned are configured to be non-blocking.
    */
   virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see man 2 dup(2).
+   */
+  virtual SysCallSocketResult duplicate(os_fd_t oldfd) PURE;
+
+  /**
+   * @see man TCP_INFO. Get the tcp info for the socket.
+   */
+  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

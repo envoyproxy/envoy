@@ -19,7 +19,7 @@ class HttpTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                           public HttpTapConfig,
                           public std::enable_shared_from_this<HttpTapConfigImpl> {
 public:
-  HttpTapConfigImpl(envoy::config::tap::v3::TapConfig&& proto_config,
+  HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                     Extensions::Common::Tap::Sink* admin_streamer);
 
   // TapFilter::HttpTapConfig

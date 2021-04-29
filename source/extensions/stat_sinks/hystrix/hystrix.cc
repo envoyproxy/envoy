@@ -319,7 +319,10 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   // Separated out just so it's easier to understand
   auto on_destroy_callback = [this, &stream_decoder_filter_callbacks]() {
     ENVOY_LOG(debug, "stopped sending data to hystrix dashboard on port {}",
-              stream_decoder_filter_callbacks.connection()->remoteAddress()->asString());
+              stream_decoder_filter_callbacks.connection()
+                  ->addressProvider()
+                  .remoteAddress()
+                  ->asString());
 
     // Unregister the callbacks from the sink so data is no longer encoded through them.
     unregisterConnection(&stream_decoder_filter_callbacks);
@@ -328,8 +331,9 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   // Add the callback to the admin_filter list of callbacks
   admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
 
-  ENVOY_LOG(debug, "started sending data to hystrix dashboard on port {}",
-            stream_decoder_filter_callbacks.connection()->remoteAddress()->asString());
+  ENVOY_LOG(
+      debug, "started sending data to hystrix dashboard on port {}",
+      stream_decoder_filter_callbacks.connection()->addressProvider().remoteAddress()->asString());
   return Http::Code::OK;
 }
 
@@ -339,7 +343,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   }
   incCounter();
   std::stringstream ss;
-  Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
+  Upstream::ClusterManager::ClusterInfoMaps all_clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
   absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
@@ -370,7 +374,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
     }
   }
 
-  for (auto& cluster : clusters) {
+  for (auto& cluster : all_clusters.active_clusters_) {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.second.get().info();
 
     std::unique_ptr<ClusterStatsCache>& cluster_stats_cache_ptr =
@@ -389,7 +393,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
         cluster_info->statsScope()
             .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::NeverImport)
             .value(),
-        server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
+        server_.statsConfig().flushInterval(), time_histograms[cluster_info->name()], ss);
   }
 
   Buffer::OwnedImpl data;
@@ -407,9 +411,9 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   }
 
   // check if any clusters were removed, and remove from cache
-  if (clusters.size() < cluster_stats_cache_map_.size()) {
+  if (all_clusters.active_clusters_.size() < cluster_stats_cache_map_.size()) {
     for (auto it = cluster_stats_cache_map_.begin(); it != cluster_stats_cache_map_.end();) {
-      if (clusters.find(it->first) == clusters.end()) {
+      if (all_clusters.active_clusters_.find(it->first) == all_clusters.active_clusters_.end()) {
         auto next_it = std::next(it);
         cluster_stats_cache_map_.erase(it);
         it = next_it;

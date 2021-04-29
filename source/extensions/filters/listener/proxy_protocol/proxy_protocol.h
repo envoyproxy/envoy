@@ -69,6 +69,8 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 
 enum ProxyProtocolVersion { Unknown = -1, InProgress = -2, V1 = 1, V2 = 2 };
 
+enum class ReadOrParseState { Done, TryAgainLater, Error };
+
 /**
  * Implementation the PROXY Protocol listener filter
  * (https://github.com/haproxy/haproxy/blob/master/doc/proxy-protocol.txt)
@@ -92,33 +94,32 @@ private:
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
   void onRead();
-  void onReadWorker();
+  ReadOrParseState onReadWorker();
 
   /**
    * Helper function that attempts to read the proxy header
    * (delimited by \r\n if V1 format, or with length if V2)
-   * throws EnvoyException on any socket errors.
-   * @return bool true valid header, false if more data is needed.
+   * @return bool true valid header, false if more data is needed or socket errors occurred.
    */
-  bool readProxyHeader(Network::IoHandle& io_handle);
+  ReadOrParseState readProxyHeader(Network::IoHandle& io_handle);
 
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  bool parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
-                       size_t* buf_off = nullptr);
-  void parseTlvs(const std::vector<uint8_t>& tlvs);
-  bool readExtensions(Network::IoHandle& io_handle);
+  ReadOrParseState parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
+                                   size_t* buf_off = nullptr);
+  bool parseTlvs(const std::vector<uint8_t>& tlvs);
+  ReadOrParseState readExtensions(Network::IoHandle& io_handle);
 
   /**
-   * Given a char * & len, parse the header as per spec
+   * Given a char * & len, parse the header as per spec.
+   * @return bool true if parsing succeeded, false if parsing failed.
    */
-  void parseV1Header(char* buf, size_t len);
-  void parseV2Header(char* buf);
-  size_t lenV2Address(char* buf);
+  bool parseV1Header(char* buf, size_t len);
+  bool parseV2Header(char* buf);
+  absl::optional<size_t> lenV2Address(char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
-  Event::FileEventPtr file_event_;
 
   // The offset in buf_ that has been fully read
   size_t buf_off_{};

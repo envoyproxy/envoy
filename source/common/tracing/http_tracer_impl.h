@@ -13,6 +13,7 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/config/metadata.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
@@ -64,6 +65,7 @@ public:
   const std::string Status = "status";
   const std::string UpstreamAddress = "upstream_address";
   const std::string UpstreamCluster = "upstream_cluster";
+  const std::string UpstreamClusterName = "upstream_cluster.name";
   const std::string UserAgent = "user_agent";
   const std::string Zone = "zone";
 
@@ -102,13 +104,12 @@ public:
   static const std::string& toString(OperationName operation_name);
 
   /**
-   * Request might be traceable if x-request-id is traceable uuid or we do sampling tracing.
+   * Request might be traceable if the request ID is traceable or we do sampling tracing.
    * Note: there is a global switch which turns off tracing completely on server side.
    *
    * @return decision if request is traceable or not and Reason why.
    **/
-  static Decision isTracing(const StreamInfo::StreamInfo& stream_info,
-                            const Http::RequestHeaderMap& request_headers);
+  static Decision shouldTraceRequest(const StreamInfo::StreamInfo& stream_info);
 
   /**
    * Adds information obtained from the downstream request headers as tags to the active span.
@@ -170,7 +171,8 @@ public:
   void finishSpan() override {}
   void injectContext(Http::RequestHeaderMap&) override {}
   void setBaggage(absl::string_view, absl::string_view) override {}
-  std::string getBaggage(absl::string_view) override { return std::string(); }
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
+  std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }

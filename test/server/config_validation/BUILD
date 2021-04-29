@@ -7,19 +7,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "async_client_test",
-    srcs = ["async_client_test.cc"],
-    deps = [
-        "//include/envoy/http:message_interface",
-        "//source/common/http:message_lib",
-        "//source/server/config_validation:async_client_lib",
-        "//source/server/config_validation:dns_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/test_common:simulated_time_system_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
     deps = [
@@ -40,6 +27,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -62,6 +50,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server/config_validation:server_lib",
@@ -101,6 +90,7 @@ envoy_cc_fuzz_test(
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:gcc_build": [],
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -121,9 +111,9 @@ envoy_cc_test_library(
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -146,7 +136,6 @@ envoy_cc_test_library(
         "//test/fuzz:utility_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

@@ -33,7 +33,6 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -107,6 +106,7 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

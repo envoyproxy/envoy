@@ -14,7 +14,8 @@ public:
   // Api::OsSysCalls
   SysCallIntResult bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) override;
   SysCallIntResult chmod(const std::string& path, mode_t mode) override;
-  SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp) override;
+  SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp, unsigned long,
+                         void*, unsigned long, unsigned long*) override;
   SysCallSizeResult writev(os_fd_t fd, const iovec* iov, int num_iov) override;
   SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) override;
   SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) override;
@@ -45,7 +46,9 @@ public:
   SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) override;
   SysCallIntResult listen(os_fd_t sockfd, int backlog) override;
   SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) override;
+  SysCallSocketResult duplicate(os_fd_t oldfd) override;
   SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) override;
+  SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

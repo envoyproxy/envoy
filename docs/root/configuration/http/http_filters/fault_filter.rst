@@ -38,7 +38,7 @@ fault configuration. The currently supported header controls are:
 
 x-envoy-fault-abort-request
   HTTP status code to abort a request with. The header value should be an integer that specifies
-  the HTTP status code to return in response to a request and must be in the range [200, 600). 
+  the HTTP status code to return in response to a request and must be in the range [200, 600).
   In order for the header to work, :ref:`header_abort
   <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort>` needs to be set.
 
@@ -47,8 +47,8 @@ x-envoy-fault-abort-grpc-request
   the gRPC status code to return in response to a request. Its value range is [0, UInt32.Max] instead of [0, 16]
   to allow testing even not well-defined gRPC status codes. When this header is set, the HTTP response status code
   will be set to 200. In order for the header to work, :ref:`header_abort
-  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. If both 
-  *x-envoy-fault-abort-request* and *x-envoy-fault-abort-grpc-request* headers are set then 
+  <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort>` needs to be set. If both
+  *x-envoy-fault-abort-request* and *x-envoy-fault-abort-grpc-request* headers are set then
   *x-envoy-fault-abort-grpc-request* header will be **ignored** and fault response http status code will be
   set to *x-envoy-fault-abort-request* header value.
 
@@ -105,6 +105,10 @@ x-envoy-fault-throughput-response-percentage
   <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.max_active_faults>` setting to limit the
   maximum concurrent faults that can be active at any given time.
 
+.. note::
+
+  If the headers appear multiple times only the first value is used.
+
 The following is an example configuration that enables header control for both of the above
 options:
 
@@ -159,7 +163,7 @@ fault.http.abort.grpc_status
   aborted if the headers match. Defaults to the gRPC status code specified in the config.
   If this field is missing from both the runtime and the config, gRPC status code in the response
   will be derived from *fault.http.abort.http_status* field. This runtime key is only available when
-  the filter is :ref:`configured for abort <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
+  the filter is :ref:`configured for abort <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.abort>`.
 
 fault.http.delay.fixed_delay_percent
   % of requests that will be delayed if the headers match. Defaults to the

@@ -14,9 +14,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   ctx.query_rec = domain_query;
   ctx.query_context = std::move(context);
   ctx.query_context->in_callback_ = false;
-  ctx.expiry = std::chrono::duration_cast<std::chrono::seconds>(
-                   dispatcher_.timeSource().systemTime().time_since_epoch())
-                   .count() +
+  ctx.expiry = DateUtil::nowToSeconds(dispatcher_.timeSource()) +
                std::chrono::duration_cast<std::chrono::seconds>(timeout_).count();
   ctx.resolver_status = DnsFilterResolverStatus::Pending;
 
@@ -80,7 +78,8 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                        // timer
                        ctx.timeout_timer->disableTimer();
 
-                       ENVOY_LOG(trace, "async query status returned. Entries {}", response.size());
+                       ENVOY_LOG(trace, "async query status returned for query [{}]. Entries {}",
+                                 ctx.query_context->id_, response.size());
                        ASSERT(ctx.resolver_status == DnsFilterResolverStatus::Pending);
 
                        ctx.query_context->in_callback_ = true;
@@ -103,9 +102,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
 }
 
 void DnsFilterResolver::onResolveTimeout() {
-  const uint64_t now = std::chrono::duration_cast<std::chrono::seconds>(
-                           dispatcher_.timeSource().systemTime().time_since_epoch())
-                           .count();
+  const uint64_t now = DateUtil::nowToSeconds(dispatcher_.timeSource());
   ENVOY_LOG(trace, "Pending queries: {}", lookups_.size());
 
   // Find an outstanding pending query and purge it

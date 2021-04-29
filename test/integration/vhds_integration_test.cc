@@ -26,7 +26,11 @@ namespace {
 const std::string& config() {
   CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -35,7 +39,11 @@ static_resources:
   clusters:
   - name: xds_cluster
     type: STATIC
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: xds_cluster
       endpoints:
@@ -47,7 +55,11 @@ static_resources:
                 port_value: 0
   - name: my_service
     type: STATIC
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_service
       endpoints:
@@ -67,7 +79,7 @@ static_resources:
     - filters:
       - name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
           - name: envoy.filters.http.on_demand
@@ -76,8 +88,10 @@ static_resources:
           rds:
             route_config_name: my_route
             config_source:
+              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
+                transport_api_version: V3
                 grpc_services:
                   envoy_grpc:
                     cluster_name: xds_cluster
@@ -100,8 +114,10 @@ const char RdsConfig[] = R"EOF(
 name: my_route
 vhds:
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -117,8 +133,10 @@ virtual_hosts:
     route: { cluster: my_service }
 vhds:
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -138,7 +156,7 @@ class VhdsInitializationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
   VhdsInitializationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
   }
 
@@ -147,7 +165,7 @@ public:
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
   void initialize() override {
-    // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
+    // Controls how many addFakeUpstream() will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
@@ -235,7 +253,7 @@ class VhdsIntegrationTest : public HttpIntegrationTest,
                             public Grpc::GrpcClientIntegrationParamTest {
 public:
   VhdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
   }
 
@@ -269,7 +287,7 @@ public:
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
   void initialize() override {
-    // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
+    // Controls how many addFakeUpstream() will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
@@ -327,7 +345,7 @@ public:
 
   void notifyAboutAliasResolutionFailure(const std::string& version, FakeStreamPtr& stream,
                                          const std::vector<std::string>& aliases = {}) {
-    envoy::api::v2::DeltaDiscoveryResponse response;
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(Config::TypeUrl::get().VirtualHost);
     auto* resource = response.add_resources();
@@ -358,8 +376,9 @@ public:
   // used in VhdsOnDemandUpdateWithResourceNameAsAlias test
   // to create a DeltaDiscoveryResponse with a resource name matching the value used to create an
   // on-demand request
-  envoy::api::v2::DeltaDiscoveryResponse createDeltaDiscoveryResponseWithResourceNameUsedAsAlias() {
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) ret;
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createDeltaDiscoveryResponseWithResourceNameUsedAsAlias() {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse ret;
     ret.set_system_version_info("system_version_info_this_is_a_test");
     ret.set_type_url(Config::TypeUrl::get().VirtualHost);
 
@@ -367,8 +386,8 @@ public:
     resource->set_name("my_route/vhost_1");
     resource->set_version("4");
     resource->mutable_resource()->PackFrom(
-        API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first"))));
+        TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first")));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
 
@@ -550,7 +569,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
 
-  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+  envoy::service::discovery::v3::DeltaDiscoveryResponse vhds_update =
       createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
   vhds_stream_->sendGrpcMessage(vhds_update);
 
@@ -567,8 +586,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 // tests a scenario when:
 //  - an RDS exchange contains a non-empty virtual_hosts array
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
-//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
-//  - Upstream makes a request to an (now) unknown domain
+//  - Upstream makes a request to an unknown domain
 //  - A VHDS DiscoveryResponse received but contains no update for the domain (the management server
 //  couldn't resolve it)
 //  - Upstream receives a 404 response
@@ -607,11 +625,9 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 
 // tests a scenario when:
 //  - an RDS exchange contains a non-empty virtual_hosts array
-//  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
-//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
-//  - Upstream makes a request to an (now) unknown domain
-//  - A VHDS DiscoveryResponse received that contains update for vhost.first host, but vhost.third
-//  couldn't be resolved
+//  - Upstream makes a request to vhost.third that cannot be resolved by the management server
+//  - Management server sends a spontaneous update for vhost.first and an empty response for
+//  vhost.third
 //  - Upstream receives a 404 response
 TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral) {
   // RDS exchange with a non-empty virtual_hosts field
@@ -670,12 +686,12 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
 
-  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+  envoy::service::discovery::v3::DeltaDiscoveryResponse vhds_update =
       createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
   vhds_stream_->sendGrpcMessage(vhds_update);
 
   codec_client_->sendReset(encoder);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_TRUE(codec_client_->connected());
 
   cleanupUpstreamAndDownstream();
@@ -775,6 +791,40 @@ TEST_P(VhdsIntegrationTest, MultipleUpdates) {
     cleanupUpstreamAndDownstream();
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
+}
+
+// Verifies that invalid VHDS updates get rejected and do not affect subsequent updates
+// see https://github.com/envoyproxy/envoy/issues/14918
+TEST_P(VhdsIntegrationTest, AttemptAddingDuplicateDomainNames) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // A spontaneous VHDS DiscoveryResponse with duplicate domains that results in an error in the
+  // ack.
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+           virtualHostYaml("my_route/vhost_1", "vhost.duplicate")),
+       TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+           virtualHostYaml("my_route/vhost_2", "vhost.duplicate"))},
+      {}, "2", vhds_stream_);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_,
+                                           13, "Only unique values for domains are permitted"));
+
+  // Another update, this time valid, should result in no errors
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          virtualHostYaml("my_route/vhost_3", "vhost.third"))},
+      {}, "2", vhds_stream_);
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

@@ -27,13 +27,14 @@ ResetHeaderParserImpl::ResetHeaderParserImpl(
 absl::optional<std::chrono::milliseconds>
 ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
                                      const Http::HeaderMap& headers) const {
-  const Http::HeaderEntry* header = headers.get(name_);
+  const auto header = headers.get(name_);
 
-  if (header == nullptr) {
+  if (header.empty()) {
     return absl::nullopt;
   }
 
-  const auto& header_value = header->value().getStringView();
+  // This is effectively a trusted header so per the API only using the first value is used.
+  const auto& header_value = header[0]->value().getStringView();
   uint64_t num_seconds{};
 
   switch (format_) {
@@ -45,8 +46,7 @@ ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
 
   case ResetHeaderFormat::UnixTimestamp:
     if (absl::SimpleAtoi(header_value, &num_seconds)) {
-      const auto time_now = time_source.systemTime().time_since_epoch();
-      const uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(time_now).count();
+      const uint64_t timestamp = DateUtil::nowToSeconds(time_source);
 
       if (num_seconds < timestamp) {
         return absl::nullopt;

@@ -34,6 +34,16 @@ IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen
                                               domain_);
 }
 
+IoHandlePtr TestIoSocketHandle::duplicate() {
+  auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
+  if (result.rc_ == -1) {
+    throw EnvoyException(fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
+                                     errorDetails(result.errno_)));
+  }
+  return std::make_unique<TestIoSocketHandle>(writev_override_, result.rc_, socket_v6only_,
+                                              domain_);
+}
+
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
                                             absl::optional<int> domain) const {
   return std::make_unique<TestIoSocketHandle>(writev_override_proc_, socket_fd, socket_v6only,

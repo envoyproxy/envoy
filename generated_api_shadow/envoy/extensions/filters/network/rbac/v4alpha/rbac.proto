@@ -21,6 +21,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //
 // Header should not be used in rules/shadow_rules in RBAC network filter as
 // this information is only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
+// [#next-free-field: 6]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.rbac.v3.RBAC";
@@ -45,8 +46,13 @@ message RBAC {
   // If absent, no shadow RBAC policy will be applied.
   config.rbac.v4alpha.RBAC shadow_rules = 2;
 
+  // If specified, shadow rules will emit stats with the given prefix.
+  // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with
+  // shadow rules.
+  string shadow_rules_stat_prefix = 5;
+
   // The prefix to use when emitting statistics.
-  string stat_prefix = 3 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 3 [(validate.rules).string = {min_len: 1}];
 
   // RBAC enforcement strategy. By default RBAC will be enforced only once
   // when the first byte of data arrives from the downstream. When used in

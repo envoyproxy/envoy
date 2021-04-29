@@ -1,11 +1,9 @@
 #!/bin/bash -E
 
-TESTCOMMAND="${1:-}"
-TESTFILTER="${2:-*}"
+TESTFILTER="${1:-*}"
+TESTEXCLUDES="${2}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
-EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
-
 
 trap_errors () {
     local frame=0 command line sub file
@@ -31,7 +29,7 @@ trap exit 1 INT
 run_examples () {
     local examples example
     cd "${SRCDIR}/examples" || exit 1
-    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" | sort)
+    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" ! -name "$TESTEXCLUDES" | sort)
     for example in $examples; do
         pushd "$example" > /dev/null || return 1
         ./verify.sh
@@ -39,39 +37,7 @@ run_examples () {
     done
 }
 
-verify_build_configs () {
-    local config configs missing
-    missing=()
-    cd "${SRCDIR}/examples" || return 1
-    configs="$(find . -name "*.yaml" -o -name "*.lua" | grep -vE "${EXCLUDED_BUILD_CONFIGS}" | cut  -d/ -f2-)"
-    for config in $configs; do
-        grep "\"$config\"" BUILD || missing+=("$config")
-    done
-    if [[ -n "${missing[*]}" ]]; then
-       for config in "${missing[@]}"; do
-           echo "Missing config: $config" >&2
-       done
-       return 1
-    fi
-}
-
-case "$TESTCOMMAND" in
-    build_config)
-	echo "Running build_configs test"
-	verify_build_configs
-	;;
-    sandbox)
-	echo "Running sandbox test"
-	run_examples
-	;;
-    ""|all)
-	echo "Running all tests"
-	verify_build_configs
-	run_examples
-	;;
-    *)
-	echo "Usage: ./ci/verify_examples.sh [build_config|sandbox|all] [<test_filter>]"
-esac
+run_examples
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:"

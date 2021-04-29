@@ -43,6 +43,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/crypto:utility_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
@@ -54,6 +55,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.http",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",

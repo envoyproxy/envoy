@@ -24,7 +24,7 @@ message ProxyProtocol {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_bytes: 1}];
+    string key = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.

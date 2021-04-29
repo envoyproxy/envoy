@@ -26,7 +26,7 @@ message CustomTag {
         "envoy.type.tracing.v2.CustomTag.Literal";
 
     // Static literal value to populate the tag value.
-    string value = 1 [(validate.rules).string = {min_bytes: 1}];
+    string value = 1 [(validate.rules).string = {min_len: 1}];
   }
 
   // Environment type custom tag with environment name and default value.
@@ -35,7 +35,7 @@ message CustomTag {
         "envoy.type.tracing.v2.CustomTag.Environment";
 
     // Environment variable name to obtain the value to populate the tag value.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // When the environment variable is not found,
     // the tag value will be populated with this default value if specified,
@@ -50,7 +50,7 @@ message CustomTag {
 
     // Header name to obtain the value to populate the tag value.
     string name = 1
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // When the header does not exist,
     // the tag value will be populated with this default value if specified,
@@ -80,7 +80,7 @@ message CustomTag {
   }
 
   // Used to populate the tag name.
-  string tag = 1 [(validate.rules).string = {min_bytes: 1}];
+  string tag = 1 [(validate.rules).string = {min_len: 1}];
 
   // Used to specify what kind of custom tag.
   oneof type {

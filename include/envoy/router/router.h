@@ -36,6 +36,7 @@ namespace Envoy {
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
+class ThreadLocalCluster;
 } // namespace Upstream
 
 namespace Router {
@@ -56,6 +57,16 @@ public:
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Returns the response header transforms that would be applied if finalizeResponseHeaders were
+   * called now. This is useful if you want to obtain response header transforms at request time and
+   * process them later. Note: do not use unless you are sure that there will be no route
+   * modifications later in the filter chain.
+   * @param stream_info holds additional information about the request.
+   */
+  virtual Http::HeaderTransforms
+  responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -173,20 +184,20 @@ using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 class RetryPolicy {
 public:
   // clang-format off
-  static const uint32_t RETRY_ON_5XX                     = 0x1;
-  static const uint32_t RETRY_ON_GATEWAY_ERROR           = 0x2;
-  static const uint32_t RETRY_ON_CONNECT_FAILURE         = 0x4;
-  static const uint32_t RETRY_ON_RETRIABLE_4XX           = 0x8;
-  static const uint32_t RETRY_ON_REFUSED_STREAM          = 0x10;
-  static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
-  static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
-  static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
-  static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
-  static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
-  static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
-  static const uint32_t RETRY_ON_RESET                   = 0x800;
-  static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
-  static const uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
+  static constexpr uint32_t RETRY_ON_5XX                     = 0x1;
+  static constexpr uint32_t RETRY_ON_GATEWAY_ERROR           = 0x2;
+  static constexpr uint32_t RETRY_ON_CONNECT_FAILURE         = 0x4;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_4XX           = 0x8;
+  static constexpr uint32_t RETRY_ON_REFUSED_STREAM          = 0x10;
+  static constexpr uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
+  static constexpr uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
+  static constexpr uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
+  static constexpr uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
+  static constexpr uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
+  static constexpr uint32_t RETRY_ON_RESET                   = 0x800;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
+  static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -452,20 +463,22 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 /**
  * All virtual cluster stats. @see stats_macro.h
  */
-#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
-  COUNTER(upstream_rq_total)
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(other)                                                                                  \
+  STATNAME(vcluster)                                                                               \
+  STATNAME(vhost)
 
 /**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
-struct VirtualClusterStats {
-  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -485,8 +498,9 @@ public:
    */
   virtual VirtualClusterStats& stats() const PURE;
 
-  static VirtualClusterStats generateStats(Stats::Scope& scope) {
-    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  static VirtualClusterStats generateStats(Stats::Scope& scope,
+                                           const VirtualClusterStatNames& stat_names) {
+    return VirtualClusterStats(stat_names, scope);
   }
 };
 
@@ -724,6 +738,17 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
+   * Returns the URL path as it will be calculated by finalizeRequestHeaders
+   * using current values of headers. Note that final path may be different if
+   * headers change before finalization.
+   * @param headers supplies the request headers.
+   * @return absl::optional<std::string> the value of the URL path after rewrite or absl::nullopt
+   *         if rewrite is not configured.
+   */
+  virtual absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const PURE;
+
+  /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For
    * example URL prefix rewriting, adding headers, etc. This should only be called ONCE
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
@@ -794,6 +819,27 @@ public:
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return true if new style max_stream_duration config should be used over the old style.
+   */
+  virtual bool usingNewTimeouts() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the route's maximum stream duration.
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the max grpc-timeout this route will allow.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the delta between grpc-timeout and enforced grpc
+   *         timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const PURE;
 
   /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
@@ -1129,6 +1175,13 @@ public:
    * manager level.
    */
   virtual bool mostSpecificHeaderMutationsWins() const PURE;
+
+  /**
+   * @return uint32_t The maximum bytes of the response direct response body size. The default value
+   * is 4096.
+   * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
+   */
+  virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
@@ -1165,10 +1218,6 @@ public:
    * Called to cancel any pending newStream request,
    */
   virtual bool cancelAnyPendingStream() PURE;
-  /**
-   * @return optionally returns the protocol for the connection pool.
-   */
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
   /**
    * @return optionally returns the host for the connection pool.
    */
@@ -1221,11 +1270,13 @@ public:
    *             connection pools the description may be different each time this is called.
    * @param upstream_local_address supplies the local address of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
+   * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info) PURE;
+                           const StreamInfo::StreamInfo& info,
+                           absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.
   //
@@ -1258,8 +1309,10 @@ public:
    * Encode headers, optionally indicating end of stream.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request.
+   * @return status indicating success. Encoding will fail if headers do not have required HTTP
+   * headers.
    */
-  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
@@ -1290,7 +1343,7 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

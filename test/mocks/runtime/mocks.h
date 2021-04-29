@@ -32,7 +32,6 @@ public:
     }
   }
 
-  MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const));
   MOCK_METHOD(bool, deprecatedFeatureEnabled, (absl::string_view key, bool default_enabled),
               (const));
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
@@ -68,6 +67,7 @@ public:
   MOCK_METHOD(void, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
+  MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const));
 
   testing::NiceMock<MockSnapshot> snapshot_;
   testing::NiceMock<Stats::MockStore> store_;

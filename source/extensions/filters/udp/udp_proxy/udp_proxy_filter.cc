@@ -14,7 +14,8 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
-  Upstream::ThreadLocalCluster* cluster = config->clusterManager().get(config->cluster());
+  Upstream::ThreadLocalCluster* cluster =
+      config->clusterManager().getThreadLocalCluster(config->cluster());
   if (cluster != nullptr) {
     onClusterAddOrUpdate(*cluster);
   }
@@ -74,7 +75,6 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
           })) {}
 
 UdpProxyFilter::ClusterInfo::~ClusterInfo() {
-  member_update_cb_handle_->remove();
   // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
   // not a performance critical path.
   while (!sessions_.empty()) {
@@ -161,11 +161,12 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
-      socket_(cluster.filter_.createSocket(host)),
-      socket_event_(socket_->ioHandle().createFileEvent(
-          cluster.filter_.read_callbacks_->udpListener().dispatcher(),
-          [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
-          Event::FileReadyType::Read)) {
+      socket_(cluster.filter_.createSocket(host)) {
+
+  socket_->ioHandle().initializeFileEvent(
+      cluster.filter_.read_callbacks_->udpListener().dispatcher(),
+      [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host->address()->asStringView());
@@ -220,7 +221,7 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
-      packets_dropped);
+      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     cluster_.cluster_stats_.sess_rx_errors_.inc();

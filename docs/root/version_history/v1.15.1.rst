@@ -1,0 +1,27 @@
+1.15.1 (September 29, 2020)
+===========================
+
+Changes
+-------
+* http: fixed CVE-2020-25017. Previously header matching did not match on all headers for non-inline
+  headers. This patch changes the default behavior to always logically match on all headers.
+  Multiple individual headers will be logically concatenated with ',' similar to what is done with
+  inline headers. This makes the behavior effectively consistent. This behavior can be temporary
+  reverted by setting the runtime value "envoy.reloadable_features.http_match_on_all_headers" to
+  "false".
+
+  Targeted fixes have been additionally performed on the following extensions which make them
+  consider all duplicate headers by default as a comma concatenated list:
+
+    1. Any extension using CEL matching on headers.
+    2. The header to metadata filter.
+    3. The JWT filter.
+    4. The Lua filter.
+
+  Like primary header matching used in routing, RBAC, etc. this behavior can be disabled by setting
+  the runtime value "envoy.reloadable_features.http_match_on_all_headers" to false.
+* http: The setCopy() header map API previously only set the first header in the case of duplicate
+  non-inline headers. setCopy() now behaves similarly to the other set*() APIs and replaces all found
+  headers with a single value. This may have had security implications in the extauth filter which
+  uses this API. This behavior can be disabled by setting the runtime value
+  "envoy.reloadable_features.http_set_copy_replace_all_headers" to false.

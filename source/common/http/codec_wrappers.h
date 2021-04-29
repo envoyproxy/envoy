@@ -49,6 +49,10 @@ public:
     inner_.decodeMetadata(std::move(metadata_map));
   }
 
+  void dumpState(std::ostream& os, int indent_level) const override {
+    inner_.dumpState(os, indent_level);
+  }
+
 protected:
   ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner) {}
 
@@ -68,11 +72,12 @@ protected:
 class RequestEncoderWrapper : public RequestEncoder {
 public:
   // RequestEncoder
-  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
-    inner_.encodeHeaders(headers, end_stream);
+  Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
+    RETURN_IF_ERROR(inner_.encodeHeaders(headers, end_stream));
     if (end_stream) {
       onEncodeComplete();
     }
+    return okStatus();
   }
 
   void encodeData(Buffer::Instance& data, bool end_stream) override {
@@ -86,6 +91,8 @@ public:
     inner_.encodeTrailers(trailers);
     onEncodeComplete();
   }
+
+  void enableTcpTunneling() override { inner_.enableTcpTunneling(); }
 
   void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
     inner_.encodeMetadata(metadata_map_vector);

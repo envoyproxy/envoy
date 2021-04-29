@@ -8,6 +8,7 @@
 #include "config_tracker.h"
 #include "drain_manager.h"
 #include "factory_context.h"
+#include "fatal_action_factory.h"
 #include "filter_chain_factory_context.h"
 #include "guard_dog.h"
 #include "health_checker_factory_context.h"

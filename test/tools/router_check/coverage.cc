@@ -5,7 +5,7 @@
 namespace Envoy {
 double RouteCoverage::report() {
   uint64_t route_weight = 0;
-  for (const auto& covered_field : coverageFields()) {
+  for (auto covered_field : coverageFields()) {
     if (covered_field) {
       route_weight += 1;
     }

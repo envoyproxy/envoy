@@ -1,3 +1,5 @@
+.. _api-v3_config_accesslog:
+
 Access loggers
 ==============
 
@@ -7,3 +9,4 @@ Access loggers
 
   v3/*
   ../../extensions/access_loggers/*/v3/*
+  ../../extensions/access_loggers/*/v3alpha/*

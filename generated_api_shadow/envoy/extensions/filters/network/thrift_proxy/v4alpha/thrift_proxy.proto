@@ -5,7 +5,7 @@ package envoy.extensions.filters.network.thrift_proxy.v4alpha;
 import "envoy/extensions/filters/network/thrift_proxy/v4alpha/route.proto";
 
 import "google/protobuf/any.proto";
-import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -58,7 +58,7 @@ enum ProtocolType {
   TWITTER = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy";
@@ -72,7 +72,7 @@ message ThriftProxy {
   ProtocolType protocol = 3 [(validate.rules).enum = {defined_only: true}];
 
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The route table for the connection manager is static and is specified in this property.
   RouteConfiguration route_config = 4;
@@ -81,7 +81,17 @@ message ThriftProxy {
   // Thrift proxy. Order matters as the filters are processed sequentially. For backwards
   // compatibility, if no thrift_filters are specified, a default Thrift router filter
   // (`envoy.filters.thrift.router`) is used.
+  // [#extension-category: envoy.thrift_proxy.filters]
   repeated ThriftFilter thrift_filters = 5;
+
+  // If set to true, Envoy will try to skip decode data after metadata in the Thrift message.
+  // This mode will only work if the upstream and downstream protocols are the same and the transport
+  // is the same, the transport type is framed and the protocol is not Twitter. Otherwise Envoy will
+  // fallback to decode the data.
+  bool payload_passthrough = 6;
+
+  // Optional maximum requests for a single downstream connection. If not specified, there is no limit.
+  google.protobuf.UInt32Value max_requests_per_connection = 7;
 }
 
 // ThriftFilter configures a Thrift filter.
@@ -99,7 +109,7 @@ message ThriftFilter {
   // [#comment:TODO(zuercher): Auto generate the following list]
   // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
   // * :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit>`
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.

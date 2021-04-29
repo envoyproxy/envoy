@@ -13,6 +13,7 @@ Types
   ../type/v3/ratelimit_unit.proto
   ../type/v3/semantic_version.proto
   ../type/v3/token_bucket.proto
+  ../type/http/v3/path_transformation.proto
   ../type/matcher/v3/metadata.proto
   ../type/matcher/v3/node.proto
   ../type/matcher/v3/number.proto
@@ -21,5 +22,6 @@ Types
   ../type/matcher/v3/string.proto
   ../type/matcher/v3/struct.proto
   ../type/matcher/v3/value.proto
+  ../type/matcher/v3/http_inputs.proto
   ../type/metadata/v3/metadata.proto
   ../type/tracing/v3/custom_tag.proto

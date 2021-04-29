@@ -19,6 +19,7 @@ constexpr uint16_t DNS_RESPONSE_CODE_FORMAT_ERROR = 1;
 constexpr uint16_t DNS_RESPONSE_CODE_NAME_ERROR = 3;
 constexpr uint16_t DNS_RESPONSE_CODE_NOT_IMPLEMENTED = 4;
 
+constexpr size_t MIN_QUERY_NAME_LENGTH = 3;
 constexpr size_t MAX_LABEL_LENGTH = 63;
 constexpr size_t MAX_NAME_LENGTH = 255;
 
@@ -28,10 +29,6 @@ constexpr size_t MAX_RETURNED_RECORDS = 8;
 
 // Ensure that responses stay below the 512 byte byte limit. If we are to exceed this we must
 // add DNS extension fields
-//
-// Note:  There is Network::MAX_UDP_PACKET_SIZE, which is defined as 1500 bytes. If we support
-// DNS extensions, which support up to 4096 bytes, we will have to keep this 1500 byte limit
-// in mind.
 constexpr uint64_t MAX_DNS_RESPONSE_SIZE = 512;
 
 } // namespace DnsFilter

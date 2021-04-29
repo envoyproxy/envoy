@@ -15,7 +15,7 @@ The following procedure will be used when proposing new extensions for inclusion
   2. All extensions must be sponsored by an existing maintainer. Sponsorship means that the
   maintainer will shepherd the extension through design/code reviews. Maintainers can self-sponsor
   extensions if they are going to write them, shepherd them, and maintain them.
-  
+
      Sponsorship serves two purposes:
      * It ensures that the extension will ultimately meet the Envoy quality bar.
      * It makes sure that incentives are aligned and that extensions are not added to the repo without
@@ -24,7 +24,7 @@ The following procedure will be used when proposing new extensions for inclusion
      *If sponsorship cannot be found from an existing maintainer, an organization can consider
      [doing the work to become a maintainer](./GOVERNANCE.md#process-for-becoming-a-maintainer) in
      order to be able to self-sponsor extensions.*
-  
+
   3. Each extension must have two reviewers proposed for reviewing PRs to the extension. Neither of
   the reviewers must be a senior maintainer. Existing maintainers (including the sponsor) and other
   contributors can count towards this number. The initial reviewers will be codified in the
@@ -35,6 +35,10 @@ The following procedure will be used when proposing new extensions for inclusion
   by other contributors.
   5. Any new dependencies added for this extension must comply with
   [DEPENDENCY_POLICY.md](DEPENDENCY_POLICY.md), please follow the steps detailed there.
+  6. If an extension depends on platform specific functionality, be sure to guard it in the build
+  system. See [platform specific features](./PULL_REQUESTS.md#platform-specific-features).
+  Add the extension to the necessary `*_SKIP_TARGETS` in [bazel/repositories.bzl](bazel/repositories.bzl)
+  and tag tests to be skipped/failed on the unsupported platform.
 
 ## Removing existing extensions
 
@@ -58,6 +62,19 @@ may be a single individual, but it is always preferred to have multiple reviewer
 In the event that the Extension PR author is a sponsoring maintainer and no other sponsoring maintainer
 is available, another maintainer may be enlisted to perform a minimal review for style and common C++
 anti-patterns. The Extension PR must still be approved by a non-maintainer reviewer.
+
+## Wasm extensions
+
+Wasm extensions are not allowed in the main envoyproxy/envoy repository unless
+part of the Wasm implementation validation. The rationale for this policy:
+* Wasm extensions should not depend upon Envoy implementation specifics as
+  they exist behind a version independent ABI. Hence, there is little value in
+  qualifying Wasm extensions in the main repository.
+* Wasm extensions introduce extensive dependencies via crates, etc. We would
+  prefer to keep the envoyproxy/envoy repository dependencies minimal, easy
+  to reason about and maintain.
+* We do not implement any core extensions in Wasm and do not plan to in the
+  medium term.
 
 ## Extension stability and security posture
 
@@ -88,7 +105,7 @@ The `security_posture` is one of:
 * `unknown`: This is functionally equivalent to `requires_trusted_downstream_and_upstream`, but acts
   as a placeholder to allow us to identify extensions that need classifying.
 * `data_plane_agnostic`: Not relevant to data plane threats, e.g. stats sinks.
- 
+
 An assessment of a robust security posture for an extension is subject to the following guidelines:
 
 * Does the extension have fuzz coverage? If it's only receiving fuzzing
@@ -105,7 +122,18 @@ An assessment of a robust security posture for an extension is subject to the fo
 * Does the extension have active [CODEOWNERS](CODEOWNERS) who are willing to
   vouch for the robustness of the extension?
 * Is the extension absent a [low coverage
-  exception](https://github.com/envoyproxy/envoy/blob/master/test/per_file_coverage.sh#L5)?
+  exception](https://github.com/envoyproxy/envoy/blob/main/test/per_file_coverage.sh#L5)?
 
 The current stability and security posture of all extensions can be seen
 [here](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions).
+
+## Adding Extension Points
+
+Envoy might lack the extension point necessary for an extension. In that
+case we need to install an extension point, which can be done as follows:
+
+  1. Open a GitHub issue describing the proposed extension point and use cases.
+  2. Make changes in core Envoy for the extension point.
+  3. Update [extending envoy](docs/root/extending/extending.rst) to list the new
+     extension point and add any documentation explaining the extension point.
+     At the very least this should link to the corresponding proto.

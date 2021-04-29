@@ -1,10 +1,13 @@
 #include "common/http/hash_policy.h"
 
+#include <string>
+
 #include "envoy/config/route/v3/route_components.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/common/regex.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -39,14 +42,34 @@ public:
                                     const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
 
-    const HeaderEntry* header = headers.get(header_name_);
-    if (header) {
-      if (regex_rewrite_ != nullptr) {
-        hash = HashUtil::xxHash64(regex_rewrite_->replaceAll(header->value().getStringView(),
-                                                             regex_rewrite_substitution_));
-      } else {
-        hash = HashUtil::xxHash64(header->value().getStringView());
+    const auto header = headers.get(header_name_);
+    if (!header.empty()) {
+      absl::InlinedVector<absl::string_view, 1> header_values;
+
+      size_t num_headers_to_hash = 1;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hash_multiple_header_values")) {
+        num_headers_to_hash = header.size();
+        header_values.reserve(num_headers_to_hash);
       }
+
+      for (size_t i = 0; i < num_headers_to_hash; i++) {
+        header_values.push_back(header[i]->value().getStringView());
+      }
+
+      absl::InlinedVector<std::string, 1> rewritten_header_values;
+      if (regex_rewrite_ != nullptr) {
+        rewritten_header_values.reserve(num_headers_to_hash);
+        for (auto& value : header_values) {
+          rewritten_header_values.push_back(
+              regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
+          value = rewritten_header_values.back();
+        }
+      }
+
+      // Ensure generating same hash value for different order header values.
+      // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
+      std::sort(header_values.begin(), header_values.end());
+      hash = HashUtil::xxHash64(absl::MakeSpan(header_values));
     }
     return hash;
   }

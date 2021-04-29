@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package envoy.admin.v4alpha;
 
+import "envoy/config/core/v4alpha/base.proto";
+
 import "google/protobuf/duration.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -17,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ServerInfo {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.ServerInfo";
 
@@ -52,9 +53,12 @@ message ServerInfo {
 
   // Command line options the server is currently running with.
   CommandLineOptions command_line_options = 6;
+
+  // Populated node identity of this server.
+  config.core.v4alpha.Node node = 7;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.CommandLineOptions";
 
@@ -184,4 +188,7 @@ message CommandLineOptions {
 
   // See :option:`--socket-mode` for details.
   uint32 socket_mode = 36;
+
+  // See :option:`--enable-core-dump` for details.
+  bool enable_core_dump = 37;
 }

@@ -1,5 +1,6 @@
 #include "extensions/filters/http/compressor/config.h"
 
+#include "test/extensions/filters/http/compressor/mock_compressor_library.pb.h"
 #include "test/mocks/server/factory_context.h"
 
 #include "gtest/gtest.h"
@@ -11,6 +12,8 @@ namespace Compressor {
 namespace {
 
 using testing::NiceMock;
+
+const ::test::mock_compressor_library::Unregistered _mock_compressor_library_dummy;
 
 TEST(CompressorFilterFactoryTests, MissingCompressorLibraryConfig) {
   const envoy::extensions::filters::http::compressor::v3::Compressor proto_config;

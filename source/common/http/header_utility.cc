@@ -80,17 +80,6 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
   }
 }
 
-void HeaderUtility::getAllOfHeader(const HeaderMap& headers, absl::string_view key,
-                                   std::vector<absl::string_view>& out) {
-  headers.iterate([key = LowerCaseString(std::string(key)),
-                   &out](const HeaderEntry& header) -> HeaderMap::Iterate {
-    if (header.key() == key.get().c_str()) {
-      out.emplace_back(header.value().getStringView());
-    }
-    return HeaderMap::Iterate::Continue;
-  });
-}
-
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
   // No headers to match is considered a match.
@@ -105,45 +94,86 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
   return true;
 }
 
-bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderData& header_data) {
-  const HeaderEntry* header = request_headers.get(header_data.name_);
+HeaderUtility::GetAllOfHeaderAsStringResult
+HeaderUtility::getAllOfHeaderAsString(const HeaderMap::GetResult& header_value,
+                                      absl::string_view separator) {
+  GetAllOfHeaderAsStringResult result;
+  // In this case we concatenate all found headers using a delimiter before performing the
+  // final match. We use an InlinedVector of absl::string_view to invoke the optimized join
+  // algorithm. This requires a copying phase before we invoke join. The 3 used as the inline
+  // size has been arbitrarily chosen.
+  // TODO(mattklein123): Do we need to normalize any whitespace here?
+  absl::InlinedVector<absl::string_view, 3> string_view_vector;
+  string_view_vector.reserve(header_value.size());
+  for (size_t i = 0; i < header_value.size(); i++) {
+    string_view_vector.push_back(header_value[i]->value().getStringView());
+  }
+  result.result_backing_string_ = absl::StrJoin(string_view_vector, separator);
 
-  if (header == nullptr) {
+  return result;
+}
+
+HeaderUtility::GetAllOfHeaderAsStringResult
+HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::LowerCaseString& key,
+                                      absl::string_view separator) {
+  GetAllOfHeaderAsStringResult result;
+  const auto header_value = headers.get(key);
+
+  if (header_value.empty()) {
+    // Empty for clarity. Avoid handling the empty case in the block below if the runtime feature
+    // is disabled.
+  } else if (header_value.size() == 1) {
+    result.result_ = header_value[0]->value().getStringView();
+  } else {
+    return getAllOfHeaderAsString(header_value, separator);
+  }
+
+  return result;
+}
+
+bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderData& header_data) {
+  const auto header_value = getAllOfHeaderAsString(request_headers, header_data.name_);
+
+  if (!header_value.result().has_value()) {
     return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
   }
 
   bool match;
-  const absl::string_view header_view = header->value().getStringView();
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() || header_view == header_data.value_;
+    match = header_data.value_.empty() || header_value.result().value() == header_data.value_;
     break;
   case HeaderMatchType::Regex:
-    match = header_data.regex_->match(header_view);
+    match = header_data.regex_->match(header_value.result().value());
     break;
   case HeaderMatchType::Range: {
-    int64_t header_value = 0;
-    match = absl::SimpleAtoi(header_view, &header_value) &&
-            header_value >= header_data.range_.start() && header_value < header_data.range_.end();
+    int64_t header_int_value = 0;
+    match = absl::SimpleAtoi(header_value.result().value(), &header_int_value) &&
+            header_int_value >= header_data.range_.start() &&
+            header_int_value < header_data.range_.end();
     break;
   }
   case HeaderMatchType::Present:
     match = true;
     break;
   case HeaderMatchType::Prefix:
-    match = absl::StartsWith(header_view, header_data.value_);
+    match = absl::StartsWith(header_value.result().value(), header_data.value_);
     break;
   case HeaderMatchType::Suffix:
-    match = absl::EndsWith(header_view, header_data.value_);
+    match = absl::EndsWith(header_value.result().value(), header_data.value_);
     break;
   case HeaderMatchType::Contains:
-    match = absl::StrContains(header_view, header_data.value_);
+    match = absl::StrContains(header_value.result().value(), header_data.value_);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return match != header_data.invert_match_;
+}
+
+bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
+  return scheme == Headers::get().SchemeValues.Https || scheme == Headers::get().SchemeValues.Http;
 }
 
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
@@ -171,6 +201,15 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
              Http::Code::OK;
 }
 
+bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
+  return (headers.Method() &&
+          (headers.Method()->value() == Http::Headers::get().MethodValues.Get ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Head ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Delete ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Trace ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Connect));
+}
+
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
   headers_to_add.iterate([&headers](const HeaderEntry& header) -> HeaderMap::Iterate {
     HeaderString k;
@@ -188,7 +227,8 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
-void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port) {
+void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
+                                      absl::optional<uint32_t> listener_port) {
 
   if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     // According to RFC 2817 Connect method should have port part in host header.
@@ -211,8 +251,9 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
     if (!absl::SimpleAtoi(port_str, &port)) {
       return;
     }
-    if (port != listener_port) {
-      // We would strip ports only if they are the same, as local port of the listener.
+    if (listener_port.has_value() && port != listener_port) {
+      // We would strip ports only if it is specified and they are the same, as local port of the
+      // listener.
       return;
     }
     const absl::string_view host = original_host.substr(0, port_start);
@@ -255,6 +296,91 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
     return true;
   }
   return false;
+}
+
+Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Method()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Method.get()));
+  }
+  bool is_connect = Http::HeaderUtility::isConnect(headers);
+  if (is_connect) {
+    if (!headers.Host()) {
+      // Host header must be present for CONNECT request.
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+    }
+  } else {
+    if (!headers.Path()) {
+      // :path header must be present for non-CONNECT requests.
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+    }
+  }
+  return Http::okStatus();
+}
+
+bool HeaderUtility::isRemovableHeader(absl::string_view header) {
+  return (header.empty() || header[0] != ':') &&
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
+}
+
+bool HeaderUtility::isModifiableHeader(absl::string_view header) {
+  return (header.empty() || header[0] != ':') &&
+         (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.treat_host_like_authority") ||
+          !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
+}
+
+HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscores(
+    const std::string& header_name,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action,
+    Stats::Counter& dropped_headers_with_underscores,
+    Stats::Counter& requests_rejected_with_underscores_in_headers) {
+  if (headers_with_underscores_action == envoy::config::core::v3::HttpProtocolOptions::ALLOW ||
+      !HeaderUtility::headerNameContainsUnderscore(header_name)) {
+    return HeaderValidationResult::ACCEPT;
+  }
+  if (headers_with_underscores_action ==
+      envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
+    ENVOY_LOG_MISC(debug, "Dropping header with invalid characters in its name: {}", header_name);
+    dropped_headers_with_underscores.inc();
+    return HeaderValidationResult::DROP;
+  }
+  ENVOY_LOG_MISC(debug, "Rejecting request due to header name with underscores: {}", header_name);
+  requests_rejected_with_underscores_in_headers.inc();
+  return HeaderUtility::HeaderValidationResult::REJECT;
+}
+
+HeaderUtility::HeaderValidationResult
+HeaderUtility::validateContentLength(absl::string_view header_value,
+                                     bool override_stream_error_on_invalid_http_message,
+                                     bool& should_close_connection) {
+  should_close_connection = false;
+  std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
+  absl::optional<uint64_t> content_length;
+  for (const absl::string_view& value : values) {
+    uint64_t new_value;
+    if (!absl::SimpleAtoi(value, &new_value) ||
+        !std::all_of(value.begin(), value.end(), absl::ascii_isdigit)) {
+      ENVOY_LOG_MISC(debug, "Content length was either unparseable or negative");
+      should_close_connection = !override_stream_error_on_invalid_http_message;
+      return HeaderValidationResult::REJECT;
+    }
+    if (!content_length.has_value()) {
+      content_length = new_value;
+      continue;
+    }
+    if (new_value != content_length.value()) {
+      ENVOY_LOG_MISC(
+          debug,
+          "Parsed content length {} is inconsistent with previously detected content length {}",
+          new_value, content_length.value());
+      should_close_connection = !override_stream_error_on_invalid_http_message;
+      return HeaderValidationResult::REJECT;
+    }
+  }
+  return HeaderValidationResult::ACCEPT;
 }
 
 } // namespace Http

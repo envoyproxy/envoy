@@ -18,6 +18,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_manager.h"
@@ -75,14 +76,14 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
 
   /**
+   * @return Server::Options& the command-line options that Envoy was started with.
+   */
+  virtual const Server::Options& options() PURE;
+
+  /**
    * @return AccessLogManager for use by the entire server.
    */
   virtual AccessLog::AccessLogManager& logManager() PURE;
-
-  /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Random::RandomGenerator& random() PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.

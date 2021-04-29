@@ -10,11 +10,13 @@
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
@@ -44,7 +46,7 @@ namespace Router {
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
-      stream_info_(parent_.callbacks()->dispatcher().timeSource()),
+      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
@@ -62,9 +64,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
-  if (conn_pool_->protocol().has_value()) {
-    stream_info_.protocol(conn_pool_->protocol().value());
-  }
 }
 
 UpstreamRequest::~UpstreamRequest() {
@@ -172,6 +171,16 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
+
+void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "UpstreamRequest " << this << "\n";
+  const auto addressProvider = connection().addressProviderSharedPtr();
+  const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
+  DUMP_DETAILS(addressProvider);
+  DUMP_DETAILS(request_headers);
+}
+
 const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEntry(); }
 
 const Network::Connection& UpstreamRequest::connection() const {
@@ -210,7 +219,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!upstream_ || paused_for_connect_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
     if (!buffered_request_body_) {
-      buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
+      buffered_request_body_ = parent_.callbacks()->dispatcher().getWatermarkFactory().create(
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
@@ -340,7 +349,12 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    reset_reason = Http::StreamResetReason::LocalReset;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure")) {
+      reset_reason = Http::StreamResetReason::ConnectionFailure;
+    } else {
+      reset_reason = Http::StreamResetReason::LocalReset;
+    }
   }
 
   // Mimic an upstream reset.
@@ -351,7 +365,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void UpstreamRequest::onPoolReady(
     std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-    const StreamInfo::StreamInfo& info) {
+    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -368,8 +382,15 @@ void UpstreamRequest::onPoolReady(
 
   onUpstreamHostSelected(host);
 
+  if (protocol) {
+    stream_info_.protocol(protocol.value());
+  }
+
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  parent_.callbacks()->streamInfo().setUpstreamFilterState(
+      std::make_shared<StreamInfo::FilterStateImpl>(info.filterState().parent()->parent(),
+                                                    StreamInfo::FilterState::LifeSpan::Request));
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
@@ -401,7 +422,7 @@ void UpstreamRequest::onPoolReady(
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
-  if (conn_pool_->protocol().has_value() &&
+  if (protocol.has_value() &&
       headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
   }
@@ -416,9 +437,21 @@ void UpstreamRequest::onPoolReady(
     }
   }
 
-  upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
-
+  const Http::Status status =
+      upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
   calling_encode_headers_ = false;
+
+  if (!status.ok()) {
+    // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
+    // erroneously remove required headers.
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    const std::string details =
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
+                     status.message(), "}");
+    parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
+                                        absl::nullopt, details);
+    return;
+  }
 
   if (!paused_for_connect_) {
     encodeBodyAndTrailers();
@@ -440,10 +473,6 @@ void UpstreamRequest::encodeBodyAndTrailers() {
                        downstream_metadata_map_vector_);
       upstream_->encodeMetadata(downstream_metadata_map_vector_);
       downstream_metadata_map_vector_.clear();
-      if (shouldSendEndStream()) {
-        Buffer::OwnedImpl empty_data("");
-        upstream_->encodeData(empty_data, true);
-      }
     }
 
     if (buffered_request_body_) {

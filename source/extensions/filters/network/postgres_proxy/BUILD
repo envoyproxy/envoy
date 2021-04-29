@@ -19,10 +19,12 @@ envoy_cc_library(
     srcs = [
         "postgres_decoder.cc",
         "postgres_filter.cc",
+        "postgres_message.cc",
     ],
     hdrs = [
         "postgres_decoder.h",
         "postgres_filter.h",
+        "postgres_message.h",
         "postgres_session.h",
     ],
     repository = "@envoy",
@@ -42,6 +44,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.network",
     repository = "@envoy",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [

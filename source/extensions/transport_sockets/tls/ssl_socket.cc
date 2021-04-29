@@ -42,6 +42,7 @@ public:
   }
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override { return false; }
 };
 } // namespace
 
@@ -71,14 +72,8 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
-  BIO* bio;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_use_io_handle_bio")) {
-    // Use custom BIO that reads from/writes to IoHandle
-    bio = BIO_new_io_handle(&callbacks_->ioHandle());
-  } else {
-    // TODO(fcoras): remove once the io_handle_bio proves to be stable
-    bio = BIO_new_socket(callbacks_->ioHandle().fdDoNotUse(), 0);
-  }
+  // Use custom BIO that reads from/writes to IoHandle
+  BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
 }
 
@@ -93,16 +88,13 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
       ASSERT(static_cast<size_t>(rc) <= remaining);
       mem += rc;
       remaining -= rc;
-      result.commit_slice_ = true;
+      result.bytes_read_ += rc;
     } else {
       result.error_ = absl::make_optional<int>(rc);
       break;
     }
   }
 
-  if (result.commit_slice_) {
-    slice.len_ -= remaining;
-  }
   return result;
 }
 
@@ -122,28 +114,32 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   while (keep_reading) {
-    // We use 2 slices here so that we can use the remainder of an existing buffer chain element
-    // if there is extra space. 16K read is arbitrary and can be tuned later.
-    Buffer::RawSlice slices[2];
-    uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer.reserve(16384, slices, 2);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      auto result = sslReadIntoSlice(slices[i]);
-      if (result.commit_slice_) {
-        slices_to_commit++;
-        bytes_read += slices[i].len_;
-      }
+    uint64_t bytes_read_this_iteration = 0;
+    Buffer::Reservation reservation = read_buffer.reserveForRead();
+    for (uint64_t i = 0; i < reservation.numSlices(); i++) {
+      auto result = sslReadIntoSlice(reservation.slices()[i]);
+      bytes_read_this_iteration += result.bytes_read_;
       if (result.error_.has_value()) {
         keep_reading = false;
         int err = SSL_get_error(rawSsl(), result.error_.value());
+        ENVOY_CONN_LOG(trace, "ssl error occurred while read: {}", callbacks_->connection(),
+                       Utility::getErrorDescription(err));
         switch (err) {
         case SSL_ERROR_WANT_READ:
           break;
         case SSL_ERROR_ZERO_RETURN:
+          // Graceful shutdown using close_notify TLS alert.
           end_stream = true;
           break;
+        case SSL_ERROR_SYSCALL:
+          if (result.error_.value() == 0) {
+            // Non-graceful shutdown by closing the underlying socket.
+            end_stream = true;
+            break;
+          }
+          FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
-        // Renegotiation has started. We don't handle renegotiation so just fall through.
+          // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
           drainErrorQueue();
           action = PostIoAction::Close;
@@ -154,13 +150,13 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
       }
     }
 
-    if (slices_to_commit > 0) {
-      read_buffer.commit(slices, slices_to_commit);
-      if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
-        keep_reading = false;
-      }
+    reservation.commit(bytes_read_this_iteration);
+    if (bytes_read_this_iteration > 0 && callbacks_->shouldDrainReadBuffer()) {
+      callbacks_->setTransportSocketIsReadable();
+      keep_reading = false;
     }
+
+    bytes_read += bytes_read_this_iteration;
   }
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
@@ -208,11 +204,14 @@ void SslSocket::drainErrorQueue() {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
     }
-    failure_reason_.append(absl::StrCat(" ", err, ":", ERR_lib_error_string(err), ":",
-                                        ERR_func_error_string(err), ":",
-                                        ERR_reason_error_string(err)));
+    failure_reason_.append(absl::StrCat(" ", err, ":",
+                                        absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
+                                        absl::NullSafeStringView(ERR_func_error_string(err)), ":",
+                                        absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
-  ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+  if (!failure_reason_.empty()) {
+    ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+  }
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }
@@ -254,6 +253,8 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
     } else {
       int err = SSL_get_error(rawSsl(), rc);
+      ENVOY_CONN_LOG(trace, "ssl error occurred while write: {}", callbacks_->connection(),
+                     Utility::getErrorDescription(err));
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
@@ -285,7 +286,27 @@ void SslSocket::shutdownSsl() {
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(rawSsl());
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      // Windows operate under `EmulatedEdge`. These are level events that are artificially
+      // made to behave like edge events. And if the rc is 0 then in that case we want read
+      // activation resumption. This code is protected with an `constexpr` if, to minimize the tax
+      // on POSIX systems that operate in Edge events.
+      if (rc == 0) {
+        // See https://www.openssl.org/docs/manmaster/man3/SSL_shutdown.html
+        // if return value is 0,  Call SSL_read() to do a bidirectional shutdown.
+        callbacks_->setTransportSocketIsReadable();
+      }
+    }
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
+    drainErrorQueue();
+    info_->setState(Ssl::SocketState::ShutdownSent);
+  }
+}
+
+void SslSocket::shutdownBasic() {
+  if (info_->state() != Ssl::SocketState::ShutdownSent &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
+    callbacks_->ioHandle().shutdown(ENVOY_SHUT_WR);
     drainErrorQueue();
     info_->setState(Ssl::SocketState::ShutdownSent);
   }
@@ -303,6 +324,10 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   if (info_->state() == Ssl::SocketState::HandshakeInProgress ||
       info_->state() == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
+  } else {
+    // We're not in a state to do the full SSL shutdown so perform a basic shutdown to flush any
+    // outstanding alerts
+    shutdownBasic();
   }
 }
 
@@ -327,7 +352,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -357,7 +382,7 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
@@ -368,7 +393,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
       config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -398,7 +423,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }

@@ -1,3 +1,5 @@
+.. _api-v3_config:
+
 Extensions
 ==========
 
@@ -22,3 +24,6 @@ Extensions
   upstream/upstream
   wasm/wasm
   watchdog/watchdog
+  descriptors/descriptors
+  request_id/request_id
+  http/header_formatters

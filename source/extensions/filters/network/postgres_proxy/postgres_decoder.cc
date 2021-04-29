@@ -9,69 +9,91 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
+#define BODY_FORMAT(...)                                                                           \
+  []() -> std::unique_ptr<Message> { return createMsgBodyReader<__VA_ARGS__>(); }
+#define NO_BODY BODY_FORMAT()
+
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ = MsgProcessor{"Startup", {&DecoderImpl::onStartup}};
+  first_ =
+      MessageProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {&DecoderImpl::onStartup}};
 
   // Frontend messages.
   FE_messages_.direction_ = "Frontend";
 
   // Setup handlers for known messages.
-  absl::flat_hash_map<char, MsgProcessor>& FE_known_msgs = FE_messages_.messages_;
+  absl::flat_hash_map<char, MessageProcessor>& FE_known_msgs = FE_messages_.messages_;
 
   // Handler for known Frontend messages.
-  FE_known_msgs['B'] = MsgProcessor{"Bind", {}};
-  FE_known_msgs['C'] = MsgProcessor{"Close", {}};
-  FE_known_msgs['d'] = MsgProcessor{"CopyData", {}};
-  FE_known_msgs['c'] = MsgProcessor{"CopyDone", {}};
-  FE_known_msgs['f'] = MsgProcessor{"CopyFail", {}};
-  FE_known_msgs['D'] = MsgProcessor{"Describe", {}};
-  FE_known_msgs['E'] = MsgProcessor{"Execute", {}};
-  FE_known_msgs['H'] = MsgProcessor{"Flush", {}};
-  FE_known_msgs['F'] = MsgProcessor{"FunctionCall", {}};
+  FE_known_msgs['B'] = MessageProcessor{
+      "Bind", BODY_FORMAT(String, String, Array<Int16>, Array<VarByteN>, Array<Int16>), {}};
+  FE_known_msgs['C'] = MessageProcessor{"Close", BODY_FORMAT(Byte1, String), {}};
+  FE_known_msgs['d'] = MessageProcessor{"CopyData", BODY_FORMAT(ByteN), {}};
+  FE_known_msgs['c'] = MessageProcessor{"CopyDone", NO_BODY, {}};
+  FE_known_msgs['f'] = MessageProcessor{"CopyFail", BODY_FORMAT(String), {}};
+  FE_known_msgs['D'] = MessageProcessor{"Describe", BODY_FORMAT(Byte1, String), {}};
+  FE_known_msgs['E'] = MessageProcessor{"Execute", BODY_FORMAT(String, Int32), {}};
+  FE_known_msgs['H'] = MessageProcessor{"Flush", NO_BODY, {}};
+  FE_known_msgs['F'] = MessageProcessor{
+      "FunctionCall", BODY_FORMAT(Int32, Array<Int16>, Array<VarByteN>, Int16), {}};
   FE_known_msgs['p'] =
-      MsgProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse", {}};
-  FE_known_msgs['P'] = MsgProcessor{"Parse", {&DecoderImpl::onParse}};
-  FE_known_msgs['Q'] = MsgProcessor{"Query", {&DecoderImpl::onQuery}};
-  FE_known_msgs['S'] = MsgProcessor{"Sync", {}};
-  FE_known_msgs['X'] = MsgProcessor{"Terminate", {&DecoderImpl::decodeFrontendTerminate}};
+      MessageProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse",
+                       BODY_FORMAT(Int32, ByteN),
+                       {}};
+  FE_known_msgs['P'] =
+      MessageProcessor{"Parse", BODY_FORMAT(String, String, Array<Int32>), {&DecoderImpl::onParse}};
+  FE_known_msgs['Q'] = MessageProcessor{"Query", BODY_FORMAT(String), {&DecoderImpl::onQuery}};
+  FE_known_msgs['S'] = MessageProcessor{"Sync", NO_BODY, {}};
+  FE_known_msgs['X'] =
+      MessageProcessor{"Terminate", NO_BODY, {&DecoderImpl::decodeFrontendTerminate}};
 
   // Handler for unknown Frontend messages.
-  FE_messages_.unknown_ = MsgProcessor{"Other", {&DecoderImpl::incMessagesUnknown}};
+  FE_messages_.unknown_ =
+      MessageProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
 
   // Backend messages.
   BE_messages_.direction_ = "Backend";
 
   // Setup handlers for known messages.
-  absl::flat_hash_map<char, MsgProcessor>& BE_known_msgs = BE_messages_.messages_;
+  absl::flat_hash_map<char, MessageProcessor>& BE_known_msgs = BE_messages_.messages_;
 
   // Handler for known Backend messages.
-  BE_known_msgs['R'] = MsgProcessor{"Authentication", {&DecoderImpl::decodeAuthentication}};
-  BE_known_msgs['K'] = MsgProcessor{"BackendKeyData", {}};
-  BE_known_msgs['2'] = MsgProcessor{"BindComplete", {}};
-  BE_known_msgs['3'] = MsgProcessor{"CloseComplete", {}};
-  BE_known_msgs['C'] = MsgProcessor{"CommandComplete", {&DecoderImpl::decodeBackendStatements}};
-  BE_known_msgs['d'] = MsgProcessor{"CopyData", {}};
-  BE_known_msgs['c'] = MsgProcessor{"CopyDone", {}};
-  BE_known_msgs['G'] = MsgProcessor{"CopyInResponse", {}};
-  BE_known_msgs['H'] = MsgProcessor{"CopyOutResponse", {}};
-  BE_known_msgs['D'] = MsgProcessor{"DataRow", {}};
-  BE_known_msgs['I'] = MsgProcessor{"EmptyQueryResponse", {}};
-  BE_known_msgs['E'] = MsgProcessor{"ErrorResponse", {&DecoderImpl::decodeBackendErrorResponse}};
-  BE_known_msgs['V'] = MsgProcessor{"FunctionCallResponse", {}};
-  BE_known_msgs['v'] = MsgProcessor{"NegotiateProtocolVersion", {}};
-  BE_known_msgs['n'] = MsgProcessor{"NoData", {}};
-  BE_known_msgs['N'] = MsgProcessor{"NoticeResponse", {&DecoderImpl::decodeBackendNoticeResponse}};
-  BE_known_msgs['A'] = MsgProcessor{"NotificationResponse", {}};
-  BE_known_msgs['t'] = MsgProcessor{"ParameterDescription", {}};
-  BE_known_msgs['S'] = MsgProcessor{"ParameterStatus", {}};
-  BE_known_msgs['1'] = MsgProcessor{"ParseComplete", {}};
-  BE_known_msgs['s'] = MsgProcessor{"PortalSuspend", {}};
-  BE_known_msgs['Z'] = MsgProcessor{"ReadyForQuery", {}};
-  BE_known_msgs['T'] = MsgProcessor{"RowDescription", {}};
+  BE_known_msgs['R'] =
+      MessageProcessor{"Authentication", BODY_FORMAT(ByteN), {&DecoderImpl::decodeAuthentication}};
+  BE_known_msgs['K'] = MessageProcessor{"BackendKeyData", BODY_FORMAT(Int32, Int32), {}};
+  BE_known_msgs['2'] = MessageProcessor{"BindComplete", NO_BODY, {}};
+  BE_known_msgs['3'] = MessageProcessor{"CloseComplete", NO_BODY, {}};
+  BE_known_msgs['C'] = MessageProcessor{
+      "CommandComplete", BODY_FORMAT(String), {&DecoderImpl::decodeBackendStatements}};
+  BE_known_msgs['d'] = MessageProcessor{"CopyData", BODY_FORMAT(ByteN), {}};
+  BE_known_msgs['c'] = MessageProcessor{"CopyDone", NO_BODY, {}};
+  BE_known_msgs['G'] = MessageProcessor{"CopyInResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
+  BE_known_msgs['H'] = MessageProcessor{"CopyOutResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
+  BE_known_msgs['W'] = MessageProcessor{"CopyBothResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
+  BE_known_msgs['D'] = MessageProcessor{"DataRow", BODY_FORMAT(Array<VarByteN>), {}};
+  BE_known_msgs['I'] = MessageProcessor{"EmptyQueryResponse", NO_BODY, {}};
+  BE_known_msgs['E'] = MessageProcessor{
+      "ErrorResponse", BODY_FORMAT(Byte1, String), {&DecoderImpl::decodeBackendErrorResponse}};
+  BE_known_msgs['V'] = MessageProcessor{"FunctionCallResponse", BODY_FORMAT(VarByteN), {}};
+  BE_known_msgs['v'] = MessageProcessor{"NegotiateProtocolVersion", BODY_FORMAT(ByteN), {}};
+  BE_known_msgs['n'] = MessageProcessor{"NoData", NO_BODY, {}};
+  BE_known_msgs['N'] = MessageProcessor{
+      "NoticeResponse", BODY_FORMAT(ByteN), {&DecoderImpl::decodeBackendNoticeResponse}};
+  BE_known_msgs['A'] =
+      MessageProcessor{"NotificationResponse", BODY_FORMAT(Int32, String, String), {}};
+  BE_known_msgs['t'] = MessageProcessor{"ParameterDescription", BODY_FORMAT(Array<Int32>), {}};
+  BE_known_msgs['S'] = MessageProcessor{"ParameterStatus", BODY_FORMAT(String, String), {}};
+  BE_known_msgs['1'] = MessageProcessor{"ParseComplete", NO_BODY, {}};
+  BE_known_msgs['s'] = MessageProcessor{"PortalSuspend", NO_BODY, {}};
+  BE_known_msgs['Z'] = MessageProcessor{"ReadyForQuery", BODY_FORMAT(Byte1), {}};
+  BE_known_msgs['T'] = MessageProcessor{
+      "RowDescription",
+      BODY_FORMAT(Array<Sequence<String, Int32, Int16, Int32, Int16, Int32, Int16>>),
+      {}};
 
   // Handler for unknown Backend messages.
-  BE_messages_.unknown_ = MsgProcessor{"Other", {&DecoderImpl::incMessagesUnknown}};
+  BE_messages_.unknown_ =
+      MessageProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
 
   // Setup hash map for handling backend statements.
   BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
@@ -80,7 +102,7 @@ void DecoderImpl::initialize() {
     session_.setInTransaction(true);
   };
   BE_statements_["ROLLBACK"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatements(DecoderCallbacks::StatementType::Noop);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     callbacks_->incTransactionsRollback();
     session_.setInTransaction(false);
   };
@@ -90,7 +112,7 @@ void DecoderImpl::initialize() {
     session_.setInTransaction(true);
   };
   BE_statements_["COMMIT"] = [this](DecoderImpl*) -> void {
-    callbacks_->incStatements(DecoderCallbacks::StatementType::Noop);
+    callbacks_->incStatements(DecoderCallbacks::StatementType::Other);
     session_.setInTransaction(false);
     callbacks_->incTransactionsCommit();
   };
@@ -154,13 +176,13 @@ void DecoderImpl::initialize() {
   };
 }
 
-bool DecoderImpl::parseMessage(Buffer::Instance& data) {
+Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
   ENVOY_LOG(trace, "postgres_proxy: parsing message, len {}", data.length());
 
   // The minimum size of the message sufficient for parsing is 5 bytes.
   if (data.length() < 5) {
     // not enough data in the buffer.
-    return false;
+    return Decoder::NeedMoreData;
   }
 
   if (!startup_) {
@@ -171,13 +193,12 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   // The 1 byte message type and message length should be in the buffer
   // Check if the entire message has been read.
   std::string message;
-
-  uint32_t length = data.peekBEInt<uint32_t>(startup_ ? 0 : 1);
-  if (data.length() < (length + (startup_ ? 0 : 1))) {
+  message_len_ = data.peekBEInt<uint32_t>(startup_ ? 0 : 1);
+  if (data.length() < (message_len_ + (startup_ ? 0 : 1))) {
     ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
-              length + (startup_ ? 0 : 1));
+              message_len_ + (startup_ ? 0 : 1));
     // Not enough data in the buffer.
-    return false;
+    return Decoder::NeedMoreData;
   }
 
   if (startup_) {
@@ -185,43 +206,56 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
     // Startup message with 1234 in the most significant 16 bits
     // indicate request to encrypt.
     if (code >= 0x04d20000) {
-      ENVOY_LOG(trace, "postgres_proxy: detected encrypted traffic.");
       encrypted_ = true;
-      startup_ = false;
-      incSessionsEncrypted();
+      // Handler for SSLRequest (Int32(80877103) = 0x04d2162f)
+      // See details in https://www.postgresql.org/docs/current/protocol-message-formats.html.
+      if (code == 0x04d2162f) {
+        // Notify the filter that `SSLRequest` message was decoded.
+        // If the filter returns true, it means to pass the message upstream
+        // to the server. If it returns false it means, that filter will try
+        // to terminate SSL session and SSLRequest should not be passed to the
+        // server.
+        encrypted_ = callbacks_->onSSLRequest();
+      }
+
+      // Count it as recognized frontend message.
+      callbacks_->incMessagesFrontend();
+      if (encrypted_) {
+        ENVOY_LOG(trace, "postgres_proxy: detected encrypted traffic.");
+        incSessionsEncrypted();
+        startup_ = false;
+      }
       data.drain(data.length());
-      return false;
+      return encrypted_ ? Decoder::ReadyForNext : Decoder::Stopped;
     } else {
       ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
-      // 4 bytes of length and 4 bytes of version code.
     }
   }
 
-  setMessageLength(length);
-
   data.drain(startup_ ? 4 : 5); // Length plus optional 1st byte.
 
-  auto bytesToRead = length - 4;
-  message.assign(std::string(static_cast<char*>(data.linearize(bytesToRead)), bytesToRead));
-  data.drain(bytesToRead);
-  setMessage(message);
-
   ENVOY_LOG(trace, "postgres_proxy: msg parsed");
-  return true;
+  return Decoder::ReadyForNext;
 }
 
-bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
+Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   // If encrypted, just drain the traffic.
   if (encrypted_) {
     ENVOY_LOG(trace, "postgres_proxy: ignoring {} bytes of encrypted data", data.length());
     data.drain(data.length());
-    return true;
+    return Decoder::ReadyForNext;
+  }
+
+  if (!frontend && startup_) {
+    data.drain(data.length());
+    return Decoder::ReadyForNext;
   }
 
   ENVOY_LOG(trace, "postgres_proxy: decoding {} bytes", data.length());
 
-  if (!parseMessage(data)) {
-    return false;
+  const Decoder::Result result = parseHeader(data);
+  if (result != Decoder::ReadyForNext || encrypted_) {
+    return result;
   }
 
   MsgGroup& msg_processor = std::ref(frontend ? FE_messages_ : BE_messages_);
@@ -229,7 +263,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
   // Set processing to the handler of unknown messages.
   // If message is found, the processing will be updated.
-  std::reference_wrapper<MsgProcessor> msg = msg_processor.unknown_;
+  std::reference_wrapper<MessageProcessor> msg = msg_processor.unknown_;
 
   if (startup_) {
     msg = std::ref(first_);
@@ -241,19 +275,35 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     }
   }
 
-  std::vector<MsgAction>& actions = std::get<1>(msg.get());
-  for (const auto& action : actions) {
-    action(this);
+  // message_len_ specifies total message length including 4 bytes long
+  // "length" field. The length of message body is total length minus size
+  // of "length" field (4 bytes).
+  uint32_t bytes_to_read = message_len_ - 4;
+
+  std::vector<MsgAction>& actions = std::get<2>(msg.get());
+  if (!actions.empty()) {
+    // Linearize the message for processing.
+    message_.assign(std::string(static_cast<char*>(data.linearize(bytes_to_read)), bytes_to_read));
+
+    // Invoke actions associated with the type of received message.
+    for (const auto& action : actions) {
+      action(this);
+    }
+
+    // Drop the linearized message.
+    message_.erase();
   }
 
   ENVOY_LOG(debug, "({}) command = {} ({})", msg_processor.direction_, command_,
             std::get<0>(msg.get()));
-  ENVOY_LOG(debug, "({}) length = {}", msg_processor.direction_, getMessageLength());
-  ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_, getMessage());
+  ENVOY_LOG(debug, "({}) length = {}", msg_processor.direction_, message_len_);
+  ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_,
+            genDebugMessage(msg, data, bytes_to_read));
 
+  data.drain(bytes_to_read);
   ENVOY_LOG(trace, "postgres_proxy: {} bytes remaining in buffer", data.length());
 
-  return true;
+  return Decoder::ReadyForNext;
 }
 
 // Method is called when C (CommandComplete) message has been
@@ -262,8 +312,14 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 void DecoderImpl::decodeBackendStatements() {
   // The message_ contains the statement. Find space character
   // and the statement is the first word. If space cannot be found
-  // take the whole message.
-  std::string statement = message_.substr(0, message_.find(' '));
+  // try to find for the null terminator character (\0).
+  std::size_t position = message_.find(' ');
+  if (position == std::string::npos) {
+    // If the null terminator character (\0) cannot be found then
+    // take the whole message.
+    position = message_.find('\0');
+  }
+  const std::string statement = message_.substr(0, position);
 
   auto it = BE_statements_.find(statement);
   if (it != BE_statements_.end()) {
@@ -364,6 +420,19 @@ void DecoderImpl::onStartup() {
       (attributes_.find("user") != attributes_.end())) {
     attributes_["database"] = attributes_["user"];
   }
+}
+
+// Method generates displayable format of currently processed message.
+const std::string DecoderImpl::genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
+                                               uint32_t message_len) {
+  const MsgBodyReader& f = std::get<1>(msg);
+  std::string message = "Unrecognized";
+  if (f != nullptr) {
+    const auto msgParser = f();
+    msgParser->read(data, message_len);
+    message = msgParser->toString();
+  }
+  return message;
 }
 
 } // namespace PostgresProxy

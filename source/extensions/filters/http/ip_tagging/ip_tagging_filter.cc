@@ -211,6 +211,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
 
   std::vector<std::string> tags =
       config_->getResolver()(callbacks_->streamInfo().downstreamRemoteAddress());
+
   if (!tags.empty()) {
     headers.appendEnvoyIpTags(absl::StrJoin(tags, ","), ",");
 

@@ -17,9 +17,13 @@ typed_config:
     http_criteria:
     grpc_criteria:
   sampling_window: 120s
-  aggression_coefficient:
-    default_value: 1.0
+  aggression:
+    default_value: 2.0
     runtime_key: "foo.aggression"
+  sr_threshold:
+    default_value:
+      value: 100.0
+    runtime_key: "foo.sr_threshold"
   enabled:
     default_value: true
     runtime_key: "foo.enabled"
@@ -30,7 +34,7 @@ class AdmissionControlIntegrationTest : public Event::TestUsingSimulatedTime,
                                         public HttpIntegrationTest {
 public:
   AdmissionControlIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override {}
 
@@ -66,7 +70,7 @@ protected:
     au->setResponseTrailers(std::move(trailers));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
     return response;
   }
@@ -80,7 +84,7 @@ protected:
         Http::TestResponseHeaderMapImpl({{":status", code}})));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
     return response;
   }
@@ -115,8 +119,8 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
   }
 
   // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 3%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
+  // throttling rate. Allowing an error of 5%.
+  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));
@@ -155,8 +159,8 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   }
 
   // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 3%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.03);
+  // throttling rate. Allowing an error of 5%.
+  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));

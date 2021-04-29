@@ -14,6 +14,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -32,7 +33,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
       tls_(tls.allocateSlot()), ip_allowlist_(config.ip_white_list()),
       stats_(generateStats(scope, config.stat_prefix())) {
 
-  if (!cm.get(remote_cluster_name_)) {
+  if (!cm.clusters().hasCluster(remote_cluster_name_)) {
     throw EnvoyException(
         fmt::format("unknown cluster '{}' in client ssl auth config", remote_cluster_name_));
   }
@@ -111,7 +112,8 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipAllowlist().contains(*read_callbacks_->connection().remoteAddress())) {
+  if (config_->ipAllowlist().contains(
+          *read_callbacks_->connection().addressProvider().remoteAddress())) {
     config_->stats().auth_ip_allowlist_.inc();
     read_callbacks_->continueReading();
     return;

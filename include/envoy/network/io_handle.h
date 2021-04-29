@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "envoy/api/io_error.h"
@@ -14,6 +15,7 @@
 namespace Envoy {
 namespace Buffer {
 struct RawSlice;
+class Instance;
 } // namespace Buffer
 
 namespace Event {
@@ -23,6 +25,13 @@ class Dispatcher;
 using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
 namespace Network {
+
+struct Win32RedirectRecords {
+  // The size of the buffer is selected based on:
+  // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/sio-query-wfp-connection-redirect-records
+  uint8_t buf_[1024];
+  unsigned long buf_size_;
+};
 
 /**
  * IoHandle: an abstract interface for all I/O operations
@@ -66,6 +75,17 @@ public:
                                         uint64_t num_slice) PURE;
 
   /**
+   * Read from a io handle directly into buffer.
+   * @param buffer supplies the buffer to read into.
+   * @param max_length supplies the maximum length to read. A value of absl::nullopt means to read
+   *   as much data as possible, within the constraints of available buffer size.
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
+   * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
+   */
+  virtual Api::IoCallUint64Result read(Buffer::Instance& buffer,
+                                       absl::optional<uint64_t> max_length) PURE;
+
+  /**
    * Write the data in slices out.
    * @param slices points to the location of data to be written.
    * @param num_slice indicates number of slices |slices| contains.
@@ -73,6 +93,16 @@ public:
    * err_ = nullptr and rc_ = the bytes written for success.
    */
   virtual Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
+
+  /**
+   * Write the contents of the buffer out to a file descriptor. Bytes that were successfully written
+   * are drained from the buffer.
+   * @param buffer supplies the buffer to write from.
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = if successful, the number of bytes
+   * written and drained from the buffer, or err_ = some IoError for failure. If call failed, rc_
+   * shouldn't be used.
+   */
+  virtual Api::IoCallUint64Result write(Buffer::Instance& buffer) PURE;
 
   /**
    * Send a message to the address.
@@ -97,6 +127,9 @@ public:
     unsigned int msg_len_{0};
     // The gso_size, if specified in the transport header
     unsigned int gso_size_{0};
+    // If true indicates a successful syscall, but the packet was dropped due to truncation. We do
+    // not support receiving truncated packets.
+    bool truncated_and_dropped_{false};
   };
 
   /**
@@ -215,6 +248,13 @@ public:
                                           socklen_t* optlen) PURE;
 
   /**
+   * @see MSDN WSAIoctl. Controls the mode of a socket.
+   */
+  virtual Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
+                                      unsigned long in_buffer_len, void* out_buffer,
+                                      unsigned long out_buffer_len,
+                                      unsigned long* bytes_returned) PURE;
+  /**
    * Toggle blocking behavior
    * @param blocking flag to set/unset blocking state
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
@@ -240,21 +280,53 @@ public:
   virtual Address::InstanceConstSharedPtr peerAddress() PURE;
 
   /**
-   * Creates a file event that will signal when the io handle is readable, writable or closed.
+   * Duplicates the handle. This is intended to be used only on listener sockets. (see man dup)
+   * @return a pointer to the new handle.
+   */
+  virtual std::unique_ptr<IoHandle> duplicate() PURE;
+
+  /**
+   * Initializes the internal file event that will signal when the io handle is readable, writable
+   * or closed. Each handle is allowed to have only a single file event. The internal file event is
+   * managed by the handle and it is turned on and off when the socket would block. Calls to this
+   * function must be paired with calls to reset the file event or close the socket.
    * @param dispatcher dispatcher to be used to allocate the file event.
    * @param cb supplies the callback to fire when the handle is ready.
    * @param trigger specifies whether to edge or level trigger.
    * @param events supplies a logical OR of @ref Event::FileReadyType events that the file event
    *               should initially listen on.
-   * @return @ref Event::FileEventPtr
    */
-  virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                              Event::FileTriggerType trigger, uint32_t events) PURE;
+  virtual void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                   Event::FileTriggerType trigger, uint32_t events) PURE;
+
+  /**
+   * Activates file events for the current underlying fd.
+   * @param events events that will be activated.
+   */
+  virtual void activateFileEvents(uint32_t events) PURE;
+
+  /**
+   * Enables file events for the current underlying fd.
+   * @param events events that will be enabled.
+   */
+  virtual void enableFileEvents(uint32_t events) PURE;
+
+  /**
+   * Resets the file event.
+   */
+  virtual void resetFileEvents() PURE;
 
   /**
    * Shut down part of a full-duplex connection (see man 2 shutdown)
    */
   virtual Api::SysCallIntResult shutdown(int how) PURE;
+
+  /**
+   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  time of the connection. If the platform does not support this, then an empty optional is
+   *  returned.
+   */
+  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

@@ -1,0 +1,35 @@
+version: "3.7"
+services:
+
+  proxy-ws:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy-ws
+    ports:
+      - "10000:10000"
+
+  proxy-wss-wss:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy-wss
+    ports:
+      - "20000:10000"
+
+  proxy-wss-passthrough:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy-wss-passthrough
+    ports:
+      - "30000:10000"
+
+  service-ws:
+    image: solsson/websocat
+    hostname: service-ws
+    command: -E ws-listen:0.0.0.0:80 literalreply:'[ws] HELO'
+
+  service-wss:
+    image: solsson/websocat
+    hostname: service-wss
+    command: wss-listen:0.0.0.0:443 literalreply:"[wss] HELO" --pkcs12-der /certs/output.pkcs12
+    volumes:
+      - ./certs/output.pkcs12:/certs/output.pkcs12

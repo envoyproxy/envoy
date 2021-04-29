@@ -1,0 +1,236 @@
+actions {
+  add_reference {
+    key: "foo"
+    value: "bar"
+  }
+}
+actions {
+  add_reference {
+    key: "foo"
+    value: "baz"
+  }
+}
+actions {
+  add_reference_key {
+    key: "foo_string_key"
+    string_value: "barrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+  }
+}
+actions {
+  add_reference_key {
+    key: "foo_string_key"
+    string_value: "baz"
+  }
+}
+actions {
+  add_reference_key {
+    key: "foo_uint64_key"
+    uint64_value: 42
+  }
+}
+actions {
+  add_reference_key {
+    key: "foo_uint64_key"
+    uint64_value: 37
+  }
+}
+actions {
+  add_copy {
+    key: "foo_string_key"
+    string_value: "barrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+  }
+}
+actions {
+  add_copy {
+    key: "foo_string_key"
+    string_value: "baz"
+  }
+}
+actions {
+  add_copy {
+    key: "foo_uint64_key"
+    uint64_value: 42
+  }
+}
+actions {
+  add_copy {
+    key: "foo_uint64_key"
+    uint64_value: 37
+  }
+}
+actions {
+  set_reference {
+    key: "foo"
+    value: "bar"
+  }
+}
+actions {
+  set_reference {
+    key: "foo"
+    value: "baz"
+  }
+}
+actions {
+  set_reference_key {
+    key: "foo"
+    value: "bar"
+  }
+}
+actions {
+  set_reference_key {
+    key: "foo"
+    value: "baz"
+  }
+}
+
+actions {
+  add_reference {
+    key: ":method"
+    value: "bar"
+  }
+}
+actions {
+  add_reference {
+    key: ":method"
+    value: "baz"
+  }
+}
+actions {
+  add_reference_key {
+    key: ":method"
+    string_value: "bar"
+  }
+}
+actions {
+  add_reference_key {
+    key: ":method"
+    string_value: "baz"
+  }
+}
+actions {
+  add_reference_key {
+    key: ":method"
+    uint64_value: 42
+  }
+}
+actions {
+  add_reference_key {
+    key: ":method"
+    uint64_value: 37
+  }
+}
+actions {
+  add_copy {
+    key: ":method"
+    string_value: "bar"
+  }
+}
+actions {
+  add_copy {
+    key: ":method"
+    string_value: "baz"
+  }
+}
+actions {
+  add_copy {
+    key: ":method"
+    uint64_value: 42
+  }
+}
+actions {
+  add_copy {
+    key: ":method"
+    uint64_value: 37
+  }
+}
+actions {
+  set_reference {
+    key: ":method"
+    value: "bar"
+  }
+}
+actions {
+  set_reference {
+    key: ":method"
+    value: "baz"
+  }
+}
+actions {
+  set_reference_key {
+    key: ":method"
+    value: "bar"
+  }
+}
+actions {
+  set_reference_key {
+    key: ":method"
+    value: "baz"
+  }
+}
+
+actions {
+  get_and_mutate {
+    key: ":method"
+    append: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+  }
+}
+actions {
+  get_and_mutate {
+    key: ":method"
+    append: "aa"
+  }
+}
+actions {
+  get_and_mutate {
+    key: ":method"
+    clear: {}
+  }
+}
+actions {
+  get_and_mutate {
+    key: ":method"
+    find: "a"
+  }
+}
+actions {
+  get_and_mutate {
+    key: ":method"
+    set_copy: "a"
+  }
+}
+actions {
+  get_and_mutate {
+    key: ":method"
+    set_integer: 0
+  }
+}
+actions {
+  get_and_mutate {
+    key: ":method"
+    set_reference: "a"
+  }
+}
+actions {
+  copy: {}
+}
+actions {
+  lookup: ":method"
+}
+actions {
+  lookup: "foo"
+}
+actions {
+  remove: "f"
+}
+actions {
+  remove_prefix: "foo"
+}
+actions {
+  remove: ":m"
+}
+actions {
+  remove_prefix: ":m"
+}
+config {
+  lazy_map_min_size: 0
+}

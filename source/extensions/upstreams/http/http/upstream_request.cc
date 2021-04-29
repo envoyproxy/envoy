@@ -10,7 +10,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -48,24 +47,22 @@ bool HttpConnPool::cancelAnyPendingStream() {
   return false;
 }
 
-absl::optional<Envoy::Http::Protocol> HttpConnPool::protocol() const {
-  return conn_pool_->protocol();
-}
-
 void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                  absl::string_view transport_failure_reason,
                                  Upstream::HostDescriptionConstSharedPtr host) {
+  conn_pool_stream_handle_ = nullptr;
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);
 }
 
 void HttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info) {
+                               const StreamInfo::StreamInfo& info,
+                               absl::optional<Envoy::Http::Protocol> protocol) {
   conn_pool_stream_handle_ = nullptr;
   auto upstream =
       std::make_unique<HttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder);
   callbacks_->onPoolReady(std::move(upstream), host,
-                          request_encoder.getStream().connectionLocalAddress(), info);
+                          request_encoder.getStream().connectionLocalAddress(), info, protocol);
 }
 
 } // namespace Http

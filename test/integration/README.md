@@ -18,22 +18,22 @@ initialize();
 codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
 // Create some request headers.
-Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                        {":path", "/test/long/url"},
-                                        {":scheme", "http"},
-                                        {":authority", "host"}};
+Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                               {":path", "/test/long/url"},
+                                               {":scheme", "http"},
+                                               {":authority", "host"}};
 
 // Send the request headers from the client, wait until they are received upstream. When they
 // are received, send the default response headers from upstream and wait until they are
 // received at by client
-sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
 // Verify the proxied request was received upstream, as expected.
 EXPECT_TRUE(upstream_request_->complete());
 EXPECT_EQ(0U, upstream_request_->bodyLength());
 // Verify the proxied response was received downstream, as expected.
-EXPECT_TRUE(response_->complete());
-EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+EXPECT_TRUE(response->complete());
+EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 EXPECT_EQ(0U, response_->body().size());
 ```
 
@@ -93,7 +93,7 @@ cluster:
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ratelimit_cluster->set_name("ratelimit");
-      ratelimit_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ratelimit_cluster);
     });
 ```
 

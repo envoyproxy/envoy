@@ -1,5 +1,7 @@
 #include "common/http/utility.h"
 
+#include <http_parser.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -32,28 +34,6 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
-namespace Http {
-namespace Utility {
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data) {
-  Http::Status status;
-  try {
-    status = dispatch(data);
-    // TODO(#10878): Remove this when exception removal is complete. It is currently in migration,
-    // so dispatch may either return an error status or throw an exception. Soon we won't need to
-    // catch these exceptions, as all codec errors will be migrated to using error statuses that are
-    // returned from dispatch.
-  } catch (FrameFloodException& e) {
-    status = bufferFloodError(e.what());
-  } catch (CodecProtocolException& e) {
-    status = codecProtocolError(e.what());
-  } catch (PrematureResponseException& e) {
-    status = prematureResponseError(e.what(), e.responseCode());
-  }
-  return status;
-}
-} // namespace Utility
-} // namespace Http
 namespace Http2 {
 namespace Utility {
 
@@ -148,9 +128,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+  if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
   }
@@ -221,8 +199,97 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 } // namespace Utility
 } // namespace Http2
+namespace Http3 {
+namespace Utility {
+envoy::config::core::v3::Http3ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  if (options.has_override_stream_error_on_invalid_http_message()) {
+    return options;
+  }
+  envoy::config::core::v3::Http3ProtocolOptions options_clone(options);
+  if (hcm_stream_error_set) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  } else {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
+  }
+  return options_clone;
+}
+
+} // namespace Utility
+} // namespace Http3
 
 namespace Http {
+
+static const char kDefaultPath[] = "/";
+
+// If http_parser encounters an IP address [address] as the host it will set the offset and
+// length to point to 'address' rather than '[address]'. Fix this by adjusting the offset
+// and length to include the brackets.
+// @param absolute_url the absolute URL. This is usually of the form // http://host/path
+//        but may be host:port for CONNECT requests
+// @param offset the offset for the first character of the host. For IPv6 hosts
+//        this will point to the first character inside the brackets and will be
+//        adjusted to point at the brackets
+// @param len the length of the host-and-port field. For IPv6 hosts this will
+//        not include the brackets and will be adjusted to do so.
+bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64_t& len) {
+  // According to https://tools.ietf.org/html/rfc3986#section-3.2.2 the only way a hostname
+  // may begin with '[' is if it's an ipv6 address.
+  if (offset == 0 || *(absolute_url.data() + offset - 1) != '[') {
+    return false;
+  }
+  // Start one character sooner and end one character later.
+  offset--;
+  len += 2;
+  // HTTP parser ensures that any [ has a closing ]
+  ASSERT(absolute_url.length() >= offset + len);
+  return true;
+}
+
+bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
+  struct http_parser_url u;
+  http_parser_url_init(&u);
+  const int result =
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+
+  if (result != 0) {
+    return false;
+  }
+  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
+      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
+    return false;
+  }
+  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                              u.field_data[UF_SCHEMA].len);
+
+  uint64_t authority_len = u.field_data[UF_HOST].len;
+  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
+    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
+  }
+
+  uint64_t authority_beginning = u.field_data[UF_HOST].off;
+  const bool is_ipv6 = maybeAdjustForIpv6(absolute_url, authority_beginning, authority_len);
+  host_and_port_ = absl::string_view(absolute_url.data() + authority_beginning, authority_len);
+  if (is_ipv6 && !parseAuthority(host_and_port_).is_ip_address_) {
+    return false;
+  }
+
+  // RFC allows the absolute-uri to not end in /, but the absolute path form
+  // must start with. Determine if there's a non-zero path, and if so determine
+  // the length of the path, query params etc.
+  uint64_t path_etc_len = absolute_url.length() - (authority_beginning + hostAndPort().length());
+  if (path_etc_len > 0) {
+    uint64_t path_beginning = authority_beginning + hostAndPort().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_etc_len);
+  } else if (!is_connect) {
+    ASSERT((u.field_set & (1 << UF_PATH)) == 0);
+    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
+  }
+  return true;
+}
 
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
@@ -369,10 +436,18 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
+  auto status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    throw CodecClientException(":status must be specified and a valid unsigned long");
+  }
+  return status.value();
+}
+
+absl::optional<uint64_t> Utility::getResponseStatusNoThrow(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    throw CodecClientException(":status must be specified and a valid unsigned long");
+    return absl::nullopt;
   }
   return response_code;
 }
@@ -395,42 +470,6 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
-}
-
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config) {
-  Http1Settings ret;
-  ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
-  ret.accept_http_10_ = config.accept_http_10();
-  ret.default_host_for_http_10_ = config.default_host_for_http_10();
-  ret.enable_trailers_ = config.enable_trailers();
-  ret.allow_chunked_length_ = config.allow_chunked_length();
-
-  if (config.header_key_format().has_proper_case_words()) {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
-  } else {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
-  }
-
-  return ret;
-}
-
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                            const Protobuf::BoolValue& hcm_stream_error) {
-  Http1Settings ret = parseHttp1Settings(config);
-
-  if (config.has_override_stream_error_on_invalid_http_message()) {
-    // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM
-    // stream_error_on_invalid_http_message
-    ret.stream_error_on_invalid_http_message_ =
-        config.override_stream_error_on_invalid_http_message().value();
-  } else {
-    // fallback to HCM value
-    ret.stream_error_on_invalid_http_message_ = hcm_stream_error.value();
-  }
-
-  return ret;
 }
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
@@ -476,15 +515,19 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   if (local_reply_data.is_grpc_) {
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
-    response_headers->setGrpcStatus(
-        std::to_string(enumToInt(local_reply_data.grpc_status_
-                                     ? local_reply_data.grpc_status_.value()
-                                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+
+    if (response_headers->getGrpcStatusValue().empty()) {
+      response_headers->setGrpcStatus(std::to_string(
+          enumToInt(local_reply_data.grpc_status_
+                        ? local_reply_data.grpc_status_.value()
+                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+    }
+
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
-      // https://github.com/envoyproxy/envoy/blob/master/source/common/formatter/substitution_formatter.cc#L129
+      // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
       if (body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }
@@ -552,17 +595,16 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   xff_string = StringUtil::ltrim(xff_string);
   xff_string = StringUtil::rtrim(xff_string);
 
-  try {
-    // This technically requires a copy because inet_pton takes a null terminated string. In
-    // practice, we are working with a view at the end of the owning string, and could pass the
-    // raw pointer.
-    // TODO(mattklein123) PERF: Avoid the copy here.
-    return {
-        Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
-        last_comma == std::string::npos && num_to_skip == 0};
-  } catch (const EnvoyException&) {
-    return {nullptr, false};
+  // This technically requires a copy because inet_pton takes a null terminated string. In
+  // practice, we are working with a view at the end of the owning string, and could pass the
+  // raw pointer.
+  // TODO(mattklein123) PERF: Avoid the copy here.
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddressNoThrow(std::string(xff_string));
+  if (address != nullptr) {
+    return {address, last_comma == std::string::npos && num_to_skip == 0};
   }
+  return {nullptr, false};
 }
 
 bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
@@ -606,7 +648,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    const HeaderEntry* nominated_header = nullptr;
+    HeaderMap::GetResult nominated_header;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -633,8 +675,10 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       nominated_header = headers.get(lcs_header_to_remove);
     }
 
-    if (nominated_header) {
-      auto nominated_header_value_sv = nominated_header->value().getStringView();
+    if (!nominated_header.empty()) {
+      // NOTE: The TE header is an inline header, so by definition if we operate on it there can
+      // only be a single value. In all other cases we remove the nominated header.
+      auto nominated_header_value_sv = nominated_header[0]->value().getStringView();
 
       const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
 
@@ -645,6 +689,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       }
 
       if (is_te_header) {
+        ASSERT(nominated_header.size() == 1);
         for (const auto& header_value :
              StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
 
@@ -777,6 +822,10 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote reset";
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return "remote refused stream reset";
+  case Http::StreamResetReason::ConnectError:
+    return "remote error with CONNECT request";
+  case Http::StreamResetReason::ProtocolError:
+    return "protocol error";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -956,21 +1005,19 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
   // so is not worth it since the DNS resolver should handle it for us.
   bool is_ip_address = false;
-  try {
-    absl::string_view potential_ip_address = host_to_resolve;
-    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
-    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
-    // now, just do all the trimming here, but in the future we should consider whether we can
-    // have unified [] handling as low as possible in the stack.
-    if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
-        potential_ip_address.back() == ']') {
-      potential_ip_address.remove_prefix(1);
-      potential_ip_address.remove_suffix(1);
-    }
-    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
+  absl::string_view potential_ip_address = host_to_resolve;
+  // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+  // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+  // now, just do all the trimming here, but in the future we should consider whether we can
+  // have unified [] handling as low as possible in the stack.
+  if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
+      potential_ip_address.back() == ']') {
+    potential_ip_address.remove_prefix(1);
+    potential_ip_address.remove_suffix(1);
+  }
+  if (Network::Utility::parseInternetAddressNoThrow(std::string(potential_ip_address)) != nullptr) {
     is_ip_address = true;
     host_to_resolve = potential_ip_address;
-  } catch (const EnvoyException&) {
   }
 
   return {is_ip_address, host_to_resolve, port};

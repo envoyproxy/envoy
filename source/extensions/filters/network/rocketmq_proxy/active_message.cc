@@ -150,10 +150,10 @@ void ActiveMessage::onQueryTopicRoute() {
   if (route) {
     cluster_name = route->routeEntry()->clusterName();
     Upstream::ClusterManager& cluster_manager = connection_manager_.config().clusterManager();
-    cluster = cluster_manager.get(cluster_name);
+    cluster = cluster_manager.getThreadLocalCluster(cluster_name);
   }
   if (cluster) {
-    ENVOY_LOG(trace, "Enovy has an operating cluster {} for topic {}", cluster_name, topic_name);
+    ENVOY_LOG(trace, "Envoy has an operating cluster {} for topic {}", cluster_name, topic_name);
     std::vector<QueueData> queue_data_list;
     std::vector<BrokerData> broker_data_list;
     for (auto& host_set : cluster->prioritySet().hostSetsPerPriority()) {
@@ -209,7 +209,7 @@ void ActiveMessage::onQueryTopicRoute() {
     TopicRouteData topic_route_data(std::move(queue_data_list), std::move(broker_data_list));
     ProtobufWkt::Struct data_struct;
     topic_route_data.encode(data_struct);
-    std::string json = MessageUtil::getJsonStringFromMessage(data_struct);
+    std::string json = MessageUtil::getJsonStringFromMessageOrDie(data_struct);
     ENVOY_LOG(trace, "Serialize TopicRouteData for {} OK:\n{}", cluster_name, json);
     RemotingCommandPtr response = std::make_unique<RemotingCommand>(
         static_cast<int>(ResponseCode::Success), downstreamRequest()->version(),

@@ -39,8 +39,6 @@ envoy_extension_cc_test(
     name = "tsi_handshaker_test",
     srcs = ["tsi_handshaker_test.cc"],
     extension_name = "envoy.transport_sockets.alts",
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//source/extensions/transport_sockets/alts:tsi_handshaker",
@@ -88,6 +86,7 @@ envoy_extension_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/transport_sockets/alts:config",
+        "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/integration:http_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",

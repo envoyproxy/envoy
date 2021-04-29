@@ -22,18 +22,13 @@ namespace {
 
 TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(
-          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
-  ON_CALL(*context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
-          features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   const std::string yaml_string = R"EOF(
   http:
     name: datadog
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.DatadogConfig
       collector_cluster: fake_cluster
       service_name: fake_file
    )EOF";

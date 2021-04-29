@@ -42,7 +42,7 @@ public:
    * platform.
    * @param optval as per setsockopt(2).
    * @param optlen as per setsockopt(2).
-   * @return int as per setsockopt(2). ENOTSUP is returned if the option is not supported on the
+   * @return int as per setsockopt(2). `ENOTSUP` is returned if the option is not supported on the
    * platform for fd after the above option level fallback semantics are taken into account or the
    *         socket is non-IP.
    */

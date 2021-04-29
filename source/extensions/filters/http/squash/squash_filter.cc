@@ -11,6 +11,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -40,7 +41,7 @@ SquashFilterConfig::SquashFilterConfig(
           PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_poll_period, 1000)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, request_timeout, 1000)) {
 
-  if (!cluster_manager.get(cluster_name_)) {
+  if (!cluster_manager.clusters().hasCluster(cluster_name_)) {
     throw EnvoyException(
         fmt::format("squash filter: unknown cluster '{}' in squash config", cluster_name_));
   }
@@ -49,7 +50,7 @@ SquashFilterConfig::SquashFilterConfig(
 std::string SquashFilterConfig::getAttachment(const ProtobufWkt::Struct& attachment_template) {
   ProtobufWkt::Struct attachment_json(attachment_template);
   updateTemplateInStruct(attachment_json);
-  return MessageUtil::getJsonStringFromMessage(attachment_json);
+  return MessageUtil::getJsonStringFromMessageOrDie(attachment_json);
 }
 
 void SquashFilterConfig::updateTemplateInStruct(ProtobufWkt::Struct& attachment_template) {
@@ -137,7 +138,7 @@ void SquashFilter::onDestroy() { cleanup(); }
 
 Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Check for squash header
-  if (!headers.get(Http::Headers::get().XSquashDebug)) {
+  if (headers.get(Http::Headers::get().XSquashDebug).empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -148,13 +149,15 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
   request->headers().setReferencePath(POST_ATTACHMENT_PATH);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
   request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
+  request->body().add(config_->attachmentJson());
 
   is_squashing_ = true;
-  in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
-          .send(std::move(request), create_attachment_callback_,
-                Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(request), create_attachment_callback_,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  }
 
   if (in_flight_request_ == nullptr) {
     ENVOY_LOG(debug, "Squash: can't create request for squash server");
@@ -273,10 +276,14 @@ void SquashFilter::pollForAttachment() {
   request->headers().setReferencePath(debug_attachment_path_);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
 
-  in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
-          .send(std::move(request), check_attachment_callback_,
-                Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(request), check_attachment_callback_,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  } else {
+    scheduleRetry();
+  }
   // No need to check if in_flight_request_ is null as onFailure will take care of
   // cleanup.
 }
@@ -308,9 +315,7 @@ void SquashFilter::cleanup() {
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::ResponseMessagePtr&& m) {
-  Buffer::InstancePtr& data = m->body();
-  std::string jsonbody = data->toString();
-  return Json::Factory::loadFromString(jsonbody);
+  return Json::Factory::loadFromString(m->bodyAsString());
 }
 
 } // namespace Squash

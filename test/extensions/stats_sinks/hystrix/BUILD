@@ -32,6 +32,7 @@ envoy_extension_cc_test(
     srcs = ["hystrix_test.cc"],
     extension_name = "envoy.stat_sinks.hystrix",
     deps = [
+        "//source/common/json:json_loader_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/stat_sinks/hystrix:hystrix_lib",
         "//test/mocks/server:admin_mocks",

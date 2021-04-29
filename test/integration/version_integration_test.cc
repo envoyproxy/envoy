@@ -28,7 +28,7 @@ const char ExampleIpTaggingConfig[] = R"EOF(
 TEST_P(VersionIntegrationTest, DEPRECATED_FEATURE_TEST(IpTaggingV2StaticStructConfig)) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
   name: envoy.filters.http.ip_tagging
-  config:
+  hidden_envoy_deprecated_config:
   )EOF",
                                         ExampleIpTaggingConfig));
 
@@ -41,6 +41,7 @@ TEST_P(VersionIntegrationTest, DEPRECATED_FEATURE_TEST(IpTaggingV2StaticStructCo
 
 // envoy.filters.http.ip_tagging from v2 TypedStruct config.
 TEST_P(VersionIntegrationTest, IpTaggingV2StaticTypedStructConfig) {
+  config_helper_.enableDeprecatedV2Api();
   config_helper_.addFilter(absl::StrCat(R"EOF(
 name: ip_tagging
 typed_config:
@@ -67,6 +68,7 @@ typed_config:
 
 // envoy.filters.http.ip_tagging from v2 typed Any config.
 TEST_P(VersionIntegrationTest, IpTaggingV2StaticTypedConfig) {
+  config_helper_.enableDeprecatedV2Api();
   config_helper_.addFilter(absl::StrCat(R"EOF(
   name: ip_tagging
   typed_config:

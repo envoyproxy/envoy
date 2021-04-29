@@ -25,10 +25,11 @@ public:
   DirectoryIteratorImpl(const DirectoryIteratorImpl&) = delete;
   DirectoryIteratorImpl(DirectoryIteratorImpl&&) = default;
 
+  static FileType fileType(const std::string& name, Api::OsSysCallsImpl& os_sys_calls);
+
 private:
   void nextEntry();
   void openDirectory();
-  FileType fileType(const std::string& name) const;
 
   std::string directory_path_;
   DIR* dir_{nullptr};

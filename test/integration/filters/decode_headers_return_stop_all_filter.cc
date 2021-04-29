@@ -27,29 +27,26 @@ public:
   // Http::FilterHeadersStatus::StopAllIterationAndWatermark for headers. Triggers a timer to
   // continue iteration after 5s.
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
-    const Http::HeaderEntry* entry_content =
-        header_map.get(Envoy::Http::LowerCaseString("content_size"));
-    const Http::HeaderEntry* entry_added =
-        header_map.get(Envoy::Http::LowerCaseString("added_size"));
-    ASSERT(entry_content != nullptr && entry_added != nullptr);
-    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
-    added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
-    const Http::HeaderEntry* entry_is_first_trigger =
+    const auto entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    const auto entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    ASSERT(!entry_content.empty() && !entry_added.empty());
+    content_size_ = std::stoul(std::string(entry_content[0]->value().getStringView()));
+    added_size_ = std::stoul(std::string(entry_added[0]->value().getStringView()));
+    const auto entry_is_first_trigger =
         header_map.get(Envoy::Http::LowerCaseString("is_first_trigger"));
-    is_first_trigger_ = entry_is_first_trigger != nullptr;
+    is_first_trigger_ = !entry_is_first_trigger.empty();
     // Remove "first_trigger" headers so that if the filter is registered twice in a filter chain,
     // it would act differently.
     header_map.remove(Http::LowerCaseString("is_first_trigger"));
 
     createTimerForContinue();
 
-    const Http::HeaderEntry* entry_buffer =
-        header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
-    if (entry_buffer == nullptr || !is_first_trigger_) {
+    const auto entry_buffer = header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
+    if (entry_buffer.empty() || !is_first_trigger_) {
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
     } else {
       watermark_enabled_ = true;
-      buffer_limit_ = std::stoul(std::string(entry_buffer->value().getStringView()));
+      buffer_limit_ = std::stoul(std::string(entry_buffer[0]->value().getStringView()));
       decoder_callbacks_->setDecoderBufferLimit(buffer_limit_);
       header_map.remove(Http::LowerCaseString("buffer_limit"));
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;

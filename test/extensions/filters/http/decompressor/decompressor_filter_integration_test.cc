@@ -95,19 +95,19 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   // sent.
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("gzip", upstream_request_->headers()
-                        .get(Http::LowerCaseString("accept-encoding"))
+                        .get(Http::LowerCaseString("accept-encoding"))[0]
                         ->value()
                         .getStringView());
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::LowerCaseString("content-encoding")));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
   EXPECT_EQ(uncompressed_request_length, upstream_request_->bodyLength());
   EXPECT_EQ(std::to_string(compressed_request_length),
             upstream_request_->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ(std::to_string(uncompressed_request_length),
             upstream_request_->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
                 ->value()
                 .getStringView());
 
@@ -144,7 +144,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   upstream_request_->encodeData(response_data2, true);
 
   // Wait for frames to arrive downstream.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   // Assert that the total bytes received downstream equal the sum of the uncompressed byte buffers
   // sent.
@@ -153,12 +153,12 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   EXPECT_EQ(uncompressed_response_length, response->body().length());
   EXPECT_EQ(std::to_string(compressed_response_length),
             response->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ(std::to_string(uncompressed_response_length),
             response->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
                 ->value()
                 .getStringView());
 
@@ -224,13 +224,13 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("gzip", upstream_request_->headers()
-                        .get(Http::LowerCaseString("accept-encoding"))
+                        .get(Http::LowerCaseString("accept-encoding"))[0]
                         ->value()
                         .getStringView());
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::LowerCaseString("content-encoding")));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
   EXPECT_EQ(std::to_string(compressed_request_length),
             upstream_request_->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                 ->value()
                 .getStringView());
 
@@ -264,13 +264,13 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   upstream_request_->encodeData(response_data2, true);
 
   // Wait for frames to arrive downstream.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(std::to_string(compressed_response_length),
             response->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
                 ->value()
                 .getStringView());
 

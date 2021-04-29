@@ -24,6 +24,7 @@ namespace Oauth2 {
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 class MockCallbacks : public FilterCallbacks {
 public:
@@ -34,11 +35,13 @@ public:
 class OAuth2ClientTest : public testing::Test {
 public:
   OAuth2ClientTest()
-      : mock_callbacks_(std::make_shared<MockCallbacks>()), request_(&cm_.async_client_) {
+      : mock_callbacks_(std::make_shared<MockCallbacks>()),
+        request_(&cm_.thread_local_cluster_.async_client_) {
     envoy::config::core::v3::HttpUri uri;
     uri.set_cluster("auth");
     uri.set_uri("auth.com/oauth/token");
     uri.mutable_timeout()->set_seconds(1);
+    cm_.initializeThreadLocalClusters({"auth"});
     client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri);
   }
 
@@ -73,21 +76,29 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   }};
   Http::ResponseMessagePtr mock_response(
       new Http::ResponseMessageImpl(std::move(mock_response_headers)));
-  mock_response->body() = std::make_unique<Buffer::OwnedImpl>(json);
+  mock_response->body().add(json);
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_.push_back(&cb);
-            return &request_;
-          }));
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                                 const Http::AsyncClient::RequestOptions&)
+                                 -> Http::AsyncClient::Request* {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post,
+                  message->headers().Method()->value().getStringView());
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.FormUrlEncoded,
+                  message->headers().ContentType()->value().getStringView());
+        EXPECT_TRUE(
+            !message->headers().get(Http::CustomHeaders::get().Accept).empty() &&
+            message->headers().get(Http::CustomHeaders::get().Accept)[0]->value().getStringView() ==
+                Http::Headers::get().ContentTypeValues.Json);
+        callbacks_.push_back(&cb);
+        return &request_;
+      }));
 
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _));
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
@@ -104,9 +115,9 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   }};
   Http::ResponseMessagePtr mock_response(
       new Http::ResponseMessageImpl(std::move(mock_response_headers)));
-  mock_response->body() = std::make_unique<Buffer::OwnedImpl>(json);
+  mock_response->body().add(json);
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -118,7 +129,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
@@ -131,7 +142,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
   Http::ResponseMessagePtr mock_response(
       new Http::ResponseMessageImpl(std::move(mock_response_headers)));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -143,7 +154,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
@@ -160,9 +171,9 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
   }};
   Http::ResponseMessagePtr mock_response(
       new Http::ResponseMessageImpl(std::move(mock_response_headers)));
-  mock_response->body() = std::make_unique<Buffer::OwnedImpl>(json);
+  mock_response->body().add(json);
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -174,13 +185,13 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
 TEST_F(OAuth2ClientTest, NetworkError) {
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -193,10 +204,18 @@ TEST_F(OAuth2ClientTest, NetworkError) {
   EXPECT_EQ(1, callbacks_.size());
 
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
   }));
+}
+
+TEST_F(OAuth2ClientTest, NoCluster) {
+  ON_CALL(cm_, getThreadLocalCluster("auth")).WillByDefault(Return(nullptr));
+  client_->setCallbacks(*mock_callbacks_);
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+  EXPECT_EQ(0, callbacks_.size());
 }
 
 } // namespace Oauth2

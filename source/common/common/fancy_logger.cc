@@ -90,6 +90,15 @@ void FancyContext::setAllFancyLoggers(spdlog::level::level_enum level)
   }
 }
 
+FancyLogLevelMap FancyContext::getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  FancyLogLevelMap log_levels;
+  absl::ReaderMutexLock l(&fancy_log_lock_);
+  for (const auto& it : *fancy_log_map_) {
+    log_levels[it.first] = it.second->level();
+  }
+  return log_levels;
+}
+
 void FancyContext::initSink() {
   spdlog::sink_ptr sink = Logger::Registry::getSink();
   Logger::DelegatingLogSinkSharedPtr sp = std::static_pointer_cast<Logger::DelegatingLogSink>(sink);

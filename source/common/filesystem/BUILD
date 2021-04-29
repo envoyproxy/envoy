@@ -114,6 +114,8 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/network:default_socket_interface_lib",
     ] + select({
         "//bazel:windows_x86_64": [
             "//source/common/api:os_sys_calls_lib",

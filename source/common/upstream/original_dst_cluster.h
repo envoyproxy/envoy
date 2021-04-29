@@ -56,7 +56,7 @@ public:
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
-    // Prefetching is not implemented for OriginalDstCluster
+    // Preconnecting is not implemented for OriginalDstCluster
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
 
   private:

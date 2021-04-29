@@ -1,10 +1,10 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/endpoint.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/metadata.h"
@@ -217,8 +217,10 @@ public:
                   type: EDS
                   eds_cluster_config:
                     eds_config:
+                      resource_api_version: V3
                       api_config_source:
                         api_type: GRPC
+                        transport_api_version: V3
                         grpc_services:
                           envoy_grpc:
                             cluster_name: "eds-cluster"
@@ -253,7 +255,11 @@ public:
                       name: eds-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
-                      http2_protocol_options: {{}}
+                      typed_extension_protocol_options:
+                        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+                          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+                          explicit_http_config:
+                            http2_protocol_options: {{}}
                       connect_timeout: 5s
                       load_assignment:
                         cluster_name: eds-cluster
@@ -359,8 +365,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
   }
 
@@ -374,16 +379,16 @@ public:
         RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
-        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+        envoy::service::discovery::v3::DiscoveryRequest discovery_request;
         result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
         RELEASE_ASSERT(result, result.message());
 
-        API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+        envoy::service::discovery::v3::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
-            TestUtility::parseYaml<API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment)>(fmt::format(
+            TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:

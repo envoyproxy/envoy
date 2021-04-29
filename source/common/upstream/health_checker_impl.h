@@ -6,9 +6,11 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/network/socket.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "common/common/dump_state_utils.h"
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
@@ -31,7 +33,6 @@ public:
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param runtime supplies the runtime loader.
-   * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
    * @param log_manager supplies the log_manager.
    * @param validation_visitor message validation visitor instance.
@@ -40,8 +41,8 @@ public:
    */
   static HealthCheckerSharedPtr
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Runtime::Loader& runtime, Random::RandomGenerator& random,
-         Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
+         Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
+         AccessLog::AccessLogManager& log_manager,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
@@ -98,6 +99,9 @@ private:
     void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override { onResponseComplete(); }
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(HttpActiveHealthCheckSession);
+    }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -106,6 +110,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
+    void onGoAway(Http::GoAwayErrorCode error_code);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -119,14 +124,27 @@ private:
       HttpActiveHealthCheckSession& parent_;
     };
 
+    class HttpConnectionCallbackImpl : public Http::ConnectionCallbacks {
+    public:
+      HttpConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Http::ConnectionCallbacks
+      void onGoAway(Http::GoAwayErrorCode error_code) override { parent_.onGoAway(error_code); }
+
+    private:
+      HttpActiveHealthCheckSession& parent_;
+    };
+
     ConnectionCallbackImpl connection_callback_impl_{*this};
+    HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::Address::InstanceConstSharedPtr local_address_;
+    Network::SocketAddressProviderSharedPtr local_address_provider_;
     bool expect_reset_{};
+    bool reuse_connection_ = false;
+    bool request_in_flight_ = false;
   };
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
@@ -151,6 +169,7 @@ private:
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
+  Random::RandomGenerator& random_generator_;
 };
 
 /**
@@ -317,6 +336,9 @@ private:
     void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override;
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(GrpcActiveHealthCheckSession);
+    }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -375,6 +397,10 @@ private:
     return envoy::data::core::v3::GRPC;
   }
 
+protected:
+  Random::RandomGenerator& random_generator_;
+
+private:
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;

@@ -1,3 +1,5 @@
+.. _arch_overview_udp_proxy:
+
 UDP proxy
 =========
 

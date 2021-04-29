@@ -21,6 +21,8 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "extensions/filters/common/ext_authz/ext_authz.h"
+
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -37,9 +39,11 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
   // Set the address
   auto addr = peer.mutable_address();
   if (local) {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.localAddress(), *addr);
+    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().localAddress(),
+                                                      *addr);
   } else {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.remoteAddress(), *addr);
+    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().remoteAddress(),
+                                                      *addr);
   }
 
   // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
@@ -118,7 +122,7 @@ void CheckRequestUtils::setHttpRequest(
   auto* mutable_headers = httpreq.mutable_headers();
   headers.iterate([mutable_headers](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
-    if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
+    if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
       (*mutable_headers)[std::string(e.key().getStringView())] =
           std::string(e.value().getStringView());
     }
@@ -141,7 +145,7 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     // Add in a header to detect when a partial body is used.
-    (*mutable_headers)[Http::Headers::get().EnvoyAuthPartialBody.get()] =
+    (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] =
         length != decoding_buffer->length() ? "true" : "false";
   }
 }

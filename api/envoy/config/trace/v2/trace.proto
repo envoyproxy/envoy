@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.config.trace.v2;
 
-import "udpa/annotations/status.proto";
-
 import public "envoy/config/trace/v2/datadog.proto";
 import public "envoy/config/trace/v2/dynamic_ot.proto";
 import public "envoy/config/trace/v2/http_tracer.proto";

@@ -26,18 +26,19 @@ echo "Generating compilation database..."
 
 # bazel build need to be run to setup virtual includes, generating files which are consumed
 # by clang-tidy
-"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --include_headers
+read -ra COMP_DB_TARGETS <<< "$COMP_DB_TARGETS"
+"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --include_headers "${COMP_DB_TARGETS[@]}"
 
 # Do not run clang-tidy against win32 impl
 # TODO(scw00): We should run clang-tidy against win32 impl once we have clang-cl support for Windows
 function exclude_win32_impl() {
-  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32
+  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32 | grep -v source/common/event/win32
 }
 
 # Do not run clang-tidy against macOS impl
 # TODO: We should run clang-tidy against macOS impl for completeness
 function exclude_macos_impl() {
-  grep -v source/common/filesystem/kqueue/
+  grep -v source/common/filesystem/kqueue/ | grep -v source/common/network/apple_dns_impl | grep -v test/common/network/apple_dns_impl_test
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
@@ -50,13 +51,44 @@ function exclude_headersplit_testdata() {
   grep -v tools/envoy_headersplit/
 }
 
+# Do not run clang-tidy against Chromium URL import, this needs to largely
+# reflect the upstream structure.
+function exclude_chromium_url() {
+  grep -v source/common/chromium_url/
+}
+
 # Exclude files in third_party which are temporary forks from other OSS projects.
 function exclude_third_party() {
   grep -v third_party/
 }
 
+# Exclude files which are part of the Wasm emscripten environment
+function exclude_wasm_emscripten() {
+  grep -v source/extensions/common/wasm/ext
+}
+
+# Exclude files which are part of the Wasm SDK
+function exclude_wasm_sdk() {
+  grep -v proxy_wasm_cpp_sdk
+}
+
+# Exclude files which are part of the Wasm Host environment
+function exclude_wasm_host() {
+  grep -v proxy_wasm_cpp_host
+}
+
+# Exclude proxy-wasm test_data.
+function exclude_wasm_test_data() {
+  grep -v wasm/test_data
+}
+
+# Exclude files which are part of the Wasm examples
+function exclude_wasm_examples() {
+  grep -v examples/wasm
+}
+
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party
+  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {
@@ -82,9 +114,7 @@ elif [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   run_clang_tidy
 else
   if [[ -z "${DIFF_REF}" ]]; then
-    if [[ "${BUILD_REASON}" == "PullRequest" ]]; then
-      DIFF_REF="remotes/origin/${SYSTEM_PULLREQUEST_TARGETBRANCH}"
-    elif [[ "${BUILD_REASON}" == *CI ]]; then
+    if [[ "${BUILD_REASON}" == *CI ]]; then
       DIFF_REF="HEAD^"
     else
       DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)

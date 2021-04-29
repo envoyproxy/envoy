@@ -43,8 +43,6 @@ namespace Event {
 // The same mechanism implements both of these operations, so they are invoked as a group.
 // - Event::SchedulableCallback::scheduleCallbackCurrentIteration(). Each of these callbacks is
 // scheduled and invoked independently.
-// - Event::FileEvent::activate() if "envoy.reloadable_features.activate_fds_next_event_loop"
-// runtime feature is disabled.
 // - Event::Timer::enableTimer(0) if "envoy.reloadable_features.activate_timers_next_event_loop"
 // runtime feature is disabled.
 //
@@ -110,10 +108,9 @@ private:
 
   static constexpr int flagsBasedOnEventType() {
     if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
-      // On Windows, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run forever.
-      // This is because libevent only supports level triggering on Windows, and so the write
-      // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
-      // loop will run at most once
+      // With level events, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run
+      // forever. This is because the write event callbacks will trigger every time through the
+      // loop. Adding EVLOOP_ONCE ensures the loop will run at most once
       return EVLOOP_NONBLOCK | EVLOOP_ONCE;
     }
     return EVLOOP_NONBLOCK;

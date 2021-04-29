@@ -21,6 +21,7 @@ public:
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override { return false; }
 
 private:
   TransportSocketCallbacks* callbacks_{};
@@ -32,6 +33,7 @@ public:
   // Network::TransportSocketFactory
   TransportSocketPtr createTransportSocket(TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
+  bool usesProxyProtocolOptions() const override { return false; }
 };
 
 } // namespace Network

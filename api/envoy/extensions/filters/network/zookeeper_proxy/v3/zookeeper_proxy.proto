@@ -23,7 +23,7 @@ message ZooKeeperProxy {
 
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_zookeeper_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // [#not-implemented-hide:] The optional path to use for writing ZooKeeper access logs.
   // If the access log field is empty, access logs will not be written.

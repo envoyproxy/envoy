@@ -1,0 +1,52 @@
+{% import 'routing_helper.template.yaml' as helper with context -%}
+name: local_route
+virtual_hosts:
+- name: www
+  domains:
+  - www.yourcompany.com
+  routes:
+  - match:
+      prefix: "/foo/bar"
+      runtime_fraction:
+        default_value:
+          numerator: 0
+          denominator: HUNDRED
+        runtime_key: routing.www.use_service_2
+    route:
+      {{ helper.make_route('service2')|indent(4) }}
+  - match:
+      prefix: "/"
+    route:
+      {{ helper.make_route('service1')|indent(4) }}
+  require_tls: ALL
+  rate_limits:
+    actions:
+      remote_address: {}
+- name: www_redirect
+  domains:
+  - wwww.yourcompany.net
+  routes:
+  - match:
+      prefix: "/"
+    redirect:
+      host_redirect: www.yourcompany.net
+  require_tls: ALL
+  rate_limits:
+  - actions:
+      remote_address: {}
+- name: api
+  domains:
+  - api.yourcompany.net
+  routes:
+  - match:
+      path: "/foo/bar"
+    route:
+      {{ helper.make_route('service3')|indent(4) }}
+  - match:
+      prefix: "/"
+    route:
+      {{ helper.make_route('service1')|indent(4) }}
+  require_tls: EXTERNAL_ONLY
+  rate_limits:
+  - actions:
+      remote_address: {}

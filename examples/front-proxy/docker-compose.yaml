@@ -7,10 +7,6 @@ services:
       dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
-    expose:
-      - "8080"
-      - "8443"
-      - "8001"
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -23,13 +19,9 @@ services:
     volumes:
       - ./service-envoy.yaml:/etc/service-envoy.yaml
     networks:
-      envoymesh:
-        aliases:
-          - service1
+      - envoymesh
     environment:
       - SERVICE_NAME=1
-    expose:
-      - "8000"
 
   service2:
     build:
@@ -38,13 +30,9 @@ services:
     volumes:
       - ./service-envoy.yaml:/etc/service-envoy.yaml
     networks:
-      envoymesh:
-        aliases:
-          - service2
+      - envoymesh
     environment:
       - SERVICE_NAME=2
-    expose:
-      - "8000"
 
 networks:
   envoymesh: {}

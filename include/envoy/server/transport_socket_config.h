@@ -65,9 +65,9 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return RandomGenerator& the random generator for the server.
+   * @return Server::Options& the command-line options that Envoy was started with.
    */
-  virtual Envoy::Random::RandomGenerator& random() PURE;
+  virtual const Options& options() PURE;
 
   /**
    * @return the server-wide stats store.

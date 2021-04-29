@@ -42,12 +42,18 @@ public:
   bool append() const override { return append_; }
 
   using FieldExtractor = std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>;
+  using FormatterPtrMap = absl::node_hash_map<std::string, Envoy::Formatter::FormatterPtr>;
 
 private:
   FieldExtractor field_extractor_;
   const bool append_;
-  absl::node_hash_map<std::string, std::vector<Envoy::Formatter::FormatterProviderPtr>>
-      start_time_formatters_;
+
+  // Maps a string format pattern (including field name and any command operators between
+  // parenthesis) to the list of FormatterProviderPtrs that are capable of formatting that pattern.
+  // We use a map here to make sure that we only create a single parser for a given format pattern
+  // even if it appears multiple times in the larger formatting context (e.g. it shows up multiple
+  // times in a format string).
+  FormatterPtrMap formatter_map_;
 };
 
 /**

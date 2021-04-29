@@ -1,5 +1,5 @@
-# TODO(dio): Consider to remove this patch when we have the ability to compile the project using
-# clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
+# TODO(dio): Consider to remove compiler specific part of this patch when we solely compile the
+# project using clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
 
 diff --git a/base/compiler_specific.h b/base/compiler_specific.h
 index 0cd36dc..8c4cbd4 100644
@@ -50,3 +50,40 @@ index 0cd36dc..8c4cbd4 100644
  #else
  #define STACK_UNINITIALIZED
  #endif
+
+# TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
+# library from the upstream Chromium project. This is tracked in:
+# https://github.com/envoyproxy/envoy/issues/14743.
+
+diff --git a/url/BUILD b/url/BUILD
+index f2ec8da..4e2d55b 100644
+--- a/url/BUILD
++++ b/url/BUILD
+@@ -52,3 +52,27 @@ cc_library(
+         "//polyfills",
+     ] + build_config.icuuc_deps,
+ )
++
++cc_library(
++    name = "envoy_url",
++    srcs = [
++       "url_canon.cc",
++       "url_canon_internal.cc",
++       "url_canon_path.cc",
++       "url_canon_stdstring.cc",
++    ],
++    hdrs = [
++       "third_party/mozilla/url_parse.h",
++       "url_canon.h",
++       "url_canon_internal.h",
++       "url_canon_stdstring.h",
++       "url_parse_internal.h",
++    ],
++    copts = build_config.default_copts,
++    visibility = ["//visibility:public"],
++    deps = [
++       "//base",
++       "//base/strings",
++       "//polyfills",
++    ]
++)

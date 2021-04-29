@@ -11,6 +11,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
@@ -28,14 +29,15 @@ namespace Http {
 enum class FilterHeadersStatus {
   // Continue filter chain iteration.
   Continue,
-  // Do not iterate to any of the remaining filters in the chain. Returning
-  // FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // Do not iterate for headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for headers as well as data and
+  // trailers for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIteration,
-  // Continue headers iteration to remaining filters, but ignore any subsequent data or trailers.
-  // This results in creating a header only request/response.
-  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
-  ContinueAndEndStream,
   // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
   // NOT be returned when end_stream is already set to false.
   //
@@ -47,7 +49,7 @@ enum class FilterHeadersStatus {
   // injectDecodedDataToFilterChain()/injectEncodedDataToFilterChain(), possibly multiple times
   // if the body needs to be divided into several chunks. The filter may need to handle
   // watermark events when injecting a body, see:
-  // https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md.
+  // https://github.com/envoyproxy/envoy/blob/main/source/docs/flow_control.md.
   //
   // The last call to inject data MUST have end_stream set to true to conclude the stream.
   // If the filter cannot provide a body the stream should be reset.
@@ -133,6 +135,10 @@ enum class FilterDataStatus {
   // body data for later dispatching. Returning FilterDataStatus::Continue from
   // decodeData()/encodeData() or calling continueDecoding()/continueEncoding() MUST be called if
   // continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for either data or trailers
+  // for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIterationNoBuffer
 };
 
@@ -155,6 +161,18 @@ enum class FilterTrailersStatus {
 enum class FilterMetadataStatus {
   // Continue filter chain iteration.
   Continue,
+};
+
+/**
+ * Return codes for onLocalReply filter invocations.
+ */
+enum class LocalErrorStatus {
+  // Continue sending the local reply after onLocalError has been sent to all filters.
+  Continue,
+
+  // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
+  // informed rather than sending the local reply.
+  ContinueAndResetStream,
 };
 
 /**
@@ -206,6 +224,24 @@ public:
    * resolution or make it an independent entity like filters that gets called on route resolution.
    */
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
+
+  /**
+   * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
+   *
+   * Similar to route(const Router::RouteCallback& cb), this route that is set will be
+   * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
+   * of the filter chain.
+   *
+   * NOTE: Passing nullptr in as the route parameter is equivalent to route resolution being
+   * attempted and failing to find a route. An example of when this happens is when
+   * RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers, const
+   * StreamInfo::StreamInfo& stream_info, uint64_t random_value) returns nullptr during a
+   * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
+   * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
+   * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
+   * absl::optional ptrs instead of null ptrs.
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
 
   /**
    * Returns the clusterInfo for the cached route.
@@ -406,6 +442,12 @@ public:
   virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
+   * Returns the 100-Continue headers provided to encode100ContinueHeaders. Returns absl::nullopt if
+   * no headers have been provided yet.
+   */
+  virtual ResponseHeaderMapOptRef continueHeaders() const PURE;
+
+  /**
    * Called with headers to be encoded, optionally indicating end of stream.
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
@@ -422,6 +464,12 @@ public:
                              absl::string_view details) PURE;
 
   /**
+   * Returns the headers provided to encodeHeaders. Returns absl::nullopt if no headers have been
+   * provided yet.
+   */
+  virtual ResponseHeaderMapOptRef responseHeaders() const PURE;
+
+  /**
    * Called with data to be encoded, optionally indicating end of stream.
    * @param data supplies the data to be encoded.
    * @param end_stream supplies whether this is the last data frame.
@@ -433,6 +481,12 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Returns the trailers provided to encodeTrailers. Returns absl::nullopt if no headers have been
+   * provided yet.
+   */
+  virtual ResponseTrailerMapOptRef responseTrailers() const PURE;
 
   /**
    * Called with metadata to be encoded.
@@ -490,19 +544,24 @@ public:
    */
   virtual uint32_t decoderBufferLimit() PURE;
 
-  // Takes a stream, and acts as if the headers are newly arrived.
-  // On success, this will result in a creating a new filter chain and likely upstream request
-  // associated with the original downstream stream.
-  // On failure, if the preconditions outlined below are not met, the caller is
-  // responsible for handling or terminating the original stream.
-  //
-  // This is currently limited to
-  //   - streams which are completely read
-  //   - streams which do not have a request body.
-  //
-  // Note that HttpConnectionManager sanitization will *not* be performed on the
-  // recreated stream, as it is assumed that sanitization has already been done.
-  virtual bool recreateStream() PURE;
+  /**
+   * Takes a stream, and acts as if the headers are newly arrived.
+   * On success, this will result in a creating a new filter chain and likely
+   * upstream request associated with the original downstream stream. On
+   * failure, if the preconditions outlined below are not met, the caller is
+   * responsible for handling or terminating the original stream.
+   *
+   * This is currently limited to
+   *   - streams which are completely read
+   *   - streams which do not have a request body.
+   *
+   * Note that HttpConnectionManager sanitization will *not* be performed on the
+   * recreated stream, as it is assumed that sanitization has already been done.
+   *
+   * @param original_response_headers Headers used for logging in the access logs and for charging
+   * stats. Ignored if null.
+   */
+  virtual bool recreateStream(const ResponseHeaderMap* original_response_headers) PURE;
 
   /**
    * Adds socket options to be applied to any connections used for upstream requests. Note that
@@ -528,11 +587,27 @@ public:
 };
 
 /**
- * Common base class for both decoder and encoder filters.
+ * Common base class for both decoder and encoder filters. Functions here are related to the
+ * lifecycle of a filter. Currently the life cycle is as follows:
+ * - All filters receive onStreamComplete()
+ * - All log handlers receive log()
+ * - All filters receive onDestroy()
+ *
+ * This means:
+ * - onStreamComplete can be used to make state changes that are intended to appear in the access
+ * logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
+ * - onDestroy is used to cleanup all pending filter resources like pending http requests and
+ * timers.
  */
 class StreamFilterBase {
 public:
   virtual ~StreamFilterBase() = default;
+
+  /**
+   * This routine is called before the access log handlers' log() is called. Filters can use this
+   * callback to enrich the data passed in to the log handlers.
+   */
+  virtual void onStreamComplete() {}
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -545,6 +620,42 @@ public:
    * onDestroy().
    */
   virtual void onDestroy() PURE;
+
+  /**
+   * Called when a match result occurs that isn't handled by the filter manager.
+   * @param action the resulting match action
+   */
+  virtual void onMatchCallback(const Matcher::Action&) {}
+
+  struct LocalReplyData {
+    // The error code which (barring reset) will be sent to the client.
+    Http::Code code_;
+    // The details of why a local reply is being sent.
+    absl::string_view details_;
+    // True if a reset will occur rather than the local reply (some prior filter
+    // has returned ContinueAndResetStream)
+    bool reset_imminent_;
+  };
+
+  /**
+   * Called after sendLocalReply is called, and before any local reply is
+   * serialized either to filters, or downstream.
+   * This will be called on both encoder and decoder filters starting at the
+   * terminal filter (generally the router filter) and working towards the first filter configured.
+   *
+   * Note that in some circumstances, onLocalReply may be called more than once
+   * for a given stream, because it is possible that a filter call
+   * sendLocalReply while processing the original local reply response.
+   *
+   * Filters implementing onLocalReply are responsible for never calling sendLocalReply
+   * from onLocalReply, as that has the potential for looping.
+   *
+   * @param data data associated with the sendLocalReply call.
+   * @param LocalErrorStatus the action to take after onLocalError completes.
+   */
+  virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
+    return LocalErrorStatus::Continue;
+  }
 };
 
 /**
@@ -564,6 +675,7 @@ public:
    * Called with a decoded data frame.
    * @param data supplies the decoded data.
    * @param end_stream supplies whether this is the last data frame.
+   * Further note that end_stream is only true if there are no trailers.
    * @return FilterDataStatus determines how filter chain iteration proceeds.
    */
   virtual FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) PURE;
@@ -702,6 +814,27 @@ public:
   virtual ResponseTrailerMap& addEncodedTrailers() PURE;
 
   /**
+   * Attempts to create a locally generated response using the provided response_code and body_text
+   * parameters. If the request was a gRPC request the local reply will be encoded as a gRPC
+   * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
+   * provided parameters.
+   *
+   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
+   *
+   * @param response_code supplies the HTTP response code.
+   * @param body_text supplies the optional body text which is sent using the text/plain content
+   *                  type, or encoded in the grpc-message header.
+   * @param modify_headers supplies an optional callback function that can modify the
+   *                       response headers.
+   * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+   * @param details a string detailing why this local reply was sent.
+   */
+  virtual void sendLocalReply(Code response_code, absl::string_view body_text,
+                              std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
+  /**
    * Adds new metadata to be encoded.
    *
    * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
@@ -777,6 +910,7 @@ public:
    * Called with data to be encoded, optionally indicating end of stream.
    * @param data supplies the data to be encoded.
    * @param end_stream supplies whether this is the last data frame.
+   * Further note that end_stream is only true if there are no trailers.
    * @return FilterDataStatus determines how filter chain iteration proceeds.
    */
   virtual FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) PURE;
@@ -817,6 +951,18 @@ class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEn
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
+class HttpMatchingData {
+public:
+  static absl::string_view name() { return "http"; }
+
+  virtual ~HttpMatchingData() = default;
+
+  virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;
+  virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
+  virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
+  virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
+};
+
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
@@ -832,16 +978,42 @@ public:
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   /**
+   * Add a decoder filter that is used when reading stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void
+  addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
+
+  /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   /**
+   * Add an encoder filter that is used when writing stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void
+  addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
+
+  /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a decoder/encoder filter that is used both when reading and writing stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
+                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.

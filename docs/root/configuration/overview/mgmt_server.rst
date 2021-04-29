@@ -10,6 +10,12 @@ When an Envoy instance loses connectivity with the management server, Envoy will
 the previous configuration while actively retrying in the background to reestablish the
 connection with the management server.
 
+It is important that Envoy detects when a connection to a management server is unhealthy so that
+it can try to establish a new connection. Configuring either
+:ref:`TCP keep-alives <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.tcp_keepalive>`
+or :ref:`HTTP/2 keepalives <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`
+in the cluster that connects to the management server is recommended.
+
 Envoy debug logs the fact that it is not able to establish a connection with the management server
 every time it attempts a connection.
 

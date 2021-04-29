@@ -25,6 +25,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "containers_lib",
+    hdrs = ["containers.h"],
+    deps = [
+        ":cleanup_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_recursion_checker_lib",
     hdrs = ["debug_recursion_checker.h"],
     deps = [":assert_lib"],
@@ -90,6 +98,11 @@ envoy_cc_library(
     hdrs = ["enum_to_int.h"],
 )
 
+envoy_cc_library(
+    name = "safe_memcpy_lib",
+    hdrs = ["safe_memcpy.h"],
+)
+
 # fmt_lib is automatically a dependency of all envoy_cc_library definitions.
 envoy_basic_cc_library(
     name = "fmt_lib",
@@ -107,6 +120,10 @@ envoy_cc_library(
     srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
+    deps = [
+        ":macros",
+        ":safe_memcpy_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -114,6 +131,11 @@ envoy_cc_library(
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
     deps = [":utility_lib"],
+)
+
+envoy_cc_library(
+    name = "interval_value",
+    hdrs = ["interval_value.h"],
 )
 
 envoy_cc_library(
@@ -143,6 +165,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "fancy_logger.h",
+        "json_escape_string.h",
         "logger.h",
     ],
     external_deps = ["abseil_synchronization"],
@@ -181,6 +204,19 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     strip_include_prefix = "android",
+    deps = [":base_logger_lib"],
+)
+
+envoy_cc_library(
+    name = "win32_event_logger_impl_lib",
+    srcs = select({
+        "//bazel:windows_x86_64": ["win32/event_logger_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:windows_x86_64": ["win32/event_logger_impl.h"],
+        "//conditions:default": [],
+    }),
     deps = [":base_logger_lib"],
 )
 
@@ -311,10 +347,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "thread_lib",
+    srcs = ["thread.cc"],
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
         ":non_copyable",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -402,9 +440,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "shared_token_bucket_impl_lib",
+    srcs = ["shared_token_bucket_impl.cc"],
+    hdrs = ["shared_token_bucket_impl.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//source/common/common:thread_lib",
+        "//source/common/common:thread_synchronizer_lib",
+        "//source/common/common:token_bucket_impl_lib",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "statusor_lib",
     hdrs = ["statusor.h"],
     deps = [
-        "//third_party/statusor:statusor_lib",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

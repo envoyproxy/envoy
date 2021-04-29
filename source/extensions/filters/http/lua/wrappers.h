@@ -184,7 +184,10 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
-            {"downstreamSslConnection", static_luaDownstreamSslConnection}};
+            {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
+            {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
+            {"downstreamSslConnection", static_luaDownstreamSslConnection},
+            {"requestedServerName", static_luaRequestedServerName}};
   }
 
 private:
@@ -206,8 +209,30 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamSslConnection);
 
+  /**
+   * Get current downstream local address
+   * @return string representation of downstream local address.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamLocalAddress);
+
+  /**
+   * Get current downstream local address
+   * @return string representation of downstream directly connected address.
+   * This is equivalent to the address of the physical connection.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamDirectRemoteAddress);
+
+  /**
+   * Get requested server name
+   * @return requested server name (e.g. SNI in TLS), if any.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
+
   // Envoy::Lua::BaseLuaObject
-  void onMarkDead() override { dynamic_metadata_wrapper_.reset(); }
+  void onMarkDead() override {
+    dynamic_metadata_wrapper_.reset();
+    downstream_ssl_connection_.reset();
+  }
 
   StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
@@ -233,6 +258,11 @@ private:
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
   const std::string public_key_;
+};
+
+class Timestamp {
+public:
+  enum Resolution { Millisecond };
 };
 
 } // namespace Lua

@@ -160,6 +160,7 @@ template <typename Request, typename Response> class AsyncClient /* : public Raw
 public:
   AsyncClient() = default;
   AsyncClient(RawAsyncClientPtr&& client) : client_(std::move(client)) {}
+  AsyncClient(RawAsyncClientSharedPtr client) : client_(client) {}
   virtual ~AsyncClient() = default;
 
   virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
@@ -192,7 +193,7 @@ public:
   void reset() { client_.reset(); }
 
 private:
-  RawAsyncClientPtr client_{};
+  RawAsyncClientSharedPtr client_{};
 };
 
 } // namespace Grpc

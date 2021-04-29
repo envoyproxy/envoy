@@ -60,10 +60,17 @@ def _envoy_linkopts():
             "-pagezero_size 10000",
             "-image_base 100000000",
         ],
-        "@envoy//bazel:windows_x86_64": [
-            "-DEFAULTLIB:advapi32.lib",
+        "@envoy//bazel:windows_opt_build": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
+            "-DEFAULTLIB:shell32.lib",
+            "-DEBUG:FULL",
+            "-WX",
+        ],
+        "@envoy//bazel:windows_x86_64": [
+            "-DEFAULTLIB:ws2_32.lib",
+            "-DEFAULTLIB:iphlpapi.lib",
+            "-DEFAULTLIB:shell32.lib",
             "-WX",
         ],
         "//conditions:default": [

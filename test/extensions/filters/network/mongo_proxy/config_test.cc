@@ -30,6 +30,9 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   const std::string yaml_string = R"EOF(
   stat_prefix: my_stat_prefix
   access_log: path/to/access/log
+  commands:
+  - foo
+  - bar
   )EOF";
 
   envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy proto_config;
@@ -47,6 +50,8 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
 
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
+  config.add_commands("foo");
+  config.add_commands("bar");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
@@ -64,6 +69,8 @@ TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
           factory.createEmptyConfigProto().get());
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
+  config.add_commands("foo");
+  config.add_commands("bar");
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
@@ -88,8 +95,7 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
 }
 
 TEST(MongoFilterConfigTest, EmptyConfig) {
-  handleInvalidConfiguration(
-      "{}", R"(StatPrefix: \["value length must be at least " '\\x01' " bytes"\])");
+  handleInvalidConfiguration("{}", "StatPrefix: value length must be at least 1 characters");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
@@ -125,7 +131,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
     fixed_delay: -1s
   )EOF";
 
-  handleInvalidConfiguration(yaml_string, R"(FixedDelay: \["value must be greater than " "0s"\])");
+  handleInvalidConfiguration(yaml_string, "FixedDelay: value must be greater than 0s");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
@@ -180,8 +186,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       fixed_delay: 0s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string,
-                               R"(FixedDelay: \["value must be greater than " "0s"\])");
+    handleInvalidConfiguration(yaml_string, "FixedDelay: value must be greater than 0s");
   }
 }
 

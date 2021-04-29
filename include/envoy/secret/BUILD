@@ -30,6 +30,7 @@ envoy_cc_library(
     hdrs = ["secret_manager.h"],
     deps = [
         ":secret_provider_interface",
+        "//include/envoy/init:target_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],

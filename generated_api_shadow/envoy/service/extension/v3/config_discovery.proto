@@ -8,7 +8,6 @@ import "google/api/annotations.proto";
 
 import "envoy/annotations/resource.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.service.extension.v3";
 option java_outer_classname = "ConfigDiscoveryProto";
@@ -16,7 +15,7 @@ option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: ExtensionConfigDS]
+// [#protodoc-title: Extension Config Discovery Service (ECDS)]
 
 // Return extension configurations.
 service ExtensionConfigDiscoveryService {

@@ -20,7 +20,8 @@ SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long int request, void* argp) {
+SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long request, void* argp,
+                                       unsigned long, void*, unsigned long, unsigned long*) {
   const int rc = ::ioctl(sockfd, request, argp);
   return {rc, rc != -1 ? 0 : errno};
 }
@@ -242,6 +243,11 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) {
+  const int rc = ::dup(oldfd);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
   os_fd_t rc;
 
@@ -259,6 +265,21 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
   }
 
   return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
+                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) {
+#ifdef TCP_INFO
+  struct tcp_info unix_tcp_info;
+  socklen_t len = sizeof(unix_tcp_info);
+  auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &unix_tcp_info, &len);
+  if (!SOCKET_FAILURE(result)) {
+    tcp_info->tcpi_rtt = std::chrono::microseconds(unix_tcp_info.tcpi_rtt);
+  }
+  return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
+#endif
+
+  return {false, EOPNOTSUPP};
 }
 
 } // namespace Api

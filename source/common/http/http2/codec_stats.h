@@ -19,6 +19,7 @@ namespace Http2 {
   COUNTER(inbound_empty_frames_flood)                                                              \
   COUNTER(inbound_priority_frames_flood)                                                           \
   COUNTER(inbound_window_update_frames_flood)                                                      \
+  COUNTER(metadata_empty_frames)                                                                   \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
@@ -27,6 +28,7 @@ namespace Http2 {
   COUNTER(trailers)                                                                                \
   COUNTER(tx_flush_timeout)                                                                        \
   COUNTER(tx_reset)                                                                                \
+  COUNTER(keepalive_timeout)                                                                       \
   GAUGE(streams_active, Accumulate)                                                                \
   GAUGE(pending_send_bytes, Accumulate)
 

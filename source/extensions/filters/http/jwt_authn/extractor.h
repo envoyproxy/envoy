@@ -29,7 +29,7 @@ public:
   virtual const std::string& token() const PURE;
 
   // Check if an issuer has specified the location.
-  virtual bool isIssuerSpecified(const std::string& issuer) const PURE;
+  virtual bool isIssuerAllowed(const std::string& issuer) const PURE;
 
   // Remove the token from the headers
   virtual void removeJwt(Http::HeaderMap& headers) const PURE;

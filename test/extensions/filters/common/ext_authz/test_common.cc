@@ -17,7 +17,8 @@ namespace ExtAuthz {
 CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response_status,
                                                envoy::type::v3::StatusCode http_status_code,
                                                const std::string& body,
-                                               const HeaderValueOptionVector& headers) {
+                                               const HeaderValueOptionVector& headers,
+                                               const HeaderValueOptionVector& downstream_headers) {
   auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(response_status);
@@ -46,13 +47,22 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
         item->CopyFrom(header);
       }
     }
+    if (!downstream_headers.empty()) {
+      const auto ok_response_headers_to_add =
+          response->mutable_ok_response()->mutable_response_headers_to_add();
+      for (const auto& header : downstream_headers) {
+        auto* item = ok_response_headers_to_add->Add();
+        item->CopyFrom(header);
+      }
+    }
   }
   return response;
 }
 
 Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code,
                                        const std::string& body,
-                                       const HeaderValueOptionVector& headers) {
+                                       const HeaderValueOptionVector& headers,
+                                       const HeaderValueOptionVector& downstream_headers) {
   auto authz_response = Response{};
   authz_response.status = status;
   authz_response.status_code = status_code;
@@ -68,6 +78,12 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
         authz_response.headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
                                                    header.header().value());
       }
+    }
+  }
+  if (!downstream_headers.empty()) {
+    for (auto& header : downstream_headers) {
+      authz_response.response_headers_to_add.emplace_back(
+          Http::LowerCaseString(header.header().key()), header.header().value());
     }
   }
   return authz_response;
@@ -94,13 +110,19 @@ Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOption
     response->headers().addCopy(Http::LowerCaseString(header.header().key()),
                                 header.header().value());
   }
-  response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+  response->body().add(body);
   return response;
 };
 
 bool TestCommon::compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
   return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
          std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
+}
+
+bool TestCommon::compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
+                                           const std::vector<Http::LowerCaseString>& rhs) {
+  return std::set<Http::LowerCaseString>(lhs.begin(), lhs.end()) ==
+         std::set<Http::LowerCaseString>(rhs.begin(), rhs.end());
 }
 
 } // namespace ExtAuthz

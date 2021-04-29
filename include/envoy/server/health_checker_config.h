@@ -25,11 +25,6 @@ public:
   virtual Envoy::Runtime::Loader& runtime() PURE;
 
   /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Envoy::Random::RandomGenerator& random() PURE;
-
-  /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
    *         for all singleton processing.
    */

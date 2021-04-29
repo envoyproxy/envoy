@@ -11,6 +11,20 @@
 
 namespace Envoy {
 namespace Grpc {
+namespace {
+
+// Validates a string for gRPC header key compliance. This is a subset of legal HTTP characters.
+// See https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
+bool validateGrpcHeaderChars(absl::string_view key) {
+  for (auto ch : key) {
+    if (!(absl::ascii_isalnum(ch) || ch == '_' || ch == '.' || ch == '-')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+} // namespace
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                                                const envoy::config::core::v3::GrpcService& config,
@@ -21,9 +35,9 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   }
 
   const std::string& cluster_name = config.envoy_grpc().cluster_name();
-  auto clusters = cm_.clusters();
-  const auto& it = clusters.find(cluster_name);
-  if (it == clusters.end()) {
+  auto all_clusters = cm_.clusters();
+  const auto& it = all_clusters.active_clusters_.find(cluster_name);
+  if (it == all_clusters.active_clusters_.end()) {
     throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
   }
   if (it->second.get().info()->addedViaApi()) {
@@ -66,6 +80,14 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
 #else
   ASSERT(google_tls_slot_ != nullptr);
 #endif
+
+  // Check metadata for gRPC API compliance. Uppercase characters are lowered in the HeaderParser.
+  // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
+  for (const auto& header : config.initial_metadata()) {
+    if (!validateGrpcHeaderChars(header.key()) || !validateGrpcHeaderChars(header.value())) {
+      throw EnvoyException("Illegal characters in gRPC initial metadata.");
+    }
+  }
 }
 
 RawAsyncClientPtr GoogleAsyncClientFactoryImpl::create() {

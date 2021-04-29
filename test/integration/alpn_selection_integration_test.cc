@@ -31,13 +31,13 @@ public:
       auto* cluster = static_resources->mutable_clusters(0);
 
       if (use_h2_) {
-        cluster->mutable_http2_protocol_options();
+        ConfigHelper::setHttp2(*cluster);
       }
       const std::string transport_socket_yaml = absl::StrFormat(
           R"EOF(
 name: tls
 typed_config:
-  "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
   common_tls_context:
     alpn_protocols: [ %s ]
     tls_certificates:
@@ -80,10 +80,11 @@ require_client_certificate: true
 
   void createUpstreams() override {
     auto endpoint = upstream_address_fn_(0);
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        createUpstreamSslContext(), endpoint->ip()->port(),
-        use_h2_ ? FakeHttpConnection::Type::HTTP2 : FakeHttpConnection::Type::HTTP1,
-        endpoint->ip()->version(), timeSystem()));
+    FakeUpstreamConfig config = upstreamConfig();
+    config.upstream_protocol_ =
+        use_h2_ ? FakeHttpConnection::Type::HTTP2 : FakeHttpConnection::Type::HTTP1;
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(createUpstreamSslContext(), endpoint->ip()->port(), version_, config));
   }
 
   bool use_h2_{};
@@ -106,7 +107,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMatchingAlpn) {
             fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -128,7 +129,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMismatchingAlpn) {
   EXPECT_EQ("", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -148,7 +149,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamConfiguredALPN) {
   EXPECT_EQ("custom-alpn", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -166,7 +167,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMatchingAlpn) {
             fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -185,7 +186,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMismatchingAlpn) {
   EXPECT_EQ("", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -207,7 +208,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreamConfiguredALPN) {
   EXPECT_EQ("custom-alpn", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 } // namespace Envoy

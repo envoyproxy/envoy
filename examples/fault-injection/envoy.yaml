@@ -8,14 +8,13 @@ static_resources:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
-          codec_type: auto
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          codec_type: AUTO
           stat_prefix: ingress_http
           access_log:
-            name: envoy.access_loggers.file
+          - name: envoy.access_loggers.stdout
             typed_config:
-              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-              path: /dev/stdout
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
           route_config:
             name: local_route
             virtual_hosts:
@@ -30,7 +29,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.fault
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+              "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
               abort:
                 http_status: 503
                 percentage:
@@ -46,23 +45,17 @@ static_resources:
   clusters:
   - name: local_service
     connect_timeout: 1s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: local_service
       endpoints:
       - lb_endpoints:
-          endpoint:
+        - endpoint:
             address:
               socket_address:
                 address: backend
                 port_value: 80
-admin:
-  access_log_path: /dev/stdout
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 9901
 layered_runtime:
   layers:
   - name: disk_layer_0

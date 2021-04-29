@@ -1,3 +1,5 @@
+#pragma once
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -10,7 +12,7 @@ const std::string ADAPTIVE_CONCURRENCY_CONFIG =
     R"EOF(
 name: envoy.filters.http.adaptive_concurrency
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency
+  "@type": type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency
   gradient_controller_config:
     sample_aggregate_percentile:
       value: 50

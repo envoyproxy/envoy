@@ -21,10 +21,12 @@ envoy_cc_extension(
         "admission_control.h",
         "thread_local_controller.h",
     ],
+    category = "envoy.filters.http",
     security_posture = "unknown",
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/thread_local:thread_local_object",
         "//source/common/common:cleanup_lib",
         "//source/common/http:codes_lib",
         "//source/common/runtime:runtime_lib",
@@ -39,6 +41,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.http",
     security_posture = "unknown",
     status = "alpha",
     deps = [

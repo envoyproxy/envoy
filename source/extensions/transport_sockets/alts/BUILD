@@ -34,6 +34,10 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
     external_deps = [
         "abseil_node_hash_set",
     ],
@@ -93,6 +97,7 @@ envoy_cc_library(
         "//include/envoy/network:io_handle_interface",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",

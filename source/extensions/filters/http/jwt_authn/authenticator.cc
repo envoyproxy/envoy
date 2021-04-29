@@ -3,6 +3,7 @@
 #include "envoy/http/async_client.h"
 
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
@@ -140,7 +141,8 @@ void AuthenticatorImpl::startVerify() {
   tokens_.pop_back();
 
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
-  const Status status = jwt_->parseFromString(curr_token_->token());
+  ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
+  Status status = jwt_->parseFromString(curr_token_->token());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -148,46 +150,38 @@ void AuthenticatorImpl::startVerify() {
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
   if (!jwt_->iss_.empty()) {
-    // Check if token extracted from the location contains the issuer specified by config.
-    if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
+    // Check if `iss` is allowed.
+    if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
       doneWithStatus(Status::JwtUnknownIssuer);
       return;
     }
-  } else {
-    // If provider is not specified, in allow_missing_or_failed or allow_missing case,
-    // the issuer specified in "iss" payload is required in order to lookup provider.
-    if (!provider_) {
-      doneWithStatus(Status::JwtUnknownIssuer);
-      return;
-    }
-  }
-
-  // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the
-  // epoch is not guaranteed to be defined as the unix epoch. We should use
-  // the abseil time functionality instead or use the jwt_verify_lib to check
-  // the validity of a JWT.
-  // Check "exp" claim.
-  const uint64_t unix_timestamp =
-      std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
-          .count();
-  // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
-  // to 0.
-  if (jwt_->nbf_ > unix_timestamp) {
-    doneWithStatus(Status::JwtNotYetValid);
-    return;
-  }
-  // If the exp claim does *not* appear in the JWT then the exp field is defaulted
-  // to 0.
-  if (jwt_->exp_ > 0 && jwt_->exp_ < unix_timestamp) {
-    doneWithStatus(Status::JwtExpired);
-    return;
   }
 
   // Check the issuer is configured or not.
   jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
                          : jwks_cache_.findByIssuer(jwt_->iss_);
-  // isIssuerSpecified() check already make sure the issuer is in the cache.
-  ASSERT(jwks_data_ != nullptr);
+  // When `provider` is valid, findByProvider should never return nullptr.
+  // Only when `allow_missing` or `allow_failed` is used, `provider` is invalid,
+  // and this authenticator is checking tokens from all providers. In this case,
+  // Jwt `iss` field is used to find the first provider with the issuer.
+  // If not found, use the first provider without issuer specified.
+  // If still no found, fail the request with UnknownIssuer error.
+  if (!jwks_data_) {
+    doneWithStatus(Status::JwtUnknownIssuer);
+    return;
+  }
+
+  // Default is 60 seconds
+  uint64_t clock_skew_seconds = ::google::jwt_verify::kClockSkewInSecond;
+  if (jwks_data_->getJwtProvider().clock_skew_seconds() > 0) {
+    clock_skew_seconds = jwks_data_->getJwtProvider().clock_skew_seconds();
+  }
+  const uint64_t unix_timestamp = DateUtil::nowToSeconds(timeSource());
+  status = jwt_->verifyTimeConstraint(unix_timestamp, clock_skew_seconds);
+  if (status != Status::Ok) {
+    doneWithStatus(status);
+    return;
+  }
 
   // Check if audience is allowed
   bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_->audiences_)
@@ -246,7 +240,8 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  const Status status = ::google::jwt_verify::verifyJwt(*jwt_, *jwks_data_->getJwksObj());
+  const Status status =
+      ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -254,9 +249,12 @@ void AuthenticatorImpl::verifyKey() {
 
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
+
   if (!provider.forward_payload_header().empty()) {
+    std::string payload_with_padding = jwt_->payload_str_base64url_;
+    Base64::completePadding(payload_with_padding);
     headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
-                      jwt_->payload_str_base64url_);
+                      payload_with_padding);
   }
 
   if (!provider.forward()) {

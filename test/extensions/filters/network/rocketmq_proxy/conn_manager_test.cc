@@ -39,7 +39,7 @@ private:
   RocketmqFilterStats stats_;
 };
 
-class RocketmqConnectionManagerTest : public testing::Test {
+class RocketmqConnectionManagerTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   RocketmqConnectionManagerTest() : stats_(RocketmqFilterStats::generateStats("test.", store_)) {}
 
@@ -70,9 +70,9 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
-    ON_CALL(thread_local_cluster_, prioritySet()).WillByDefault(ReturnRef(priority_set_));
-    EXPECT_CALL(factory_context_.cluster_manager_, get(_))
-        .WillRepeatedly(Return(&thread_local_cluster_));
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    ON_CALL(factory_context_.cluster_manager_.thread_local_cluster_, prioritySet())
+        .WillByDefault(ReturnRef(priority_set_));
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -93,9 +93,9 @@ public:
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_info_, "tcp://127.0.0.1:80")};
+  Upstream::HostSharedPtr host_{
+      Upstream::makeTestHost(cluster_info_, "tcp://127.0.0.1:80", simTime())};
   Upstream::PrioritySetImpl priority_set_;
-  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
 };
 
 TEST_F(RocketmqConnectionManagerTest, OnHeartbeat) {
@@ -233,7 +233,7 @@ TEST_F(RocketmqConnectionManagerTest, OnHeartbeatWithDownstreamConnecitonClosed)
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::HeartBeat);
   NiceMock<Network::MockConnection> connection;
-  EXPECT_CALL(connection, state()).Times(1).WillOnce(Invoke([&]() -> Network::Connection::State {
+  EXPECT_CALL(connection, state()).WillOnce(Invoke([&]() -> Network::Connection::State {
     return Network::Connection::State::Closed;
   }));
   EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(Invoke([&]() -> Network::Connection& {
@@ -397,6 +397,7 @@ route_config:
         cluster: fake_cluster
 )EOF";
   initializeFilter(yaml);
+  initializeCluster();
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::GetRouteInfoByTopic);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -420,7 +421,8 @@ route_config:
 )EOF";
   initializeFilter(yaml);
 
-  EXPECT_CALL(factory_context_.cluster_manager_, get(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillRepeatedly(Return(nullptr));
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::GetRouteInfoByTopic);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -523,6 +525,7 @@ route_config:
         cluster: fake_cluster
 )EOF";
   initializeFilter(yaml);
+  initializeCluster();
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::PopMessage);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -545,6 +548,7 @@ route_config:
         cluster: fake_cluster
 )EOF";
   initializeFilter(yaml);
+  initializeCluster();
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::AckMessage);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -603,6 +607,7 @@ route_config:
         cluster: fake_cluster
 )EOF";
   initializeFilter(yaml);
+  initializeCluster();
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::SendMessage);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -628,6 +633,7 @@ route_config:
         cluster: fake_cluster
 )EOF";
   initializeFilter(yaml);
+  initializeCluster();
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::SendMessageV2);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);

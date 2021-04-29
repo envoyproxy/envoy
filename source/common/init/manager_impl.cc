@@ -63,14 +63,11 @@ void ManagerImpl::initialize(const Watcher& watcher) {
   }
 }
 
-const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() const {
-  return target_names_count_;
-}
-
 void ManagerImpl::dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& unready_targets_dumps) {
   auto& message = *unready_targets_dumps.mutable_unready_targets_dumps()->Add();
   message.set_name(name_);
   for (const auto& [target_name, count] : target_names_count_) {
+    UNREFERENCED_PARAMETER(count);
     message.add_target_names(target_name);
   }
 }

@@ -1,0 +1,7 @@
+FROM python:3.8-alpine
+
+RUN apk update && apk add postgresql-dev gcc python3-dev musl-dev
+RUN pip3 install -q Flask==0.11.1 requests==2.18.4 psycopg2-binary
+RUN mkdir /code
+ADD ./service.py /code
+ENTRYPOINT ["python3", "/code/service.py"]

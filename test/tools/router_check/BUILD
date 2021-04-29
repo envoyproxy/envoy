@@ -28,6 +28,7 @@ envoy_cc_test_library(
     external_deps = ["tclap"],
     deps = [
         ":validation_proto_cc_proto",
+        "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -38,6 +39,7 @@ envoy_cc_test_library(
         "//source/exe:platform_impl_lib",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:printers_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

@@ -46,7 +46,7 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
   }
 }
 
-TapConfigBaseImpl::TapConfigBaseImpl(envoy::config::tap::v3::TapConfig&& proto_config,
+TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
@@ -209,7 +209,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
-    output_file_ << MessageUtil::getJsonStringFromMessage(*trace, true, true);
+    output_file_ << MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

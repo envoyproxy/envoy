@@ -2,10 +2,10 @@
 
 #include <string>
 
-// Profiling support is provided in the release tcmalloc, but not in the library
+// Profiling support is provided in the release tcmalloc of `gperftools`, but not in the library
 // that supplies the debug tcmalloc. So all the profiling code must be ifdef'd
 // on PROFILER_AVAILABLE which is dependent on those two settings.
-#if defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
+#if defined(GPERFTOOLS_TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
 #define PROFILER_AVAILABLE
 #endif
 

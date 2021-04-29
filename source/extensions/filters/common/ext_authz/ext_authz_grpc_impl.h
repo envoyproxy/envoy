@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
@@ -43,17 +44,15 @@ class GrpcClientImpl : public Client,
                        public ExtAuthzAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
-  // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
-  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout,
-                 envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
+                 envoy::config::core::v3::ApiVersion transport_api_version);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
-             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
-             const StreamInfo::StreamInfo& stream_info) override;
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
+             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -63,12 +62,9 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  void onTimeout();
-  void respondFailure(Filters::Common::ExtAuthz::ErrorKind kind);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
-
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
@@ -76,7 +72,6 @@ private:
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
-  Event::TimerPtr timeout_timer_;
 };
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;

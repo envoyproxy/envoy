@@ -12,7 +12,7 @@ collectively known as :ref:`"xDS" <xds_protocol>` (* discovery service). This do
 overview of the options currently available.
 
 * Top level configuration :ref:`reference <config>`.
-* :ref:`Reference configurations <install_ref_configs>`.
+* :ref:`Reference configurations <intro_deployment_types>`.
 * Envoy :ref:`v3 API overview <config_overview>`.
 * :ref:`xDS API endpoints <config_overview_management_server>`.
 
@@ -111,6 +111,14 @@ The :ref:`RunTime Discovery Service (RTDS) API <config_runtime_rtds>` allows
 :ref:`runtime <config_runtime>` layers to be fetched via an xDS API. This may be favorable to,
 or augmented by, file system layers.
 
+ECDS
+----
+
+The :ref:`Extension Config Discovery Service (ECDS) API <config_overview_extension_discovery>`
+allows extension configurations (e.g. HTTP filter configuration) to be served independently from
+the listener. This is useful when building systems that are more appropriately split from the
+primary control plane such as WAF, fault testing, etc.
+
 Aggregated xDS ("ADS")
 ----------------------
 
@@ -130,3 +138,9 @@ a resource from an update implying that the resource is gone. Envoy supports a "
 xDS (including ADS), where updates only contain resources added/changed/removed. Delta xDS is a
 new protocol, with request/response APIs different from SotW.
 :ref:`More details about delta <config_overview_delta>`.
+
+xDS TTL
+-------
+
+Certain xDS updates might want to set a TTL to guard against control plane unavailability, read more
+:ref:`here <config_overview_ttl>`.

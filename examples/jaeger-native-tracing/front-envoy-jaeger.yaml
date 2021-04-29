@@ -9,13 +9,13 @@ static_resources:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           generate_request_id: true
           tracing:
             provider:
               name: envoy.tracers.dynamic_ot
               typed_config:
-                "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
+                "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
                 library: /usr/local/lib/libjaegertracing_plugin.so
                 config:
                   service_name: front-proxy
@@ -55,7 +55,6 @@ static_resources:
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -65,9 +64,3 @@ static_resources:
               socket_address:
                 address: service1
                 port_value: 8000
-admin:
-  access_log_path: "/dev/null"
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 8001

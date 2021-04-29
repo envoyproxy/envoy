@@ -40,6 +40,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
@@ -137,6 +138,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 
@@ -162,6 +164,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 

@@ -7,29 +7,50 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/network/socket.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/trace_reason.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
-#include "common/http/request_id_extension_impl.h"
+#include "common/common/macros.h"
+#include "common/network/socket_impl.h"
 #include "common/stream_info/filter_state_impl.h"
+
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace StreamInfo {
 
+namespace {
+
+using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
+
+const ReplacementMap& emptySpaceReplacement() {
+  CONSTRUCT_ON_FIRST_USE(
+      ReplacementMap,
+      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
+}
+
+} // namespace
+
 struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source,
+                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
                  FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
-      : StreamInfoImpl(absl::nullopt, time_source, std::make_shared<FilterStateImpl>(life_span)) {}
+      : StreamInfoImpl(absl::nullopt, time_source, downstream_address_provider,
+                       std::make_shared<FilterStateImpl>(life_span)) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
-      : StreamInfoImpl(protocol, time_source,
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
+                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider)
+      : StreamInfoImpl(protocol, time_source, downstream_address_provider,
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
+                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
                  FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
       : StreamInfoImpl(
-            protocol, time_source,
+            protocol, time_source, downstream_address_provider,
             std::make_shared<FilterStateImpl>(
                 FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
                 FilterState::LifeSpan::FilterChain)) {}
@@ -117,8 +138,18 @@ struct StreamInfoImpl : public StreamInfo {
     return response_code_details_;
   }
 
+  void setResponseCode(uint32_t code) override { response_code_ = code; }
+
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    response_code_details_.emplace(rc_details);
+    response_code_details_.emplace(absl::StrReplaceAll(rc_details, emptySpaceReplacement()));
+  }
+
+  const absl::optional<std::string>& connectionTerminationDetails() const override {
+    return connection_termination_details_;
+  }
+
+  void setConnectionTerminationDetails(absl::string_view connection_termination_details) override {
+    connection_termination_details_.emplace(connection_termination_details);
   }
 
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
@@ -162,31 +193,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
-  void setDownstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
-    downstream_local_address_ = downstream_local_address;
-  }
-
-  const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
-    return downstream_local_address_;
-  }
-
-  void setDownstreamDirectRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) override {
-    downstream_direct_remote_address_ = downstream_direct_remote_address;
-  }
-
-  const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
-    return downstream_direct_remote_address_;
-  }
-
-  void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
-    downstream_remote_address_ = downstream_remote_address;
-  }
-
-  const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
-    return downstream_remote_address_;
+  const Network::SocketAddressProvider& downstreamAddressProvider() const override {
+    return *downstream_address_provider_;
   }
 
   void
@@ -245,12 +253,16 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) override {
-    request_id_extension_ = utils;
+  void setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) override {
+    ASSERT(provider != nullptr);
+    request_id_provider_ = provider;
   }
-  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
-    return request_id_extension_;
+  const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const override {
+    return request_id_provider_.get();
   }
+
+  void setTraceReason(Tracing::Reason reason) override { trace_reason_ = reason; }
+  Tracing::Reason traceReason() const override { return trace_reason_; }
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -268,6 +280,16 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+
+  void setFilterChainName(absl::string_view filter_chain_name) override {
+    filter_chain_name_ = filter_chain_name;
+  }
+
+  const std::string& filterChainName() const override { return filter_chain_name_; }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -280,6 +302,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
@@ -290,27 +313,38 @@ struct StreamInfoImpl : public StreamInfo {
   std::string route_name_;
 
 private:
+  static Network::SocketAddressProviderSharedPtr emptyDownstreamAddressProvider() {
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(
+        Network::SocketAddressProviderSharedPtr,
+        std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr));
+  }
+
   StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
                  FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::move(filter_state)),
-        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
+        downstream_address_provider_(downstream_address_provider != nullptr
+                                         ? downstream_address_provider
+                                         : emptyDownstreamAddressProvider()),
+        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
-  Http::RequestIDExtensionSharedPtr request_id_extension_;
+  Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  absl::optional<uint64_t> connection_id_;
+  std::string filter_chain_name_;
+  Tracing::Reason trace_reason_;
 };
 
 } // namespace StreamInfo

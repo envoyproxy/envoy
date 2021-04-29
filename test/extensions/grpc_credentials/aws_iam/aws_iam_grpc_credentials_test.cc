@@ -69,14 +69,14 @@ public:
         ABSL_FALLTHROUGH_INTENDED;
       case RegionLocation::NotProvided:
         config_yaml = fmt::format(R"EOF(
-  "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig
+  "@type": type.googleapis.com/envoy.config.grpc_credential.v3.AwsIamConfig
   service_name: {}
   )EOF",
                                   service_name_);
         break;
       case RegionLocation::InConfig:
         config_yaml = fmt::format(R"EOF(
-  "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig
+  "@type": type.googleapis.com/envoy.config.grpc_credential.v3.AwsIamConfig
   service_name: {}
   region: {}
   )EOF",

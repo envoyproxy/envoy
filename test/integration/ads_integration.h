@@ -17,12 +17,15 @@ namespace Envoy {
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version);
-  AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
+  AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
+                     envoy::config::core::v3::ApiVersion transport_api_version =
+                         envoy::config::core::v3::ApiVersion::AUTO);
+  AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
 
   void TearDown() override;
 
-  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
+  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name,
+                                                   const std::string& lb_policy = "ROUND_ROBIN");
 
   envoy::config::cluster::v3::Cluster buildTlsCluster(const std::string& name);
 
@@ -55,7 +58,10 @@ public:
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
 
+  // If API version is v2, fatal-by-default is disabled unless fatal_by_default_v2_override_ is set.
   envoy::config::core::v3::ApiVersion api_version_;
+  // Set to force fatal-by-default v2 even if API version is v2.
+  bool fatal_by_default_v2_override_{false};
 };
 
 } // namespace Envoy

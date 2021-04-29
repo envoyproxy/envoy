@@ -36,7 +36,6 @@ public:
   State state() const override;
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
-  const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const override;
   void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) override;
 
 private:

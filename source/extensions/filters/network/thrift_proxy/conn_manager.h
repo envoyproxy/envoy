@@ -39,6 +39,8 @@ public:
   virtual TransportPtr createTransport() PURE;
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
+  virtual bool payloadPassthrough() const PURE;
+  virtual uint64_t maxRequestsPerConnection() const PURE;
 };
 
 /**
@@ -76,6 +78,7 @@ public:
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
+  bool passthroughEnabled() const override;
 
 private:
   struct ActiveRpc;
@@ -102,6 +105,7 @@ private:
 
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
+    bool passthroughEnabled() const override;
 
     ActiveRpc& parent_;
     DecoderPtr decoder_;
@@ -123,6 +127,7 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return parent_.stream_id_; }
     const Network::Connection* connection() const override { return parent_.connection(); }
+    Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
     void continueDecoding() override;
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     TransportType downstreamTransportType() const override {
@@ -142,6 +147,8 @@ private:
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
+    MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
+    bool responseSuccess() override { return parent_.responseSuccess(); }
 
     ActiveRpc& parent_;
     ThriftFilters::DecoderFilterSharedPtr handle_;
@@ -158,15 +165,10 @@ private:
         : parent_(parent), request_timer_(new Stats::HistogramCompletableTimespanImpl(
                                parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
-          stream_info_(parent_.time_source_), local_response_sent_{false}, pending_transport_end_{
-                                                                               false} {
+          stream_info_(parent_.time_source_,
+                       parent_.read_callbacks_->connection().addressProviderSharedPtr()),
+          local_response_sent_{false}, pending_transport_end_{false} {
       parent_.stats_.request_active_.inc();
-
-      stream_info_.setDownstreamLocalAddress(parent_.read_callbacks_->connection().localAddress());
-      stream_info_.setDownstreamRemoteAddress(
-          parent_.read_callbacks_->connection().remoteAddress());
-      stream_info_.setDownstreamDirectRemoteAddress(
-          parent_.read_callbacks_->connection().directRemoteAddress());
     }
     ~ActiveRpc() override {
       request_timer_->complete();
@@ -180,6 +182,7 @@ private:
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
+    FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus messageEnd() override;
     FilterStatus structBegin(absl::string_view name) override;
@@ -204,6 +207,9 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     const Network::Connection* connection() const override;
+    Event::Dispatcher& dispatcher() override {
+      return parent_.read_callbacks_->connection().dispatcher();
+    }
     void continueDecoding() override { parent_.continueDecoding(); }
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
@@ -217,6 +223,8 @@ private:
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+    MessageMetadataSharedPtr responseMetadata() override { return response_decoder_->metadata_; }
+    bool responseSuccess() override { return response_decoder_->success_.value_or(false); }
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
@@ -225,6 +233,7 @@ private:
       LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
 
+    bool passthroughSupported() const;
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
     void finalizeRequest();
 
@@ -272,6 +281,10 @@ private:
   bool stopped_{false};
   bool half_closed_{false};
   TimeSource& time_source_;
+
+  // The number of requests accumulated on the current connection.
+  uint64_t accumulated_requests_{};
+  bool requests_overflow_{false};
 };
 
 } // namespace ThriftProxy

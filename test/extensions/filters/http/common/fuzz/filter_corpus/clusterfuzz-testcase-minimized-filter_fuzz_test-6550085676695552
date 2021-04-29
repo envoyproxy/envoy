@@ -1,0 +1,1 @@
+config {   name: "envoy.filters.http.wasm" } 

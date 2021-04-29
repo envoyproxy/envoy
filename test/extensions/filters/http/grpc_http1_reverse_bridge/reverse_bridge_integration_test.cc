@@ -103,7 +103,7 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
   response_trailers.setGrpcStatus(std::string("0"));
   upstream_request_->encodeTrailers(response_trailers);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ(response->body(), response_data.toString());
@@ -152,7 +152,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   Buffer::OwnedImpl response_data{"defgh"};
   upstream_request_->encodeData(response_data, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   // Ensure that we restored the content-type and that we added the length prefix.
@@ -173,5 +173,34 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
+TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-not-protobuf");
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 5, response_headers, 5);
+
+  EXPECT_TRUE(response->complete());
+
+  // The response should indicate an error.
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
+
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
 } // namespace
 } // namespace Envoy

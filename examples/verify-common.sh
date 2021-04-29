@@ -18,9 +18,9 @@ bring_up_example_stack () {
     path="$1"
     read -ra up_args <<< "up --build -d ${args[*]}"
     if [[ -z "$DOCKER_NO_PULL" ]]; then
-	run_log "Pull the images ($path)"
-	docker-compose pull
-	echo
+        run_log "Pull the images ($path)"
+        docker-compose pull
+        echo
     fi
     run_log "Bring up services ($path)"
     docker-compose "${up_args[@]}" || return 1
@@ -95,6 +95,16 @@ responds_with () {
     }
 }
 
+responds_without () {
+    local expected
+    expected="$1"
+    shift
+    _curl "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
+        echo "ERROR: curl without (${*}): $expected" >&2
+        return 1
+    }
+}
+
 responds_with_header () {
     local expected
     expected="$1"
@@ -115,6 +125,20 @@ responds_without_header () {
     }
 }
 
+wait_for () {
+    local i=1 returns=1 seconds="$1"
+    shift
+    while ((i<=seconds)); do
+        if "$@"; then
+            returns=0
+            break
+        else
+            sleep 1
+            ((i++))
+        fi
+    done
+    return "$returns"
+}
 
 trap 'cleanup' EXIT
 

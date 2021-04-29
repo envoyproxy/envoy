@@ -22,7 +22,7 @@ python_venv() {
   VENV_DIR="${BUILD_DIR}/${PY_NAME}"
 
   source_venv "${VENV_DIR}"
-  pip install -r "${SCRIPT_DIR}"/requirements.txt
+  pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
   shift
   python3 "${SCRIPT_DIR}/${PY_NAME}.py" "$*"

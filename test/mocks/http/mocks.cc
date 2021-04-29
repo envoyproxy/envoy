@@ -1,7 +1,9 @@
 #include "mocks.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/header_map.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,6 +21,19 @@ MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
 MockServerConnectionCallbacks::MockServerConnectionCallbacks() = default;
 MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
+
+MockFilterManagerCallbacks::MockFilterManagerCallbacks() {
+  ON_CALL(*this, continueHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
+    return makeOptRefFromPtr(continue_headers_.get());
+  }));
+  ON_CALL(*this, responseHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
+    return makeOptRefFromPtr(response_headers_.get());
+  }));
+  ON_CALL(*this, responseTrailers()).WillByDefault(Invoke([this]() -> ResponseTrailerMapOptRef {
+    return makeOptRefFromPtr(response_trailers_.get());
+  }));
+}
+MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 
 MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
@@ -163,6 +178,10 @@ IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
 
 IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers) {
   return IsSupersetOfHeadersMatcher(expected_headers);
+}
+
+MockReceivedSettings::MockReceivedSettings() {
+  ON_CALL(*this, maxConcurrentStreams()).WillByDefault(ReturnRef(max_concurrent_streams_));
 }
 
 } // namespace Http

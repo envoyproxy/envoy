@@ -31,6 +31,10 @@ AdminHandler::AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_
   const bool rc =
       admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
+  if (admin_.socket().addressType() == Network::Address::Type::Pipe) {
+    ENVOY_LOG(warn, "Admin tapping (via /tap) is unreliable when the admin endpoint is a pipe and "
+                    "the connection is HTTP/1. Either use an IP address or connect using HTTP/2.");
+  }
 }
 
 AdminHandler::~AdminHandler() {
@@ -65,7 +69,7 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
                               tap_request.config_id()));
   }
   for (auto config : config_id_map_[tap_request.config_id()]) {
-    config->newTapConfig(std::move(*tap_request.mutable_tap_config()), this);
+    config->newTapConfig(tap_request.tap_config(), this);
   }
 
   admin_stream.setEndStreamOnComplete(false);
@@ -74,10 +78,10 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
       ENVOY_LOG(debug, "detach tap admin request for config_id={}",
                 attached_request_.value().config_id_);
       config->clearTapConfig();
-      attached_request_ = absl::nullopt;
     }
+    attached_request_ = absl::nullopt;
   });
-  attached_request_.emplace(tap_request.config_id(), &admin_stream);
+  attached_request_.emplace(tap_request.config_id(), tap_request.tap_config(), &admin_stream);
   return Http::Code::OK;
 }
 
@@ -91,6 +95,9 @@ void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& co
   ASSERT(!config_id.empty());
   ASSERT(config_id_map_[config_id].count(&config) == 0);
   config_id_map_[config_id].insert(&config);
+  if (attached_request_.has_value() && attached_request_.value().config_id_ == config_id) {
+    config.newTapConfig(attached_request_.value().config_, this);
+  }
 }
 
 void AdminHandler::unregisterConfig(ExtensionConfig& config) {
@@ -119,7 +126,7 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(
     switch (format) {
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
-      output_string = MessageUtil::getJsonStringFromMessage(*trace, true, true);
+      output_string = MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

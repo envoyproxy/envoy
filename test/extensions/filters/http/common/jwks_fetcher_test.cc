@@ -53,7 +53,11 @@ timeout:
 
 class JwksFetcherTest : public testing::Test {
 public:
-  void SetUp() override { TestUtility::loadFromYaml(JwksUri, uri_); }
+  void SetUp() override {
+    TestUtility::loadFromYaml(JwksUri, uri_);
+    mock_factory_ctx_.cluster_manager_.initializeThreadLocalClusters({"pubkey_cluster"});
+  }
+
   HttpUri uri_;
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   NiceMock<Tracing::MockSpan> parent_span_;
@@ -66,7 +70,7 @@ TEST_F(JwksFetcherTest, TestGetSuccess) {
   MockJwksReceiver receiver;
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
-  EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(1);
+  EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_));
   EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
 
   // Act
@@ -80,7 +84,7 @@ TEST_F(JwksFetcherTest, TestGet400) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network));
 
   // Act
   fetcher->fetch(uri_, parent_span_, receiver);
@@ -93,7 +97,7 @@ TEST_F(JwksFetcherTest, TestGetNoBody) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network));
 
   // Act
   fetcher->fetch(uri_, parent_span_, receiver);
@@ -106,7 +110,7 @@ TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks)).Times(1);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks));
 
   // Act
   fetcher->fetch(uri_, parent_span_, receiver);
@@ -120,7 +124,7 @@ TEST_F(JwksFetcherTest, TestHttpFailure) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network));
 
   // Act
   fetcher->fetch(uri_, parent_span_, receiver);
@@ -128,12 +132,13 @@ TEST_F(JwksFetcherTest, TestHttpFailure) {
 
 TEST_F(JwksFetcherTest, TestCancel) {
   // Setup
-  Http::MockAsyncClientRequest request(&(mock_factory_ctx_.cluster_manager_.async_client_));
+  Http::MockAsyncClientRequest request(
+      &(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_));
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, &request);
   MockJwksReceiver receiver;
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
-  EXPECT_CALL(request, cancel()).Times(1);
+  EXPECT_CALL(request, cancel());
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
 
@@ -152,7 +157,8 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
 
   // Expectations for span
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, _))
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, _))
       .WillOnce(Invoke(
           [this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
                  const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {

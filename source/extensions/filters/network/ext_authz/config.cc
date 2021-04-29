@@ -9,6 +9,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
+#include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -27,7 +28,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
-          transport_api_version = proto_config.transport_api_version(),
+          transport_api_version = Envoy::Config::Utility::getAndCheckTransportVersion(proto_config),
           timeout_ms](Network::FilterManager& filter_manager) -> void {
     auto async_client_factory =
         context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
@@ -35,7 +36,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
 
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
         async_client_factory->create(), std::chrono::milliseconds(timeout_ms),
-        transport_api_version, false);
+        transport_api_version);
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         std::make_shared<Filter>(ext_authz_config, std::move(client))});
   };

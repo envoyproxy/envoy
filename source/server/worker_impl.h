@@ -58,6 +58,7 @@ public:
 private:
   void threadRoutine(GuardDog& guard_dog);
   void stopAcceptingConnectionsCb(OverloadActionState state);
+  void rejectIncomingConnectionsCb(OverloadActionState state);
 
   ThreadLocal::Instance& tls_;
   ListenerHooks& hooks_;

@@ -10,28 +10,18 @@ services:
     environment:
       ENVOY_UID: 0
     networks:
-      envoymesh:
-        aliases:
-          - http_service
-    expose:
-      - "80"
-      - "8081"
+      - envoymesh
     ports:
       - "80-81:80"
-      - "8081-8082:8081"
 
   lrs_server:
     build:
       context: .
       dockerfile: Dockerfile-lrs
     networks:
-      envoymesh:
-        aliases:
-          - lrs_server
+      - envoymesh
     volumes:
       - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service
-    expose:
-      - "18000"
     ports:
       - "18000:18000"
 

@@ -5,6 +5,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/tracing/trace_reason.h"
 
 #include "common/http/conn_manager_impl.h"
 #include "common/http/http1/codec_stats.h"
@@ -38,7 +39,7 @@ public:
   static ServerConnectionPtr
   autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-                  Http1::CodecStats::AtomicPtr& http1_codec_stats,
+                  Random::RandomGenerator& random, Http1::CodecStats::AtomicPtr& http1_codec_stats,
                   Http2::CodecStats::AtomicPtr& http2_codec_stats,
                   const Http1Settings& http1_settings,
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
@@ -78,10 +79,11 @@ public:
 
   /**
    * Mutate request headers if request needs to be traced.
+   * @return the trace reason selected after header mutation to be stored in stream info.
    */
-  static void mutateTracingRequestHeader(RequestHeaderMap& request_headers,
-                                         Runtime::Loader& runtime, ConnectionManagerConfig& config,
-                                         const Router::Route* route);
+  ABSL_MUST_USE_RESULT static Tracing::Reason
+  mutateTracingRequestHeader(RequestHeaderMap& request_headers, Runtime::Loader& runtime,
+                             ConnectionManagerConfig& config, const Router::Route* route);
 
 private:
   static void mutateXfccRequestHeader(RequestHeaderMap& request_headers,

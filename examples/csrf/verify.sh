@@ -67,3 +67,8 @@ responds_with_header \
     -X POST \
     -H "Origin: http://example.com" \
     http://localhost:8000/csrf/additional_origin
+
+run_log "Check admin ingress stats"
+responds_with \
+    ingress_http.csrf \
+    "http://localhost:8001/stats?filter=ingress_http"

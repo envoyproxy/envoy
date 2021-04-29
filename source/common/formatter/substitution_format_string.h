@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 
@@ -19,7 +20,7 @@ public:
    * Generate a formatter object from config SubstitutionFormatString.
    */
   static FormatterPtr
-  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config);
+  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config, Api::Api& api);
 
   /**
    * Generate a Json formatter object from proto::Struct config

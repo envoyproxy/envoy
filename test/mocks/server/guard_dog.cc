@@ -11,7 +11,7 @@ using ::testing::NiceMock;
 using ::testing::Return;
 
 MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
-  ON_CALL(*this, createWatchDog(_, _)).WillByDefault(Return(watch_dog_));
+  ON_CALL(*this, createWatchDog(_, _, _)).WillByDefault(Return(watch_dog_));
 }
 
 MockGuardDog::~MockGuardDog() = default;

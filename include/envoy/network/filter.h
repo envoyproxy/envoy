@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/protobuf/protobuf.h"
@@ -19,6 +20,7 @@ namespace Network {
 
 class Connection;
 class ConnectionSocket;
+class Socket;
 class UdpListener;
 struct UdpRecvData;
 
@@ -43,6 +45,11 @@ public:
    * @return the connection that owns this filter.
    */
   virtual Connection& connection() PURE;
+
+  /**
+   * @return Socket the socket the filter is operating on.
+   */
+  virtual const Socket& socket() PURE;
 };
 
 /**
@@ -228,6 +235,11 @@ public:
   virtual void addReadFilter(ReadFilterSharedPtr filter) PURE;
 
   /**
+   * Remove a read filter from the connection.
+   */
+  virtual void removeReadFilter(ReadFilterSharedPtr filter) PURE;
+
+  /**
    * Initialize all of the installed read filters. This effectively calls onNewConnection() on
    * each of them.
    * @return true if read filters were initialized successfully, otherwise false.
@@ -286,6 +298,11 @@ public:
    */
   virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
   virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
+
+  /**
+   * @return Object on which filters can share data on a per-request basis.
+   */
+  virtual StreamInfo::FilterState& filterState() PURE;
 };
 
 /**
@@ -358,9 +375,21 @@ public:
   virtual const TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
+   * @return std::chrono::milliseconds the amount of time to wait for the transport socket to report
+   * that a connection has been established. If the timeout is reached, the connection is closed. 0
+   * specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds transportSocketConnectTimeout() const PURE;
+
+  /**
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
+
+  /**
+   * @return the name of this filter chain.
+   */
+  virtual absl::string_view name() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

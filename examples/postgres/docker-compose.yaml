@@ -1,0 +1,29 @@
+version: "3.7"
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    networks:
+      envoymesh:
+    ports:
+      - "1999:1999"
+      - "8001:8001"
+    command: "/usr/local/bin/envoy -c /etc/envoy.yaml -l debug"
+
+  postgres:
+    image: postgres:latest
+    networks:
+      envoymesh:
+    environment:
+      # WARNING! Do not use it on production environments because this will
+      #          allow anyone with access to the Postgres port to access your
+      #          database without a password, even if POSTGRES_PASSWORD is set.
+      #          See PostgreSQL documentation about "trust":
+      #          https://www.postgresql.org/docs/current/auth-trust.html
+      POSTGRES_HOST_AUTH_METHOD: trust
+
+networks:
+  envoymesh:
+    name: envoymesh

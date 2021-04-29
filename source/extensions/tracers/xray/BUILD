@@ -57,8 +57,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.tracers",
     security_posture = "robust_to_untrusted_downstream",
-    status = "wip",
     deps = [
         ":xray_lib",
         "//source/common/config:datasource_lib",

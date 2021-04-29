@@ -62,6 +62,14 @@ namespace Lua {
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
 
 /**
+ * Declare a Lua function in which values are added to a table to approximate an enum.
+ */
+#define LUA_ENUM(state, name, val)                                                                 \
+  lua_pushlstring(state, #name, sizeof(#name) - 1);                                                \
+  lua_pushnumber(state, val);                                                                      \
+  lua_settable(state, -3);
+
+/**
  * Calculate the maximum space needed to be aligned.
  */
 template <typename T> constexpr size_t maximumSpaceNeededToAlign() {
@@ -352,6 +360,8 @@ private:
 };
 
 using CoroutinePtr = std::unique_ptr<Coroutine>;
+using Initializer = std::function<void(lua_State*)>;
+using InitializerList = std::vector<Initializer>;
 
 /**
  * This class wraps a Lua state that can be used safely across threads. The model is that every
@@ -377,36 +387,33 @@ public:
   /**
    * Register a global for later use.
    * @param global supplies the name of the global.
+   * @param initializers supplies a collection of initializers.
    * @return a slot/index for later use with getGlobalRef().
    */
-  uint64_t registerGlobal(const std::string& global);
+  uint64_t registerGlobal(const std::string& global, const InitializerList& initializers);
 
   /**
    * Register a type with the thread local state. After this call the type will be available on
    * all threaded workers.
    */
   template <class T> void registerType() {
-    tls_slot_->runOnAllThreads([](ThreadLocal::ThreadLocalObjectSharedPtr previous) {
-      LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(previous);
-      T::registerType(tls.state_.get());
-      return previous;
-    });
+    tls_slot_->runOnAllThreads(
+        [](OptRef<LuaThreadLocal> tls) { T::registerType(tls->state_.get()); });
   }
 
   /**
    * Return the number of bytes used by the runtime.
    */
   uint64_t runtimeBytesUsed() {
-    uint64_t bytes_used =
-        lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNT, 0) * 1024;
-    bytes_used += lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNTB, 0);
+    uint64_t bytes_used = lua_gc(tlsState().get(), LUA_GCCOUNT, 0) * 1024;
+    bytes_used += lua_gc(tlsState().get(), LUA_GCCOUNTB, 0);
     return bytes_used;
   }
 
   /**
    * Force a full runtime GC.
    */
-  void runtimeGC() { lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0); }
+  void runtimeGC() { lua_gc(tlsState().get(), LUA_GCCOLLECT, 0); }
 
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
@@ -416,7 +423,9 @@ private:
     std::vector<int> global_slots_;
   };
 
-  ThreadLocal::SlotPtr tls_slot_;
+  CSmartPtr<lua_State, lua_close>& tlsState() { return (*tls_slot_)->state_; }
+
+  ThreadLocal::TypedSlotPtr<LuaThreadLocal> tls_slot_;
   uint64_t current_global_slot_{};
 };
 

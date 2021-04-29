@@ -9,7 +9,7 @@ changes. They may be as part of a larger implementation PR. Please follow the st
 process for validating build/test sanity of `api/` before submitting a PR.
 
 *Note: New .proto files should be added to
-[BUILD](https://github.com/envoyproxy/envoy/blob/master/api/versioning/BUILD) in order to get the RSTs generated.*
+[BUILD](https://github.com/envoyproxy/envoy/blob/main/api/versioning/BUILD) in order to get the RSTs generated.*
 
 ## Documentation changes
 
@@ -50,11 +50,11 @@ generated RST files are also viewable in `generated/rst`.
 
 Note also that the generated documentation can be viewed in CI:
 
-1. Open docs job in CircleCI.
-2. Navigate to "artifacts" tab.
-3. Expand files and click on `index.html`.
+1. Open docs job in Azure Pipelines.
+2. Navigate to "Upload Docs to GCS" log.
+3. Click on the link there.
 
-If you do not see an artifacts tab this is a bug in CircleCI. Try logging out and logging back in.
+If you do not see "Upload Docs to GCS" or it is failing, that means the docs are not built correctly.
 
 ### Documentation guidelines
 
@@ -72,7 +72,6 @@ The following are some general guidelines around documentation.
   // [#comment:TODO(mattklein123): Do something cooler]
   string foo_field = 3;
   ```
-
-* Prefer *italics* for emphasis as `backtick` emphasis is somewhat jarring in our Sphinx theme.
+* Please use *italics* (enclosed in asterisks `*emphasized word*`) for emphasis and `inline literals` for code quotation (enclosed in *double* backticks ` ``code`` `).
 * All documentation is expected to use proper English grammar with proper punctuation. If you are
   not a fluent English speaker please let us know and we will help out.

@@ -59,7 +59,13 @@ public:
   /* active HC. */                                                               \
   m(PENDING_DYNAMIC_REMOVAL, 0x20)                                               \
   /* The host is pending its initial active health check. */                     \
-  m(PENDING_ACTIVE_HC, 0x40)
+  m(PENDING_ACTIVE_HC, 0x40)                                                     \
+  /* The host should be excluded from panic, spillover, etc. calculations */     \
+  /* because it was explicitly taken out of rotation via protocol signal and */  \
+  /* is not meant to be routed to. */                                            \
+  m(EXCLUDED_VIA_IMMEDIATE_HC_FAIL, 0x80)                                        \
+  /* The host failed active HC due to timeout. */                                \
+  m(ACTIVE_HC_TIMEOUT, 0x100)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -67,15 +73,6 @@ public:
   enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
 
 #undef DECLARE_ENUM
-
-  enum class ActiveHealthFailureType {
-    // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
-    UNKNOWN,
-    // The host is actively responding it's unhealthy
-    UNHEALTHY,
-    // The host is timing out
-    TIMEOUT,
-  };
 
   /**
    * @return host specific counters.
@@ -157,17 +154,6 @@ public:
   virtual Health health() const PURE;
 
   /**
-   * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
-   */
-  virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
-
-  /**
-   * Set the most recent health failure type for a host. Types are specified in
-   * ActiveHealthFailureType.
-   */
-  virtual void setActiveHealthFailureType(ActiveHealthFailureType flag) PURE;
-
-  /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
    * a new monitor must be installed before the host is used across threads. Thus,
    * this routine should only be called on the main thread before the host is used across threads.
@@ -211,7 +197,7 @@ using HostVector = std::vector<HostSharedPtr>;
 using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
-using HostMap = absl::node_hash_map<std::string, Upstream::HostSharedPtr>;
+using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -418,9 +404,10 @@ public:
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * Install a callback that will be invoked when a host set changes. Triggers when any change
@@ -428,9 +415,10 @@ public:
    * added/removed hosts will be passed to the callback.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
@@ -515,7 +503,7 @@ public:
 /**
  * All cluster stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                               \
+#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
   COUNTER(bind_errors)                                                                             \
@@ -553,6 +541,7 @@ public:
   COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
   COUNTER(upstream_cx_http1_total)                                                                 \
   COUNTER(upstream_cx_http2_total)                                                                 \
+  COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \
@@ -606,28 +595,37 @@ public:
  * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
  * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
-#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER) COUNTER(upstream_rq_dropped)
+#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
+  COUNTER(upstream_rq_dropped)
 
 /**
- * Cluster circuit breakers stats. Open circuit breaker stats and remaining resource stats
- * can be handled differently by passing in different macros.
+ * Cluster circuit breakers gauges. Note that we do not generate a stats
+ * structure from this macro. This is because depending on flags, we want to use
+ * null gauges for all the "remaining" ones. This is hard to automate with the
+ * 2-phase macros, so ClusterInfoImpl::generateCircuitBreakersStats is
+ * hand-coded and must be changed if we alter the set of gauges in this macro.
+ * We also include stat-names in this structure that are used when composing
+ * the circuit breaker names, depending on priority settings.
  */
-#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                            \
-  OPEN_GAUGE(cx_open, Accumulate)                                                                  \
-  OPEN_GAUGE(cx_pool_open, Accumulate)                                                             \
-  OPEN_GAUGE(rq_open, Accumulate)                                                                  \
-  OPEN_GAUGE(rq_pending_open, Accumulate)                                                          \
-  OPEN_GAUGE(rq_retry_open, Accumulate)                                                            \
-  REMAINING_GAUGE(remaining_cx, Accumulate)                                                        \
-  REMAINING_GAUGE(remaining_cx_pools, Accumulate)                                                  \
-  REMAINING_GAUGE(remaining_pending, Accumulate)                                                   \
-  REMAINING_GAUGE(remaining_retries, Accumulate)                                                   \
-  REMAINING_GAUGE(remaining_rq, Accumulate)
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)      \
+  GAUGE(cx_open, Accumulate)                                                                       \
+  GAUGE(cx_pool_open, Accumulate)                                                                  \
+  GAUGE(rq_open, Accumulate)                                                                       \
+  GAUGE(rq_pending_open, Accumulate)                                                               \
+  GAUGE(rq_retry_open, Accumulate)                                                                 \
+  GAUGE(remaining_cx, Accumulate)                                                                  \
+  GAUGE(remaining_cx_pools, Accumulate)                                                            \
+  GAUGE(remaining_pending, Accumulate)                                                             \
+  GAUGE(remaining_retries, Accumulate)                                                             \
+  GAUGE(remaining_rq, Accumulate)                                                                  \
+  STATNAME(circuit_breakers)                                                                       \
+  STATNAME(default)                                                                                \
+  STATNAME(high)
 
 /**
  * All stats tracking request/response headers and body sizes. Not used by default.
  */
-#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(HISTOGRAM)                                         \
+#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
   HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
@@ -636,48 +634,44 @@ public:
 /**
  * All stats around timeout budgets. Not used by default.
  */
-#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(HISTOGRAM)                                                \
+#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)        \
   HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
   HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
 
 /**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
-struct ClusterStats {
-  ALL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(ClusterStatNames, ALL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(ClusterStats, ClusterStatNames, ALL_CLUSTER_STATS);
 
-/**
- * Struct definition for all cluster load report stats. @see stats_macros.h
- */
-struct ClusterLoadReportStats {
-  ALL_CLUSTER_LOAD_REPORT_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
+MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
+                  ALL_CLUSTER_LOAD_REPORT_STATS);
+
+// We can't use macros to make the Stats class for circuit breakers due to
+// the conditional inclusion of 'remaining' gauges. But we do auto-generate
+// the StatNames struct.
+MAKE_STAT_NAMES_STRUCT(ClusterCircuitBreakersStatNames, ALL_CLUSTER_CIRCUIT_BREAKERS_STATS);
+
+MAKE_STAT_NAMES_STRUCT(ClusterRequestResponseSizeStatNames,
+                       ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS);
+MAKE_STATS_STRUCT(ClusterRequestResponseSizeStats, ClusterRequestResponseSizeStatNames,
+                  ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS);
+
+MAKE_STAT_NAMES_STRUCT(ClusterTimeoutBudgetStatNames, ALL_CLUSTER_TIMEOUT_BUDGET_STATS);
+MAKE_STATS_STRUCT(ClusterTimeoutBudgetStats, ClusterTimeoutBudgetStatNames,
+                  ALL_CLUSTER_TIMEOUT_BUDGET_STATS);
 
 /**
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
  */
 struct ClusterCircuitBreakersStats {
-  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
-};
-
-/**
- * Struct definition for cluster timeout budget stats. @see stats_macros.h
- */
-struct ClusterRequestResponseSizeStats {
-  ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(GENERATE_HISTOGRAM_STRUCT)
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, GENERATE_GAUGE_STRUCT, h, tr, GENERATE_STATNAME_STRUCT)
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
 using ClusterRequestResponseSizeStatsOptRef =
     absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
-
-/**
- * Struct definition for cluster timeout budget stats. @see stats_macros.h
- */
-struct ClusterTimeoutBudgetStats {
-  ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
-};
 
 using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
 using ClusterTimeoutBudgetStatsOptRef =
@@ -706,12 +700,17 @@ class ClusterInfo {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
-    static const uint64_t HTTP2 = 0x1;
+    static constexpr uint64_t HTTP2 = 0x1;
     // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
     // This is used when creating connection pools.
-    static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
+    static constexpr uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
-    static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    static constexpr uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    // If USE_ALPN and HTTP2 are true, the upstream protocol will be negotiated using ALPN.
+    // If ALPN is attempted but not supported by the upstream HTTP/1.1 is used.
+    static constexpr uint64_t USE_ALPN = 0x8;
+    // Whether the upstream supports HTTP3. This is used when creating connection pools.
+    static constexpr uint64_t HTTP3 = 0x10;
   };
 
   virtual ~ClusterInfo() = default;
@@ -735,7 +734,7 @@ public:
   /**
    * @return how many streams should be anticipated per each current stream.
    */
-  virtual float perUpstreamPrefetchRatio() const PURE;
+  virtual float perUpstreamPreconnectRatio() const PURE;
 
   /**
    * @return how many streams should be anticipated per each current stream.
@@ -766,6 +765,12 @@ public:
   virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
 
   /**
+   * @return const envoy::config::core::v3::Http3ProtocolOptions& for HTTP/3 connections
+   * created on behalf of this cluster. @see envoy::config::core::v3::Http3ProtocolOptions.
+   */
+  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
+
+  /**
    * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
    */
   virtual const envoy::config::core::v3::HttpProtocolOptions&
@@ -778,8 +783,7 @@ public:
    *         and contains extension-specific protocol options for upstream connections.
    */
   template <class Derived>
-  const std::shared_ptr<const Derived>
-  extensionProtocolOptionsTyped(const std::string& name) const {
+  std::shared_ptr<const Derived> extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
   }
 
@@ -863,6 +867,14 @@ public:
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the observability name associated to the cluster. Used in stats, tracing, logging, and
+   * config dumps. The observability name is configured with :ref:`alt_stat_name
+   * <envoy_api_field_config.cluster.v3.Cluster.alt_stat_name>`. If unprovided, the default value is
+   * the cluster name.
+   */
+  virtual const std::string& observabilityName() const PURE;
 
   /**
    * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at
@@ -962,9 +974,9 @@ public:
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
 
   /**
-   * Calculate upstream protocol based on features.
+   * Calculate upstream protocol(s) based on features.
    */
-  virtual Http::Protocol
+  virtual std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
   /**
@@ -982,6 +994,11 @@ public:
    * @return the Http2 Codec Stats.
    */
   virtual Http::Http2::CodecStats& http2CodecStats() const PURE;
+
+  /**
+   * @return the Http3 Codec Stats.
+   */
+  virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
 
 protected:
   /**
@@ -1055,6 +1072,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
+using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream
 } // namespace Envoy
