@@ -58,7 +58,7 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
       "--config=fuzz-coverage"
       "--test_tag_filters=-nocoverage")
 else
-  COVERAGE_TARGETS=${COVERAGE_ARGS[*]}
+  COVERAGE_TARGETS=("${COVERAGE_ARGS[*]}")
   BAZEL_BUILD_OPTIONS+=(
       "--config=test-coverage"
       "--test_tag_filters=-nocoverage,-fuzz_target")
