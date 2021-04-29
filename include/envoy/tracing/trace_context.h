@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/common/pure.h"
 #include "envoy/common/lower_case_string.h"
+#include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

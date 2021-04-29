@@ -101,7 +101,7 @@ void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context) {
     }
     const std::string current_span_context = oss.str();
     trace_context.setTraceContext(
-        Http::CustomHeaders::get().OtSpanContext.get(),
+        Http::CustomHeaders::get().OtSpanContext,
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
     // Inject the context using the tracer's standard HTTP header format.
@@ -141,10 +141,10 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   std::unique_ptr<opentracing::Span> active_span;
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
   if (propagation_mode == PropagationMode::SingleHeader &&
-      trace_context.getTraceContext(Http::CustomHeaders::get().OtSpanContext.get()).has_value()) {
+      trace_context.getTraceContext(Http::CustomHeaders::get().OtSpanContext).has_value()) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
     std::string parent_context = Base64::decode(std::string(
-        trace_context.getTraceContext(Http::CustomHeaders::get().OtSpanContext.get()).value()));
+        trace_context.getTraceContext(Http::CustomHeaders::get().OtSpanContext).value()));
 
     if (!parent_context.empty()) {
       InputConstMemoryStream istream{parent_context.data(), parent_context.size()};

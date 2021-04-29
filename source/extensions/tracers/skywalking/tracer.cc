@@ -45,10 +45,10 @@ void Span::finishSpan() {
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context) {
-  auto sw8_header = tracing_context_->createSW8HeaderValue(std::string(
-      trace_context.getTraceContext(Http::Headers::get().HostLegacy.get()).value_or("")));
+  auto sw8_header = tracing_context_->createSW8HeaderValue(
+      std::string(trace_context.getTraceContext(Http::Headers::get().HostLegacy).value_or("")));
   if (sw8_header.has_value()) {
-    trace_context.setTraceContext(skywalkingPropagationHeaderKey().get(), sw8_header.value());
+    trace_context.setTraceContext(skywalkingPropagationHeaderKey(), sw8_header.value());
   }
 }
 

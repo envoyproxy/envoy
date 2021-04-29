@@ -100,9 +100,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   if (!should_trace.has_value()) {
     const SamplingRequest request{
-        trace_context.getTraceContext(Http::Headers::get().HostLegacy.get()).value_or(""),
-        trace_context.getTraceContext(Http::Headers::get().Method.get()).value_or(""),
-        trace_context.getTraceContext(Http::Headers::get().Method.get()).value_or("")};
+        trace_context.getTraceContext(Http::Headers::get().HostLegacy).value_or(""),
+        trace_context.getTraceContext(Http::Headers::get().Method).value_or(""),
+        trace_context.getTraceContext(Http::Headers::get().Path).value_or("")};
 
     should_trace = sampling_strategy_->shouldTrace(request);
   }

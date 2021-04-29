@@ -42,19 +42,18 @@ std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
 void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_TRACE_ID.get(),
+  trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                 span_.traceIdAsHexString());
-  trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_SPAN_ID.get(),
-                                span_.idAsHexString());
+  trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
 
   // Set the parent-span header properly, based on the newly-created span structure.
   if (span_.isSetParentId()) {
-    trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.get(),
+    trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
                                   span_.parentIdAsHexString());
   }
 
   // Set the sampled header.
-  trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_SAMPLED.get(),
+  trace_context.setTraceContext(ZipkinCoreConstants::get().X_B3_SAMPLED,
                                 span_.sampled() ? SAMPLED : NOT_SAMPLED);
 }
 
@@ -122,15 +121,13 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span = tracer.startSpan(
           config,
-          std::string(
-              trace_context.getTraceContext(Http::Headers::get().HostLegacy.get()).value_or("")),
+          std::string(trace_context.getTraceContext(Http::Headers::get().HostLegacy).value_or("")),
           start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
       new_zipkin_span = tracer.startSpan(
           config,
-          std::string(
-              trace_context.getTraceContext(Http::Headers::get().HostLegacy.get()).value_or("")),
+          std::string(trace_context.getTraceContext(Http::Headers::get().HostLegacy).value_or("")),
           start_time, ret_span_context.first);
     }
 
