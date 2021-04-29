@@ -47,7 +47,10 @@ public:
       : stats_(stats), http3_options_(http3_options),
         send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark), ENVOY_LOGGER()),
-        filter_manager_connection_(filter_manager_connection) {}
+        filter_manager_connection_(filter_manager_connection),
+        async_stream_blockage_change_(
+            filter_manager_connection.dispatcher().createSchedulableCallback(
+                [this]() { switchStreamBlockState(); })) {}
 
   ~EnvoyQuicStream() override = default;
 
@@ -70,31 +73,15 @@ public:
       }
     }
 
-    if (status_changed && !in_decode_data_callstack_) {
-      // Avoid calling this while decoding data because transient disabling and
-      // enabling reading may trigger another decoding data inside the
-      // callstack which messes up stream state.
-      if (disable) {
-        // Block QUIC stream right away. And if there are queued switching
-        // state callback, update the desired state as well.
-        switchStreamBlockState(true);
-        if (unblock_posted_) {
-          should_block_ = true;
-        }
-      } else {
-        should_block_ = false;
-        if (!unblock_posted_) {
-          // If this is the first time unblocking stream is desired, post a
-          // callback to do it in next loop. This is because unblocking QUIC
-          // stream can lead to immediate upstream encoding.
-          unblock_posted_ = true;
-          connection()->dispatcher().post([this] {
-            unblock_posted_ = false;
-            switchStreamBlockState(should_block_);
-          });
-        }
-      }
+    if (!status_changed) {
+      return;
     }
+
+    // If the status transiently changed from unblocked to blocked and then unblocked, the quic
+    // stream will be spuriously unblocked and call OnDataAvailable(). This call shouldn't take any
+    // effect because any available data should have been processed already upon arrival or they
+    // were blocked by some condition other than flow control, i.e. Qpack decoding.
+    async_stream_blockage_change_->scheduleCallbackNextIteration();
   }
 
   void addCallbacks(Http::StreamCallbacks& callbacks) override {
@@ -139,7 +126,7 @@ public:
   absl::string_view responseDetails() override { return details_; }
 
 protected:
-  virtual void switchStreamBlockState(bool should_block) PURE;
+  virtual void switchStreamBlockState() PURE;
 
   // Needed for ENVOY_STREAM_LOG.
   virtual uint32_t streamId() PURE;
@@ -149,10 +136,12 @@ protected:
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
   bool end_stream_decoded_{false};
+  // The latest state a QUIC stream blockage state change callback should look at. As
+  // more readDisable() calls may happen between the callback is posted and it's
+  // executed, the stream might be unblocked and blocked several times. If this
+  // counter is 0, the callback should unblock the stream. Otherwise it should
+  // block the stream.
   uint32_t read_disable_counter_{0u};
-  // If true, switchStreamBlockState() should be deferred till this variable
-  // becomes false.
-  bool in_decode_data_callstack_{false};
 
   Http::Http3::CodecStats& stats_;
   const envoy::config::core::v3::Http3ProtocolOptions& http3_options_;
@@ -169,16 +158,11 @@ private:
   // directly and buffers them in filters if needed. Itself doesn't buffer request data.
   EnvoyQuicSimulatedWatermarkBuffer send_buffer_simulation_;
 
-  // True if there is posted unblocking QUIC stream callback. There should be
-  // only one such callback no matter how many times readDisable() is called.
-  bool unblock_posted_{false};
-  // The latest state an unblocking QUIC stream callback should look at. As
-  // more readDisable() calls may happen between the callback is posted and it's
-  // executed, the stream might be unblocked and blocked several times. Only the
-  // latest desired state should be considered by the callback.
-  bool should_block_{false};
-
   QuicFilterManagerConnectionImpl& filter_manager_connection_;
+  // Used to block or unblock stream in the next event loop. QUICHE doesn't like stream blockage
+  // state change in its own call stack. And Envoy upstream doesn't like quic stream to be unblocked
+  // in its callstack either because the stream will push data right away.
+  Event::SchedulableCallbackPtr async_stream_blockage_change_;
 };
 
 } // namespace Quic
