@@ -130,7 +130,7 @@ public:
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                   Upstream::ClusterConnectivityState& state,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
@@ -183,7 +183,6 @@ private:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
-  TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is

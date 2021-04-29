@@ -29,7 +29,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       sk_X509_push(intermediates.get(), cert.release());
     }
   }
-  bool success = context_impl_.verifyCertChain(*leaf, *intermediates, *error_details);
+  bool success = context_->verifyCertChain(*leaf, *intermediates, *error_details);
   if (!success) {
     return quic::QUIC_FAILURE;
   }

@@ -1447,7 +1447,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.parent_.time_source_, parent_.cluster_manager_state_);
+            parent_.cluster_manager_state_);
       });
 
   if (pool.has_value()) {
@@ -1516,7 +1516,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     std::vector<Http::Protocol>& protocols,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     ClusterConnectivityState& state) {
   if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
@@ -1525,7 +1525,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state, source, std::chrono::milliseconds(300), coptions);
+        state, std::chrono::milliseconds(300), coptions);
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1546,9 +1546,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state, source);
+                                         options, transport_socket_options, state);
 #else
-    UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif

@@ -31,8 +31,7 @@ public:
                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
-                    CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                    TimeSource& time_source)
+                    CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol)
       : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                               random_generator, state, client_fn, codec_fn, protocol) {
     auto source_address = host_->cluster().sourceAddress();
@@ -42,8 +41,7 @@ public:
     }
     Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
     quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-        dispatcher, transport_socket_factory, host->cluster().statsScope(), time_source,
-        source_address);
+        dispatcher, transport_socket_factory, source_address);
   }
 
   // Make sure all connections are torn down before quic_info_ is deleted.
@@ -59,7 +57,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state, TimeSource& time_source) {
+                 Upstream::ClusterConnectivityState& state) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [](HttpConnPoolImplBase* pool) {
@@ -81,7 +79,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             pool->dispatcher(), pool->randomGenerator())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3}, time_source);
+      std::vector<Protocol>{Protocol::Http3});
 }
 
 } // namespace Http3

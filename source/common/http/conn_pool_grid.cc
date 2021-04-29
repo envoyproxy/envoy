@@ -189,11 +189,11 @@ ConnectivityGrid::ConnectivityGrid(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
+    Upstream::ClusterConnectivityState& state, std::chrono::milliseconds next_attempt_duration,
+    ConnectivityOptions connectivity_options)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source),
+      state_(state), next_attempt_duration_(next_attempt_duration),
       http3_status_tracker_(dispatcher_) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
@@ -221,8 +221,7 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
   if (pools_.empty()) {
     pools_.push_back(Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_,
-                                             options_, transport_socket_options_, state_,
-                                             time_source_));
+                                             options_, transport_socket_options_, state_));
     return pools_.begin();
   }
   pools_.push_back(std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_,

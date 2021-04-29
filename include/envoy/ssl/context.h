@@ -8,6 +8,9 @@
 
 #include "absl/types/optional.h"
 
+struct x509_st;
+struct stack_st_X509;
+
 namespace Envoy {
 namespace Ssl {
 
@@ -40,6 +43,19 @@ public:
    * expire, or `absl::nullopt` if no OCSP responses exist.
    */
   virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+
+  /*
+   * Attempts to verify the certificate chain.
+   * @param leaf_cert the leaf certificate to be verified.
+   * @param intermediates the intermediate certificates, if present.
+   * @param error_details if an error is encountered, a human readable explanation will be stored
+   * here.
+   * @return true if the certificate chain is verified, false otherwise.
+   */
+  virtual bool verifyCertChain(x509_st& /*leaf_cert*/, stack_st_X509& /*intermediates*/,
+                               std::string& /*error_details*/) {
+    return false;
+  }
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

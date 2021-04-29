@@ -81,7 +81,8 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
-  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
+                       std::string& error_details) override;
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
