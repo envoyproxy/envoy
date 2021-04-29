@@ -159,6 +159,7 @@ public:
     return {GetCryptoStream()->crypto_negotiated_params().sni};
   }
 
+  using quic::QuicSession::closed_streams;
   using quic::QuicSpdySession::ActivateStream;
 
 protected:

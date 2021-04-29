@@ -305,7 +305,6 @@ TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
-  EXCLUDE_UPSTREAM_HTTP3; // quic_stream_sequencer.cc:235 CHECK failed: !blocked_.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
