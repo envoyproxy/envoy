@@ -82,6 +82,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.return_502_for_upstream_protocol_errors",
     "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
+    "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
