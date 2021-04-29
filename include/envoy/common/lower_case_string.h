@@ -52,7 +52,7 @@ public:
     return *this;
   }
 
-  explicit LowerCaseString(const absl::string_view new_string) : string_(new_string) {
+  explicit LowerCaseString(absl::string_view new_string) : string_(new_string) {
     ASSERT(valid());
     lower();
   }
