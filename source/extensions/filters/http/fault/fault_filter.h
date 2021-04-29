@@ -74,7 +74,7 @@ public:
   const std::string& responseRateLimitPercentRuntime() const {
     return response_rate_limit_percent_runtime_;
   }
-  bool disable_downstream_server_tracing_{false};
+  bool disableDownstreamServerTracing() const { return disable_downstream_server_tracing_; }
 
 private:
   class RuntimeKeyValues {
@@ -106,6 +106,7 @@ private:
   const std::string abort_grpc_status_runtime_;
   const std::string max_active_faults_runtime_;
   const std::string response_rate_limit_percent_runtime_;
+  const bool disable_downstream_server_tracing_;
 };
 
 /**
