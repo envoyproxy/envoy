@@ -19,7 +19,7 @@ Usage
 
     -c <string>,  --config-path <string>
       Path to a v2 router config file (YAML or JSON). The router config file schema is found in
-      :ref:`config <envoy_api_file_envoy/api/v2/route/route.proto>` and the config file extension
+      :ref:`config <envoy_v3_api_file_envoy/config/route/v3/route.proto>` and the config file extension
       must reflect its file type (for instance, .json for JSON and .yaml for YAML).
 
     -d,  --details
