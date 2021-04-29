@@ -22,8 +22,7 @@ protected:
   SimulatedTimeSystemTest()
       : scheduler_(time_system_.createScheduler(base_scheduler_, base_scheduler_)),
         start_monotonic_time_(time_system_.monotonicTime()),
-        start_system_time_(time_system_.systemTime()) {
-  }
+        start_system_time_(time_system_.systemTime()) {}
 
   void trackPrepareCalls() {
     base_scheduler_.registerOnPrepareCallback([this]() { output_.append(1, 'p'); });
