@@ -7,7 +7,8 @@
 
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
-#include "common/protobuf/utility.h"
+
+#include "extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 
 #include "absl/container/node_hash_map.h"
 #include "jwt_verify_lib/check_audience.h"
@@ -23,14 +24,12 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-// Default cache expiration time in 5 minutes.
-constexpr int PubkeyCacheExpirationSec = 600;
-
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
-  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api,
-               ThreadLocal::SlotAllocator& tls)
-      : jwt_provider_(jwt_provider), time_source_(time_source), tls_(tls) {
+  JwksDataImpl(const JwtProvider& jwt_provider, Server::Configuration::FactoryContext& context,
+               CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
+      : jwt_provider_(jwt_provider), time_source_(context.timeSource()),
+        tls_(context.threadLocal()) {
 
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
@@ -40,7 +39,8 @@ public:
 
     tls_.set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
 
-    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true, api);
+    const auto inline_jwks =
+        Config::DataSource::read(jwt_provider_.local_jwks(), true, context.api());
     if (!inline_jwks.empty()) {
       auto jwks =
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);
@@ -48,7 +48,14 @@ public:
         ENVOY_LOG(warn, "Invalid inline jwks for issuer: {}, jwks: {}", jwt_provider_.issuer(),
                   inline_jwks);
       } else {
-        setJwksToAllThreads(std::move(jwks), std::chrono::steady_clock::time_point::max());
+        setJwksToAllThreads(std::move(jwks));
+      }
+    } else {
+      // enable remote jwks async fetch
+      if (jwt_provider_.has_remote_jwks() && jwt_provider_.remote_jwks().has_async_fetch()) {
+        async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
+            jwt_provider_.remote_jwks(), context, fetcher_cb, stats,
+            [this](google::jwt_verify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
       }
     }
   }
@@ -67,7 +74,8 @@ public:
     // convert unique_ptr to shared_ptr
     JwksConstSharedPtr shared_jwks(jwks.release());
     tls_->jwks_ = shared_jwks;
-    tls_->expire_ = getRemoteJwksExpirationTime();
+    tls_->expire_ = time_source_.monotonicTime() +
+                    JwksAsyncFetcher::getCacheDuration(jwt_provider_.remote_jwks());
     return shared_jwks.get();
   }
 
@@ -80,24 +88,12 @@ private:
   };
 
   // Set jwks shared_ptr to all threads.
-  void setJwksToAllThreads(JwksConstPtr&& jwks, std::chrono::steady_clock::time_point expire) {
+  void setJwksToAllThreads(JwksConstPtr&& jwks) {
     JwksConstSharedPtr shared_jwks(jwks.release());
-    tls_.runOnAllThreads([shared_jwks, expire](OptRef<ThreadLocalCache> obj) {
+    tls_.runOnAllThreads([shared_jwks](OptRef<ThreadLocalCache> obj) {
       obj->jwks_ = shared_jwks;
-      obj->expire_ = expire;
+      obj->expire_ = std::chrono::steady_clock::time_point::max();
     });
-  }
-
-  // Get the expiration time for a remote Jwks
-  std::chrono::steady_clock::time_point getRemoteJwksExpirationTime() const {
-    auto expire = time_source_.monotonicTime();
-    if (jwt_provider_.has_remote_jwks() && jwt_provider_.remote_jwks().has_cache_duration()) {
-      expire += std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(jwt_provider_.remote_jwks().cache_duration()));
-    } else {
-      expire += std::chrono::seconds(PubkeyCacheExpirationSec);
-    }
-    return expire;
   }
 
   // The jwt provider config.
@@ -108,6 +104,8 @@ private:
   TimeSource& time_source_;
   // the thread local slot for cache
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
+  // async fetcher
+  JwksAsyncFetcherPtr async_fetcher_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
@@ -115,11 +113,12 @@ using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source, Api::Api& api,
-                ThreadLocal::SlotAllocator& tls) {
+  JwksCacheImpl(const JwtAuthentication& config, Server::Configuration::FactoryContext& context,
+                CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats)
+      : stats_(stats) {
     for (const auto& it : config.providers()) {
       const auto& provider = it.second;
-      auto jwks_data = std::make_unique<JwksDataImpl>(provider, time_source, api, tls);
+      auto jwks_data = std::make_unique<JwksDataImpl>(provider, context, fetcher_fn, stats);
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
         issuer_ptr_map_.emplace(provider.issuer(), jwks_data.get());
       }
@@ -145,6 +144,8 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
+  JwtAuthnFilterStats& stats() override { return stats_; }
+
 private:
   JwksData* findIssuerMap(const std::string& issuer) {
     const auto& it = issuer_ptr_map_.find(issuer);
@@ -154,6 +155,8 @@ private:
     return it->second;
   }
 
+  // stats
+  JwtAuthnFilterStats& stats_;
   // The Jwks data map indexed by provider.
   absl::node_hash_map<std::string, JwksDataImplPtr> jwks_data_map_;
   // The Jwks data pointer map indexed by issuer.
@@ -164,8 +167,9 @@ private:
 
 JwksCachePtr
 JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-                  TimeSource& time_source, Api::Api& api, ThreadLocal::SlotAllocator& tls) {
-  return std::make_unique<JwksCacheImpl>(config, time_source, api, tls);
+                  Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
+                  JwtAuthnFilterStats& stats) {
+  return std::make_unique<JwksCacheImpl>(config, context, fetcher_fn, stats);
 }
 
 } // namespace JwtAuthn

@@ -232,6 +232,45 @@ message RemoteJwks {
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 5 minutes.
   google.protobuf.Duration cache_duration = 2;
+
+  // Fetch Jwks asynchronously in the main thread before the listener is activated.
+  // Fetched Jwks can be used by all worker threads. Refetch due to cache expiration
+  // is done in the main thread too. The request Jwt verification don't need to wait
+  // for Jwks fetching.
+  //
+  // If this feature is NOT enabled:
+  //
+  // * The Jwks is fetched when the requests come. During the fetching, these requests
+  //   will be paused until the Jwks is fetched.
+  // * Each worker thread needs to fetch its own remote Jwks since Jwks cache is per
+  //   worker thread.
+  //
+  // If this feature is enabled:
+  //
+  // * Fetched Jwks is done in the main thread and it can be used by all worker threads.
+  //   Each worker thread doesn't need to fetch its own.
+  // * Jwks is ready when the requests come, their Jwt can be verified right away, not
+  //   need to wait for the Jwks fetching.
+  //
+  JwksAsyncFetch async_fetch = 3;
+}
+
+// Fetch JWKS asynchronously in the main thread. When the filter config is processed
+// in the main thread, a call to fetch the remote Jwks is started.
+// The listerner is activated only after the Jwks is fetched.
+// When the Jwks cache is expired, the Jwks is refetched in the main thread too.
+// The fetched Jwks can be used by all worker threads.
+message JwksAsyncFetch {
+  // If true, the listener can be activated even when the initial fetch is still in progress.
+  // If false, the listener is activated only after the initial fetch is completed.
+  // Default is false.
+  // If the initial fetch is taking too long and the listener needs to be activated quickly
+  // in order to process incoming requests, set this to true.
+  bool activate_listener = 1;
+
+  // The number of retries when Jwks fetch failed with networking errors.
+  // Default is no retry.
+  uint32 network_fail_retries = 2;
 }
 
 // This message specifies a header location to extract JWT token.
@@ -449,7 +488,8 @@ message FilterStateRule {
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.
-  map<string, JwtRequirement> requires = 3;
+  map<string, JwtRequirement>
+  requires = 3;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
