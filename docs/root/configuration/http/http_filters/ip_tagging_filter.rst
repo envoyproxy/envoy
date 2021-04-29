@@ -26,6 +26,7 @@ IP tags can be either read as inline block or from a file on filesystem. Envoy w
 A sample filter configuration to read inline tags could be:
 
 .. code-block:: yaml
+
    http_filters
      - name: ip.tagging
        typed_config:
@@ -41,6 +42,7 @@ A sample filter configuration to read inline tags could be:
 Sample configuration to read tags from a file on filesystem:
 
 .. code-block:: yaml
+
    http_filters
      - name: ip.tagging
        typed_config:
@@ -51,6 +53,7 @@ Sample configuration to read tags from a file on filesystem:
 The content of the `yaml` file looks like:
 
 .. code-block:: yaml
+
   - ip_tag_name: tag1
     ip_tags:
       - address_prefix: 1.2.3.4

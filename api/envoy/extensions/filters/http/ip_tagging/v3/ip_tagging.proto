@@ -65,7 +65,7 @@ message IPTagging {
 
   // Specifies the path to the IP tags file from filesystem.
   string path = 5 [
-    (validate.rules).string = {min_bytes: 1},
+    (validate.rules).string = {min_len: 1},
     (udpa.annotations.field_migrate).oneof_promotion = "path_list_specifier"
   ];
 
