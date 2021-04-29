@@ -64,14 +64,16 @@ By default it will use TCP and ALPN to select the best available protocol of HTT
 
 .. _arch_overview_http3_upstream:
 
-If HTTP/3 is configured in the automatic pool, it will currently attempt an QUIC connection first,
-then 300ms later, attempt a TCP connection. Whichever handshake succeeds will be used for the initial
+If HTTP/3 is configured in the automatic pool it will currently attempt an QUIC connection first,
+then 300ms later, if a QUIC connection is not established, will also attempt to establish a TCP connection.
+Whichever handshake succeeds will be used for the initial
 stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
 
-Upcoming versions of HTTP/3 support will include only selecting HTTP/3 if the server advertises support
-via alt-svc headers, and "QUIC hints" where attempting QUIC but failing over can be hard-coded. This code
-path is alpha and rapidly undergoing improvements with the goal of having the default behavior result in
-optimal latency for internet environments, so please be patient and follow along with Envoy release notes
+Upcoming versions of HTTP/3 support will include only selecting HTTP/3 if the upstream advertises support
+either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_,
+`HTTPS DNS RR <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_, "QUIC hints" which
+will be manually configured. This path is alpha and rapidly undergoing improvements with the goal of having
+the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
 to stay aprised of the latest and greatest changes.
 
 

@@ -20,7 +20,7 @@ HTTP protocols
 --------------
 
 Envoy’s HTTP connection manager has native support for HTTP/1.1, WebSockets, HTTP/2 and HTTP/3. It does not support
-SPDY. Envoy’s HTTP support was designed to first and foremost be an HTTP/2+ multiplexing proxy.
+SPDY. Envoy’s HTTP support was designed to first and foremost be an HTTP/2 multiplexing proxy.
 Internally, HTTP/2 terminology is used to describe system components. For example, an HTTP request
 and response take place on a *stream*. A codec API is used to translate from different wire
 protocols into a protocol agnostic form for streams, requests, responses, etc. In the case of

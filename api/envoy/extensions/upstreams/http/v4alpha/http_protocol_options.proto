@@ -120,11 +120,10 @@ message HttpProtocolOptions {
     config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 
     // Unlike HTTP/1 and HTTP/2, HTTP/3 will not be configured unless it is
-    // present, and will eventually rely on server-side alt-svc advertisement to try HTTP/3.
-    // If HTTP/3 is configured via HTTP/3, and if the HTTP/3 connection fails (currently controlled by a
-    // hard-coded timeout) TCP (HTTP/1 or HTTP/2 based on ALPN) will be
-    // attempted as well.
-    // See :ref:`here <arch_overview_http3_upstream>` for more information.
+    // present, and (soon) only if there is an indication of server side
+    // support.
+    // See :ref:`here <arch_overview_http3_upstream>` for more information on
+    // when HTTP/3 will be used, and when Envoy will fail over to TCP.
     //
     // .. note::
     //   QUIC support is currently alpha and should be used with caution, and

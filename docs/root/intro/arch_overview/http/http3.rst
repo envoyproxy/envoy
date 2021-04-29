@@ -24,7 +24,7 @@ BPF is strongly advised. BPF docs `coming soon <https://github.com/envoyproxy/en
 HTTP3 upstream
 ===============
 
-HTTP/3 downstream support is still in Alpha, and should be used with caution.
+HTTP/3 upstream support is still in Alpha, and should be used with caution.
 Outstanding issues required for HTTP/3 to go GA can be found
 `here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
 
@@ -32,6 +32,7 @@ Envoy HTTP/3 support can be turned up by turning up HTTP/3 support in
 :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`,
 Either configuring HTTP/3 explicitly on, or using the auto_http option to use HTTP/3 if it is supported.
 
-See :ref:`here <arch_overview_http3_upstream>` for more information about HTTP/3 connection pooling.
+See :ref:`here <arch_overview_http3_upstream>` for more information about HTTP/3 connection pooling, including
+detailed information of where QUIC will be used, and how it fails over to TCP when QUIC use is configured to be optional.
 
 An example upstream HTTP/3 configuration file can be found :repo:`here </configs/google_com_http3_upstream_proxy.yaml`>.
