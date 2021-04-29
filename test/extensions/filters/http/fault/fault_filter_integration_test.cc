@@ -99,15 +99,15 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   EXPECT_EQ(1UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  Buffer::OwnedImpl data(std::string(127, 'a'));
+  Buffer::OwnedImpl data(std::string(102, 'a'));
   upstream_request_->encodeData(data, true);
 
   // Wait for a tick worth of data.
-  response->waitForBodyData(64);
+  response->waitForBodyData(51);
 
   // Wait for a tick worth of data and end stream.
-  simTime().advanceTimeWait(std::chrono::milliseconds(63));
-  response->waitForBodyData(127);
+  simTime().advanceTimeWait(std::chrono::milliseconds(50));
+  response->waitForBodyData(102);
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
@@ -338,15 +338,15 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   EXPECT_EQ(1UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  Buffer::OwnedImpl data(std::string(127, 'a'));
+  Buffer::OwnedImpl data(std::string(102, 'a'));
   upstream_request_->encodeData(data, false);
 
   // Wait for a tick worth of data.
-  response->waitForBodyData(64);
+  response->waitForBodyData(51);
 
   // Advance time and wait for a tick worth of data.
-  simTime().advanceTimeWait(std::chrono::milliseconds(63));
-  response->waitForBodyData(127);
+  simTime().advanceTimeWait(std::chrono::milliseconds(50));
+  response->waitForBodyData(102);
 
   // Send trailers and wait for end stream.
   Http::TestResponseTrailerMapImpl trailers{{"hello", "world"}};
@@ -368,17 +368,17 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  Buffer::OwnedImpl data(std::string(128, 'a'));
+  Buffer::OwnedImpl data(std::string(102, 'a'));
   upstream_request_->encodeData(data, false);
   Http::TestResponseTrailerMapImpl trailers{{"hello", "world"}};
   upstream_request_->encodeTrailers(trailers);
 
   // Wait for a tick worth of data.
-  response->waitForBodyData(64);
+  response->waitForBodyData(51);
 
   // Advance time and wait for a tick worth of data, trailers, and end stream.
-  simTime().advanceTimeWait(std::chrono::milliseconds(63));
-  response->waitForBodyData(128);
+  simTime().advanceTimeWait(std::chrono::milliseconds(50));
+  response->waitForBodyData(102);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_NE(nullptr, response->trailers());
 

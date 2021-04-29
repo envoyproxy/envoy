@@ -33,7 +33,8 @@ absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
-
+  // Do not include 32-byte per-entry overhead while counting header size.
+  FLAGS_quic_header_size_limit_includes_overhead->setValue(false);
   return flags;
 }
 

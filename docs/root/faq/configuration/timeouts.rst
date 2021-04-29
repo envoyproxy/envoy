@@ -19,7 +19,7 @@ Connection timeouts
 
 Connection timeouts apply to the entire HTTP connection and all streams the connection carries.
 
-* The HTTP protocol :ref:`idle timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
+* The HTTP protocol :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream
   cluster HTTP connections. The idle timeout is the time at which a downstream or upstream
   connection will be terminated if there are no active streams. The default idle timeout if not
