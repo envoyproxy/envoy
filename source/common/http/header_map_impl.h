@@ -482,15 +482,24 @@ public:
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
   absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
-    auto result = HeaderMap::GetResult(const_cast<RequestHeaderMapImpl*>(this)->getExisting(key));
+    return getTraceContext(LowerCaseString(key));
+  }
+
+  void setTraceContext(absl::string_view key, absl::string_view value) override {
+    Http::LowerCaseString low_case_key{key};
+    setCopy(low_case_key, value);
+  }
+
+  absl::optional<absl::string_view> getTraceContext(const LowerCaseString& key) const override {
+    auto result = get(key);
     if (!result.empty()) {
       return result[0]->value().getStringView();
     }
     return absl::nullopt;
   }
-  void setTraceContext(absl::string_view key, absl::string_view value) override {
-    Http::LowerCaseString low_case_key{key};
-    setCopy(low_case_key, value);
+
+  void setTraceContext(const LowerCaseString& key, absl::string_view value) override {
+    setReferenceKey(key, value);
   }
 
 protected:

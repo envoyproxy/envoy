@@ -105,6 +105,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_formatter_interface",
+        "//include/envoy/common:lower_case_string",
         "//include/envoy/tracing:trace_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
