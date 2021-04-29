@@ -193,7 +193,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
-// Request abort controlled via header configuration.
+// Request abort controlled via header configuration and enable downstream server tracing.
 TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableTracing) {
   initializeFilter(header_fault_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -218,7 +218,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableTracing) {
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.delays_injected"));
 }
 
-// Request abort controlled via header configuration.
+// Request abort controlled via header configuration and disable downstream server tracing.
 TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigDisableTracing) {
   initializeFilter(disable_tracing_fault_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
