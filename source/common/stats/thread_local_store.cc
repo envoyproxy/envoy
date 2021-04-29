@@ -204,7 +204,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
 
   // We can't call runOnAllThreads here as global threading has already been shutdown.
-  // It is okay to simply clear the scopes and central cache entires to cleanup. 
+  // It is okay to simply clear the scopes and central cache entires to cleanup.
   {
     Thread::LockGuard lock(lock_);
     scopes_to_cleanup_.clear();
@@ -280,8 +280,8 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
     // Switch to batching of clearing scopes. This greatly reduces the overhead when there are
-    // tens of thousands of scopes to clear in a short period. i.e.: VHDS updates with tens of thousands
-    // of VirtualHosts
+    // tens of thousands of scopes to clear in a short period. i.e.: VHDS updates with tens of
+    // thousands of VirtualHosts
     bool need_post = scopes_to_cleanup_.empty();
     scopes_to_cleanup_.push_back(scope->scope_id_);
     central_cache_entries_to_cleanup_.push_back(scope->central_cache_);

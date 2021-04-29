@@ -1783,7 +1783,6 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   store_->shutdownThreading();
 
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
-
 }
 
 } // namespace Stats
