@@ -70,11 +70,6 @@ private:
   // example if the DispatcherImpl::post is called by two threads, they race to
   // both set this to null.
   std::atomic<const ScopeTrackedObject*> object_{};
-
-  // Latched "envoy.reloadable_features.activate_timers_next_event_loop" runtime feature. If true,
-  // timers scheduled with a 0 time delta are evaluated in the next iteration of the event loop
-  // after polling and activating new fd events.
-  const bool activate_timers_next_event_loop_;
 };
 
 } // namespace Event

@@ -43,8 +43,6 @@ namespace Event {
 // The same mechanism implements both of these operations, so they are invoked as a group.
 // - Event::SchedulableCallback::scheduleCallbackCurrentIteration(). Each of these callbacks is
 // scheduled and invoked independently.
-// - Event::Timer::enableTimer(0) if "envoy.reloadable_features.activate_timers_next_event_loop"
-// runtime feature is disabled.
 //
 // Event::FileEvent::activate and Event::SchedulableCallback::scheduleCallbackNextIteration are
 // implemented as libevent timers with a deadline of 0. Both of these actions are moved to the work
