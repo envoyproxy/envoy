@@ -517,7 +517,9 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
 
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (local_reply_data.is_grpc_) {
-    // https://github.com/envoyproxy/envoy/issues/11079
+    // If configured, the localReply HTTP status code will be the one from the
+    // called service's response headers. Default 'OK' reflects successful
+    // gRPC call. https://github.com/envoyproxy/envoy/issues/11079
     if (!local_reply_data.retain_http_status_for_grpc) {
       response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     }

@@ -313,8 +313,8 @@ struct LocalReplyData {
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
   // Tells if this is a response to a HEAD request.
   bool is_head_request_ = false;
-  // Tells whether the localReply HTTP status code should reflect the called
-  // service's response.
+  // Tells whether the localReply HTTP status code for gRPC calls is taken from
+  // the called service's response headers.
   bool retain_http_status_for_grpc = false;
 };
 
