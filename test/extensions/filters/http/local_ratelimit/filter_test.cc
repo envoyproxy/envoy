@@ -39,7 +39,6 @@ request_headers_to_add_when_not_enforced:
     header:
       key: x-local-ratelimited
       value: 'true'
-local_rate_limit_per_downstream_connection: {}
   )";
 
 class FilterTest : public testing::Test {
@@ -158,11 +157,10 @@ TEST_F(FilterTest, RequestRateLimited) {
   auto request_headers = Http::TestRequestHeaderMapImpl();
   auto expected_headers = Http::TestRequestHeaderMapImpl();
 
-  EXPECT_EQ(request_headers, expected_headers);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_2_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(request_headers, expected_headers);
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
