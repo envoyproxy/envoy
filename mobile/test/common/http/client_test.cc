@@ -102,31 +102,33 @@ TEST_F(ClientTest, SetDestinationCluster) {
   // accept it. However, given we are just trying to test preferred network headers and using mocks
   // this is fine.
 
-  TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
+  TestRequestHeaderMapImpl headers1;
+  HttpTestUtility::addDefaultHeaders(headers1);
+  headers1.setScheme("https");
+  envoy_headers c_headers1 = Utility::toBridgeHeaders(headers1);
 
   preferred_network_.store(ENVOY_NET_GENERIC);
 
-  TestRequestHeaderMapImpl expected_headers{
-      {":scheme", "http"},
+  TestRequestHeaderMapImpl expected_headers1{
+      {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base"},
       {"x-forwarded-proto", "https"},
   };
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-  http_client_.sendHeaders(stream, c_headers, false);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers1), false));
+  http_client_.sendHeaders(stream, c_headers1, false);
 
   TestRequestHeaderMapImpl headers2;
   HttpTestUtility::addDefaultHeaders(headers2);
+  headers2.setScheme("https");
   envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
 
   preferred_network_.store(ENVOY_NET_WLAN);
 
   TestRequestHeaderMapImpl expected_headers2{
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
@@ -138,12 +140,13 @@ TEST_F(ClientTest, SetDestinationCluster) {
 
   TestRequestHeaderMapImpl headers3;
   HttpTestUtility::addDefaultHeaders(headers3);
+  headers3.setScheme("https");
   envoy_headers c_headers3 = Utility::toBridgeHeaders(headers3);
 
   preferred_network_.store(ENVOY_NET_WWAN);
 
   TestRequestHeaderMapImpl expected_headers3{
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
@@ -200,31 +203,33 @@ TEST_F(ClientTest, SetDestinationClusterUpstreamProtocol) {
   // accept it. However, given we are just trying to test preferred network headers and using mocks
   // this is fine.
 
-  TestRequestHeaderMapImpl headers{{"x-envoy-mobile-upstream-protocol", "http2"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
+  TestRequestHeaderMapImpl headers1{{"x-envoy-mobile-upstream-protocol", "http2"}};
+  HttpTestUtility::addDefaultHeaders(headers1);
+  headers1.setScheme("https");
+  envoy_headers c_headers1 = Utility::toBridgeHeaders(headers1);
 
   preferred_network_.store(ENVOY_NET_GENERIC);
 
-  TestResponseHeaderMapImpl expected_headers{
-      {":scheme", "http"},
+  TestResponseHeaderMapImpl expected_headers1{
+      {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base_h2"},
       {"x-forwarded-proto", "https"},
   };
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-  http_client_.sendHeaders(stream, c_headers, false);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers1), false));
+  http_client_.sendHeaders(stream, c_headers1, false);
 
   TestRequestHeaderMapImpl headers2{{"x-envoy-mobile-upstream-protocol", "http2"}};
   HttpTestUtility::addDefaultHeaders(headers2);
+  headers2.setScheme("https");
   envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
 
   preferred_network_.store(ENVOY_NET_WLAN);
 
   TestResponseHeaderMapImpl expected_headers2{
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
@@ -236,12 +241,13 @@ TEST_F(ClientTest, SetDestinationClusterUpstreamProtocol) {
 
   TestRequestHeaderMapImpl headers3{{"x-envoy-mobile-upstream-protocol", "http2"}};
   HttpTestUtility::addDefaultHeaders(headers3);
+  headers3.setScheme("https");
   envoy_headers c_headers3 = Utility::toBridgeHeaders(headers3);
 
   preferred_network_.store(ENVOY_NET_WWAN);
 
   TestResponseHeaderMapImpl expected_headers3{
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
@@ -254,12 +260,13 @@ TEST_F(ClientTest, SetDestinationClusterUpstreamProtocol) {
   // Setting http1.
   TestRequestHeaderMapImpl headers4{{"x-envoy-mobile-upstream-protocol", "http1"}};
   HttpTestUtility::addDefaultHeaders(headers4);
+  headers4.setScheme("https");
   envoy_headers c_headers4 = Utility::toBridgeHeaders(headers4);
 
   preferred_network_.store(ENVOY_NET_WWAN);
 
   TestResponseHeaderMapImpl expected_headers4{
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},

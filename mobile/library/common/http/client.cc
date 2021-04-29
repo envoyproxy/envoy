@@ -348,46 +348,56 @@ void Client::removeStream(envoy_stream_t stream_handle) {
 
 namespace {
 const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
-const std::string BaseCluster = "base";
-const std::string BaseWlanCluster = "base_wlan";
-const std::string BaseWwanCluster = "base_wwan";
 const LowerCaseString H2UpstreamHeader{"x-envoy-mobile-upstream-protocol"};
-const std::string H2Suffix = "_h2";
-const std::string BaseClusterH2 = BaseCluster + H2Suffix;
-const std::string BaseWlanClusterH2 = BaseWlanCluster + H2Suffix;
-const std::string BaseWwanClusterH2 = BaseWwanCluster + H2Suffix;
+
+const char* BaseClusters[] = {
+    "base",
+    "base_wlan",
+    "base_wwan",
+};
+const char* H2Clusters[] = {
+    "base_h2",
+    "base_wlan_h2",
+    "base_wwan_h2",
+};
+const char* ClearTextClusters[] = {
+    "base_clear",
+    "base_wlan_clear",
+    "base_wwan_clear",
+};
+
 } // namespace
 
-void Client::setDestinationCluster(HeaderMap& headers) {
+void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
+  // Determine upstream cluster:
+  // - Use TLS by default.
+  // - Use http/2 if requested explicitly via x-envoy-mobile-upstream-protocol.
+  // - Force http/1.1 if request scheme is http (cleartext).
+  const char* cluster{};
+  auto h2_header = headers.get(H2UpstreamHeader);
+  auto network = preferred_network_.load();
+  ASSERT(network >= 0 && network < 3, "preferred_network_ must be valid index into cluster array");
 
-  // Determine upstream protocol. Use http2 if selected for explicitly, otherwise (any other value,
-  // absence of value) select http1.
-  // TODO(junr03): once http3 is available this would probably benefit from some sort of struct that
-  // maps to appropriate cluster names. However, with only two options (http1/2) this suffices.
-  bool use_h2_cluster{};
-  auto get_result = headers.get(H2UpstreamHeader);
-  if (!get_result.empty()) {
-    ASSERT(get_result.size() == 1);
-    const auto value = get_result[0]->value().getStringView();
+  if (headers.getSchemeValue() == Headers::get().SchemeValues.Http) {
+    cluster = ClearTextClusters[network];
+  } else if (!h2_header.empty()) {
+    ASSERT(h2_header.size() == 1);
+    const auto value = h2_header[0]->value().getStringView();
     if (value == "http2") {
-      use_h2_cluster = true;
+      cluster = H2Clusters[network];
     } else {
-      ASSERT(value == "http1", fmt::format("using unsupported protocol version {}", value));
+      RELEASE_ASSERT(value == "http1", fmt::format("using unsupported protocol version {}", value));
+      cluster = BaseClusters[network];
     }
+  } else {
+    cluster = BaseClusters[network];
+  }
+
+  if (!h2_header.empty()) {
     headers.remove(H2UpstreamHeader);
   }
 
-  switch (preferred_network_.load()) {
-  case ENVOY_NET_WLAN:
-    headers.addReference(ClusterHeader, use_h2_cluster ? BaseWlanClusterH2 : BaseWlanCluster);
-    break;
-  case ENVOY_NET_WWAN:
-    headers.addReference(ClusterHeader, use_h2_cluster ? BaseWwanClusterH2 : BaseWwanCluster);
-    break;
-  case ENVOY_NET_GENERIC:
-  default:
-    headers.addReference(ClusterHeader, use_h2_cluster ? BaseClusterH2 : BaseCluster);
-  }
+  headers.addCopy(ClusterHeader, std::string{cluster});
 }
 
 } // namespace Http
