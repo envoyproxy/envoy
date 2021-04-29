@@ -113,11 +113,16 @@ void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
   Reset(envoyResetReasonToQuicRstError(reason));
 }
 
-void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
-  if (should_block) {
+void EnvoyQuicClientStream::switchStreamBlockState() {
+  // From when the callback got scheduled till now, readDisable() might have blocked and unblocked
+  // the stream multiple times, but those actions haven't taken any effect yet, and only the last
+  // state of read_disable_counter_ determines whether to unblock or block the quic stream. Unlike
+  // Envoy readDisable() the quic stream gets blocked/unblocked based on the most recent call. So a
+  // stream will be blocked upon SetBlockedUntilFlush() no matter how many times SetUnblocked() was
+  // called before, and vice versa.
+  if (read_disable_counter_ > 0) {
     sequencer()->SetBlockedUntilFlush();
   } else {
-    ASSERT(read_disable_counter_ == 0, "readDisable called in between.");
     sequencer()->SetUnblocked();
   }
 }
@@ -176,12 +181,9 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
 void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
-  ASSERT(read_disable_counter_ == 0);
-  ASSERT(!in_decode_data_callstack_);
   if (read_side_closed()) {
     return;
   }
-  in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
@@ -210,12 +212,6 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
-    in_decode_data_callstack_ = false;
-    if (read_disable_counter_ > 0) {
-      // If readDisable() was ever called during decodeData() and it meant to disable
-      // reading from downstream, the call must have been deferred. Call it now.
-      switchStreamBlockState(true);
-    }
     return;
   }
 
@@ -224,7 +220,6 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   maybeDecodeTrailers();
 
   OnFinRead();
-  in_decode_data_callstack_ = false;
 }
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,

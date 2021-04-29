@@ -16,11 +16,15 @@ Minor Behavior Changes
   (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
   ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
   (do not send 1xx or 204 responses with these headers). Both are true by default.
+* listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
+  defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+
 
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
 * http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
 * xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.

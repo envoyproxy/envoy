@@ -123,7 +123,6 @@ public:
         quic_config_, supported_versions_, std::move(connection), persistent_info.server_id_,
         persistent_info.crypto_config_.get(), &push_promise_index_, *dispatcher_,
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-    session->Initialize();
     return session;
   }
 
@@ -321,6 +320,7 @@ TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
+  config_helper_.addConfigModifier(setUpstreamTimeout);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024, /*response_size=*/1024,
                                        false);
