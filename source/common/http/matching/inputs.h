@@ -34,15 +34,18 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
     }
 
-    header_as_string_result_ = HeaderUtility::getAllOfHeaderAsString(header, ",");
+    auto header_string = HeaderUtility::getAllOfHeaderAsString(header, ",");
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            header_as_string_result_->result()};
+    if (header_string.result()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              std::string(header_string.result().value())};
+    }
+
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 
 private:
   const LowerCaseString name_;
-  absl::optional<HeaderUtility::GetAllOfHeaderAsStringResult> header_as_string_result_;
 };
 
 /**

@@ -183,7 +183,7 @@ struct DataInputGetResult {
   // which attempts to look a key up in the map: if we don't have access to the map yet, we return
   // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
   // map, we return absl::nullopt with AllDataAvailable.
-  absl::optional<absl::string_view> data_;
+  absl::optional<std::string> data_;
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
