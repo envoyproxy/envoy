@@ -1,0 +1,37 @@
+.. _arch_overview_http3:
+
+HTTP3 downstream
+================
+
+HTTP/3 downstream support is still in Alpha, and should be used with caution.
+Outstanding issues required for HTTP/3 to go GA can be found
+`here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
+
+Envoy HTTP/3 support can be turned up via adding
+:ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` and
+ensuring the downstream transport socket is a QuicDownstreamTransport.
+
+See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.template.yaml1>` for example configuration.
+
+Note that the example configuration includes both a TCP and a UDP listener, and the TCP
+listener is advertising http/3 support via alt-svc header. Advertising HTTP/3 is not necessary for
+in-house deployments where HTTP/3 is explicitly configured, but is needed for internet facing deployments
+where TCP is the default, and clients such as Chrome will only attempt HTTP/3 if it is explicitly advertised.
+
+By default the example configuration uses kernel UDP support, but for production performance, use of
+BPF is strongly advised. BPF docs `coming soon <https://github.com/envoyproxy/envoy/issues/15845>`_
+
+HTTP3 upstream
+===============
+
+HTTP/3 downstream support is still in Alpha, and should be used with caution.
+Outstanding issues required for HTTP/3 to go GA can be found
+`here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
+
+Envoy HTTP/3 support can be turned up by turning up HTTP/3 support in
+:ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`,
+Either configuring HTTP/3 explicitly on, or using the auto_http option to use HTTP/3 if it is supported.
+
+See :ref:`here <arch_overview_http3_upstream>` for more information about HTTP/3 connection pooling.
+
+An example upstream HTTP/3 configuration file can be found :repo:`here </configs/google_com_http3_upstream_proxy.yaml`>.

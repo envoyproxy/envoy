@@ -77,6 +77,9 @@ message HttpProtocolOptions {
 
       // .. note::
       //   QUIC support is currently alpha and should be used with caution.
+      //
+      //   See comments :ref:`here <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`
+      //   for details.
       config.core.v4alpha.Http3ProtocolOptions http3_protocol_options = 3;
     }
   }
@@ -93,6 +96,9 @@ message HttpProtocolOptions {
 
     // .. note::
     //   QUIC support is currently alpha and should be used with caution.
+    //
+    //   See comments :ref:`here <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`
+    //   for details.
     config.core.v4alpha.Http3ProtocolOptions http3_protocol_options = 3;
   }
 
@@ -113,11 +119,19 @@ message HttpProtocolOptions {
 
     config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 
-    // [#not-implemented-hide:]
     // Unlike HTTP/1 and HTTP/2, HTTP/3 will not be configured unless it is
-    // present. If HTTP/3 is present, attempts to connect will first be made
-    // via HTTP/3, and if the HTTP/3 connection fails, TCP (HTTP/1 or HTTP/2
-    // based on ALPN) will be used instead.
+    // present, and will eventually rely on server-side alt-svc advertisement to try HTTP/3.
+    // If HTTP/3 is configured via HTTP/3, and if the HTTP/3 connection fails (currently controlled by a
+    // hard-coded timeout) TCP (HTTP/1 or HTTP/2 based on ALPN) will be
+    // attempted as well.
+    // See :ref:`here <arch_overview_http3_upstream>` for more information.
+    //
+    // .. note::
+    //   QUIC support is currently alpha and should be used with caution, and
+    //   the auto config is undergoing especially rapid change.
+    //
+    //   See comments :ref:`here <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`
+    //   for details.
     config.core.v4alpha.Http3ProtocolOptions http3_protocol_options = 3;
   }
 

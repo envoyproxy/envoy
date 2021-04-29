@@ -62,6 +62,19 @@ For Envoy acting as a forward proxy, the preferred configuration is the
 `http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
 By default it will use TCP and ALPN to select the best available protocol of HTTP/2 and HTTP/1.1.
 
+.. _arch_overview_http3_upstream:
+
+If HTTP/3 is configured in the automatic pool, it will currently attempt an QUIC connection first,
+then 300ms later, attempt a TCP connection. Whichever handshake succeeds will be used for the initial
+stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
+
+Upcoming versions of HTTP/3 support will include only selecting HTTP/3 if the server advertises support
+via alt-svc headers, and "QUIC hints" where attempting QUIC but failing over can be hard-coded. This code
+path is alpha and rapidly undergoing improvements with the goal of having the default behavior result in
+optimal latency for internet environments, so please be patient and follow along with Envoy release notes
+to stay aprised of the latest and greatest changes.
+
+
 .. _arch_overview_conn_pool_how_many:
 
 Number of connection pools

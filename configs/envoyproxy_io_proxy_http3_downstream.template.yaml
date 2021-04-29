@@ -41,6 +41,10 @@ static_resources:
               name: local_route
               virtual_hosts:
               - name: local_service
+                response_headers_to_add:
+                  - header:
+                      key: alt-svc
+                      value: h3=":10000"; ma=86400, h3-29=":10000"; ma=86400
                 domains: ["*"]
                 routes:
                 - match:

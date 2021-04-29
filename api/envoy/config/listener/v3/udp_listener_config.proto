@@ -36,6 +36,15 @@ message UdpListenerConfig {
   //
   // .. note::
   //   QUIC support is currently alpha and should be used with caution.
+  //
+  //   For known outstanding issues before Envoy QUIC support is GA, you can
+  //   track https://github.com/envoyproxy/envoy/labels/quic-mvp for example
+  //   QUIC does not currently support in place filter chain updates, so users
+  //   requiring dynamic config reload for QUIC should wait until
+  //   https://github.com/envoyproxy/envoy/issues/13115 has been addressed.
+  //
+  //   For general feature requets beyond production readiness, you can track
+  //   https://github.com/envoyproxy/envoy/labels/area%2Fquic
   QuicProtocolOptions quic_options = 7;
 }
 
