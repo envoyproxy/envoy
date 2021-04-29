@@ -10,26 +10,6 @@
 namespace Envoy {
 namespace Http {
 namespace Http1 {
-namespace {
-ParserStatus intToStatus(int rc) {
-  // See
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
-  switch (rc) {
-  case -1:
-    return ParserStatus::Error;
-  case 0:
-    return ParserStatus::Success;
-  case 1:
-    return ParserStatus::NoBody;
-  case 2:
-    return ParserStatus::NoBodyData;
-  case 31:
-    return ParserStatus::Paused;
-  default:
-    return ParserStatus::Unknown;
-  }
-}
-} // namespace
 
 class LegacyHttpParserImpl::Impl {
 public:
@@ -160,7 +140,9 @@ void LegacyHttpParserImpl::resume() { impl_->resume(); }
 
 ParserStatus LegacyHttpParserImpl::pause() { return impl_->pause(); }
 
-ParserStatus LegacyHttpParserImpl::getStatus() { return intToStatus(impl_->getErrno()); }
+bool LegacyHttpParserImpl::isOk() { return impl_->getErrno() == HPE_OK; }
+
+bool LegacyHttpParserImpl::isPaused() { return impl_->getErrno() == HPE_PAUSED; }
 
 uint16_t LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 

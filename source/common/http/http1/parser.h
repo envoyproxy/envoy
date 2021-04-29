@@ -123,8 +123,11 @@ public:
   // Pauses the parser and returns a status indicating pause.
   virtual ParserStatus pause() PURE;
 
-  // Returns a parser status representing the errno value from the parser.
-  virtual ParserStatus getStatus() PURE;
+  // Checks if the parser status is OK.
+  virtual bool isOk() PURE;
+
+  // Check is the parser status is paused.
+  virtual bool isPaused() PURE;
 
   // Returns an integer representing the status code stored in the parser structure. For responses
   // only.

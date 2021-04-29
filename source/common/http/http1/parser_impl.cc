@@ -10,26 +10,6 @@
 namespace Envoy {
 namespace Http {
 namespace Http1 {
-namespace {
-ParserStatus intToStatus(int rc) {
-  // See
-  // https://github.com/nodejs/llhttp/blob/a620012f3fd1b64ace16d31c52cd57b97ee7174c/src/native/api.h#L29-L36
-  switch (rc) {
-  case HPE_USER:
-    return ParserStatus::Error;
-  case HPE_OK:
-    return ParserStatus::Success;
-  case 1:
-    return ParserStatus::NoBody;
-  case 2:
-    return ParserStatus::NoBodyData;
-  case HPE_PAUSED:
-    return ParserStatus::Paused;
-  default:
-    return ParserStatus::Unknown;
-  }
-}
-} // namespace
 
 class HttpParserImpl::Impl {
 public:
@@ -179,7 +159,9 @@ void HttpParserImpl::resume() { impl_->resume(); }
 
 ParserStatus HttpParserImpl::pause() { return impl_->pause(); }
 
-ParserStatus HttpParserImpl::getStatus() { return intToStatus(impl_->getErrno()); }
+bool HttpParserImpl::isOk() { return impl_->getErrno() == HPE_OK; }
+
+bool HttpParserImpl::isPaused() { return impl_->getErrno() == HPE_PAUSED; }
 
 uint16_t HttpParserImpl::statusCode() const { return impl_->statusCode(); }
 

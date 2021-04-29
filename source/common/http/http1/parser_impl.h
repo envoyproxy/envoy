@@ -17,7 +17,8 @@ public:
   RcVal execute(const char* data, int len) override;
   void resume() override;
   ParserStatus pause() override;
-  ParserStatus getStatus() override;
+  bool isOk() override;
+  bool isPaused() override;
   uint16_t statusCode() const override;
   int httpMajor() const override;
   int httpMinor() const override;
