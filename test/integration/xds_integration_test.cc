@@ -604,8 +604,8 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest,
       });
   new_config_helper.setLds("1");
 
-  // 2. Remove the tcp listener. At some extreme cases this removal will be stacked with the the
-  // previous update in the same timer expiration cycle.
+  // 2. Remove the tcp listener immediately. We are emulating the case that listener removal is
+  // stacked with the previous update in the same timer expiration cycle.
   ConfigHelper new_config_helper1(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper1.addConfigModifier(
