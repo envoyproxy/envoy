@@ -114,7 +114,7 @@ ip_tags:
       - {address_prefix: 1.2.3.4, prefix_len: 32}
 )EOF";
   EXPECT_CALL(*watcher_ptr_, addWatch("/my/awesome/", _, _));
-  EXPECT_CALL(factory_context, api()).Times(1);
+  EXPECT_CALL(factory_context, api());
   EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher_));
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce([this]() -> Filesystem::Watcher* {
     return watcher_ptr_.release();
@@ -134,8 +134,8 @@ ip_tags:
   EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
       .WillOnce(ReturnRef(remote_address));
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit")).Times(1);
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(1);
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
