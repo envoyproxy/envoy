@@ -414,7 +414,6 @@ protected:
   ::Envoy::Buffer::Instance* network_upstream_data_buffer_{};
 
   // HTTP filter state.
-  bool http_request_started_ = false; // When decodeHeaders() is called the request is "started".
   Http::RequestHeaderMap* request_headers_{};
   Http::ResponseHeaderMap* response_headers_{};
   ::Envoy::Buffer::Instance* request_body_buffer_{};

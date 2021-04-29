@@ -79,6 +79,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
+        "//source/server:active_listener_base",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
