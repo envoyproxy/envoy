@@ -507,26 +507,26 @@ class FormatChecker:
     # simple check that all flags between "Begin alphabetically sorted section."
     # and the end of the struct are in order (except the ones that already aren't)
     def check_runtime_flags(self, file_path, error_messages):
-      in_flag_block = False
-      previous_flag = "";
-      for line_number, line in enumerate(self.read_lines(file_path)):
-        if "Begin alphabetically" in line:
-          in_flag_block = True
-          continue;
-        if not in_flag_block:
-          continue;
-        if "}" in line:
-          break;
+        in_flag_block = False
+        previous_flag = ""
+        for line_number, line in enumerate(self.read_lines(file_path)):
+            if "Begin alphabetically" in line:
+                in_flag_block = True
+                continue
+            if not in_flag_block:
+                continue
+            if "}" in line:
+                break
 
-        match = FLAG_REGEX.match(line)
-        if not match:
-          error_messages.append("%s does not look like a reloadable flag" % line)
-          break;
+            match = FLAG_REGEX.match(line)
+            if not match:
+                error_messages.append("%s does not look like a reloadable flag" % line)
+                break
 
-        if previous_flag:
-          if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
-            error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
-        previous_flag = line;
+            if previous_flag:
+                if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
+                    error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
+            previous_flag = line
 
     def check_current_release_notes(self, file_path, error_messages):
         first_word_of_prior_line = ''
@@ -615,8 +615,8 @@ class FormatChecker:
             # notes have a different format.
             self.check_current_release_notes(file_path, error_messages)
         if file_path.endswith("source/common/runtime/runtime_features.cc"):
-          # Do runtime alphabetical order checks.
-          self.check_runtime_flags(file_path, error_messages)
+            # Do runtime alphabetical order checks.
+            self.check_runtime_flags(file_path, error_messages)
 
         def check_format_errors(line, line_number):
 
