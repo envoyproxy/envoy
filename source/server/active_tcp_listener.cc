@@ -69,7 +69,8 @@ ActiveTcpListener::~ActiveTcpListener() {
   // for now. If it becomes a problem (developers hitting this assert when using debug builds) we
   // can revisit. This case, if it happens, should be benign on production builds. This case is
   // covered in ConnectionHandlerTest::RemoveListenerDuringRebalance.
-  ASSERT(num_listener_connections_ == 0);
+  ASSERT(num_listener_connections_ == 0, fmt::format("destroyed listener {} has {} connections",
+                                                     config_->name(), numConnections()));
 }
 
 void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
@@ -188,14 +189,12 @@ void ActiveTcpSocket::newConnection() {
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
-    // prevent further redirection as well as 'rebalanced' as true since the connection has
-    // already been balanced if applicable inside onAcceptWorker() when the connection was
-    // initially accepted. Note also that we must account for the number of connections properly
-    // across both listeners.
+    // prevent further redirection.
+    // Leave the new listener to decide whether to execute re-balance.
+    // Note also that we must account for the number of connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
-    new_listener.value().get().incNumConnections();
-    new_listener.value().get().onAcceptWorker(std::move(socket_), false, true);
+    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
   } else {
     // Set default transport protocol if none of the listener filters did it.
     if (socket_->detectedTransportProtocol().empty()) {
@@ -250,7 +249,7 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
   auto active_socket = std::make_unique<ActiveTcpSocket>(*this, std::move(socket),
                                                          hand_off_restored_destination_connections);
 
-  // Create and run the filters
+  // Create and run the filters.
   config_->filterChainFactory().createListenerFilterChain(*active_socket);
   active_socket->continueFilterChain(true);
 
