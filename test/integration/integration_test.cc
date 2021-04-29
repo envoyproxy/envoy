@@ -1920,10 +1920,8 @@ TEST_P(IntegrationTest, Preconnect) {
   }
 
   for (auto& connection : fake_connections) {
-    AssertionResult result = connection->close();
-    RELEASE_ASSERT(result, result.message());
-    result = connection->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
+    ASSERT_TRUE(connection->close());
+    ASSERT_TRUE(connection->waitForDisconnect());
     connection.reset();
   }
 }
