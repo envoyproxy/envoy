@@ -54,8 +54,10 @@ message IPTagging {
   }
 
   // Specifies the content of the IP tag file
+  //
+  // Allow the file to be created with no IP tags.
   message IPTagFile {
-    repeated IPTag ip_tags = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated IPTag ip_tags = 1;
   }
 
   // The type of request the filter should apply to.
@@ -63,7 +65,7 @@ message IPTagging {
 
   // Specifies the path to the IP tags file from filesystem.
   string path = 5 [
-    (validate.rules).string = {min_bytes: 1},
+    (validate.rules).string = {min_len: 1},
     (udpa.annotations.field_migrate).oneof_promotion = "path_list_specifier"
   ];
 
