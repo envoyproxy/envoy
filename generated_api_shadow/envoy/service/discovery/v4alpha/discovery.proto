@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.discovery.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/service/discovery/v4alpha/cache_keys.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -20,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.DiscoveryRequest";
@@ -63,6 +64,11 @@ message DiscoveryRequest {
   // internal exception related to the failure. It is only intended for consumption during manual
   // debugging, the string provided is not guaranteed to be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
+
+  // Constraints on the set of cache keys for resources of type *type_url*.
+  // Populated only on the first request for a given resource type and
+  // when the constraints change.
+  repeated CacheKeyConstraints cache_key_constraints = 7;
 }
 
 // [#next-free-field: 7]
@@ -142,7 +148,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.DeltaDiscoveryRequest";
@@ -202,6 +208,11 @@ message DeltaDiscoveryRequest {
   // failed to update configuration. The *message* field in *error_details*
   // provides the Envoy internal exception related to the failure.
   google.rpc.Status error_detail = 7;
+
+  // Constraints on the set of cache keys for resources of type *type_url*.
+  // Populated only on the first request for a given resource type and
+  // when the constraints change.
+  repeated CacheKeyConstraints cache_key_constraints = 8;
 }
 
 // [#next-free-field: 8]
@@ -250,6 +261,9 @@ message Resource {
     // Note that this does not apply to clients other than xDS proxies, which must cache resources
     // for their own use, regardless of the value of this field.
     bool do_not_cache = 1;
+
+    // Cache keys associated with this resource, to be used by caching xDS proxies.
+    map<string, string> cache_keys = 2;
   }
 
   // The resource's name, to distinguish it from others of the same type of resource.
