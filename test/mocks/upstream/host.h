@@ -193,7 +193,7 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(MonotonicTime, creationTime, (), (const));
-  MOCK_METHOD(void, addReadyCb, (std::function<void()>, const envoy::config::core::v3::Metadata*),
+  MOCK_METHOD(void, addHealthCheckingReadyCb, (std::function<void()>, const envoy::config::core::v3::Metadata*),
               (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;

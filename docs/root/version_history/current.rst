@@ -19,13 +19,11 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* active health checks: health checks using a TLS transport socket and secrets delivered via :ref:`SDS <config_secret_discovery_service>` will now wait until secrets are loaded before the first health check attempt. This should improve startup times by not having to wait for the :ref:`no_traffic_interval <envoy_v3_api_field_config.core.v3.HealthCheck.no_traffic_interval>` until the next attempt.
 * http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
 * xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.
 * zipkin: fix timestamp serializaiton in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
-* active health checks: health checks using a TLS transport socket and secrets delivered via :ref:`SDS <config_secret_discovery_service>` will now wait until secrets are loaded before the first health check attempt. This should improve startup times by not having to wait for the :ref:`no_traffic_interval <envoy_v3_api_field_config.core.v3.HealthCheck.no_traffic_interval>` until the next attempt.
-
-* http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
 
 Removed Config or Runtime
 -------------------------
