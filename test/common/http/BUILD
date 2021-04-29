@@ -441,6 +441,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http3_status_tracker_test",
+    srcs = ["http3_status_tracker_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:http3_status_tracker",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "alternate_protocols_test",
     srcs = ["alternate_protocols_test.cc"],
     deps = [

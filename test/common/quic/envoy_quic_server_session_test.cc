@@ -55,28 +55,6 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
-class TestEnvoyQuicServerConnection : public EnvoyQuicServerConnection {
-public:
-  TestEnvoyQuicServerConnection(quic::QuicConnectionHelperInterface& helper,
-                                quic::QuicAlarmFactory& alarm_factory,
-                                quic::QuicPacketWriter& writer,
-                                const quic::ParsedQuicVersionVector& supported_versions,
-                                Network::Socket& listen_socket)
-      : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
-                                  quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
-                                  quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
-                                  helper, alarm_factory, &writer, /*owns_writer=*/false,
-                                  supported_versions, listen_socket) {}
-
-  Network::Connection::ConnectionStats& connectionStats() const {
-    return EnvoyQuicConnection::connectionStats();
-  }
-
-  MOCK_METHOD(void, SendConnectionClosePacket,
-              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
-  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
-};
-
 // Derive to have simpler priority mechanism.
 class TestEnvoyQuicServerSession : public EnvoyQuicServerSession {
 public:
@@ -154,16 +132,15 @@ public:
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
-        quic_connection_(new TestEnvoyQuicServerConnection(
+        quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
+                            std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
-                            listener_config_),
+                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -270,7 +247,7 @@ protected:
   quic::ParsedQuicVersionVector quic_version_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  TestEnvoyQuicServerConnection* quic_connection_;
+  MockEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
@@ -800,29 +777,8 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
   http_connection_->goAway();
 }
 
-TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
-  read_filter_ = std::make_shared<Network::MockReadFilter>();
-  Network::MockFilterChain filter_chain;
-  crypto_stream_->setProofSourceDetails(
-      std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain));
-  std::vector<Network::FilterFactoryCb> filter_factory{[this](
-                                                           Network::FilterManager& filter_manager) {
-    filter_manager.addReadFilter(read_filter_);
-    read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
-    read_filter_->callbacks_->connection().setConnectionStats(
-        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
-  }};
-  EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
-  EXPECT_CALL(*read_filter_, onNewConnection())
-      // Stop iteration to avoid calling getRead/WriteBuffer().
-      .WillOnce(Return(Network::FilterStatus::StopIteration));
-  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const std::vector<Network::FilterFactoryCb>& filter_factories) {
-        EXPECT_EQ(1u, filter_factories.size());
-        Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
-        return true;
-      }));
+TEST_P(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
+  installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
   if (!quic_version_[0].UsesTls()) {
     envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);

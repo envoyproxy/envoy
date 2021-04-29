@@ -590,6 +590,7 @@ void FakeUpstream::threadRoutine() {
   {
     absl::MutexLock lock(&lock_);
     new_connections_.clear();
+    quic_connections_.clear();
     consumed_connections_.clear();
   }
 }
