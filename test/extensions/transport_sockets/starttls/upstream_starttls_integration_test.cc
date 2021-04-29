@@ -146,6 +146,7 @@ Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool 
 void StartTlsSwitchFilter::upstreamWrite(Buffer::Instance& buf, bool end_stream) {
   const std::string message = buf.toString();
   if (message == "switch") {
+    // Start the upstream secure transport immiediately since we clearly have all the bytes
     ASSERT_TRUE(upstream_connection_->startSecureTransport());
     read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "switch" has been sent.
@@ -342,10 +343,10 @@ void StartTlsIntegrationTest::addStartTlsSwitchFilter(ConfigHelper& config_helpe
 
 // Test creates a clear-text connection from a client to Envoy and sends several messages.
 // Then a special message is sent, which causes StartTlsSwitchFilter to
-// instruct StartTls transport socket to start using tls.
-// The Client connection starts using tls, performs tls handshake and few messages
-// are sent over tls. start-tls transport socket de-crypts the messages and forwards them
-// upstream in clear-text..
+// instruct StartTls transport socket to start using tls for both the upstream and
+// downstream. Connections. The Client connection starts using tls, performs tls handshake
+// and a message is sent over tls. start-tls transport socket de-crypts the messages and
+// forwards them upstream over yet another start-tls transport.
 TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   initialize();
 
@@ -361,8 +362,8 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   // Send a message to switch to tls on the receiver side.
   // StartTlsSwitchFilter will switch transport socket on the
-  // receiver side upon receiving "switch" message and forward
-  // back the message "switch".
+  // upstream side upon receiving "switch" message and forward
+  // back the message "switch" to this client.
   payload_reader_->set_data_to_wait_for("switch");
   Buffer::OwnedImpl buffer;
   buffer.add("usetls");
@@ -387,7 +388,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  // // Send few messages over encrypted connection.
+  // // Send few messages over the encrypted connection.
   buffer.add("hola");
   conn_->write(buffer, false);
   while (client_write_buffer_->bytesDrained() != 10) {

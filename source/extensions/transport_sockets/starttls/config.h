@@ -18,11 +18,6 @@ class BaseStartTlsSocketFactory : public ConfigFactory {
 public:
   std::string name() const override { return TransportSocketNames::get().StartTls; }
 
-  const ConfigMessage& castConfig(const Protobuf::Message& message,
-                                  ProtobufMessage::ValidationVisitor& validator) {
-    return MessageUtil::downcastAndValidate<const ConfigMessage&>(message, validator);
-  }
-
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ConfigMessage>();
   }

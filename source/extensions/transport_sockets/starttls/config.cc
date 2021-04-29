@@ -10,7 +10,9 @@ namespace StartTls {
 Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
-  const auto& outer_config = castConfig(message, context.messageValidationVisitor());
+  const auto& outer_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&>(
+      message, context.messageValidationVisitor());
 
   auto& raw_socket_config_factory = rawSocketConfigFactory();
   auto& tls_socket_config_factory = tlsSocketConfigFactory();
@@ -31,7 +33,9 @@ Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTranspor
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
 
-  const auto& outer_config = castConfig(message, context.messageValidationVisitor());
+  const auto& outer_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig&>(
+      message, context.messageValidationVisitor());
   auto& raw_socket_config_factory = rawSocketConfigFactory();
   auto& tls_socket_config_factory = tlsSocketConfigFactory();
 
