@@ -785,6 +785,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
+      std::cerr << "***Adding weight " << hostWeight(*host) << "for host "
+                << host->address()->asString() << std::endl;
       scheduler.edf_->add(hostWeight(*host), host);
     }
 

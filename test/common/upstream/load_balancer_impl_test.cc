@@ -1533,14 +1533,14 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   hosts_in_slow_start =
       EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
 
-  // host2 is 20 secs in slow start, the weight is scaled with time factor 20 / 60 == 0.33
+  // host2 is 20 secs in slow start, the weight is scaled with time factor 20 / 60 == 0.33.
   simTime().advanceTimeWait(std::chrono::seconds(20));
 
   // Recalculate weights.
   hostSet().runCallbacks(empty, empty);
 
   // We expect 5:1 ratio, as host2 is in slow start mode and it's weight is scaled with
-  // 0.5*0.33==0.16 factor
+  // 0.5*0.33==0.16 factor.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -1548,36 +1548,41 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
-  // host2 is 40 secs in slow start, the weight is scaled with time factor 40 / 60 == 0.66
+  // host2 is 40 secs in slow start, the weight is scaled with time factor 40 / 60 == 0.66.
   simTime().advanceTimeWait(std::chrono::seconds(20));
 
   // Recalculate weights.
   hostSet().runCallbacks(empty, empty);
 
   // We expect 2:1 ratio, as host2 is in slow start mode and it's weight is scaled with
-  // 0.5*0.66==0.33 factor
+  // 0.5*0.66==0.33 factor.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
-  // host2 is 50 secs in slow start, the weight is scaled with time factor 55 / 60 == 0.91
+  // host2 is 50 secs in slow start, the weight is scaled with time factor 55 / 60 == 0.91.
   simTime().advanceTimeWait(std::chrono::seconds(20));
 
   // Recalculate weights.
   hostSet().runCallbacks(empty, empty);
 
   // We expect 2:1 ratio, as host2 is in slow start mode and it's weight is scaled with
-  // 0.5*0.83==0.45 factor
+  // 0.5*0.83==0.45 factor.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
-  // Adwance time, so that there are no hosts in slow start.
+  // Advance time, so that there are no hosts in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(11));
 
   // Recalculate weights.
   hostSet().runCallbacks(empty, empty);
+
+  hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+
+  EXPECT_EQ(0, hosts_in_slow_start->size());
 
   // Now expect 1:1 ratio.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -1586,123 +1591,228 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
-// TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
-//   // Set slow start window to 10 seconds.
-//   common_config_.mutable_slow_start_config()->set_slow_start_window(10);
-//   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
-//   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
-//   simTime().advanceTimeWait(std::chrono::seconds(1));
-//   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
-//   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
+  // Set slow start window to 10 seconds.
+  common_config_.mutable_slow_start_config()->set_slow_start_window(10);
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
+  host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
 
-//   host_set_.hosts_ = {host1};
+  host_set_.hosts_ = {host1};
 
-//   init(true);
+  init(true);
 
-//   HostVector empty;
-//   HostVector hosts_added;
-//   hosts_added.push_back(host1);
-//   simTime().advanceTimeWait(std::chrono::seconds(1));
-//   hostSet().runCallbacks(hosts_added, empty);
-//   auto hosts_in_slow_start =
-//       EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+  HostVector empty;
+  HostVector hosts_added;
+  hosts_added.push_back(host1);
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  hostSet().runCallbacks(hosts_added, empty);
+  auto hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
 
-//   EXPECT_EQ(0, hosts_in_slow_start->size());
+  EXPECT_EQ(0, hosts_in_slow_start->size());
 
-//   simTime().advanceTimeWait(std::chrono::seconds(5));
+  simTime().advanceTimeWait(std::chrono::seconds(5));
 
-//   hosts_added.clear();
-//   auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
-//   hosts_added.push_back(host2);
+  hosts_added.clear();
+  auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
+  hosts_added.push_back(host2);
 
-//   hostSet().hosts_ = {host1, host2};
-//   hostSet().runCallbacks(hosts_added, empty);
+  hostSet().hosts_ = {host1, host2};
+  hostSet().runCallbacks(hosts_added, empty);
 
-//   // As host has not passed first HC, it should not enter slow start mode.
-//   EXPECT_EQ(1, hosts_in_slow_start->size());
+  // As host1 has not passed first HC, it should not enter slow start mode.
+  EXPECT_EQ(1, hosts_in_slow_start->size());
 
-//   simTime().advanceTimeWait(std::chrono::seconds(1));
-//   host1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-//   hostSet().healthy_hosts_ = {host1, host2};
-//   // Trigger callbacks to add host1 to slow start mode.
-//   hostSet().runCallbacks({}, {});
-//   EXPECT_EQ(2, hosts_in_slow_start->size());
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  host1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hostSet().healthy_hosts_ = {host1, host2};
+  // Trigger callbacks to add host1 to slow start mode.
+  hostSet().runCallbacks({}, {});
+  // Host1 is 7 seconds in slow start, host2 is 1 second in slow start.
+  EXPECT_EQ(2, hosts_in_slow_start->size());
 
-//   simTime().advanceTimeWait(std::chrono::seconds(1));
-//   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-//   // Trigger callbacks to remove host1 from slow start mode.
-//   hostSet().runCallbacks({}, {});
-//   EXPECT_EQ(1, hosts_in_slow_start->size());
-//   simTime().advanceTimeWait(std::chrono::seconds(4));
-//   // Trigger callbacks to remove host1 from slow start mode.
-//   hostSet().runCallbacks({}, {});
-//   EXPECT_EQ(1, hosts_in_slow_start->size());
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  // Trigger callbacks to remove host1 from slow start mode.
+  hostSet().runCallbacks({}, {});
+  // Host2 is 2 seconds in slow start.
+  EXPECT_EQ(1, hosts_in_slow_start->size());
+  simTime().advanceTimeWait(std::chrono::seconds(4));
+  // Trigger callbacks to remove host1 from slow start mode.
+  hostSet().runCallbacks({}, {});
+  // Host2 is 6 seconds in slow start.
+  EXPECT_EQ(1, hosts_in_slow_start->size());
 
-//   // We expect 3:1 ratio, as host2 is in slow start mode and should get half less traffic than
-//   // usual.
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  // We expect 3:1 ratio, as host2 is in slow start mode, its weight is scaled with time factor 6 /
+  // 10 == 0.6.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
-//   // Advance time, so there are no hosts in slow start.
-//   simTime().advanceTimeWait(std::chrono::seconds(20));
-//   hostSet().runCallbacks({}, {});
-//   EXPECT_EQ(0, hosts_in_slow_start->size());
+  // Advance time, so there are no hosts in slow start.
+  simTime().advanceTimeWait(std::chrono::seconds(20));
+  hostSet().runCallbacks({}, {});
+  EXPECT_EQ(0, hosts_in_slow_start->size());
 
-//   // We expect 1:1 ratio, as there are no hosts in slow start mode.
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-// }
+  // We expect 1:1 ratio, as there are no hosts in slow start mode.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
 
-// TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBias) {
-//   // Set slow start window to 10 seconds.
-//   common_config_.mutable_slow_start_config()->set_slow_start_window(10);
-//   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
-//   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(1);
+TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBiasAndAggression) {
+  // Set slow start window to 10 seconds.
+  common_config_.mutable_slow_start_config()->set_slow_start_window(10);
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
+  common_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
+  common_config_.mutable_slow_start_config()->mutable_aggression()->set_default_value(1.0);
 
-//   init(true);
+  init(true);
+  EXPECT_CALL(runtime_.snapshot_, getDouble("time_bias", 0.5)).WillRepeatedly(Return(0.5));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("aggression", 1.0)).WillRepeatedly(Return(1.0));
 
-//   EXPECT_CALL(runtime_.snapshot_, getDouble("time_bias", 1.0)).WillRepeatedly(Return(0.5));
+  simTime().advanceTimeWait(std::chrono::seconds(1));
 
-//   simTime().advanceTimeWait(std::chrono::seconds(1));
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:100", simTime(), 1)};
 
-//   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
-//                               makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-//                               makeTestHost(info_, "tcp://127.0.0.1:100", simTime(), 1)};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {});
+  const auto hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_EQ(3, hosts_in_slow_start->size());
 
-//   hostSet().hosts_ = hostSet().healthy_hosts_;
-//   hostSet().runCallbacks({}, {});
-//   const auto hosts_in_slow_start =
-//       EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
-//   EXPECT_EQ(3, hosts_in_slow_start->size());
+  simTime().advanceTimeWait(std::chrono::seconds(5));
+  hostSet().healthy_hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hostSet().runCallbacks({}, {});
 
-//   simTime().advanceTimeWait(std::chrono::seconds(1));
-//   hostSet().healthy_hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-//   hostSet().runCallbacks({}, {});
+  // Host2 and host3 are 5 seconds in slow start.
+  EXPECT_EQ(2, hosts_in_slow_start->size());
 
-//   EXPECT_EQ(2, hosts_in_slow_start->size());
+  // We should see 3:1:1 ratio, as hosts 2 and 3 are in slow start, their weights are scaled with
+  // 0.5*0.5==0.25 factor.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 
-//   // We should see 3:1:1 ratio, as 2 out of 3 hosts are in slow start with 0.5 time bias.
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("time_bias", 0.5)).WillRepeatedly(Return(1.0));
+  simTime().advanceTimeWait(std::chrono::seconds(4));
+  hostSet().runCallbacks({}, {}); // recompute edf schedulers
+  // We should see 1:1:1 ratio with time bias set to 1.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+}
 
-//   EXPECT_CALL(runtime_.snapshot_, getDouble("time_bias", 1.0)).WillRepeatedly(Return(1));
-//   simTime().advanceTimeWait(std::chrono::seconds(1));
-//   hostSet().runCallbacks({}, {}); // recompute edf schedulers
-//   // We should see 1:1:1 ratio with time bias set to 1.
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-//   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-// }
+TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
+  // Set slow start window to 60 seconds.
+  common_config_.mutable_slow_start_config()->set_slow_start_window(60);
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
+  common_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
+  common_config_.mutable_slow_start_config()->mutable_aggression()->set_default_value(3.0);
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
+  host_set_.hosts_ = {host1};
+
+  init(true);
+
+  // As no healthcheck is configured, hosts would enter slow start immediately.
+  HostVector empty;
+  HostVector hosts_added;
+  hosts_added.push_back(host1);
+  simTime().advanceTimeWait(std::chrono::seconds(5));
+  hostSet().runCallbacks(hosts_added, empty);
+  auto hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+
+  EXPECT_EQ(1, hosts_in_slow_start->size());
+
+  // Advance time, so that host is no longer in slow start.
+  simTime().advanceTimeWait(std::chrono::seconds(56));
+
+  hosts_added.clear();
+  auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
+
+  hosts_added.push_back(host2);
+
+  hostSet().healthy_hosts_ = {host1, host2};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks(hosts_added, empty);
+
+  hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+
+  EXPECT_EQ(1, hosts_in_slow_start->size());
+
+  // host2 is 20 secs in slow start, the weight is scaled with time factor 20 / 60 == 0.33.
+  simTime().advanceTimeWait(std::chrono::seconds(20));
+
+  // Recalculate weights.
+  hostSet().runCallbacks(empty, empty);
+
+  // // We expect 2:1 ratio, as host2 is 20 secs in slow start mode and it's weight is scaled with
+  // // pow(0.33, 0.33)*0.5==0.34 factor.
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+
+  // // host2 is 40 secs in slow start.
+  // simTime().advanceTimeWait(std::chrono::seconds(20));
+
+  // // Recalculate weights.
+  // hostSet().runCallbacks(empty, empty);
+
+  // // We still expect 2:1 ratio, as host2 is in slow start mode and it's weight is scaled with
+  // // pow(0.66, 0.33)*0.5==0.87 factor.
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+
+  // // host2 is 60 secs in slow start, and it's weight is scaled with
+  // // pow(1, 0.33)*0.5==0.5 factor.
+  // simTime().advanceTimeWait(std::chrono::seconds(20));
+
+  // // Recalculate weights.
+  // hostSet().runCallbacks(empty, empty);
+
+  // // We expect 2:1 ratio.
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  // // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // // EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+
+  // // Advance time, so that there are no hosts in slow start.
+  // simTime().advanceTimeWait(std::chrono::seconds(11));
+
+  // // Recalculate weights.
+  // hostSet().runCallbacks(empty, empty);
+
+  // hosts_in_slow_start =
+  //     EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+
+  // EXPECT_EQ(0, hosts_in_slow_start->size());
+
+  // // Now expect 1:1 ratio.
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  // EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:

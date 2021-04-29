@@ -535,7 +535,7 @@ message Cluster {
       core.v4alpha.RuntimeDouble time_bias = 3;
 
       // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
-      // so that endpoint would get lineraly increasing amount of traffic.
+      // so that endpoint would get linearly increasing amount of traffic.
       // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
       // By tuning this parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
       // Once host exits slow start, aggression no longer affects its weight.
