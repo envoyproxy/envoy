@@ -8,6 +8,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/quic/quic_io_handle_wrapper.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -126,6 +127,14 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::str
 // Return the sign algorithm id works with the public key; If the public key is
 // not supported, return 0 with error_details populated correspondingly.
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
+
+// Return a connection socket which read and write via io_handle, but doesn't close it when the
+// socket gets closed nor set options on the socket.
+Network::ConnectionSocketPtr
+createServerConnectionSocket(Network::IoHandle& io_handle,
+                             const quic::QuicSocketAddress& self_address,
+                             const quic::QuicSocketAddress& peer_address,
+                             const std::string& hostname, absl::string_view alpn);
 
 // Set initial flow control windows in quic_config according to the given Envoy config.
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

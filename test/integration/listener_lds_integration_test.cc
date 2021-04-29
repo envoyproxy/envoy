@@ -4,6 +4,8 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/network/connection.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
@@ -408,6 +410,105 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
     EXPECT_EQ(request_size, upstream_request_->bodyLength());
   }
 }
+
+class RebalancerTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                       public BaseIntegrationTest {
+public:
+  RebalancerTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+)EOF") {}
+
+  void initialize() override {
+    config_helper_.renameListener("tcp");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto& src_listener_config = *bootstrap.mutable_static_resources()->mutable_listeners(0);
+          src_listener_config.mutable_use_original_dst()->set_value(true);
+          // Note that the below original_dst is replaced by FakeOriginalDstListenerFilter at the
+          // link time.
+          src_listener_config.add_listener_filters()->set_name(
+              "envoy.filters.listener.original_dst");
+          auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
+          virtual_listener_config = src_listener_config;
+          virtual_listener_config.mutable_use_original_dst()->set_value(false);
+          virtual_listener_config.clear_listener_filters();
+          virtual_listener_config.mutable_bind_to_port()->set_value(false);
+          virtual_listener_config.set_name("balanced_target_listener");
+          virtual_listener_config.mutable_connection_balance_config()->mutable_exact_balance();
+
+          // 127.0.0.2 is defined in FakeOriginalDstListenerFilter. This virtual listener does not
+          // listen on a passive socket so it's safe to use any ip address.
+          *virtual_listener_config.mutable_address()->mutable_socket_address()->mutable_address() =
+              "127.0.0.2";
+          virtual_listener_config.mutable_address()->mutable_socket_address()->set_port_value(80);
+        });
+    BaseIntegrationTest::initialize();
+  }
+
+  std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& request,
+                                                                std::string& response) {
+    Buffer::OwnedImpl buffer(request);
+    return std::make_unique<RawConnectionDriver>(
+        lookupPort("tcp"), buffer,
+        [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+          response.append(data.toString());
+        },
+        version_, *dispatcher_);
+  }
+};
+
+struct PerConnection {
+  std::string response_;
+  std::unique_ptr<RawConnectionDriver> client_conn_;
+  FakeRawConnectionPtr upstream_conn_;
+};
+
+// Verify the connections are distributed evenly on the 2 worker threads of the redirected
+// listener.
+TEST_P(RebalancerTest, RedirectConnectionIsBalancedOnDestinationListener) {
+  concurrency_ = 2;
+  int repeats = 10;
+  initialize();
+
+  // The balancer is balanced as per active connection instead of total connection.
+  // The below vector maintains all the connections alive.
+  std::vector<PerConnection> connections;
+  for (uint32_t i = 0; i < repeats * concurrency_; ++i) {
+    connections.emplace_back();
+    connections.back().client_conn_ =
+        createConnectionAndWrite("dummy", connections.back().response_);
+    connections.back().client_conn_->waitForConnection();
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+  }
+  for (auto& conn : connections) {
+    conn.client_conn_->close();
+    while (!conn.client_conn_->closed()) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  ASSERT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                     "listener.127.0.0.2_80.worker_0.downstream_cx_total")
+
+                ->value(),
+            repeats);
+  ASSERT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                     "listener.127.0.0.2_80.worker_1.downstream_cx_total")
+
+                ->value(),
+            repeats);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RebalancerTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace
 } // namespace Envoy

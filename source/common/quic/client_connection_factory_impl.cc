@@ -22,7 +22,9 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
       crypto_config_(
           std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
-              stats_scope, getConfig(transport_socket_factory), time_source))) {}
+              stats_scope, getConfig(transport_socket_factory), time_source))) {
+  quiche::FlagRegistry::getInstance();
+}
 
 namespace {
 // TODO(alyssawilk, danzh2010): This is mutable static info that is required for the QUICHE code.
