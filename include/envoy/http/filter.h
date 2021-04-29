@@ -833,8 +833,9 @@ public:
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
    * @param details a string detailing why this local reply was sent.
-   * @param retain_http_status_for_grpc int, which if nonzero is used as the HTTP response
-   *                code for gRPC clients. No effect for HTTP clients.
+   * @param retain_http_status_for_grpc bool, which if true indicates that the called service's
+   *                      HTTP response code will be passed along to gRPC clients.
+   *                      No effect for HTTP clients.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
