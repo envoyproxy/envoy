@@ -1918,6 +1918,12 @@ TEST_P(IntegrationTest, Preconnect) {
     clients.front()->close();
     clients.pop_front();
   }
+
+  for (auto& connection : fake_connections) {
+    ASSERT_TRUE(connection->close());
+    ASSERT_TRUE(connection->waitForDisconnect());
+    connection.reset();
+  }
 }
 
 TEST_P(IntegrationTest, RandomPreconnect) {
