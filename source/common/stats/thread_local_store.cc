@@ -204,7 +204,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
 
   // We can't call runOnAllThreads here as global threading has already been shutdown.
-  // It is okay to simply clear the scopes and central cache entires to cleanup.
+  // It is okay to simply clear the scopes and central cache entries to cleanup.
   {
     Thread::LockGuard lock(lock_);
     scopes_to_cleanup_.clear();
