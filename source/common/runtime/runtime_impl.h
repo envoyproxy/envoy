@@ -27,6 +27,7 @@
 #include "common/config/subscription_base.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
+#include "common/init/watcher_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"

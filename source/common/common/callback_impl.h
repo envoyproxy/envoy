@@ -3,12 +3,12 @@
 #include <functional>
 #include <list>
 
-#include "common/common/thread.h"
 #include "envoy/common/callback.h"
+#include "envoy/thread/thread.h"
 
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
-#include "envoy/thread/thread.h"
+#include "common/common/thread.h"
 
 namespace Envoy {
 namespace Common {

@@ -3,8 +3,8 @@
 #include <chrono>
 #include <functional>
 
-#include "envoy/common/pure.h"
 #include "envoy/common/callback.h"
+#include "envoy/common/pure.h"
 
 #include "absl/base/attributes.h"
 
