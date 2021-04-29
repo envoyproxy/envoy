@@ -245,7 +245,7 @@ public:
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual absl::optional<absl::string_view> get() PURE;
+  virtual absl::optional<std::string> get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 
