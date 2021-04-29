@@ -105,6 +105,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_formatter_interface",
+        ":valid_header",
         "//include/envoy/common:lower_case_string",
         "//include/envoy/tracing:trace_context_interface",
         "//source/common/common:assert_lib",
@@ -152,4 +153,9 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:typed_config_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "valid_header",
+    hdrs = ["valid_header.h"],
 )

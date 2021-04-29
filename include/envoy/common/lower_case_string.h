@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/http/valid_header.h"
+
 #include "common/common/assert.h"
 
 #include "absl/strings/ascii.h"
@@ -10,25 +12,11 @@
 
 namespace Envoy {
 
-// Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
-// never contain embedded NULLs.
-static inline bool validHeaderString(absl::string_view s) {
-  // If you modify this list of illegal embedded characters you will probably
-  // want to change header_map_fuzz_impl_test at the same time.
-  for (const char c : s) {
-    switch (c) {
-    case '\0':
-      FALLTHRU;
-    case '\r':
-      FALLTHRU;
-    case '\n':
-      return false;
-    default:
-      continue;
-    }
-  }
-  return true;
-}
+/*
+ * Simple function pointer to validate lower case string. There is currently no need to use
+ * std::function.
+ */
+using LowerCaseStringValidator = bool (*)(absl::string_view);
 
 /**
  * Wrapper for a lower case string used in header operations to generally avoid needless case
@@ -36,24 +24,30 @@ static inline bool validHeaderString(absl::string_view s) {
  */
 class LowerCaseString {
 public:
-  LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) {
-    ASSERT(valid());
+  LowerCaseString(LowerCaseString&& rhs,
+                  LowerCaseStringValidator valid = Http::validHeaderString) noexcept
+      : string_(std::move(rhs.string_)) {
+    ASSERT(valid != nullptr ? valid(string_) : true);
   }
   LowerCaseString& operator=(LowerCaseString&& rhs) noexcept {
     string_ = std::move(rhs.string_);
-    ASSERT(valid());
     return *this;
   }
 
-  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
+  LowerCaseString(const LowerCaseString& rhs,
+                  LowerCaseStringValidator valid = Http::validHeaderString)
+      : string_(rhs.string_) {
+    ASSERT(valid != nullptr ? valid(string_) : true);
+  }
   LowerCaseString& operator=(const LowerCaseString& rhs) {
-    string_ = std::move(rhs.string_);
-    ASSERT(valid());
+    string_ = rhs.string_;
     return *this;
   }
 
-  explicit LowerCaseString(absl::string_view new_string) : string_(new_string) {
-    ASSERT(valid());
+  explicit LowerCaseString(absl::string_view new_string,
+                           LowerCaseStringValidator valid = Http::validHeaderString)
+      : string_(new_string) {
+    ASSERT(valid != nullptr ? valid(string_) : true);
     lower();
   }
 
@@ -70,7 +64,6 @@ private:
   void lower() {
     std::transform(string_.begin(), string_.end(), string_.begin(), absl::ascii_tolower);
   }
-  bool valid() const { return validHeaderString(string_); }
 
   std::string string_;
 };

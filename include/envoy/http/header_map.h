@@ -12,6 +12,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_formatter.h"
+#include "envoy/http/valid_header.h"
 #include "envoy/tracing/trace_context.h"
 
 #include "common/common/assert.h"

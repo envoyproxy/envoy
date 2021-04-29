@@ -96,6 +96,7 @@ envoy_cc_library(
     name = "lower_case_string",
     hdrs = ["lower_case_string.h"],
     deps = [
+        "//include/envoy/http:valid_header",
         "//source/common/common:assert_lib",
     ],
 )
