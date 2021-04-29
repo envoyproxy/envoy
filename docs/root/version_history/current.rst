@@ -22,6 +22,9 @@ Minor Behavior Changes
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
 
 
+* listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
+  defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+
 
 Bug Fixes
 ---------
