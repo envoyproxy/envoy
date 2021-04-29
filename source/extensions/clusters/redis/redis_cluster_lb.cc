@@ -11,13 +11,8 @@ bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSl
     return false;
   }
 
-  for (auto const& replica : rhs.replicas_) {
-    if (replicas_.find(replica.first) == replicas_.end()) {
-      return false;
-    }
-  }
-
-  return true;
+  return std::equal(replicas_.begin(), replicas_.end(), rhs.replicas_.begin(), rhs.replicas_.end(),
+                    [](const auto& it1, const auto& it2) { return it1.first == it2.first; });
 }
 
 // RedisClusterLoadBalancerFactory
