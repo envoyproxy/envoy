@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 
@@ -441,22 +442,25 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
   test_server_->waitUntilListenersReady();
   // NOTE: The line above doesn't tell you if listener is up and listening.
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  const uint32_t old_port = lookupPort(listener_name_);
   // Make a connection to the listener from version 1.
-  codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+  codec_client_ = makeHttpConnection(old_port);
 
   // Change the listener address from loopback to wildcard.
-  const std::string new_address = ipVersion() == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::";
+  const std::string new_address = Network::Test::getAnyAddressString(ipVersion());
   listener_config_.mutable_address()->mutable_socket_address()->set_address(new_address);
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   registerTestServerPorts({listener_name_});
+  const uint32_t new_port = lookupPort(listener_name_);
+  EXPECT_NE(old_port, new_port);
 
   // Wait for the client to be disconnected.
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   // Make a new connection to the new listener.
-  codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+  codec_client_ = makeHttpConnection(new_port);
   const uint32_t response_size = 800;
   const uint32_t request_size = 10;
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
