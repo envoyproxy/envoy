@@ -4800,12 +4800,12 @@ TEST_P(SslSocketTest, ClientAddSecretsReadyCallback) {
   client_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
 
   // Call onAddOrUpdateSecret, but return a null ssl_ctx. This should not invoke the callback.
-  EXPECT_CALL(context_manager, createSslClientContext(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(context_manager, createSslClientContext(_, _, _)).WillOnce(Return(nullptr));
   client_ssl_socket_factory.onAddOrUpdateSecret();
 
   EXPECT_CALL(mock_callback_, Call());
   Ssl::ClientContextSharedPtr mock_context = std::make_shared<Ssl::MockClientContext>();
-  EXPECT_CALL(context_manager, createSslClientContext(_, _)).WillOnce(Return(mock_context));
+  EXPECT_CALL(context_manager, createSslClientContext(_, _, _)).WillOnce(Return(mock_context));
   client_ssl_socket_factory.onAddOrUpdateSecret();
 
   // Add another callback, it should be invoked immediately.
@@ -4845,19 +4845,110 @@ TEST_P(SslSocketTest, ServerAddSecretsReadyCallback) {
   server_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
 
   // Call onAddOrUpdateSecret, but return a null ssl_ctx. This should not invoke the callback.
-  EXPECT_CALL(context_manager, createSslServerContext(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(context_manager, createSslServerContext(_, _, _, _)).WillOnce(Return(nullptr));
   server_ssl_socket_factory.onAddOrUpdateSecret();
 
   // Now return a ssl context which should result in the callback being invoked.
   EXPECT_CALL(mock_callback_, Call());
   Ssl::ServerContextSharedPtr mock_context = std::make_shared<Ssl::MockServerContext>();
-  EXPECT_CALL(context_manager, createSslServerContext(_, _, _)).WillOnce(Return(mock_context));
+  EXPECT_CALL(context_manager, createSslServerContext(_, _, _, _)).WillOnce(Return(mock_context));
   server_ssl_socket_factory.onAddOrUpdateSecret();
 
   // Add another callback, it should be invoked immediately.
   MockFunction<void()> second_callback_;
   EXPECT_CALL(second_callback_, Call());
   server_ssl_socket_factory.addReadyCb(second_callback_.AsStdFunction());
+}
+
+// Tests adding a callback and adding secrets in parallel.  This is intended to
+// catch a race condition introduced in
+// https://github.com/envoyproxy/envoy/pull/13516 where a callback would never
+// be called due to a concurrency bug.
+TEST_P(SslSocketTest, ServerAddSecretsReadyCallbackParallel) {
+  Stats::TestUtil::TestStore stats_store;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context);
+  EXPECT_TRUE(server_cfg->tlsCertificates().empty());
+  EXPECT_FALSE(server_cfg->isReady());
+
+  NiceMock<Ssl::MockContextManager> context_manager;
+  ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), context_manager,
+                                                   stats_store, std::vector<std::string>{});
+
+  MockFunction<void()> mock_callback_;
+  EXPECT_CALL(mock_callback_, Call());
+  Ssl::ServerContextSharedPtr mock_context = std::make_shared<Ssl::MockServerContext>();
+  EXPECT_CALL(context_manager, createSslServerContext(_, _, _, _)).WillOnce(Return(mock_context));
+
+  // Add a callback in a thread to potentially tickle the concurrency bug.
+  std::thread t([&server_ssl_socket_factory, &mock_callback_]() {
+    server_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
+  });
+
+  // 1 microsecond of sleep seems to be a sweet spot for giving the addReadyCb
+  // thread enough of a head start to reliably cause the test to fail with buggy
+  // code.
+  std::this_thread::sleep_for(std::chrono::microseconds(1));
+  server_ssl_socket_factory.onAddOrUpdateSecret();
+
+  t.join();
+}
+
+// Tests adding a callback and adding secrets in parallel.  This is intended to
+// catch a race condition introduced in
+// https://github.com/envoyproxy/envoy/pull/13516 where a callback would never
+// be called due to a concurrency bug.
+TEST_P(SslSocketTest, ClientAddSecretsReadyCallbackParallel) {
+  Stats::TestUtil::TestStore stats_store;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(factory_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
+  EXPECT_TRUE(client_cfg->tlsCertificates().empty());
+  EXPECT_FALSE(client_cfg->isReady());
+
+  NiceMock<Ssl::MockContextManager> context_manager;
+  ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), context_manager,
+                                                   stats_store);
+
+  MockFunction<void()> mock_callback_;
+  EXPECT_CALL(mock_callback_, Call());
+  Ssl::ClientContextSharedPtr mock_context = std::make_shared<Ssl::MockClientContext>();
+  EXPECT_CALL(context_manager, createSslClientContext(_, _, _)).WillOnce(Return(mock_context));
+
+  // Add a callback in a thread to potentially tickle the concurrency bug.
+  std::thread t([&client_ssl_socket_factory, &mock_callback_]() {
+    client_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
+  });
+
+  std::this_thread::sleep_for(std::chrono::microseconds(1));
+  client_ssl_socket_factory.onAddOrUpdateSecret();
+
+  t.join();
 }
 
 TEST_P(SslSocketTest, TestTransportSocketCallback) {
