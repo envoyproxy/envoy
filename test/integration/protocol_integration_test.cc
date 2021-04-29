@@ -765,6 +765,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
 // The retry priority will always target P1, which would otherwise never be hit due to P0 being
 // healthy.
 TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
+  EXCLUDE_UPSTREAM_HTTP3; // Timed out waiting for new stream.
   const Upstream::HealthyLoad healthy_priority_load({0u, 100u});
   const Upstream::DegradedLoad degraded_priority_load({0u, 100u});
   NiceMock<Upstream::MockRetryPriority> retry_priority(healthy_priority_load,
@@ -1321,14 +1322,10 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
     // header size to avoid QUIC_HEADERS_TOO_LARGE stream error.
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          hcm.mutable_max_request_headers_kb()->set_value(96);
-          hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(8000);
-        });
+                hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(96); });
   }
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
     setMaxRequestHeadersKb(96);
-    setMaxRequestHeadersCount(8000);
   }
   initialize();
 
@@ -1570,12 +1567,8 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-#ifdef WIN32
-  // TODO(alyssawilk, wrowe) debug.
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
-    return;
-  }
-#endif
+  EXCLUDE_DOWNSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3;
   // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
   testLargeRequestHeaders(2048, 1, 1024, 100);
 }
@@ -1605,7 +1598,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
-  // Default header (and trailer) count limit is 100.
+  // QUICHE doesn't limit number of headers.
+  EXCLUDE_DOWNSTREAM_HTTP3
+  // The default configured header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   Http::TestRequestTrailerMapImpl request_trailers;

@@ -21,10 +21,9 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
-      crypto_config_(std::make_unique<quic::QuicCryptoClientConfig>(
-          std::make_unique<EnvoyQuicProofVerifier>(stats_scope, getConfig(transport_socket_factory),
-                                                   time_source),
-          std::make_unique<EnvoyQuicSessionCache>(time_source))) {
+      crypto_config_(
+          std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
+              stats_scope, getConfig(transport_socket_factory), time_source))) {
   quiche::FlagRegistry::getInstance();
 }
 
@@ -60,7 +59,7 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
-      dispatcher, /*send_buffer_limit=*/0);
+      dispatcher, 0);
   return ret;
 }
 

@@ -164,9 +164,5 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
                              const quic::QuicSocketAddress& peer_address,
                              const std::string& hostname, absl::string_view alpn);
 
-// Set initial flow control windows in quic_config according to the given Envoy config.
-void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
-                                        quic::QuicConfig& quic_config);
-
 } // namespace Quic
 } // namespace Envoy
