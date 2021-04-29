@@ -36,7 +36,7 @@ LcTrieWithStats::LcTrieWithStats(const TrieVector& trie, Stats::Scope& scope,
                  [](const auto& pair) { return pair.first; });
 
   for (const std::string& tag : all_tags) {
-    filter_stats_.checkTag(tag);
+    filter_stats_.ensureTagMetricExists(tag);
   }
 }
 

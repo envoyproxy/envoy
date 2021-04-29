@@ -51,7 +51,7 @@ public:
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
   }
 
-  void checkTag(absl::string_view tag) {
+  void ensureTagMetricExists(absl::string_view tag) {
     stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
   }
 
