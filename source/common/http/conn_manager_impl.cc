@@ -1367,13 +1367,18 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                                                   connection_manager_.config_,
                                                   connection_manager_.config_.via());
 
-  bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_disable_keepalive_ref_.value())) {
-    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
-    drain_connection_due_to_overload = true;
+    ENVOY_STREAM_LOG(
+        debug, "disabling keepalive due to envoy overload and drain closing connection", *this);
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
+    connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
+
+    // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
+    // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
+    // prevent any new streams.
+    connection_manager_.startDrainSequence();
   }
 
   if (connection_manager_.codec_->protocol() == Protocol::Http10) {

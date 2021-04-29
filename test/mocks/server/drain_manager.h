@@ -16,8 +16,11 @@ public:
   MockDrainManager();
   ~MockDrainManager() override;
 
-  // Server::DrainManager
+  // Network::DrainManager
   MOCK_METHOD(bool, drainClose, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (override));
+
+  // Server::DrainManager
   MOCK_METHOD(bool, draining, (), (const));
   MOCK_METHOD(void, startDrainSequence, (std::function<void()> completion));
   MOCK_METHOD(void, startParentShutdownSequence, ());

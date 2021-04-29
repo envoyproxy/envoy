@@ -47,10 +47,22 @@ HttpConnectionManagerImplTest::requestHeaderCustomTag(const std::string& header)
 }
 
 void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_name, bool tracing,
-                                          bool use_srds) {
+                                          bool use_srds, bool setup_drain_timer) {
+  Network::DrainDecision::DrainCloseCb drain_close_func;
   use_srds_ = use_srds;
   if (ssl) {
     ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
+  }
+
+  if (setup_drain_timer) {
+    // Intercept the on-drain registration and capture drain callback
+    EXPECT_CALL(drain_close_, addOnDrainCloseCb(_))
+        .Times(1)
+        .WillOnce(Invoke([&](Network::DrainDecision::DrainCloseCb cb) -> Common::CallbackHandlePtr {
+          // for our tests, invoke immediately
+          drain_close_func = cb;
+          return nullptr;
+        }));
   }
 
   server_name_ = server_name;
@@ -85,6 +97,12 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
                                        percent1,
                                        false,
                                        256});
+  }
+
+  if (setup_drain_timer) {
+    drain_begin_timer_ = setUpTimer();
+    EXPECT_CALL(*drain_begin_timer_, enableTimer(_, _));
+    drain_close_func(std::chrono::milliseconds{0});
   }
 }
 

@@ -45,7 +45,8 @@ public:
   HttpConnectionManagerImplTest();
   ~HttpConnectionManagerImplTest() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
-  void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false);
+  void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false,
+             bool setup_drain_timer = true);
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1);
   void setUpBufferLimits();
 
@@ -157,6 +158,7 @@ public:
   NiceMock<MockFilterChainFactory> filter_factory_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))};
+  Event::MockTimer* drain_begin_timer_;
   NiceMock<Network::MockDrainDecision> drain_close_;
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;

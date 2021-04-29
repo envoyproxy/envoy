@@ -160,6 +160,7 @@ public:
   MockDrainDecision();
   ~MockDrainDecision() override;
 
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (override));
   MOCK_METHOD(bool, drainClose, (), (const));
 };
 
