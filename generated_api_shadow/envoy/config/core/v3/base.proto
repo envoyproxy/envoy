@@ -442,3 +442,19 @@ message ControlPlane {
   // the Envoy is connected to.
   string identifier = 1;
 }
+
+// Configuration of DNS Lookup option flags which control the behavior of the DNS resolver.
+message DnsLookupOptions {
+  // Always use TCP queries instead of UDP queries for DNS lookups.
+  // This may be overridden on a per-cluster basis in cds_config,
+  // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
+  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
+  // specified.
+  // Setting this value causes failure if the
+  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
+  // server startup. Apple' API only uses UDP for DNS resolution.
+  google.protobuf.BoolValue use_tcp_for_dns_lookups = 1;
+
+  // Do not use the default search domains; only query hostnames as-is or as aliases.
+  google.protobuf.BoolValue no_defalt_search_domain = 2;
+}

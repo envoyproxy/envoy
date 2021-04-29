@@ -447,7 +447,6 @@ message ControlPlane {
 
 // Configuration of DNS Lookup option flags which control the behavior of the DNS resolver.
 message DnsLookupOptions {
-
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // This may be overridden on a per-cluster basis in cds_config,
   // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v3.Cluster.dns_resolvers>` and

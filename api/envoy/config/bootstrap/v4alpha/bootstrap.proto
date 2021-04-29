@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 30]
+// [#next-free-field: 31]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -96,9 +96,9 @@ message Bootstrap {
     core.v4alpha.ApiConfigSource ads_config = 3;
   }
 
-  reserved 10, 11, 8, 9;
+  reserved 10, 11, 8, 9, 20;
 
-  reserved "runtime", "watchdog", "tracing";
+  reserved "runtime", "watchdog", "tracing", "use_tcp_for_dns_lookups";
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
@@ -222,15 +222,8 @@ message Bootstrap {
   // :ref:`stats sinks <envoy_api_msg_config.metrics.v4alpha.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 
-  // Always use TCP queries instead of UDP queries for DNS lookups.
-  // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolvers>` and
-  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v4alpha.Cluster.use_tcp_for_dns_lookups>` are
-  // specified.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 20;
+  // Configuration of DNS Lookup option flags which control the behavior of the DNS resolver.
+  core.v4alpha.DnsLookupOptions dns_lookup_options = 30;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.

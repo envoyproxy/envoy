@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 53]
+// [#next-free-field: 54]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -860,12 +860,15 @@ message Cluster {
   // server startup. Apple's API only allows overriding DNS resolvers via system settings.
   repeated core.v3.Address dns_resolvers = 18;
 
-  // [#next-major-version: Reconcile DNS options in a single message.]
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // Setting this value causes failure if the
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
   // server startup. Apple' API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 45;
+  bool use_tcp_for_dns_lookups = 45
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Configuration of DNS Lookup option flags which control the behavior of the DNS resolver.
+  core.v3.DnsLookupOptions dns_lookup_options = 53;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
