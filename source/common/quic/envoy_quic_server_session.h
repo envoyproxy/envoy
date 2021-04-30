@@ -19,6 +19,7 @@
 
 #include "common/quic/send_buffer_monitor.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
+#include "common/quic/envoy_quic_server_connection.h"
 #include "common/quic/envoy_quic_server_stream.h"
 
 namespace Envoy {
@@ -33,13 +34,12 @@ class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
 public:
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
-                         std::unique_ptr<EnvoyQuicConnection> connection,
+                         std::unique_ptr<EnvoyQuicServerConnection> connection,
                          quic::QuicSession::Visitor* visitor,
                          quic::QuicCryptoServerStreamBase::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         Network::ListenerConfig& listener_config);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
   ~EnvoyQuicServerSession() override;
 
@@ -87,13 +87,14 @@ protected:
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
+  // Used by base class to access quic connection after initialization.
+  const quic::QuicConnection* quicConnection() const override;
+  quic::QuicConnection* quicConnection() override;
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
-  void maybeCreateNetworkFilters();
 
-  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
-  Network::ListenerConfig& listener_config_;
+  std::unique_ptr<EnvoyQuicServerConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};

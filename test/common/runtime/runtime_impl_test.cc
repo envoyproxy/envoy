@@ -28,6 +28,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/envoy_quic_utils.h"
+#endif
+
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -540,6 +544,34 @@ TEST_F(StaticLoaderImplTest, All) {
   EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", 50));
   testNewOverrides(*loader_, store_);
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
+  // Test that Quiche flags can be overwritten via Envoy runtime config.
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false: true
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: false
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_spdy_testonly_default_false: false
+  )EOF");
+  SetQuicReloadableFlag(spdy_testonly_default_false, true);
+  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+  setup();
+  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_EQ(false, GetQuicReloadableFlag(spdy_testonly_default_false));
+
+  // Test 2 behaviors:
+  // 1. Removing overwritten config will make the flag fallback to default value.
+  // 2. Quiche flags can be overwritten again.
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: true
+  )EOF");
+  setup();
+  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+}
+#endif
 
 // Validate proto parsing sanity.
 TEST_F(StaticLoaderImplTest, ProtoParsing) {
