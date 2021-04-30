@@ -21,6 +21,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -658,9 +659,16 @@ void ConnectionImpl::onWriteReady() {
 
   if (connecting_) {
     int error;
-    socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
-                   "");
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
+        socket_->addressProvider().remoteAddress()->type() ==
+            Network::Address::Type::EnvoyInternal) {
+      // Connected!
+      error = 0;
+    } else {
+      socklen_t error_size = sizeof(error);
+      RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
+                     "");
+    }
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -821,7 +829,9 @@ ClientConnectionImpl::ClientConnectionImpl(
     : ConnectionImpl(
           dispatcher,
           std::make_unique<ConnectionSocketImpl>(std::move(client_io_handle), nullptr, address),
-          std::move(transport_socket), stream_info_, false),
+          std::move(transport_socket), stream_info_,
+          // Internal connection is always connected. Explore how to save the 1 poll cycle.
+          false),
       stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
   UNREFERENCED_PARAMETER(source_address);
   UNREFERENCED_PARAMETER(options);
@@ -883,8 +893,12 @@ void ClientConnectionImpl::connect() {
                  socket_->addressProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
   if (result.rc_ == 0) {
-    // write will become ready.
-    ASSERT(connecting_);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
+        socket_->addressProvider().remoteAddress()->type() !=
+            Network::Address::Type::EnvoyInternal) {
+      // write will become ready.
+      ASSERT(connecting_);
+    }
   } else {
     ASSERT(SOCKET_FAILURE(result.rc_));
 #ifdef WIN32

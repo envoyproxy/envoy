@@ -153,6 +153,9 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        Network::Address::InstanceConstSharedPtr source_address,
                                        Network::TransportSocketPtr&& transport_socket,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  FANCY_LOG(info, "lambdai: create client connection to {} from {}",
+            address != nullptr ? address->asStringView() : "nullptr",
+            source_address != nullptr ? source_address->asStringView() : "nullptr");
   ASSERT(isThreadSafe());
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
       address->type() == Network::Address::Type::EnvoyInternal) {

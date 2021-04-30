@@ -3,6 +3,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
+#include "common/network/address_impl.h"
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
@@ -188,7 +189,11 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
 
   auto active_socket = std::make_unique<ActiveInternalSocket>(
       *this, std::move(socket), false /* do not handle off at internal listener */);
-
+  // TODO(lambdai): restore address from either socket options, or from listener config.
+  active_socket->socket_->addressProvider().restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("255.255.255.255", 0));
+  active_socket->socket_->addressProvider().setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("255.255.255.254", 0));
   // Create and run the filters
   config_->filterChainFactory().createListenerFilterChain(*active_socket);
   active_socket->continueFilterChain(true);
