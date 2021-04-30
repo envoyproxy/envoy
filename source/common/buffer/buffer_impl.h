@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -50,13 +51,22 @@ public:
   Slice() = default;
 
   /**
-   * Create an empty mutable Slice that owns its storage.
+   * Create an empty mutable Slice that owns its storage, which it charges to
+   * the provided account, if any.
    * @param min_capacity number of bytes of space the slice should have. Actual capacity is rounded
    * up to the next multiple of 4kb.
+   * @param account the account to charge.
+   * @param freelist to search for the backing storage, if any.
    */
-  Slice(uint64_t min_capacity, absl::optional<FreeListReference> free_list = absl::nullopt)
+  Slice(uint64_t min_capacity, BufferMemoryAccountSharedPtr account,
+        absl::optional<FreeListReference> free_list = absl::nullopt)
       : capacity_(sliceSize(min_capacity)), storage_(newStorage(capacity_, free_list)),
-        base_(storage_.get()), data_(0), reservable_(0) {}
+        base_(storage_.get()), data_(0), reservable_(0) {
+    if (account) {
+      account->charge(capacity_);
+      account_ = account;
+    }
+  }
 
   /**
    * Create an immutable Slice that refers to an external buffer fragment.
@@ -72,6 +82,7 @@ public:
   Slice(Slice&& rhs) noexcept {
     storage_ = std::move(rhs.storage_);
     drain_trackers_ = std::move(rhs.drain_trackers_);
+    account_ = std::move(rhs.account_);
     base_ = rhs.base_;
     data_ = rhs.data_;
     reservable_ = rhs.reservable_;
@@ -85,11 +96,12 @@ public:
 
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
-      callAndClearDrainTrackers();
+      callAndClearDrainTrackersAndCharges();
 
       freeStorage(std::move(storage_), capacity_);
       storage_ = std::move(rhs.storage_);
       drain_trackers_ = std::move(rhs.drain_trackers_);
+      account_ = std::move(rhs.account_);
       base_ = rhs.base_;
       data_ = rhs.data_;
       reservable_ = rhs.reservable_;
@@ -105,12 +117,12 @@ public:
   }
 
   ~Slice() {
-    callAndClearDrainTrackers();
+    callAndClearDrainTrackersAndCharges();
     freeStorage(std::move(storage_), capacity_);
   }
 
   void freeStorage(FreeListReference free_list) {
-    callAndClearDrainTrackers();
+    callAndClearDrainTrackersAndCharges();
     freeStorage(std::move(storage_), capacity_, free_list);
   }
 
@@ -279,7 +291,7 @@ public:
   }
 
   /**
-   * Move all drain trackers from the current slice to the destination slice.
+   * Move all drain trackers and charges from the current slice to the destination slice.
    */
   void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
@@ -297,11 +309,30 @@ public:
    * Call all drain trackers associated with the slice, then clear
    * the drain tracker list.
    */
-  void callAndClearDrainTrackers() {
+  void callAndClearDrainTrackersAndCharges() {
     for (const auto& drain_tracker : drain_trackers_) {
       drain_tracker();
     }
     drain_trackers_.clear();
+
+    if (account_) {
+      account_->credit(capacity_);
+      account_.reset();
+    }
+  }
+
+  /**
+   * Charges the provided account for the resources if these conditions hold:
+   * - we're not already charging for this slice
+   * - the given account is non-null
+   * - the slice owns backing memory
+   */
+  void maybeChargeAccount(const BufferMemoryAccountSharedPtr& account) {
+    if (account_ != nullptr || storage_ == nullptr || account == nullptr) {
+      return;
+    }
+    account->charge(capacity_);
+    account_ = account;
   }
 
   static constexpr uint32_t default_slice_size_ = 16384;
@@ -383,6 +414,10 @@ protected:
 
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
+
+  /** Account associated with this slice. This may be null. When
+   * coalescing with another slice, we do not transfer over their account. */
+  BufferMemoryAccountSharedPtr account_;
 };
 
 class OwnedImpl;
@@ -633,9 +668,11 @@ public:
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);
+  OwnedImpl(BufferMemoryAccountSharedPtr account);
 
   // Buffer::Instance
   void addDrainTracker(std::function<void()> drain_tracker) override;
+  void bindAccount(BufferMemoryAccountSharedPtr account) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
@@ -730,6 +767,8 @@ private:
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
 
+  BufferMemoryAccountSharedPtr account_;
+
   struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
     virtual absl::Span<Slice> ownedSlices() PURE;
   };
@@ -797,6 +836,40 @@ private:
 };
 
 using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
+
+/**
+ * A BufferMemoryAccountImpl tracks allocated bytes across associated buffers and
+ * slices that originate from those buffers, or are untagged and pass through an
+ * associated buffer.
+ */
+class BufferMemoryAccountImpl : public BufferMemoryAccount {
+public:
+  BufferMemoryAccountImpl() = default;
+  ~BufferMemoryAccountImpl() override { ASSERT(buffer_memory_allocated_ == 0); }
+
+  // Make not copyable
+  BufferMemoryAccountImpl(const BufferMemoryAccountImpl&) = delete;
+  BufferMemoryAccountImpl& operator=(const BufferMemoryAccountImpl&) = delete;
+
+  // Make not movable.
+  BufferMemoryAccountImpl(BufferMemoryAccountImpl&&) = delete;
+  BufferMemoryAccountImpl& operator=(BufferMemoryAccountImpl&&) = delete;
+
+  uint64_t balance() const { return buffer_memory_allocated_; }
+  void charge(uint64_t amount) override {
+    // Check overflow
+    ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
+    buffer_memory_allocated_ += amount;
+  }
+
+  void credit(uint64_t amount) override {
+    ASSERT(buffer_memory_allocated_ >= amount);
+    buffer_memory_allocated_ -= amount;
+  }
+
+private:
+  uint64_t buffer_memory_allocated_ = 0;
+};
 
 } // namespace Buffer
 } // namespace Envoy

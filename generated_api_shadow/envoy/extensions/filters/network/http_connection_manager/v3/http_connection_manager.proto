@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 45]
+// [#next-free-field: 46]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -247,7 +247,7 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  // [#not-implemented-hide] Transformations that apply to path headers. Transformations are applied
+  // [#not-implemented-hide:] Transformations that apply to path headers. Transformations are applied
   // before any processing of requests by HTTP filters, routing, and matching. Only the normalized
   // path will be visible internally if a transformation is enabled. Any path rewrites that the
   // router performs (e.g. :ref:`regex_rewrite
@@ -257,7 +257,7 @@ message HttpConnectionManager {
   //
   // Note: access logging and tracing will show the original *:path* header.
   message PathNormalizationOptions {
-    // [#not-implemented-hide] Normalization applies internally before any processing of requests by
+    // [#not-implemented-hide:] Normalization applies internally before any processing of requests by
     // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
     // to :ref:`NormalizePathRFC3986
     // <envoy_api_msg_type.http.v3.PathTransformation.Operation.NormalizePathRFC3986>`. When not
@@ -267,7 +267,7 @@ message HttpConnectionManager {
     // normalization due to disallowed characters.)
     type.http.v3.PathTransformation forwarding_transformation = 1;
 
-    // [#not-implemented-hide] Normalization only applies internally before any processing of
+    // [#not-implemented-hide:] Normalization only applies internally before any processing of
     // requests by HTTP filters, routing, and matching. These will be applied after full
     // transformation is applied. The *:path* header before this transformation will be restored in
     // the router filter and sent upstream unless it was mutated by a filter. Defaults to no
@@ -279,7 +279,7 @@ message HttpConnectionManager {
     type.http.v3.PathTransformation http_filter_transformation = 2;
   }
 
-  reserved 27;
+  reserved 27, 45;
 
   // Supplies the type of codec that the connection manager should use.
   CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -349,10 +349,8 @@ message HttpConnectionManager {
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
   // Requests that exceed this limit will receive a 431 response.
-  // The max configurable limit is 96 KiB, based on current implementation
-  // constraints.
   google.protobuf.UInt32Value max_request_headers_kb = 29
-      [(validate.rules).uint32 = {lte: 96 gt: 0}];
+      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
   // The stream idle timeout for connections managed by the connection manager.
   // If not specified, this defaults to 5 minutes. The default value was selected
@@ -594,7 +592,9 @@ message HttpConnectionManager {
 
   // Determines if the port part should be removed from host/authority header before any processing
   // of request by HTTP filters or routing. The port would be removed only if it is equal to the :ref:`listener's<envoy_api_field_config.listener.v3.Listener.address>`
-  // local port and request method is not CONNECT. This affects the upstream host header as well.
+  // local port. This affects the upstream host header unless the method is
+  // CONNECT in which case if no filter adds a port the original port will be restored before headers are
+  // sent upstream.
   // Without setting this option, incoming requests with host `example:443` will not match against
   // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
@@ -604,8 +604,9 @@ message HttpConnectionManager {
 
   oneof strip_port_mode {
     // Determines if the port part should be removed from host/authority header before any processing
-    // of request by HTTP filters or routing. The port would be removed only if request method is not CONNECT.
-    // This affects the upstream host header as well.
+    // of request by HTTP filters or routing.
+    // This affects the upstream host header unless the method is CONNECT in
+    // which case if no filter adds a port the original port will be restored before headers are sent upstream.
     // Without setting this option, incoming requests with host `example:443` will not match against
     // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
     // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.

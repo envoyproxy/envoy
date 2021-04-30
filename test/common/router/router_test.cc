@@ -5378,6 +5378,16 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10000)));
+    Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                           {"grpc-timeout", "6666666666666H"}};
+    FilterUtility::finalTimeout(route, headers, true, true, false, false);
+    EXPECT_EQ("10000", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("10000m", headers.get_("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-expected-rq-timeout-ms", "8"}};
     // Make ingress envoy respect `x-envoy-expected-rq-timeout-ms` header.
