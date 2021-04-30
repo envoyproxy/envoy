@@ -52,7 +52,7 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
       response_rate_limit_percent_runtime_(
           PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
                                          RuntimeKeys::get().ResponseRateLimitPercentKey)),
-      disable_downstream_server_tracing_{fault.disable_downstream_server_tracing()} {
+      disable_downstream_server_tracing_(fault.disable_downstream_cluster_stats()) {
   if (fault.has_abort()) {
     request_abort_config_ =
         std::make_unique<Filters::Common::Fault::FaultAbortConfig>(fault.abort());

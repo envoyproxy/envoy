@@ -48,7 +48,7 @@ typed_config:
       numerator: 100
 )EOF";
 
-  const std::string disable_tracing_fault_config_ =
+  const std::string disable_stats_fault_config_ =
       R"EOF(
 name: fault
 typed_config:
@@ -65,7 +65,7 @@ typed_config:
     header_limit: {}
     percentage:
       numerator: 100
-  disable_downstream_server_tracing: true
+  disable_downstream_cluster_stats: true
 )EOF";
 
   const std::string abort_grpc_fault_config_ =
@@ -193,8 +193,8 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
-// Request abort controlled via header configuration and enable downstream server tracing.
-TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableTracing) {
+// Request abort controlled via header configuration and enable downstream server stats.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableDownstreamServerStats) {
   initializeFilter(header_fault_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -218,9 +218,9 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableTracing) {
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.delays_injected"));
 }
 
-// Request abort controlled via header configuration and disable downstream server tracing.
-TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigDisableTracing) {
-  initializeFilter(disable_tracing_fault_config_);
+// Request abort controlled via header configuration and disable downstream server stats.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigDisableDownstreamServerStats) {
+  initializeFilter(disable_stats_fault_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   auto response = codec_client_->makeHeaderOnlyRequest(

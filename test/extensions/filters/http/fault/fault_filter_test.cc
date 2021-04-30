@@ -66,13 +66,13 @@ public:
     fixed_delay: 5s
   )EOF";
 
-  const std::string fixed_delay_only_disable_tracing_yaml = R"EOF(
+  const std::string fixed_delay_only_disable_stats_yaml = R"EOF(
   delay:
     percentage:
       numerator: 100
       denominator: HUNDRED
     fixed_delay: 5s
-  disable_downstream_server_tracing: true
+  disable_downstream_cluster_stats: true
   )EOF";
 
   const std::string abort_only_yaml = R"EOF(
@@ -727,7 +727,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 }
 
 TEST_F(FaultFilterTest, DelayForDownstreamClusterDisableTracing) {
-  setUpTest(fixed_delay_only_disable_tracing_yaml);
+  setUpTest(fixed_delay_only_disable_stats_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
