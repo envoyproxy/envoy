@@ -250,6 +250,9 @@ message Bootstrap {
   // Setting this value causes failure if the
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
   // server startup. Apple' API only uses UDP for DNS resolution.
+  // This field is deprecated. Instead use
+  // :ref:`dns_lookup_options <envoy_api_field_config.config.bootstrap.v3.Bootstrap.dns_lookup_options>`
+  // which aggregates all of the DNS lookup options in a single message.
   bool use_tcp_for_dns_lookups = 20
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
