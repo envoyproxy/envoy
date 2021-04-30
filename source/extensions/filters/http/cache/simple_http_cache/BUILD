@@ -12,14 +12,13 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "simple_http_cache_lib",
+    name = "config",
     srcs = ["simple_http_cache.cc"],
     hdrs = ["simple_http_cache.h"],
-    category = "envoy.filters.http",
+    category = "envoy.filters.http.cache",
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     status = "wip",
     deps = [
-        ":config_cc_proto",
         "//include/envoy/registry",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
@@ -29,10 +28,6 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha/simple_http_cache:pkg_cc_proto",
     ],
-)
-
-envoy_proto_library(
-    name = "config",
-    srcs = ["config.proto"],
 )
