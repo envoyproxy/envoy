@@ -31,7 +31,7 @@ static_resources:
             typed_config:
               "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3alpha.CacheConfig"
               typed_config:
-                "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3alpha.SimpleHttpCacheConfig"
+                "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3alpha.simple_http_cache.SimpleHttpCacheConfig"
           - name: envoy.filters.http.router
             typed_config: {}
 
