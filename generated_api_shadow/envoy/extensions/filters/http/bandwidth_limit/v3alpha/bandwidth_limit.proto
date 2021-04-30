@@ -4,9 +4,7 @@ package envoy.extensions.filters.http.bandwidth_limit.v3alpha;
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3alpha";
@@ -26,14 +24,14 @@ message BandwidthLimit {
     // Filter is disabled.
     Disabled = 0;
 
-    // Filter enabled only for Ingress traffic.
-    Ingress = 1;
+    // Filter enabled only for incoming traffic.
+    Decode = 1;
 
-    // Filter enabled only for Egress traffic.
-    Egress = 2;
+    // Filter enabled only for outgoing traffic.
+    Encode = 2;
 
-    // Filter enabled for both Ingress and Egress traffic.
-    IngressAndEgress = 3;
+    // Filter enabled for both incoming and outgoing traffic.
+    DecodeAndEncode = 3;
   }
 
   // The human readable prefix to use when emitting stats.
@@ -55,8 +53,8 @@ message BandwidthLimit {
   //
   google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
-  // Optional fill_rate for the token buckets (per second). Defaults to 16.
+  // Optional fill_interval in milliseconds for the token buckets (per second). Defaults to 50ms.
   // .. note::
-  //   In the current implementation, the fill_rate must be <= 32 to avoid too aggressive refills.
-  google.protobuf.UInt32Value fill_rate = 4 [(validate.rules).uint32 = {gte: 1}];
+  //   In the current implementation, the fill_interval must be >= 20ms to avoid too aggressive refills.
+  google.protobuf.UInt32Value fill_interval = 4 [(validate.rules).uint32 = {gte: 1}];
 }
