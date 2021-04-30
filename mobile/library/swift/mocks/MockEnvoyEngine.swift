@@ -13,18 +13,24 @@ final class MockEnvoyEngine: NSObject {
     _ config: EnvoyConfiguration,
     _ logLevel: String?
   ) -> Void)?
-  /// Closure called when `recordCounterInc(_:count:)` is called.
-  static var onRecordCounter: ((_ elements: String, _ count: UInt) -> Void)?
+  /// Closure called when `recordCounterInc(_:tags:count:)` is called.
+  static var onRecordCounter: (
+    (_ elements: String, _ tags: [String: String], _ count: UInt) -> Void)?
   /// Closure called when `recordGaugeSet(_:value:)` is called.
-  static var onRecordGaugeSet: ((_ elements: String, _ value: UInt) -> Void)?
+  static var onRecordGaugeSet: (
+    (_ elements: String, _ tags: [String: String], _ value: UInt) -> Void)?
   /// Closure called when `recordGaugeAdd(_:amount:)` is called.
-  static var onRecordGaugeAdd: ((_ elements: String, _ amount: UInt) -> Void)?
+  static var onRecordGaugeAdd: (
+    (_ elements: String, _ tags: [String: String], _ amount: UInt) -> Void)?
   /// Closure called when `recordGaugeSub(_:amount:)` is called.
-  static var onRecordGaugeSub: ((_ elements: String, _ amount: UInt) -> Void)?
+  static var onRecordGaugeSub: (
+    (_ elements: String, _ tags: [String: String], _ amount: UInt) -> Void)?
   /// Closure called when `recordHistogramDuration(_:durationMs)` is called.
-  static var onRecordHistogramDuration: ((_ elements: String, _ durationMs: UInt) -> Void)?
+  static var onRecordHistogramDuration: (
+    (_ elements: String, _ tags: [String: String], _ durationMs: UInt) -> Void)?
   /// Closure called when `recordHistogramValue(_:value)` is called.
-  static var onRecordHistogramValue: ((_ elements: String, _ value: UInt) -> Void)?
+  static var onRecordHistogramValue: (
+    (_ elements: String, _ tags: [String: String], _ value: UInt) -> Void)?
 }
 
 extension MockEnvoyEngine: EnvoyEngine {
@@ -44,33 +50,34 @@ extension MockEnvoyEngine: EnvoyEngine {
     return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
   }
 
-  func recordCounterInc(_ elements: String, count: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordCounter?(elements, count)
+  func recordCounterInc(_ elements: String, tags: [String: String], count: UInt) -> Int32 {
+    MockEnvoyEngine.onRecordCounter?(elements, tags, count)
     return kEnvoySuccess
   }
 
-  func recordGaugeSet(_ elements: String, value: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordGaugeSet?(elements, value)
+  func recordGaugeSet(_ elements: String, tags: [String: String], value: UInt) -> Int32 {
+    MockEnvoyEngine.onRecordGaugeSet?(elements, tags, value)
     return kEnvoySuccess
   }
 
-  func recordGaugeAdd(_ elements: String, amount: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordGaugeAdd?(elements, amount)
+  func recordGaugeAdd(_ elements: String, tags: [String: String], amount: UInt) -> Int32 {
+    MockEnvoyEngine.onRecordGaugeAdd?(elements, tags, amount)
     return kEnvoySuccess
   }
 
-  func recordGaugeSub(_ elements: String, amount: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordGaugeSub?(elements, amount)
+  func recordGaugeSub(_ elements: String, tags: [String: String], amount: UInt) -> Int32 {
+    MockEnvoyEngine.onRecordGaugeSub?(elements, tags, amount)
     return kEnvoySuccess
   }
 
-  func recordHistogramDuration(_ elements: String, durationMs: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordHistogramDuration?(elements, durationMs)
+  func recordHistogramDuration(
+    _ elements: String, tags: [String: String], durationMs: UInt) -> Int32 {
+    MockEnvoyEngine.onRecordHistogramDuration?(elements, tags, durationMs)
     return kEnvoySuccess
   }
 
-  func recordHistogramValue(_ elements: String, value: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordHistogramValue?(elements, value)
+  func recordHistogramValue(_ elements: String, tags: [String: String], value: UInt) -> Int32 {
+    MockEnvoyEngine.onRecordHistogramValue?(elements, tags, value)
     return kEnvoySuccess
   }
 }

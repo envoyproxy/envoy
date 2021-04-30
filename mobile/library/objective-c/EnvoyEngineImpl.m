@@ -490,30 +490,32 @@ static envoy_data ios_get_string(const void *context) {
                                            callbacks:callbacks];
 }
 
-- (int)recordCounterInc:(NSString *)elements count:(NSUInteger)count {
+- (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count {
   // TODO: update to use real tag array when the API layer change is ready.
-  return record_counter_inc(_engineHandle, elements.UTF8String, envoy_stats_notags, count);
+  return record_counter_inc(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), count);
 }
 
-- (int)recordGaugeSet:(NSString *)elements value:(NSUInteger)value {
-  return record_gauge_set(_engineHandle, elements.UTF8String, envoy_stats_notags, value);
+- (int)recordGaugeSet:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value {
+  return record_gauge_set(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), value);
 }
 
-- (int)recordGaugeAdd:(NSString *)elements amount:(NSUInteger)amount {
-  return record_gauge_add(_engineHandle, elements.UTF8String, envoy_stats_notags, amount);
+- (int)recordGaugeAdd:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount {
+  return record_gauge_add(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), amount);
 }
 
-- (int)recordGaugeSub:(NSString *)elements amount:(NSUInteger)amount {
-  return record_gauge_sub(_engineHandle, elements.UTF8String, envoy_stats_notags, amount);
+- (int)recordGaugeSub:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount {
+  return record_gauge_sub(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), amount);
 }
 
-- (int)recordHistogramDuration:(NSString *)elements durationMs:(NSUInteger)durationMs {
-  return record_histogram_value(_engineHandle, elements.UTF8String, envoy_stats_notags, durationMs,
-                                MILLISECONDS);
+- (int)recordHistogramDuration:(NSString *)elements
+                          tags:(EnvoyTags *)tags
+                    durationMs:(NSUInteger)durationMs {
+  return record_histogram_value(_engineHandle, elements.UTF8String, toNativeStatsTags(tags),
+                                durationMs, MILLISECONDS);
 }
 
-- (int)recordHistogramValue:(NSString *)elements value:(NSUInteger)value {
-  return record_histogram_value(_engineHandle, elements.UTF8String, envoy_stats_notags, value,
+- (int)recordHistogramValue:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value {
+  return record_histogram_value(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), value,
                                 UNSPECIFIED);
 }
 

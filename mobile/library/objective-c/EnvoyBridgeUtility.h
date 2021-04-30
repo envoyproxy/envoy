@@ -65,6 +65,25 @@ static inline envoy_headers *toNativeHeadersPtr(EnvoyHeaders *headers) {
   return ret;
 }
 
+static inline envoy_stats_tags toNativeStatsTags(EnvoyTags *tags) {
+  if (tags == nil || [tags isEqual:[NSNull null]]) {
+    return envoy_stats_notags;
+  }
+
+  int length = (int)[tags count];
+
+  envoy_map_entry *tag_array = (envoy_map_entry *)safe_malloc(sizeof(envoy_map_entry) * length);
+  envoy_map_size_t tag_index = 0;
+  for (id tagKey in tags) {
+    NSString *tagValue = tags[tagKey];
+
+    envoy_map_entry new_tag = {toManagedNativeString(tagKey), toManagedNativeString(tagValue)};
+    tag_array[tag_index++] = new_tag;
+  }
+  envoy_stats_tags ret = {tag_index, tag_array};
+  return ret;
+}
+
 static inline NSData *to_ios_data(envoy_data data) {
   // TODO: we are copying from envoy_data to NSData.
   // https://github.com/lyft/envoy-mobile/issues/398
