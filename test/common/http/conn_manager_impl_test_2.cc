@@ -2145,7 +2145,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
       .WillByDefault(ReturnRef(disable_http_keep_alive));
 
   codec_->protocol_ = Protocol::Http11;
-  setup(false, "");
+  setup(false, "", true, false, false);
 
   EXPECT_CALL(random_, random())
       .WillRepeatedly(Return(static_cast<float>(Random::RandomGenerator::max()) * 0.5));
@@ -2192,7 +2192,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
       .WillByDefault(ReturnRef(disable_http_keep_alive));
 
   codec_->protocol_ = Protocol::Http2;
-  setup(false, "");
+  setup(false, "", true, false, false);
   EXPECT_CALL(*codec_, shutdownNotice);
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -2320,8 +2320,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPat
 TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
   setup(false, "");
 
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
-
+  EXPECT_CALL(drain_close_, drainClose()).Times(0);
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -2336,6 +2335,11 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
                                                                  {":method", "GET"},
                                                                  {"connection", "keep-alive"}}};
         decoder_->decodeHeaders(std::move(headers), true);
+
+        // Initiate draining before sending the response headers
+        Event::MockTimer* drain_timer = setUpTimer();
+        EXPECT_CALL(*drain_timer, enableTimer(_, _));
+        drain_begin_timer_->invokeCallback();
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
