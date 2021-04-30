@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // :ref:`ExecuteFilterAction <envoy_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`)
 // which filter configuration to create and delegate to.
 //
-// This API is currently considered experimental and is a work in progress.
+// [#experimental:]
 message Composite {
 }
 

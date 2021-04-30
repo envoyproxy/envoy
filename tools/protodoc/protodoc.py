@@ -160,6 +160,11 @@ def format_comment_with_annotations(comment, type_name=''):
     Returns:
         A string with additional RST from annotations.
     """
+    experimental_warning = ''
+    if annotations.EXPERIMENTAL_ANNOTATION in comment.annotations:
+        experimental_warning = (
+            '.. warning::\n   This API is experimental and is not covered by the security posture.\n\n')
+
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
         extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
@@ -169,7 +174,7 @@ def format_comment_with_annotations(comment, type_name=''):
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
     comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return comment + formatted_extension + formatted_extension_category
+    return experimental_warning + comment + formatted_extension + formatted_extension_category
 
 
 def map_lines(f, s):
