@@ -688,7 +688,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-{version}.src.tar.xz"],
         release_date = "2020-03-23",
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.wasm.runtime.wavm"],
+        extensions = [
+            "envoy.wasm.runtime.wamr",
+            "envoy.wasm.runtime.wavm",
+        ],
         cpe = "cpe:2.3:a:llvm:*:*",
     ),
     com_github_wavm_wavm = dict(
