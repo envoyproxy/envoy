@@ -456,6 +456,8 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   registerTestServerPorts({listener_name_});
+  // Verify that the listener was updated and that the next connection will be to the new listener.
+  // (Note that connecting to 127.0.0.1 works whether the listener address is 127.0.0.1 or 0.0.0.0.)
   const uint32_t new_port = lookupPort(listener_name_);
   EXPECT_NE(old_port, new_port);
 
