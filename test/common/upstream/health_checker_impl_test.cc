@@ -2612,7 +2612,11 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
-  EXPECT_EQ(health_transport_socket_stats.total_match_count_.value(), 1);
+
+  // We expect 2 transport socket matches: one for when
+  // addHealthCheckingReadyCb() evaluates the match to register a callback on
+  // the socket, and once when the health checks are actually performed.
+  EXPECT_EQ(health_transport_socket_stats.total_match_count_.value(), 2);
 }
 
 TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
