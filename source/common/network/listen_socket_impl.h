@@ -25,7 +25,8 @@ protected:
   SocketPtr duplicate() override {
     // Using `new` to access a non-public constructor.
     return absl::WrapUnique(
-        new ListenSocketImpl(io_handle_->duplicate(), address_provider_->localAddress()));
+        new ListenSocketImpl(io_handle_ == nullptr ? nullptr : io_handle_->duplicate(),
+                             address_provider_->localAddress()));
   }
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
@@ -50,10 +51,12 @@ template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-      : ListenSocketImpl(Network::ioHandleForAddr(T::type, address), address) {
-    RELEASE_ASSERT(io_handle_->isOpen(), "");
-
-    setPrebindSocketOptions();
+      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address) : nullptr,
+                         address) {
+    if (bind_to_port) {
+      RELEASE_ASSERT(io_handle_->isOpen(), "");
+      setPrebindSocketOptions();
+    }
 
     setupSocket(options, bind_to_port);
   }
