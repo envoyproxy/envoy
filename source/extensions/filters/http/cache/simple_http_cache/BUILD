@@ -12,7 +12,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "simple_http_cache_lib",
+    name = "config",
     srcs = ["simple_http_cache.cc"],
     hdrs = ["simple_http_cache.h"],
     category = "envoy.filters.http.cache",
