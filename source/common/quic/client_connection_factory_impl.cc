@@ -59,7 +59,6 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
       dispatcher, /*send_buffer_limit=*/0);
-  ret->Initialize();
   return ret;
 }
 
