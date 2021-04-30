@@ -2,10 +2,10 @@
 
 #include <memory>
 
-#include "common/tracing/null_span_impl.h"
-#include "common/tracing/common_values.h"
-
 #include "envoy/tracing/trace_driver.h"
+
+#include "common/tracing/common_values.h"
+#include "common/tracing/null_span_impl.h"
 
 #include "extensions/tracers/skywalking/trace_segment_reporter.h"
 

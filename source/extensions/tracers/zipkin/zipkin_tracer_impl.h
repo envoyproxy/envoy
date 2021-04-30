@@ -12,9 +12,9 @@
 #include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
-#include "common/upstream/cluster_update_tracker.h"
 #include "common/tracing/common_values.h"
 #include "common/tracing/null_span_impl.h"
+#include "common/upstream/cluster_update_tracker.h"
 
 #include "extensions/tracers/zipkin/span_buffer.h"
 #include "extensions/tracers/zipkin/tracer.h"
