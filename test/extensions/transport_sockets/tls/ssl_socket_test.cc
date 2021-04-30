@@ -4860,7 +4860,7 @@ TEST_P(SslSocketTest, ServerAddSecretsReadyCallback) {
   server_ssl_socket_factory.addReadyCb(second_callback_.AsStdFunction());
 }
 
-// Tests adding a callback and adding secrets in parallel.  This is intended to
+// Tests adding a callback and adding secrets in parallel. This is intended to
 // catch a race condition introduced in
 // https://github.com/envoyproxy/envoy/pull/13516 where a callback would never
 // be called due to a concurrency bug.
@@ -4898,16 +4898,12 @@ TEST_P(SslSocketTest, ServerAddSecretsReadyCallbackParallel) {
     server_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
   });
 
-  // 1 microsecond of sleep seems to be a sweet spot for giving the addReadyCb
-  // thread enough of a head start to reliably cause the test to fail with buggy
-  // code.
-  std::this_thread::sleep_for(std::chrono::microseconds(1));
   server_ssl_socket_factory.onAddOrUpdateSecret();
 
   t.join();
 }
 
-// Tests adding a callback and adding secrets in parallel.  This is intended to
+// Tests adding a callback and adding secrets in parallel. This is intended to
 // catch a race condition introduced in
 // https://github.com/envoyproxy/envoy/pull/13516 where a callback would never
 // be called due to a concurrency bug.
@@ -4945,7 +4941,6 @@ TEST_P(SslSocketTest, ClientAddSecretsReadyCallbackParallel) {
     client_ssl_socket_factory.addReadyCb(mock_callback_.AsStdFunction());
   });
 
-  std::this_thread::sleep_for(std::chrono::microseconds(1));
   client_ssl_socket_factory.onAddOrUpdateSecret();
 
   t.join();

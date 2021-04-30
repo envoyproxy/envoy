@@ -350,7 +350,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
 }
 
 void HostImpl::addHealthCheckingReadyCb(std::function<void()> callback,
-                          const envoy::config::core::v3::Metadata* metadata) const {
+                                        const envoy::config::core::v3::Metadata* metadata) const {
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
                             : transportSocketFactory();
