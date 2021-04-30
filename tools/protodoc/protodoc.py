@@ -163,7 +163,8 @@ def format_comment_with_annotations(comment, type_name=''):
     experimental_warning = ''
     if annotations.EXPERIMENTAL_ANNOTATION in comment.annotations:
         experimental_warning = (
-            '.. warning::\n   This API is experimental and is not covered by the security posture.\n\n')
+            '.. warning::\n   This API is experimental and is not covered by the security posture.\n\n'
+        )
 
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
