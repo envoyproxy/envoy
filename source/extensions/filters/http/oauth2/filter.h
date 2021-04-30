@@ -60,8 +60,7 @@ public:
   const std::string& tokenSecret() const override { return token_secret_; }
 
 private:
-  void readAndWatchSecret(std::string& value,
-                          Secret::GenericSecretConfigProvider& secret_provider,
+  void readAndWatchSecret(std::string& value, Secret::GenericSecretConfigProvider& secret_provider,
                           Envoy::Common::CallbackHandlePtr& update_callback) {
     const auto* secret = secret_provider.secret();
     if (secret != nullptr) {
