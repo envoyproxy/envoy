@@ -25,17 +25,25 @@ message CacheKeyConstraints {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.discovery.v3.CacheKeyConstraints.Constraint";
 
-    // Numeric range.
-    // At least one of *min_value* or *max_value* must be set.
-    message Range {
+    // A list of one or more numeric ranges.
+    // A value is considered to match if it falls in any of the ranges.
+    message RangeList {
       option (udpa.annotations.versioning).previous_message_type =
-          "envoy.service.discovery.v3.CacheKeyConstraints.Constraint.Range";
+          "envoy.service.discovery.v3.CacheKeyConstraints.Constraint.RangeList";
 
-      // If specified, value may not be less than this.
-      uint64 min_value = 1;
+      // At least one of *min_value* or *max_value* must be set.
+      message Range {
+        option (udpa.annotations.versioning).previous_message_type =
+            "envoy.service.discovery.v3.CacheKeyConstraints.Constraint.RangeList.Range";
 
-      // If specified, value may not be greater than this.
-      uint64 max_value = 2;
+        // If specified, value may not be less than this.
+        uint64 min_value = 1;
+
+        // If specified, value may not be greater than this.
+        uint64 max_value = 2;
+      }
+
+      repeated Range range = 1;
     }
 
     message Exists {
@@ -47,8 +55,8 @@ message CacheKeyConstraints {
       // The cache key must have this specific value.
       string value = 1;
 
-      // The cache key's value must be numeric and within this range.
-      Range range = 2;
+      // The cache key's value must be numeric and within one of the ranges in this list.
+      RangeList range_list = 2;
 
       // The cache key exists.
       Exists exists = 3;
