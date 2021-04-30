@@ -1,5 +1,6 @@
 #include "common/quic/client_connection_factory_impl.h"
 
+#include "common/quic/envoy_quic_session_cache.h"
 #include "common/quic/quic_transport_socket_factory.h"
 
 namespace Envoy {
@@ -20,9 +21,10 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
-      crypto_config_(
-          std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
-              stats_scope, getConfig(transport_socket_factory), time_source))) {
+      crypto_config_(std::make_unique<quic::QuicCryptoClientConfig>(
+          std::make_unique<EnvoyQuicProofVerifier>(stats_scope, getConfig(transport_socket_factory),
+                                                   time_source),
+          std::make_unique<EnvoyQuicSessionCache>(time_source))) {
   quiche::FlagRegistry::getInstance();
 }
 
