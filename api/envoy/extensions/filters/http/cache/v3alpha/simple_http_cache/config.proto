@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.cache.v3alpha.simple_http_cache;
+
+# package envoy.source.extensions.filters.http.cache;
+
+// [#protodoc-title: SimpleHttpCache CacheFilter storage plugin]
+// [#extension: envoy.extensions.http.cache.simple_http_cache]
+
+message SimpleHttpCacheConfig {
+}
