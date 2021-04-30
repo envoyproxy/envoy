@@ -2,9 +2,7 @@
 
 #include "envoy/server/tracer_config.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
-
-#include "common/tracing/http_tracer_impl.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "extensions/tracers/xray/tracer.h"
 #include "extensions/tracers/xray/xray_configuration.h"

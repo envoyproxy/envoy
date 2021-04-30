@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
-#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/skywalking/skywalking_tracer_impl.h"
 
@@ -16,13 +15,10 @@ namespace SkyWalking {
 
 SkyWalkingTracerFactory::SkyWalkingTracerFactory() : FactoryBase("envoy.tracers.skywalking") {}
 
-Tracing::HttpTracerSharedPtr SkyWalkingTracerFactory::createHttpTracerTyped(
+Tracing::DriverSharedPtr SkyWalkingTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
-  Tracing::DriverPtr skywalking_driver =
-      std::make_unique<SkyWalking::Driver>(proto_config, context);
-  return std::make_shared<Tracing::HttpTracerImpl>(std::move(skywalking_driver),
-                                                   context.serverFactoryContext().localInfo());
+  return std::make_shared<SkyWalking::Driver>(proto_config, context);
 }
 
 /**

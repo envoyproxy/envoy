@@ -3,9 +3,7 @@
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
-
-#include "common/tracing/http_tracer_impl.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/tracing_context_impl.h"
 

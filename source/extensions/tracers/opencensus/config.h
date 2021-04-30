@@ -22,13 +22,13 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerSharedPtr
-  createHttpTracerTyped(const envoy::config::trace::v3::OpenCensusConfig& proto_config,
-                        Server::Configuration::TracerFactoryContext& context) override;
+  Tracing::DriverSharedPtr
+  createTracerDriverTyped(const envoy::config::trace::v3::OpenCensusConfig& proto_config,
+                          Server::Configuration::TracerFactoryContext& context) override;
 
   // Since OpenCensus can only support a single tracing configuration per entire process,
   // we need to make sure that it is configured at most once.
-  Tracing::HttpTracerSharedPtr tracer_;
+  Tracing::DriverSharedPtr driver_;
   envoy::config::trace::v3::OpenCensusConfig config_;
 };
 

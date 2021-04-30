@@ -23,7 +23,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
-        "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/common/version:version_lib",
         "//source/extensions/tracers/common/ot:opentracing_driver_lib",

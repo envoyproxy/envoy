@@ -18,6 +18,15 @@ envoy_cc_library(
     ],
     external_deps = ["opentracing"],
     deps = [
-        "//source/common/tracing:http_tracer_lib",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/tracing:trace_driver_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/common:empty_string",
+        "//source/common/http:header_map_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/tracing:common_values_lib",
+        "//source/common/tracing:null_span_lib",
     ],
 )
