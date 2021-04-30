@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.cache.v3alpha.simple_http_cache;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.cache.v3alpha.simple_http_cache";
+option java_outer_classname = "SimpleHttpCacheProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// package envoy.source.extensions.filters.http.cache
+
+// [#protodoc-title: SimpleHttpCache CacheFilter storage plugin]
+
+// [#extension: envoy.extensions.http.cache.simple_http_cache]
+message SimpleHttpCacheConfig {
+
+}
