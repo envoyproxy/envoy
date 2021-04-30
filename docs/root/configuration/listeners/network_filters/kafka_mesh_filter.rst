@@ -13,6 +13,10 @@ are supported.
    The kafka_mesh filter is experimental and is currently under active development.
    Capabilities will be expanded over time and the configuration structures are likely to change.
 
+.. attention::
+
+   The kafka_mesh filter is does not work on Windows (the blocker is getting librdkafka compiled).
+
 .. _config_network_filters_kafka_mesh_config:
 
 Configuration
@@ -63,8 +67,8 @@ Notes
 Given that this filter does its own processing of received requests, there are some changes in behaviour compared to explicit connection to a Kafka cluster:
 
 #. Record headers are not sent upstream.
-#. Only ProduceRequests with version 2 are supported (what means very old clients like 0.8 might not be supported).
-#. Python producers need to set API version of at least 1.0.0.
+#. Only ProduceRequests with version 2 are supported (what means very old producers like 0.8 are not going to be supported).
+#. Python producers need to set API version of at least 1.0.0, so that the produce requests they send are going to have records with magic equal to 2.
 #. Downstream handling of Kafka producer 'acks' property is delegated to upstream client.
    E.g. if upstream client is configured to use acks=0 then the response is going to be sent to downstream client as soon as possible (even if they had non-zero acks!).
 #. As the filter splits single producer requests into separate records, it's possible that delivery of only some of these records fails.
