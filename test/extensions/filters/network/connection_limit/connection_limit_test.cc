@@ -113,8 +113,8 @@ delay: 0.2s
 
   // Second connection should be connection limited.
   ActiveFilter active_filter2(config_);
-  Event::MockTimer *delay_timer =
-      new NiceMock<Event::MockTimer>(&active_filter2.read_filter_callbacks_.connection_.dispatcher_);
+  Event::MockTimer* delay_timer = new NiceMock<Event::MockTimer>(
+      &active_filter2.read_filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(200), _));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
   EXPECT_EQ(1, TestUtility::findCounter(
