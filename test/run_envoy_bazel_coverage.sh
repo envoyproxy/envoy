@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 LLVM_VERSION="11.0.1"
@@ -53,23 +52,28 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
   _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_ARGS[*]})")
   COVERAGE_TARGETS=()
   while read -r line; do COVERAGE_TARGETS+=("$line"); done \
-      <<< "$_targets"
+    <<< "$_targets"
+  # TODO(asraa): Remove when http-parser removed.
+  # Gather all targets dependending on HTTP/1.1 parser for new parser.
+  _integration_targets=$(bazel query "attr('tags', 'fuzz_target', //test/...) intersect filter('.*integration.*',//test/...)")
+  INTEGRATION_TARGETS=()
+  while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
+    <<< "$_integration_targets"
   BAZEL_BUILD_OPTIONS+=(
       "--config=fuzz-coverage"
       "--test_tag_filters=-nocoverage")
 else
   COVERAGE_TARGETS=("${COVERAGE_ARGS[*]}")
+  # TODO(asraa): Remove when http-parser removed.
+  # Gather integration targets for new parser.
+  _integration_targets=$(bazel query "filter('.*integration.*',${COVERAGE_TARGETS[*]})")
+  INTEGRATION_TARGETS=()
+  while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
+    <<< "$_integration_targets"
   BAZEL_BUILD_OPTIONS+=(
       "--config=test-coverage"
       "--test_tag_filters=-nocoverage,-fuzz_target")
 fi
-
-# TODO(asraa): Remove when http-parser removed.
-# Gather integration targets for new parser.
-_integration_targets=$(bazel query "filter('.*integration.*',${COVERAGE_TARGETS[*]})")
-INTEGRATION_TARGETS=()
-while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
-  <<< "$_integration_targets"
 
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
