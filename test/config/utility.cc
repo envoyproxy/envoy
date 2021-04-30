@@ -606,6 +606,12 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
           i, listener->mutable_address()->envoy_internal_address().server_listener_name());
       continue;
     }
+    if (listener->mutable_address()->has_pipe()) {
+      ENVOY_LOG_MISC(
+          debug, "Listener {} has pipe address {}. Will not reset to loop back socket address.",
+          i, listener->mutable_address()->pipe().path());
+      continue;
+    }
     auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
     if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
       listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));

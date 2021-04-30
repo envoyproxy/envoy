@@ -141,6 +141,7 @@ struct ActiveInternalConnection : LinkedObject<ActiveInternalConnection>,
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
+    FANCY_LOG(info, "lambdai: internal connection on event {}", static_cast<int>(event));
     // Any event leads to destruction of the connection.
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {

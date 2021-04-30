@@ -165,22 +165,30 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
     std::tie(io_handle_client, io_handle_server) =
         Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
 
-    auto internal_listener =
-        getInternalListenerManagerForTest().value().get().findByAddress(address);
-
     auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
         *this, std::move(io_handle_client), address, source_address, std::move(transport_socket),
         options);
-    auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
-        std::move(io_handle_server), address, source_address);
-    if (internal_listener.has_value()) {
-      // TODO: also check if disabled
-      internal_listener.value().get().onAccept(std::move(accepted_socket));
-    } else {
+    // TODO(lambdai): refactor nested if.
+    auto internal_listener_manager = getInternalListenerManagerForTest();
+    if (internal_listener_manager.has_value()) {
 
+      auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
+          std::move(io_handle_server), address, source_address);
+      // It's either in main thread or the worker is not yet started.
+      auto internal_listener = internal_listener_manager.value().get().findByAddress(address);
+      return client_conn;
+      if (internal_listener.has_value()) {
+        // TODO: also check if disabled
+        internal_listener.value().get().onAccept(std::move(accepted_socket));
+      } else {
+        // injected error into client_conn;
+        io_handle_server->close();
+      }
+    } else {
       // injected error into client_conn;
-      client_conn->close(Network::ConnectionCloseType::NoFlush);
+      io_handle_server->close();
     }
+
     return client_conn;
   }
   return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,

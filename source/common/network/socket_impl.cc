@@ -23,13 +23,13 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
       address_provider_(std::make_shared<SocketAddressSetterImpl>(local_address, remote_address)) {
 
   FANCY_LOG(debug,
-            "lambdai: SocketImpl::SocketImpl( local address = {} privider local address = {}",
+            "lambdai: SocketImpl::SocketImpl( local address = {} provider local address = {}",
             local_address == nullptr ? "nullptr" : local_address->asStringView(),
             address_provider_->localAddress() == nullptr
                 ? "nullptr"
                 : address_provider_->localAddress()->asStringView());
   FANCY_LOG(debug,
-            "lambdai: SocketImpl::SocketImpl( remote address = {} privider local address = {}",
+            "lambdai: SocketImpl::SocketImpl( remote address = {} provider local address = {}",
             remote_address == nullptr ? "nullptr" : remote_address->asStringView(),
             address_provider_->remoteAddress() == nullptr
                 ? "nullptr"
