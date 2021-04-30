@@ -21,7 +21,7 @@ public:
   virtual ~MatchTreeValidationVisitor() = default;
 
   // Validates a single DataInput its type_url.
-  void validateDataInput(const DataInput<DataType>& data_input, absl::string_view type_url) {
+  void validateDataInput(const DataInputFactory<DataType>& data_input, absl::string_view type_url) {
     auto status = performDataInputValidation(data_input, type_url);
 
     if (!status.ok()) {
@@ -34,7 +34,7 @@ public:
 protected:
   // Implementations would subclass this to specify the validation logic for data inputs,
   // returning a helpful error message if validation fails.
-  virtual absl::Status performDataInputValidation(const DataInput<DataType>& data_input,
+  virtual absl::Status performDataInputValidation(const DataInputFactory<DataType>& data_input,
                                                   absl::string_view type_url) PURE;
 
 private:
