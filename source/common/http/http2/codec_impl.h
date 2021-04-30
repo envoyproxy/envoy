@@ -239,6 +239,7 @@ protected:
     void setFlushTimeout(std::chrono::milliseconds timeout) override {
       stream_idle_timeout_ = timeout;
     }
+    void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
@@ -290,6 +291,7 @@ protected:
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
 
+    Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
     // never called. The watermark value is set to the size of the stream window. As a result this
     // watermark can never overflow because the peer can never send more bytes than the stream
@@ -366,13 +368,6 @@ protected:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    // Http::Stream
-    Buffer::BufferMemoryAccountSharedPtr getAccount() const override {
-      return buffer_memory_account_;
-    }
-    void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
-
-    Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     ResponseDecoder& response_decoder_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
@@ -385,10 +380,7 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()),
-          buffer_memory_account_(std::make_shared<Buffer::BufferMemoryAccountImpl>()) {
-      pending_recv_data_->bindAccount(buffer_memory_account_);
-      pending_send_data_->bindAccount(buffer_memory_account_);
+        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {
     }
 
     // StreamImpl
@@ -422,19 +414,8 @@ protected:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    // Http::Stream
-    Buffer::BufferMemoryAccountSharedPtr getAccount() const override {
-      return buffer_memory_account_;
-    }
-    void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
-      RELEASE_ASSERT(
-          false,
-          "Server Stream creates an account during construction. This should not be called.");
-    }
-
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
-    Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;

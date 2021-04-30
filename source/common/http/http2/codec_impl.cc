@@ -400,9 +400,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 
     // Instead of submitting empty trailers, we send empty data instead.
     Buffer::OwnedImpl empty_buffer;
-    encodeDataHelper(empty_buffer,
-                     /*end_stream=*/
-                     true, skip_encoding_empty_trailers);
+    encodeDataHelper(empty_buffer, /*end_stream=*/true, skip_encoding_empty_trailers);
     return;
   }
 
@@ -1544,7 +1542,7 @@ void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_le
   }
 }
 
-void ConnectionImpl::ClientStreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr account) {
+void ConnectionImpl::StreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr account) {
   buffer_memory_account_ = account;
   pending_recv_data_->bindAccount(buffer_memory_account_);
   pending_send_data_->bindAccount(buffer_memory_account_);

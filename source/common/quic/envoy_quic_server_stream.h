@@ -54,10 +54,6 @@ public:
   void setFlushTimeout(std::chrono::milliseconds) override {
     // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
   }
-  Buffer::BufferMemoryAccountSharedPtr getAccount() const override {
-    // TODO(kbaichoo): implement account tracking for QUIC.
-    return nullptr;
-  }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
     // TODO(kbaichoo): implement account tracking for QUIC.

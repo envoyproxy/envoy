@@ -68,10 +68,6 @@ public:
     // connection, invoking any watermarks as necessary. There is no internal buffering that would
     // require a flush timeout not already covered by other timeouts.
   }
-  Buffer::BufferMemoryAccountSharedPtr getAccount() const override {
-    // TODO(kbaichoo): implement account tracking for H1.
-    return nullptr;
-  }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
     // TODO(kbaichoo): implement account tracking for H1.

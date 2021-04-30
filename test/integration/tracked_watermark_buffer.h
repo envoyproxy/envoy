@@ -7,6 +7,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/synchronization/notification.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -87,8 +88,15 @@ public:
   // Wait until total bytes buffered exceeds the a given size.
   bool waitUntilTotalBufferedExceeds(uint64_t byte_size, std::chrono::milliseconds timeout);
 
-  bool waitUntilEachAccountChargedAtleast(uint64_t byte_size, uint32_t expected_num_accounts,
-                                          std::chrono::milliseconds timeout);
+  // Set the expected account balance, prior to sending requests.
+  // The test thread can then wait for this condition to be true.
+  // This is separated so that the test thread can spin up requests however it
+  // desires in between.
+  //
+  // The Envoy worker thread will notify the test thread once the condition is
+  // met.
+  void setExpectedAccountBalance(uint64_t byte_size, uint32_t num_accounts);
+  bool waitForExpectedAccountBalanceWithTimeout(std::chrono::milliseconds timeout);
 
   // Number of accounts bound to a buffer that's still in use.
   uint64_t numAccountsActive();
@@ -107,11 +115,22 @@ private:
   // Remove "dangling" accounts; accounts where the account_info map is the only
   // entity still pointing to the account.
   void removeDanglingAccounts() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  // Should only be executed on the Envoy's worker thread. Otherwise, we have a
+  // possible race condition.
+  void checkIfExpectedBalancesMet() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   struct BufferInfo {
     uint32_t watermark_ = 0;
     uint64_t current_size_ = 0;
     uint64_t max_size_ = 0;
+  };
+
+  struct AccountBalanceExpectations {
+    AccountBalanceExpectations(uint64_t balance_per_account, uint32_t num_accounts)
+        : balance_per_account_(balance_per_account), num_accounts_(num_accounts) {}
+
+    uint64_t balance_per_account_ = 0;
+    uint32_t num_accounts_ = 0;
   };
 
   mutable absl::Mutex mutex_;
@@ -123,6 +142,11 @@ private:
   uint64_t total_buffer_size_ ABSL_GUARDED_BY(mutex_) = 0;
   // Info about the buffer, by buffer idx.
   absl::node_hash_map<uint64_t, BufferInfo> buffer_infos_ ABSL_GUARDED_BY(mutex_);
+  // The expected balances for the accounts. If set, when a buffer updates its
+  // size, it also checks whether the expected_balances has been satisfied, and
+  // notifies waiters of expected_balances_met_.
+  absl::optional<AccountBalanceExpectations> expected_balances_ ABSL_GUARDED_BY(mutex_);
+  absl::Notification expected_balances_met_;
   // Map from accounts to buffers bound to that account.
   AccountToBoundBuffersMap account_infos_ ABSL_GUARDED_BY(mutex_);
   // Set of actively bound buffers. Used for asserting that buffers are bound

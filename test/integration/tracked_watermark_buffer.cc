@@ -23,6 +23,8 @@ TrackedWatermarkBufferFactory::create(std::function<void()> below_low_watermark,
           buffer_info.max_size_ = current_size;
         }
         buffer_info.current_size_ = current_size;
+
+        checkIfExpectedBalancesMet();
       },
       [this, &buffer_info](uint32_t watermark) {
         absl::MutexLock lock(&mutex_);
@@ -154,26 +156,38 @@ void TrackedWatermarkBufferFactory::removeDanglingAccounts() {
   }
 }
 
-bool TrackedWatermarkBufferFactory::waitUntilEachAccountChargedAtleast(
-    uint64_t byte_size, uint32_t expected_num_accounts, std::chrono::milliseconds timeout) {
+void TrackedWatermarkBufferFactory::setExpectedAccountBalance(uint64_t byte_size,
+                                                              uint32_t num_accounts) {
   absl::MutexLock lock(&mutex_);
-  auto predicate = [this, byte_size,
-                    expected_num_accounts]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-    mutex_.AssertHeld();
+  ASSERT(!expected_balances_.has_value());
+  expected_balances_.emplace(byte_size, num_accounts);
+}
 
-    removeDanglingAccounts();
-    if (account_infos_.size() < expected_num_accounts) {
-      return false;
-    }
+bool TrackedWatermarkBufferFactory::waitForExpectedAccountBalanceWithTimeout(
+    std::chrono::milliseconds timeout) {
+  return expected_balances_met_.WaitForNotificationWithTimeout(absl::FromChrono(timeout));
+}
 
-    for (auto& acc : account_infos_) {
-      if (static_cast<Buffer::BufferMemoryAccountImpl*>(acc.first.get())->balance() < byte_size) {
-        return false;
-      }
+void TrackedWatermarkBufferFactory::checkIfExpectedBalancesMet() {
+  if (!expected_balances_ || expected_balances_met_.HasBeenNotified()) {
+    return;
+  }
+
+  removeDanglingAccounts();
+  if (account_infos_.size() < expected_balances_->num_accounts_) {
+    return;
+  }
+
+  // This is thread safe since this function should run on the only Envoy worker
+  // thread.
+  for (auto& acc : account_infos_) {
+    if (static_cast<Buffer::BufferMemoryAccountImpl*>(acc.first.get())->balance() <
+        expected_balances_->balance_per_account_) {
+      return;
     }
-    return true;
-  };
-  return mutex_.AwaitWithTimeout(absl::Condition(&predicate), absl::Milliseconds(timeout.count()));
+  }
+
+  expected_balances_met_.Notify();
 }
 
 uint64_t TrackedWatermarkBufferFactory::numAccountsActive() {

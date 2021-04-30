@@ -21,7 +21,6 @@ public:
   MOCK_METHOD(uint32_t, bufferLimit, ());
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, connectionLocalAddress, ());
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
-  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, getAccount, (), (const));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
 
   std::list<StreamCallbacks*> callbacks_{};

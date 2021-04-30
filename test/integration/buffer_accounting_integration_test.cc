@@ -105,9 +105,8 @@ protected:
         [&stream](Buffer::TrackedWatermarkBufferFactory::AccountToBoundBuffersMap& map) {
           stream << "Printing Account map. Size: " << map.size() << '\n';
           for (auto& entry : map) {
-            stream << "  Account: " << entry.first << " Charged Amount: "
-                   << static_cast<Buffer::BufferMemoryAccountImpl*>(entry.first.get())->balance()
-                   << '\n';
+            // We can't access the accounts balance in a thread safe way here.
+            stream << "  Account: " << entry.first << '\n';
             for (auto& buffer : entry.second) {
               stream << "    Buffer: " << buffer << '\n';
             }
@@ -179,11 +178,14 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   const uint32_t downstream_h2_conn_window = 64 * 1024;
   const uint32_t upstream_h2_stream_window = 64 * 1024;
   const uint32_t upstream_h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  const uint32_t request_body_size = 4096;
+  const uint32_t response_body_size = 4096;
 
   initializeWithBufferConfig({connection_watermark, downstream_h2_stream_window,
                               downstream_h2_conn_window, upstream_h2_stream_window,
                               upstream_h2_conn_window},
                              num_requests);
+  buffer_factory_->setExpectedAccountBalance(request_body_size, num_requests);
 
   // Makes us have Envoy's writes to upstream return EAGAIN
   writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
@@ -191,13 +193,11 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  const uint32_t request_body_size = 4096;
-  const uint32_t response_body_size = 4096;
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   // Wait for all requests to have accounted for the requests we've sent.
-  ASSERT_TRUE(buffer_factory_->waitUntilEachAccountChargedAtleast(request_body_size, num_requests,
-                                                                  TestUtility::DefaultTimeout))
+  ASSERT_TRUE(
+      buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
       << "buffer total: " << buffer_factory_->totalBufferSize()
       << " buffer max: " << buffer_factory_->maxBufferSize()
       << " active accounts: " << buffer_factory_->numAccountsActive()
@@ -218,11 +218,14 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   const uint32_t downstream_h2_conn_window = 64 * 1024;
   const uint32_t upstream_h2_stream_window = 64 * 1024;
   const uint32_t upstream_h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
+  const uint32_t request_body_size = 4096;
+  const uint32_t response_body_size = 16384;
 
   initializeWithBufferConfig({connection_watermark, downstream_h2_stream_window,
                               downstream_h2_conn_window, upstream_h2_stream_window,
                               upstream_h2_conn_window},
                              num_requests);
+  buffer_factory_->setExpectedAccountBalance(response_body_size, num_requests);
   writev_matcher_->setSourcePort(lookupPort("http"));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -230,13 +233,11 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   // start to accumulate in the transport socket buffer.
   writev_matcher_->setWritevReturnsEgain();
 
-  const uint32_t request_body_size = 4096;
-  const uint32_t response_body_size = 16384;
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   // Wait for all requests to buffered the response from upstream.
-  ASSERT_TRUE(buffer_factory_->waitUntilEachAccountChargedAtleast(response_body_size, num_requests,
-                                                                  TestUtility::DefaultTimeout))
+  ASSERT_TRUE(
+      buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
       << "buffer total: " << buffer_factory_->totalBufferSize()
       << " buffer max: " << buffer_factory_->maxBufferSize()
       << " active accounts: " << buffer_factory_->numAccountsActive()
