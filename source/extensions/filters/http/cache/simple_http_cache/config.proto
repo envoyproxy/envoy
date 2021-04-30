@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.source.extensions.filters.http.cache;
 
 // [#protodoc-title: SimpleHttpCache CacheFilter storage plugin]
-// [#extension: envoy.extensions.http.cache]
+// [#extension: envoy.extensions.http.simple_http_cache]
 
 message SimpleHttpCacheConfig {
 }
