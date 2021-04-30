@@ -1105,14 +1105,8 @@ TEST_F(HttpConnectionManagerImplTest, StripTrailingHostDot) {
   const std::string original_host = "host.";
   const std::string updated_host = "host";
   // Set up the codec.
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        data.drain(4);
-        return Http::okStatus();
-      }));
   Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
+  conn_manager_->createCodec(fake_input);
   // Create a new stream
   decoder_ = &conn_manager_->newStream(response_encoder_);
   RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
