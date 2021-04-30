@@ -69,7 +69,6 @@ EXTENSIONS = {
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
-    "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:config",
     "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
     "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
@@ -215,8 +214,9 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
+    "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:config",
 
-    "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+    # "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
 
     #
     # Internal redirect predicates
