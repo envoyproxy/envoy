@@ -7,15 +7,21 @@ import java.lang.ref.WeakReference
  * Envoy implementation of a `Timer` for time measurements e.g. distribution of durations.
  */
 internal class TimerImpl : Timer {
-  internal val envoyEngine: WeakReference<EnvoyEngine>
-  internal val elements: String
+  var envoyEngine: WeakReference<EnvoyEngine>
+  var series: String
+  var tags: Tags
 
-  internal constructor(engine: EnvoyEngine, elements: List<Element>) {
+  internal constructor(engine: EnvoyEngine, elements: List<Element>, tags: Tags = TagsBuilder().build()) {
     this.envoyEngine = WeakReference<EnvoyEngine>(engine)
-    this.elements = elements.joinToString(separator = ".") { it.value }
+    this.series = elements.joinToString(separator = ".") { it.value }
+    this.tags = tags
   }
 
   override fun completeWithDuration(durationMs: Int) {
-    envoyEngine.get()?.recordHistogramDuration(elements, emptyMap<String, String>(), durationMs)
+    envoyEngine.get()?.recordHistogramDuration(series, this.tags.allTags(), durationMs)
+  }
+
+  override fun completeWithDuration(tags: Tags, durationMs: Int) {
+    envoyEngine.get()?.recordHistogramDuration(series, tags.allTags(), durationMs)
   }
 }

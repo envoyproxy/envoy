@@ -9,33 +9,44 @@ final class PulseClientImplTests: XCTestCase {
     MockEnvoyEngine.onRecordCounter = nil
   }
 
-  func testCounterDelegatesToEngine() {
+  func testCounterDelegatesToEngineWithTagsAndCount() {
     var actualSeries: String?
+    var actualTags = [String: String]()
     var actualCount: UInt?
-    MockEnvoyEngine.onRecordCounter = { series, count in
+    MockEnvoyEngine.onRecordCounter = { series, tags, count in
       actualSeries = series
+      actualTags = tags
       actualCount = count
     }
     let mockEngine = MockEnvoyEngine()
     let pulseClient = PulseClientImpl(engine: mockEngine)
-    let counter = pulseClient.counter(elements: ["test", "stat"])
+    let counter = pulseClient.counter(
+      elements: ["test", "stat"],
+      tags: TagsBuilder().add(name: "testKey", value: "testValue").build()
+    )
     counter.increment()
     XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualTags, ["testKey": "testValue"])
     XCTAssertEqual(actualCount, 1)
   }
 
   func testCounterDelegatesToEngineWithCount() {
     var actualSeries: String?
+    var actualTags = [String: String]()
     var actualCount: UInt?
-    MockEnvoyEngine.onRecordCounter = { series, count in
+    MockEnvoyEngine.onRecordCounter = { series, tags, count in
       actualSeries = series
+      actualTags = tags
       actualCount = count
     }
     let mockEngine = MockEnvoyEngine()
     let pulseClient = PulseClientImpl(engine: mockEngine)
+
+    // Also verifies that counter can be created without tags
     let counter = pulseClient.counter(elements: ["test", "stat"])
     counter.increment(count: 5)
     XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualTags, [:])
     XCTAssertEqual(actualCount, 5)
   }
 
@@ -51,41 +62,53 @@ final class PulseClientImplTests: XCTestCase {
     }
   }
 
-  func testGaugeSetDelegatesToEngineWithValue() {
+  func testGaugeSetDelegatesToEngineWithTagsAndValue() {
     var actualSeries: String?
+    var actualTags = [String: String]()
     var actualValue: UInt?
-    MockEnvoyEngine.onRecordGaugeSet = { series, value in
+    MockEnvoyEngine.onRecordGaugeSet = { series, tags, value in
       actualSeries = series
+      actualTags = tags
       actualValue = value
     }
     let mockEngine = MockEnvoyEngine()
     let pulseClient = PulseClientImpl(engine: mockEngine)
-    let gauge = pulseClient.gauge(elements: ["test", "stat"])
+    let gauge = pulseClient.gauge(
+      elements: ["test", "stat"],
+      tags: TagsBuilder().add(name: "testKey", value: "testValue").build()
+    )
     gauge.set(value: 5)
     XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualTags, ["testKey": "testValue"])
     XCTAssertEqual(actualValue, 5)
   }
 
   func testGaugeAddDelegatesToEngineWithAmount() {
     var actualSeries: String?
+    var actualTags = [String: String]()
     var actualAmount: UInt?
-    MockEnvoyEngine.onRecordGaugeAdd = { series, amount in
+    MockEnvoyEngine.onRecordGaugeAdd = { series, tags, amount in
       actualSeries = series
+      actualTags = tags
       actualAmount = amount
     }
     let mockEngine = MockEnvoyEngine()
     let pulseClient = PulseClientImpl(engine: mockEngine)
+    // Also verifies that counter can be created without tags
     let gauge = pulseClient.gauge(elements: ["test", "stat"])
     gauge.add(amount: 5)
     XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualTags, [:])
     XCTAssertEqual(actualAmount, 5)
   }
 
   func testGaugeSubDelegatesToEngineWithAmount() {
     var actualSeries: String?
+    var actualTags = [String: String]()
     var actualAmount: UInt?
-    MockEnvoyEngine.onRecordGaugeSub = { series, amount in
+    MockEnvoyEngine.onRecordGaugeSub = { series, tags, amount in
       actualSeries = series
+      actualTags = tags
       actualAmount = amount
     }
     let mockEngine = MockEnvoyEngine()
@@ -93,41 +116,54 @@ final class PulseClientImplTests: XCTestCase {
     let gauge = pulseClient.gauge(elements: ["test", "stat"])
     gauge.sub(amount: 5)
     XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualTags, [:])
     XCTAssertEqual(actualAmount, 5)
   }
 
-  func testTimerCompleteWithDurationDelegatesToEngineWithValue() {
+  func testTimerCompleteWithDurationDelegatesToEngineWithTagsAndValue() {
     var actualSeries: String?
+    var actualTags = [String: String]()
     var actualDuration: UInt?
-    MockEnvoyEngine.onRecordHistogramDuration = { series, duration in
+    MockEnvoyEngine.onRecordHistogramDuration = { series, tags, duration in
       actualSeries = series
+      actualTags = tags
       actualDuration = duration
     }
     let mockEngine = MockEnvoyEngine()
 
     let pulseClient = PulseClientImpl(engine: mockEngine)
-    let timer = pulseClient.timer(elements: ["test", "stat"])
+    let timer = pulseClient.timer(
+      elements: ["test", "stat"],
+      tags: TagsBuilder().add(name: "testKey", value: "testValue").build()
+    )
     timer.completeWithDuration(durationMs: 5)
 
     XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualTags, ["testKey": "testValue"])
     XCTAssertEqual(actualDuration, 5)
   }
 
-  func testDistributionRecordValueDelegatesToEngineWithValue() {
+  func testDistributionRecordValueDelegatesToEngineWithTagsAndValue() {
     var actualSeries: String?
+    var actualTags = [String: String]()
     var actualValue: UInt?
 
-    MockEnvoyEngine.onRecordHistogramValue = { series, value in
+    MockEnvoyEngine.onRecordHistogramValue = { series, tags, value in
       actualSeries = series
+      actualTags = tags
       actualValue = value
     }
     let mockEngine = MockEnvoyEngine()
 
     let pulseClient = PulseClientImpl(engine: mockEngine)
-    let distribution = pulseClient.distribution(elements: ["test", "stat"])
+    let distribution = pulseClient.distribution(
+      elements: ["test", "stat"],
+      tags: TagsBuilder().add(name: "testKey", value: "testValue").build()
+    )
     distribution.recordValue(value: 5)
 
     XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualTags, ["testKey": "testValue"])
     XCTAssertEqual(actualValue, 5)
   }
 }

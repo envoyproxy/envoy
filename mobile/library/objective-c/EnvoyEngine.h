@@ -9,6 +9,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// A set of headers that may be passed to/from an Envoy stream.
 typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
+typedef NSDictionary<NSString *, NSString *> EnvoyTags;
+
 #pragma mark - EnvoyHTTPCallbacks
 
 /// Interface that can handle callbacks from an HTTP stream.
@@ -344,7 +346,7 @@ extern const int kEnvoyFailure;
  @param count Amount to add to the counter.
  @return A status indicating if the action was successful.
  */
-- (int)recordCounterInc:(NSString *)elements count:(NSUInteger)count;
+- (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count;
 
 /**
  Set a gauge of a given string of elements with the given value.
@@ -353,7 +355,7 @@ extern const int kEnvoyFailure;
  @param value Value to set to the gauge.
  @return A status indicating if the action was successful.
  */
-- (int)recordGaugeSet:(NSString *)elements value:(NSUInteger)value;
+- (int)recordGaugeSet:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value;
 
 /**
  Add the gauge with the given string of elements and by the given amount.
@@ -362,7 +364,7 @@ extern const int kEnvoyFailure;
  @param amount Amount to add to the gauge.
  @return A status indicating if the action was successful.
  */
-- (int)recordGaugeAdd:(NSString *)elements amount:(NSUInteger)amount;
+- (int)recordGaugeAdd:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount;
 
 /**
  Subtract from the gauge with the given string of elements and by the given amount.
@@ -371,7 +373,7 @@ extern const int kEnvoyFailure;
  @param amount Amount to subtract from the gauge.
  @return A status indicating if the action was successful.
  */
-- (int)recordGaugeSub:(NSString *)elements amount:(NSUInteger)amount;
+- (int)recordGaugeSub:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount;
 
 /**
  Add another recorded duration to the timer histogram with the given string of elements.
@@ -379,7 +381,9 @@ extern const int kEnvoyFailure;
  @param durationMs The duration in milliseconds to record in the histogram distribution
  @return A status indicating if the action was successful.
  */
-- (int)recordHistogramDuration:(NSString *)elements durationMs:(NSUInteger)durationMs;
+- (int)recordHistogramDuration:(NSString *)elements
+                          tags:(EnvoyTags *)tags
+                    durationMs:(NSUInteger)durationMs;
 
 /**
  Add another recorded value to the histogram with the given string of elements.
@@ -387,7 +391,7 @@ extern const int kEnvoyFailure;
  @param value Amount to record as a new value for the histogram distribution.
  @return A status indicating if the action was successful.
  */
-- (int)recordHistogramValue:(NSString *)elements value:(NSUInteger)value;
+- (int)recordHistogramValue:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value;
 
 @end
 

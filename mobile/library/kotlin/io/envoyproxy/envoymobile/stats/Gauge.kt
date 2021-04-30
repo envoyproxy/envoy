@@ -3,12 +3,21 @@ package io.envoyproxy.envoymobile
 /** A time series gauge. */
 interface Gauge {
 
-  /** Set the gauge by the given value. */
+  /** Sets the gauge by the given value. */
   fun set(value: Int)
 
-  /** Add the given amount to the gauge. */
+  /** Sets the gauge by the given value along with tags. */
+  fun set(tags: Tags = TagsBuilder().build(), value: Int)
+
+  /** Adds the given amount to the gauge. */
   fun add(amount: Int)
 
-  /** Subtract the given amount from the gauge. */
+  /** Adds the given amount to the gauge along with tags. */
+  fun add(tags: Tags = TagsBuilder().build(), amount: Int)
+
+  /** Subtracts the given amount from the gauge. */
   fun sub(amount: Int)
+
+  /** Subtracts the given amount from the gauge along with tags. */
+  fun sub(tags: Tags = TagsBuilder().build(), amount: Int)
 }

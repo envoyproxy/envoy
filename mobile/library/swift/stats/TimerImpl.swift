@@ -5,17 +5,26 @@ import Foundation
 @objcMembers
 final class TimerImpl: NSObject, Timer {
   private let series: String
+  private let tags: Tags
   private weak var engine: EnvoyEngine?
 
-  init(elements: [Element], engine: EnvoyEngine) {
+  init(elements: [Element], tags: Tags, engine: EnvoyEngine) {
     self.series = elements.map { $0.value }.joined(separator: ".")
     self.engine = engine
+    self.tags = tags
     super.init()
   }
 
   /// Record a new duration value for the distribution.
   func completeWithDuration(durationMs: Int) {
     // TODO(jingwei99) potentially surface error up if engine is nil.
-    self.engine?.recordHistogramDuration(self.series, durationMs: numericCast(durationMs))
+    self.engine?.recordHistogramDuration(
+      self.series, tags: self.tags.allTags(), durationMs: numericCast(durationMs))
+  }
+
+  /// Record a new duration value for the distribution with tags.
+  func completeWithDuration(tags: Tags, durationMs: Int) {
+    self.engine?.recordHistogramDuration(
+      self.series, tags: tags.allTags(), durationMs: numericCast(durationMs))
   }
 }
