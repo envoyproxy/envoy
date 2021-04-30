@@ -449,17 +449,18 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
   return is_valid_path;
 }
 
-void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                                  const ConnectionManagerConfig& config,
-                                                  uint32_t port) {
-  if (config.stripPortType() == Http::StripPortType::Any) {
-    HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
-  } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
-    HeaderUtility::stripPortFromHost(request_headers, port);
-  }
+absl::optional<uint32_t>
+ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                             const ConnectionManagerConfig& config, uint32_t port) {
   if (config.shouldStripTrailingHostDot()) {
     HeaderUtility::stripTrailingHostDot(request_headers);
   }
+  if (config.stripPortType() == Http::StripPortType::Any) {
+    return HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
+  } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
+    return HeaderUtility::stripPortFromHost(request_headers, port);
+  }
+  return absl::nullopt;
 }
 
 } // namespace Http

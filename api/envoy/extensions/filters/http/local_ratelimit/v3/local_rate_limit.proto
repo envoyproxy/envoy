@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -63,8 +63,14 @@ message LocalRateLimit {
   // Defaults to 0% of requests for safety.
   config.core.v3.RuntimeFractionalPercent filter_enforced = 5;
 
+  // Specifies a list of HTTP headers that should be added to each request that
+  // has been rate limited and is also forwarded upstream. This can only occur when the
+  // filter is enabled but not enforced.
+  repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 10
+      [(validate.rules).repeated = {max_items: 10}];
+
   // Specifies a list of HTTP headers that should be added to each response for requests that
-  // have been rate limited.
+  // have been rate limited. This occurs when the filter is either enabled or fully enforced.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 6
       [(validate.rules).repeated = {max_items: 10}];
 
