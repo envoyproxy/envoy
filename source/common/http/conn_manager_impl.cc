@@ -446,6 +446,15 @@ void ConnectionManagerImpl::doConnectionClose(
     connection_duration_timer_.reset();
   }
 
+  if (start_drain_cb_) {
+    start_drain_cb_.reset();
+  }
+
+  if (start_drain_timer_) {
+    start_drain_timer_->disableTimer();
+    start_drain_timer_.reset();
+  }
+
   if (drain_timer_) {
     drain_timer_->disableTimer();
     drain_timer_.reset();
