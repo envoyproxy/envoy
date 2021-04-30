@@ -78,9 +78,12 @@ void NewGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
-    ControlPlaneStats&) {
+    ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
   auto sub = subscriptions_.find(message->type_url());
   // If this type url is not watched, try another version type url.
   if (enable_type_url_downgrade_and_upgrade_ && sub == subscriptions_.end()) {
