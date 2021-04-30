@@ -98,6 +98,37 @@ delay: 0s
                    ->value());
 }
 
+// Connection limit with delay case.
+TEST_F(ConnectionLimitFilterTest, ConnectionLimitWithDelay) {
+  initialize(R"EOF(
+stat_prefix: connection_limit_stats
+max_connections: 1
+delay: 0.2s
+)EOF");
+
+  // First connection is OK.
+  InSequence s;
+  ActiveFilter active_filter1(config_);
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onNewConnection());
+
+  // Second connection should be connection limited.
+  ActiveFilter active_filter2(config_);
+  Event::MockTimer *delay_timer =
+      new NiceMock<Event::MockTimer>(&active_filter2.read_filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(200), _));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
+  EXPECT_EQ(1, TestUtility::findCounter(
+                   stats_store_, "connection_limit.connection_limit_stats.limited_connections")
+                   ->value());
+  EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
+                                      "connection_limit.connection_limit_stats.active_connections")
+                   ->value());
+  delay_timer->invokeCallback();
+  EXPECT_EQ(1, TestUtility::findGauge(stats_store_,
+                                      "connection_limit.connection_limit_stats.active_connections")
+                   ->value());
+}
+
 // Verify the runtime disable functionality.
 TEST_F(ConnectionLimitFilterTest, RuntimeDisabled) {
   initialize(R"EOF(
