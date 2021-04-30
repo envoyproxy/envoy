@@ -31,8 +31,3 @@ envoy_cc_extension(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
-
-envoy_proto_library(
-    name = "config",
-    srcs = ["config.proto"],
-)
