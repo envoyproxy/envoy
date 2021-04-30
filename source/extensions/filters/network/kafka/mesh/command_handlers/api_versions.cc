@@ -8,7 +8,6 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-// TOOD (adam.kotwasinski) API key constants should be present in 'responses' header.
 constexpr int16_t PRODUCE_API_KEY = 0;
 // Introduced in Kafka 1.0, together with record format 2.
 constexpr int16_t MIN_PRODUCE_SUPPORTED = 5;
