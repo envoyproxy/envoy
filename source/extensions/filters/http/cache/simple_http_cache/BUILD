@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_extension_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
