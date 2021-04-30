@@ -66,7 +66,7 @@ fi
 
 # TODO(asraa): Remove when http-parser removed.
 # Gather integration targets for new parser.
-_integration_targets=$(bazel query "filter('.*integration.*',${COVERAGE_ARGS[*]})")
+_integration_targets=$(bazel query "filter('.*integration.*',${COVERAGE_TARGETS[*]})")
 INTEGRATION_TARGETS=()
 while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
   <<< "$_integration_targets"
