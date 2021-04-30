@@ -56,7 +56,8 @@ public:
   ~TypedMetadataFactory() override = default;
 
   /**
-   * Convert the google.protobuf.Struct into an instance of TypedMetadata::Object.
+   * Convert the google.protobuf.Struct or google.protobuf.Any
+   * into an instance of TypedMetadata::Object.
    * It should throw an EnvoyException in case the conversion can't be completed.
    * @param data config data stored as a protobuf struct.
    * @return a derived class object pointer of TypedMetadata.
@@ -65,15 +66,8 @@ public:
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& data) const PURE;
 
-  // Subclass has to override and implement this function so that Envoy will be
-  // able to parse and use `typed_filter_metadata` field. Otherwise,
-  // `typed_filter_metadata` will be ignored.
-  // This is not pure virtual because we do not want to break any existing
-  // subclasses, who have not yet had a override on this function.
-  virtual std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Any& data) const {
-    (void)data; // avoid the unused parameter error
-    return nullptr;
-  }
+  virtual std::unique_ptr<const TypedMetadata::Object>
+  parse(const ProtobufWkt::Any& data) const PURE;
 
   std::string category() const override { return "envoy.typed_metadata"; }
 };

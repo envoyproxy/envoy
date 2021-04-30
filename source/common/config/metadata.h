@@ -120,14 +120,19 @@ protected:
     for (const auto& [factory_name, factory] :
          Registry::FactoryRegistry<factoryClass>::factories()) {
       const auto& typed_meta_iter = typed_data_by_key.find(factory_name);
-      // Struct is deprecated in favor of Any.
+      // If the key exists in Any metadata, and parse() not return nullptr,
+      // populate data_.
       if (typed_meta_iter != typed_data_by_key.end()) {
-        data_[factory->name()] = factory->parse(typed_meta_iter->second);
-      } else {
-        const auto& meta_iter = data_by_key.find(factory_name);
-        if (meta_iter != data_by_key.end()) {
-          data_[factory->name()] = factory->parse(meta_iter->second);
+        auto result = factory->parse(typed_meta_iter->second);
+        if (result != nullptr) {
+          data_[factory->name()] = std::move(result);
+          continue;
         }
+      }
+      // Fall back cases to parsing Struct metadata and populate data_.
+      const auto& meta_iter = data_by_key.find(factory_name);
+      if (meta_iter != data_by_key.end()) {
+        data_[factory->name()] = factory->parse(meta_iter->second);
       }
     }
   }
