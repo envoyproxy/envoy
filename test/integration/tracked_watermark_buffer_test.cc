@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -175,6 +176,23 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
 
   buffer3.reset();
   EXPECT_EQ(factory_.numAccountsActive(), 0);
+}
+
+TEST_F(TrackedWatermarkBufferTest, WaitForExpectedAccountBalanceShouldReturnTrueWhenConditionsMet) {
+  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
+  BufferMemoryAccountSharedPtr account1 = std::make_shared<BufferMemoryAccountImpl>();
+  BufferMemoryAccountSharedPtr account2 = std::make_shared<BufferMemoryAccountImpl>();
+  buffer1->bindAccount(account1);
+  buffer2->bindAccount(account2);
+
+  factory_.setExpectedAccountBalance(4096, 2);
+
+  buffer1->add("Need to wait on the other buffer to get data.");
+  EXPECT_FALSE(factory_.waitForExpectedAccountBalanceWithTimeout(std::chrono::seconds(0)));
+
+  buffer2->add("Now we have expected balances!");
+  EXPECT_TRUE(factory_.waitForExpectedAccountBalanceWithTimeout(std::chrono::seconds(0)));
 }
 
 } // namespace
