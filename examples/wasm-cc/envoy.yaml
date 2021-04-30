@@ -30,6 +30,12 @@ static_resources:
               config:
                 name: "my_plugin"
                 root_id: "my_root_id"
+                # if your wasm filter requires custom configuration you can add
+                # as follows
+                configuration:
+                  "@type": "type.googleapis.com/google.protobuf.StringValue"
+                  value: |
+                    {}
                 vm_config:
                   runtime: "envoy.wasm.runtime.v8"
                   vm_id: "my_vm_id"
