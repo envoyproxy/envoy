@@ -143,7 +143,8 @@ message HTTPFault {
   string abort_grpc_status_runtime = 14;
 
   // To control whether stats storage is allocated dynamiclly for each downstream server.
-  // If set to false, "x-envoy-downstream-service-cluster" field of header will be ignored by this filter.
-  // Default to be false.
+  // If set to true, "x-envoy-downstream-service-cluster" field of header will be ignored by this filter.
+  // If set to false, dynamic stats storage will be allocated for the downstream cluster name.
+  // Default value is false.
   bool disable_downstream_cluster_stats = 15;
 }
