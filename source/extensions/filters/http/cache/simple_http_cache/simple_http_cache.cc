@@ -215,7 +215,7 @@ public:
   // From TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>();
+        envoy::extensions::cache::simple_http_cache::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
   HttpCache&
