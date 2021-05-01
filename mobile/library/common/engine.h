@@ -109,8 +109,8 @@ private:
   envoy_logger logger_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
-  std::unique_ptr<Http::Client> http_client_;
-  std::unique_ptr<Event::ProvisionalDispatcher> dispatcher_;
+  Http::ClientPtr http_client_;
+  Event::ProvisionalDispatcherPtr dispatcher_;
   Logger::LambdaDelegatePtr lambda_logger_{};
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;

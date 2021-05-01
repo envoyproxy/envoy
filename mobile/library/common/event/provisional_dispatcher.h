@@ -62,5 +62,7 @@ private:
   Thread::ThreadSynchronizer synchronizer_;
 };
 
+using ProvisionalDispatcherPtr = std::unique_ptr<ProvisionalDispatcher>;
+
 } // namespace Event
 } // namespace Envoy

@@ -226,5 +226,7 @@ private:
   Thread::ThreadSynchronizer synchronizer_;
 };
 
+using ClientPtr = std::unique_ptr<Client>;
+
 } // namespace Http
 } // namespace Envoy
