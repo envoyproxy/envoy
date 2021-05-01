@@ -148,92 +148,82 @@ Engine::~Engine() { terminate(); }
 envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats_tags tags,
                                         uint64_t count) {
   ENVOY_LOG(trace, "[pulse.{}] recordCounterInc", elements);
-  if (server_ && client_scope_ && stat_name_set_) {
-    Stats::StatNameTagVector tags_vctr =
-        Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-    std::string name = Stats::Utility::sanitizeStatsName(elements);
-    Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(name)}, tags_vctr)
-        .add(count);
-    return ENVOY_SUCCESS;
-  }
-  return ENVOY_FAILURE;
+  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
+  Stats::StatNameTagVector tags_vctr =
+      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
+  std::string name = Stats::Utility::sanitizeStatsName(elements);
+  Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(name)}, tags_vctr)
+      .add(count);
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t Engine::recordGaugeSet(const std::string& elements, envoy_stats_tags tags,
                                       uint64_t value) {
   ENVOY_LOG(trace, "[pulse.{}] recordGaugeSet", elements);
-  if (server_ && client_scope_ && stat_name_set_) {
-    Stats::StatNameTagVector tags_vctr =
-        Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-    std::string name = Stats::Utility::sanitizeStatsName(elements);
-    Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                      Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-        .set(value);
-    return ENVOY_SUCCESS;
-  }
-  return ENVOY_FAILURE;
+  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
+  Stats::StatNameTagVector tags_vctr =
+      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
+  std::string name = Stats::Utility::sanitizeStatsName(elements);
+  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
+                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
+      .set(value);
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t Engine::recordGaugeAdd(const std::string& elements, envoy_stats_tags tags,
                                       uint64_t amount) {
   ENVOY_LOG(trace, "[pulse.{}] recordGaugeAdd", elements);
-  if (server_ && client_scope_ && stat_name_set_) {
-    Stats::StatNameTagVector tags_vctr =
-        Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-    std::string name = Stats::Utility::sanitizeStatsName(elements);
-    Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                      Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-        .add(amount);
-    return ENVOY_SUCCESS;
-  }
-  return ENVOY_FAILURE;
+  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
+  Stats::StatNameTagVector tags_vctr =
+      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
+  std::string name = Stats::Utility::sanitizeStatsName(elements);
+  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
+                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
+      .add(amount);
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t Engine::recordGaugeSub(const std::string& elements, envoy_stats_tags tags,
                                       uint64_t amount) {
   ENVOY_LOG(trace, "[pulse.{}] recordGaugeSub", elements);
-  if (server_ && client_scope_ && stat_name_set_) {
-    Stats::StatNameTagVector tags_vctr =
-        Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-    std::string name = Stats::Utility::sanitizeStatsName(elements);
-    Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                      Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-        .sub(amount);
-    return ENVOY_SUCCESS;
-  }
-  return ENVOY_FAILURE;
+  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
+  Stats::StatNameTagVector tags_vctr =
+      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
+  std::string name = Stats::Utility::sanitizeStatsName(elements);
+  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
+                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
+      .sub(amount);
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t Engine::recordHistogramValue(const std::string& elements, envoy_stats_tags tags,
                                             uint64_t value,
                                             envoy_histogram_stat_unit_t unit_measure) {
   ENVOY_LOG(trace, "[pulse.{}] recordHistogramValue", elements);
-  if (server_ && client_scope_ && stat_name_set_) {
-    Stats::StatNameTagVector tags_vctr =
-        Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-    std::string name = Stats::Utility::sanitizeStatsName(elements);
-    Stats::Histogram::Unit envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
-    switch (unit_measure) {
-    case MILLISECONDS:
-      envoy_unit_measure = Stats::Histogram::Unit::Milliseconds;
-      break;
-    case MICROSECONDS:
-      envoy_unit_measure = Stats::Histogram::Unit::Microseconds;
-      break;
-    case BYTES:
-      envoy_unit_measure = Stats::Histogram::Unit::Bytes;
-      break;
-    case UNSPECIFIED:
-      envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
-      break;
-    }
-
-    Stats::Utility::histogramFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                          envoy_unit_measure, tags_vctr)
-        .recordValue(value);
-    return ENVOY_SUCCESS;
+  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
+  Stats::StatNameTagVector tags_vctr =
+      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
+  std::string name = Stats::Utility::sanitizeStatsName(elements);
+  Stats::Histogram::Unit envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
+  switch (unit_measure) {
+  case MILLISECONDS:
+    envoy_unit_measure = Stats::Histogram::Unit::Milliseconds;
+    break;
+  case MICROSECONDS:
+    envoy_unit_measure = Stats::Histogram::Unit::Microseconds;
+    break;
+  case BYTES:
+    envoy_unit_measure = Stats::Histogram::Unit::Bytes;
+    break;
+  case UNSPECIFIED:
+    envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
+    break;
   }
-  return ENVOY_FAILURE;
+
+  Stats::Utility::histogramFromElements(*client_scope_, {Stats::DynamicName(name)},
+                                        envoy_unit_measure, tags_vctr)
+      .recordValue(value);
+  return ENVOY_SUCCESS;
 }
 
 Event::ProvisionalDispatcher& Engine::dispatcher() { return *dispatcher_; }
