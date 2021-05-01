@@ -142,7 +142,7 @@ void EnvoyQuicSessionCache::createAndInsertEntry(const quic::QuicServerId& serve
 size_t EnvoyQuicSessionCache::size() const { return cache_.size(); }
 
 EnvoyQuicSessionCache::Entry::Entry() = default;
-EnvoyQuicSessionCache::Entry::Entry(Entry&&) = default;
+EnvoyQuicSessionCache::Entry::Entry(Entry&&) noexcept = default;
 EnvoyQuicSessionCache::Entry::~Entry() = default;
 
 void EnvoyQuicSessionCache::Entry::pushSession(bssl::UniquePtr<SSL_SESSION> session) {

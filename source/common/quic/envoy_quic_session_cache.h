@@ -27,7 +27,7 @@ public:
 private:
   struct Entry {
     Entry();
-    Entry(Entry&&);
+    Entry(Entry&&) noexcept;
     ~Entry();
 
     // Adds a new |session| onto sessions, dropping the oldest one if two are
