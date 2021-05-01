@@ -219,7 +219,7 @@ public:
   }
   // From HttpCacheFactory
   HttpCache&
-  getCache(const envoy::extensions::cache::simple_http_cache::v3alpha::CacheConfig&) override {
+  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&) override {
     return cache_;
   }
 
