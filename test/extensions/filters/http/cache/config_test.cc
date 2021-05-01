@@ -24,7 +24,7 @@ protected:
 
 TEST_F(CacheFilterFactoryTest, Basic) {
   config_.mutable_typed_config()->PackFrom(
-      envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig());
+      envoy::extensions::cache::simple_http_cache::v3alpha::SimpleHttpCacheConfig());
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
