@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/cache/simple_http_cache/config.pb.h"
+#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
 
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/cache/config.h"

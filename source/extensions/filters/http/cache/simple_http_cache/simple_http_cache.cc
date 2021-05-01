@@ -5,7 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
-#include "source/extensions/filters/http/cache/simple_http_cache/config.pb.h"
+#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
 
 namespace Envoy {
 namespace Extensions {
