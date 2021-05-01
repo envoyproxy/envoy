@@ -18,14 +18,14 @@ const Http::LowerCaseString& skywalkingPropagationHeaderKey() {
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
   if (name == Tracing::Tags::get().HttpUrl) {
-    span_entity_->addTag(UrlTag.data(), value.data());
+    span_entity_->addTag(UrlTag.data(), std::string(value));
   } else if (name == Tracing::Tags::get().HttpStatusCode) {
-    span_entity_->addTag(StatusCodeTag.data(), value.data());
+    span_entity_->addTag(StatusCodeTag.data(), std::string(value));
   } else if (name == Tracing::Tags::get().Error) {
     span_entity_->setErrorStatus();
-    span_entity_->addTag(name.data(), value.data());
+    span_entity_->addTag(std::string(name), std::string(value));
   } else {
-    span_entity_->addTag(name.data(), value.data());
+    span_entity_->addTag(std::string(name), std::string(value));
   }
 }
 
