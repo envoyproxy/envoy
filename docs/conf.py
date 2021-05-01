@@ -18,7 +18,6 @@ from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 import sys
 
-#MAKEFAIL
 
 # https://stackoverflow.com/questions/44761197/how-to-use-substitution-definitions-with-code-blocks
 class SubstitutionCodeBlock(CodeBlock):
