@@ -27,6 +27,6 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha/simple_http_cache:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/cache/simple_http_cache/v3alpha:pkg_cc_proto",
     ],
 )
