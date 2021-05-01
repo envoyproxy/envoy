@@ -106,5 +106,22 @@ TEST_F(FieldMatcherTest, AllMatcher) {
       MatchState::UnableToMatch);
 }
 
+TEST_F(FieldMatcherTest, NotMatcher) {
+  EXPECT_TRUE(NotFieldMatcher<TestData>(
+                  std::make_unique<AllFieldMatcher<TestData>>(createMatchers({true, false})))
+                  .match(TestData())
+                  .result());
+
+  EXPECT_EQ(
+      NotFieldMatcher<TestData>(
+          std::make_unique<AllFieldMatcher<TestData>>(createMatchers(
+              {std::make_pair(false,
+                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
+               std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)})))
+          .match(TestData())
+          .match_state_,
+      MatchState::UnableToMatch);
+}
+
 } // namespace Matcher
 } // namespace Envoy
