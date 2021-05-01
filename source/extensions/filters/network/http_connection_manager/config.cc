@@ -474,8 +474,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   const auto& filters = config.http_filters();
+  DependencyManager dependency_manager;
   for (int32_t i = 0; i < filters.size(); i++) {
-    processFilter(filters[i], i, "http", filter_factories_, "http", i == filters.size() - 1);
+    processFilter(filters[i], i, "http", "http", i == filters.size() - 1, filter_factories_,
+                  dependency_manager);
+  }
+  // TODO(auni53): Validate encode dependencies too.
+  auto status = dependency_manager.validDecodeDependencies();
+  if (!status.ok()) {
+    throw EnvoyException(std::string(status.message()));
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -488,10 +495,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
+      DependencyManager upgrade_dependency_manager;
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
-        processFilter(upgrade_config.filters(j), j, name, *factories, "http upgrade",
-                      j == upgrade_config.filters().size() - 1);
+        processFilter(upgrade_config.filters(j), j, name, "http upgrade",
+                      j == upgrade_config.filters().size() - 1, *factories,
+                      upgrade_dependency_manager);
       }
+      // TODO(auni53): Validate encode dependencies too.
+      auto status = upgrade_dependency_manager.validDecodeDependencies();
+      if (!status.ok()) {
+        throw EnvoyException(std::string(status.message()));
+      }
+
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     } else {
@@ -505,8 +520,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
-    int i, const std::string& prefix, FilterFactoriesList& filter_factories,
-    const std::string& filter_chain_type, bool last_filter_in_current_config) {
+    int i, const std::string& prefix, const std::string& filter_chain_type,
+    bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
+    DependencyManager& dependency_manager) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   if (proto_config.config_type_case() ==
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::ConfigTypeCase::
@@ -524,6 +540,7 @@ void HttpConnectionManagerConfig::processFilter(
       proto_config, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  dependency_manager.registerFilter(factory.name(), *factory.dependencies());
   bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
   Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);

@@ -4,13 +4,17 @@
 #include "common/http/date_provider_impl.h"
 #include "common/network/address_impl.h"
 
+#include "extensions/filters/http/common/factory_base.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/network/http_connection_manager/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
+#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -43,6 +47,21 @@ public:
                                 route_config_provider_manager_,
                                 scoped_routes_config_provider_manager_, http_tracer_manager_,
                                 filter_config_provider_manager_);
+  }
+};
+
+class PassThroughFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
+                                     test::http_connection_manager::FilterDependencyTestFilter> {
+public:
+  PassThroughFilterFactory(std::string name) : FactoryBase(name) {}
+
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::http_connection_manager::FilterDependencyTestFilter&, const std::string&,
+      Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamDecoderFilter(std::make_shared<Http::PassThroughDecoderFilter>());
+    };
   }
 };
 

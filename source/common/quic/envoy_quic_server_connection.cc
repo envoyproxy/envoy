@@ -14,29 +14,26 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     quic::QuicSocketAddress initial_self_address, quic::QuicSocketAddress initial_peer_address,
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     quic::QuicPacketWriter* writer, bool owns_writer,
-    const quic::ParsedQuicVersionVector& supported_versions, Network::Socket& listen_socket)
-    : EnvoyQuicConnection(server_connection_id, initial_self_address, initial_peer_address, helper,
-                          alarm_factory, writer, owns_writer, quic::Perspective::IS_SERVER,
-                          supported_versions,
-                          std::make_unique<Network::ConnectionSocketImpl>(
-                              // Wraps the real IoHandle instance so that if the connection socket
-                              // gets closed, the real IoHandle won't be affected.
-                              std::make_unique<QuicIoHandleWrapper>(listen_socket.ioHandle()),
-                              nullptr, quicAddressToEnvoyAddressInstance(initial_peer_address))) {}
+    const quic::ParsedQuicVersionVector& supported_versions,
+    Network::ConnectionSocketPtr connection_socket)
+    : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
+                           &helper, &alarm_factory, writer, owns_writer,
+                           quic::Perspective::IS_SERVER, supported_versions),
+      QuicNetworkConnection(std::move(connection_socket)) {}
 
 bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
-  if (!EnvoyQuicConnection::OnPacketHeader(header)) {
+  quic::QuicSocketAddress old_self_address = self_address();
+  if (!quic::QuicConnection::OnPacketHeader(header)) {
     return false;
   }
-  if (connectionSocket()->addressProvider().localAddress() != nullptr) {
+  if (old_self_address == self_address()) {
     return true;
   }
+  // Update local address if QUICHE has updated the self address.
   ASSERT(self_address().IsInitialized());
-  // Self address should be initialized by now.
   connectionSocket()->addressProvider().setLocalAddress(
       quicAddressToEnvoyAddressInstance(self_address()));
-  connectionSocket()->setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
+
   return true;
 }
 
