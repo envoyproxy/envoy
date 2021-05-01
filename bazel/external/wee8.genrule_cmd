@@ -125,6 +125,8 @@ elif [[ $${ARCH} == "aarch64" || $${ARCH} == "arm64" ]]; then
   WEE8_BUILD_ARGS+=" target_cpu=\"arm64\""
 elif [[ $${ARCH} == "ppc64le" ]]; then
   WEE8_BUILD_ARGS+=" target_cpu=\"ppc64\""
+elif [[ $${ARCH} == "s390x" ]]; then
+  WEE8_BUILD_ARGS+=" target_cpu=\"s390x\""
 fi
 
 # Select gn tool for the current platform.
