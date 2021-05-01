@@ -22,7 +22,7 @@ const char* kCustomParameter1Value = "foo";
 const auto kCustomParameter2 = static_cast<quic::TransportParameters::TransportParameterId>(0xff34);
 const char* kCustomParameter2Value = "bar";
 
-std::vector<uint8_t> CreateFakeStatelessResetToken() {
+std::vector<uint8_t> createFakeStatelessResetToken() {
   return std::vector<uint8_t>(kFakeStatelessResetTokenData,
                               kFakeStatelessResetTokenData + sizeof(kFakeStatelessResetTokenData));
 }
@@ -35,7 +35,7 @@ std::unique_ptr<quic::TransportParameters> makeFakeTransportParams() {
   params->supported_versions.push_back(kFakeVersionLabel);
   params->supported_versions.push_back(kFakeVersionLabel2);
   params->max_idle_timeout_ms.set_value(kFakeIdleTimeoutMilliseconds);
-  params->stateless_reset_token = CreateFakeStatelessResetToken();
+  params->stateless_reset_token = createFakeStatelessResetToken();
   params->max_udp_payload_size.set_value(kFakeMaxPacketSize);
   params->initial_max_data.set_value(kFakeInitialMaxData);
   params->disable_active_migration = kFakeDisableMigration;
