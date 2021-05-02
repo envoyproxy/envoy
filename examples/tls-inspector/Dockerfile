@@ -1,5 +1,5 @@
 FROM envoyproxy/envoy-distroless-dev:latest
 
-COPY ./envoy.yaml /etc/envoy.yaml
+COPY --chmod=0644 ./envoy.yaml /etc/envoy.yaml
 # RUN chmod go+r /etc/envoy.yaml
 CMD ["/usr/local/bin/envoy", "-c /etc/envoy.yaml"]
