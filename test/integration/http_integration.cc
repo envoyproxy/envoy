@@ -1164,7 +1164,8 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 }
 
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
-                                                  uint32_t max_count) {
+                                                  uint32_t max_count,
+                                                  std::chrono::milliseconds timeout) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
@@ -1205,7 +1206,8 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
       codec_client_->close();
     }
   } else {
-    auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
+    auto response =
+        sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, timeout);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
