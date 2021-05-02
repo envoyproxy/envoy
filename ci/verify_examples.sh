@@ -32,6 +32,7 @@ run_examples () {
     examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" ! -name "$TESTEXCLUDES" | sort)
     for example in $examples; do
         pushd "$example" > /dev/null || return 1
+        chmod -R go+r . || return 1
         ./verify.sh
         popd > /dev/null || return 1
     done
