@@ -68,3 +68,15 @@ message HttpResponseTrailerMatchInput {
   string header_name = 1
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
+
+// Match input indicates that matching should be done on a specific cookie key.
+// The resulting input string will be all values for the given key joined by a
+// comma, e.g. if the request contains two 'foo' cookie keys with value 'bar'
+// and 'baz', the input string will be 'bar,baz'.
+message HttpRequestCookieMatchInput {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.type.matcher.v3.HttpRequestCookieMatchInput";
+
+  // The cookie to match on.
+  string cookie_name = 1;
+}

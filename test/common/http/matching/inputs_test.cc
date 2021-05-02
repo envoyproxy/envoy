@@ -20,6 +20,17 @@ TEST(HttpHeadersDataInputBase, Idempotence) {
   EXPECT_EQ(input.get(data).data_, "bar");
   EXPECT_EQ(input.get(data).data_, "bar");
 }
+
+TEST(HttpRequestCookiesDataInput, Idempotence) {
+  HttpRequestCookiesDataInput input("mycookie");
+
+  HttpMatchingDataImpl data;
+  TestRequestHeaderMapImpl request_headers({{"Cookie", "mycookie=foo;mycookie=bar"}});
+  data.onRequestHeaders(request_headers);
+
+  EXPECT_EQ(input.get(data).data_, "foo,bar");
+  EXPECT_EQ(input.get(data).data_, "foo,bar");
+}
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

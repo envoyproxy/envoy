@@ -144,6 +144,40 @@ class HttpResponseTrailersDataInputFactory
 public:
   HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response-trailers") {}
 };
+
+class HttpRequestCookiesDataInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  explicit HttpRequestCookiesDataInput(const std::string& cookie_name)
+      : cookie_name_(cookie_name) {}
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& /*data*/) override;
+
+private:
+  const std::string cookie_name_;
+  std::string result_storage_;
+};
+
+class HttpRequestCookiesDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  std::string name() const override { return "cookies"; }
+
+  Matcher::DataInputPtr<HttpMatchingData>
+  createDataInput(const Protobuf::Message& config,
+                  Server::Configuration::FactoryContext& factory_context) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::type::matcher::v3::HttpRequestCookieMatchInput&>(
+        config, factory_context.messageValidationVisitor());
+
+    return std::make_unique<HttpRequestCookiesDataInput>(typed_config.cookie_name());
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::type::matcher::v3::HttpRequestCookieMatchInput>();
+  }
+
+private:
+  const std::string name_;
+};
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy
