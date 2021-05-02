@@ -847,8 +847,7 @@ TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
         Network::IoResult result = {Network::PostIoAction::KeepOpen, buffer.length() - 5, false};
-        server_to_client_.add(buffer.linearize(0), buffer.length() - 5);
-        buffer.drain(buffer.length() - 5);
+        server_to_client_.move(buffer, 14);
         return result;
       }));
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
@@ -865,8 +864,7 @@ TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
         Network::IoResult result = {Network::PostIoAction::KeepOpen, 4, false};
-        server_to_client_.add(buffer.linearize(0), 4);
-        buffer.drain(4);
+        server_to_client_.move(buffer, 4);
         return result;
       }));
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
@@ -877,8 +875,7 @@ TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
         Network::IoResult result = {Network::PostIoAction::KeepOpen, 1, false};
-        server_to_client_.add(buffer.linearize(0), 1);
-        buffer.drain(1);
+        server_to_client_.move(buffer);
         return result;
       }));
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));

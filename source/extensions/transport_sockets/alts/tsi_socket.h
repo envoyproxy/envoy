@@ -118,8 +118,8 @@ private:
   bool handshake_complete_{};
   bool end_stream_read_{};
   bool read_error_{};
+  bool write_buffer_contains_handshake_bytes_{};
   uint64_t prev_bytes_to_drain_{};
-  uint64_t prev_handshake_bytes_to_drain_{};
 };
 
 /**
