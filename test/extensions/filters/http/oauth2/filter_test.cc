@@ -10,12 +10,14 @@
 #include "common/http/message_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/secret/secret_manager_impl.h"
 
 #include "extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -155,6 +157,69 @@ public:
   Event::SimulatedTimeSystem test_time_;
 };
 
+// Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret
+TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
+  NiceMock<Server::MockConfigTracker> config_tracker;
+  std::unique_ptr<Secret::SecretManager> secret_manager(
+      new Secret::SecretManagerImpl(config_tracker));
+  envoy::config::core::v3::ConfigSource config_source;
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  Api::ApiPtr api = Api::createApiForTest();
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  Init::TargetHandlePtr init_handle;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(init_manager, add(_))
+      .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
+        init_handle = target.createHandle("test");
+      }));
+
+  auto client_secret_provider =
+      secret_manager->findOrCreateGenericSecretProvider(config_source, "client", secret_context);
+  auto client_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto token_secret_provider =
+      secret_manager->findOrCreateGenericSecretProvider(config_source, "token", secret_context);
+  auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+
+  SDSSecretReader secret_reader(client_secret_provider, token_secret_provider, *api);
+  EXPECT_TRUE(secret_reader.clientSecret().empty());
+  EXPECT_TRUE(secret_reader.tokenSecret().empty());
+
+  const std::string yaml_client = R"EOF(
+name: client
+generic_secret:
+  secret:
+    inline_string: "client_test"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_client), typed_secret);
+  const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
+
+  client_callback->onConfigUpdate(decoded_resources_client.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test");
+  EXPECT_EQ(secret_reader.tokenSecret(), "");
+
+  const std::string yaml_token = R"EOF(
+name: token
+generic_secret:
+  secret:
+    inline_string: "token_test"
+)EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_token), typed_secret);
+  const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
+
+  token_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test");
+  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+}
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
   ON_CALL(factory_context_.cluster_manager_, clusters())
