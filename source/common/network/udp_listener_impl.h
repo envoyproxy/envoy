@@ -46,8 +46,8 @@ public:
                      MonotonicTime receive_time) override;
   uint64_t maxDatagramSize() const override { return config_.max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t dropped) override { cb_.onDatagramsDropped(dropped); }
-  size_t numReadsExpectedPerEventLoop() const override {
-    return cb_.numReadsExpectedPerEventLoop();
+  size_t numPacketsExpectedPerEventLoop() const override {
+    return cb_.numPacketsExpectedPerEventLoop();
   }
 
 protected:

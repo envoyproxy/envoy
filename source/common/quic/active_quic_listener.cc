@@ -211,8 +211,9 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
   return connection_id_snippet % concurrency_;
 }
 
-size_t ActiveQuicListener::numReadsExpectedPerEventLoop() const {
-  return quic_dispatcher_.NumSessions();
+size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
+  // Expect each session to read 32 packets per READ event.
+  return quic_dispatcher_.NumSessions() * 32;
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(

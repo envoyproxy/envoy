@@ -332,10 +332,9 @@ public:
   virtual void post(Network::UdpRecvData&& data) PURE;
 
   /**
-   * An estimated number of reads needed by this callback to enough packets to process in each READ
-   * event.
+   * An estimated number of packets this callback expects to process in current READ event.
    */
-  virtual size_t numReadsExpectedPerEventLoop() const PURE;
+  virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };
 
 using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;

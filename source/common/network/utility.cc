@@ -698,8 +698,15 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                uint32_t& packets_dropped) {
   // Make sure at not too many packets will be read in following loop, but at least it will read
   // once.
-  uint64_t i = std::max(1ul, std::min(MAX_NUM_READS_PER_EVENT_LOOP,
-                                      udp_packet_processor.numReadsExpectedPerEventLoop()));
+  size_t num_packets_to_read = std::min(MAX_NUM_PACKETS_PER_EVENT_LOOP,
+                                        udp_packet_processor.numPacketsExpectedPerEventLoop());
+  size_t num_reads =
+      handle.supportsMmsg()
+          ? (num_packets_to_read / NUM_DATAGRAMS_PER_MMSG_RECEIVE)
+          : (handle.supportsUdpGro() ? (num_packets_to_read / NUM_DATAGRAMS_PER_GRO_RECEIVE)
+                                     : num_packets_to_read);
+  // Make sure at least read once.
+  num_reads = std::max(1ul, num_reads);
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
@@ -727,8 +734,8 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
     }
-    --i;
-    if (i == 0) {
+    --num_reads;
+    if (num_reads == 0) {
       return std::move(result.err_);
     }
   } while (true);
