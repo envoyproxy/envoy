@@ -66,9 +66,6 @@ public:
   ~FilterConfig() override = default;
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit protoConfig() const {
-    return proto_config_;
-  }
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
@@ -78,6 +75,15 @@ public:
   Http::Code status() const { return status_; }
   uint64_t stage() const { return stage_; }
   bool hasDescriptors() const { return has_descriptors_; }
+  std::chrono::milliseconds fillInterval() const { return fill_interval_; }
+  uint32_t maxTokens() const { return max_tokens_; }
+  uint32_t tokensPerFill() const { return tokens_per_fill_; }
+  const Protobuf::RepeatedPtrField<
+      envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>
+  descriptors() const {
+    return descriptors_;
+  }
+  bool rateLimitPerConnection() const { return rate_limit_per_connection_; }
 
 private:
   friend class FilterTest;
@@ -94,6 +100,13 @@ private:
 
   const Http::Code status_;
   mutable LocalRateLimitStats stats_;
+  const std::chrono::milliseconds fill_interval_;
+  const uint32_t max_tokens_;
+  const uint32_t tokens_per_fill_;
+  const Protobuf::RepeatedPtrField<
+      envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>
+      descriptors_;
+  const bool rate_limit_per_connection_;
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
@@ -103,7 +116,6 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
-  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit proto_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
