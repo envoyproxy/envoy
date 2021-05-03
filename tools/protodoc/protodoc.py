@@ -432,27 +432,27 @@ def strip_leading_space(s):
 
 def file_cross_ref_label(msg_name):
     """File cross reference label."""
-    return 'envoy_api_file_%s' % msg_name
+    return 'envoy_v3_api_file_%s' % msg_name
 
 
 def message_cross_ref_label(msg_name):
     """Message cross reference label."""
-    return 'envoy_api_msg_%s' % msg_name
+    return 'envoy_v3_api_msg_%s' % msg_name
 
 
 def enum_cross_ref_label(enum_name):
     """Enum cross reference label."""
-    return 'envoy_api_enum_%s' % enum_name
+    return 'envoy_v3_api_enum_%s' % enum_name
 
 
 def field_cross_ref_label(field_name):
     """Field cross reference label."""
-    return 'envoy_api_field_%s' % field_name
+    return 'envoy_v3_api_field_%s' % field_name
 
 
 def enum_value_cross_ref_label(enum_value_name):
     """Enum value cross reference label."""
-    return 'envoy_api_enum_value_%s' % enum_value_name
+    return 'envoy_v3_api_enum_value_%s' % enum_value_name
 
 
 def format_anchor(label):
