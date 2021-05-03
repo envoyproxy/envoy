@@ -305,7 +305,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
 }
 
 // Verify that a config with a deprecated field can be loaded with runtime global override.
-TEST_F(ProtobufUtilityTest, LoadBinaryGlobalOverrideProtoFromFile) {
+TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryGlobalOverrideProtoFromFile)) {
   const std::string bootstrap_yaml = R"EOF(
 layered_runtime:
   layers:
