@@ -835,12 +835,12 @@ ClientConnectionImpl::ClientConnectionImpl(
       stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
   UNREFERENCED_PARAMETER(source_address);
   UNREFERENCED_PARAMETER(options);
-  // TOOD(lambdai) bind source address
+  // TODO(lambdai) bind source address
   // if (!source_address )
   // immediate_error_event_ = ConnectionEvent::LocalClose;
   //
   // Trigger a write event to close this connection out-of-band.
-  ioHandle().activateFileEvents(Event::FileReadyType::Write);
+  //ioHandle().activateFileEvents(Event::FileReadyType::Write);
 }
 // internal address end
 ClientConnectionImpl::ClientConnectionImpl(
