@@ -6,16 +6,16 @@ namespace {
 
 constexpr size_t MaxSessionCacheEntries = 1024;
 
-// Returns false if the SSL |session| doesn't exist or it is expired at |system_time|.
-bool isSessionValid(SSL_SESSION* session, SystemTime system_time) {
+// Returns false if the SSL |session| doesn't exist or it is expired at |now|.
+bool isSessionValid(SSL_SESSION* session, SystemTime now) {
   if (session == nullptr) {
     return false;
   }
-  const time_t now = std::chrono::system_clock::to_time_t(system_time);
-  if (now < 0) {
+  const time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+  if (now_time_t < 0) {
     return false;
   }
-  const uint64_t now_u64 = static_cast<uint64_t>(now);
+  const uint64_t now_u64 = static_cast<uint64_t>(now_time_t);
   const uint64_t session_time = SSL_SESSION_get_time(session);
   const uint64_t session_expiration = session_time + SSL_SESSION_get_timeout(session);
   // now_u64 may be slightly behind because of differences in how time is calculated at this layer

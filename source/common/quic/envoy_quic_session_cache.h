@@ -39,6 +39,7 @@ private:
 
     SSL_SESSION* peekSession();
 
+    // We only save the last two sessions per server as that is sufficient in practice.
     bssl::UniquePtr<SSL_SESSION> sessions[2];
     std::unique_ptr<quic::TransportParameters> params;
     std::unique_ptr<quic::ApplicationState> application_state;
