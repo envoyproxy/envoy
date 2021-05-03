@@ -64,6 +64,7 @@ message DiscoveryRequest {
   // debugging, the string provided is not guaranteed to be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
 
+  // [#not-implemented-hide:]
   // Constraints on the set of cache keys for resources of type *type_url*.
   // Populated only on the first request for a given resource type and
   // when the constraints change.
@@ -206,6 +207,7 @@ message DeltaDiscoveryRequest {
   // provides the Envoy internal exception related to the failure.
   google.rpc.Status error_detail = 7;
 
+  // [#not-implemented-hide:]
   // Constraints on the set of cache keys for resources of type *type_url*.
   // Populated only on the first request for a given resource type and
   // when the constraints change.
