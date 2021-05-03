@@ -1322,10 +1322,14 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
     // header size to avoid QUIC_HEADERS_TOO_LARGE stream error.
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(96); });
+                hcm) -> void {
+          hcm.mutable_max_request_headers_kb()->set_value(96);
+          hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(8000);
+        });
   }
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
     setMaxRequestHeadersKb(96);
+    setMaxRequestHeadersCount(8000);
   }
   initialize();
 
@@ -1598,9 +1602,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
-  // QUICHE doesn't limit number of headers.
-  EXCLUDE_DOWNSTREAM_HTTP3
-  // The default configured header (and trailer) count limit is 100.
+  // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   Http::TestRequestTrailerMapImpl request_trailers;
