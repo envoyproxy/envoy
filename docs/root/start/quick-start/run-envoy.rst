@@ -155,7 +155,7 @@ Check Envoy is proxying on http://localhost:10000.
    $ curl -v localhost:10000
    ...
 
-You can exit the server with `Ctrl-c`.
+You can exit the server with ``Ctrl-c``.
 
 See the :ref:`admin quick start guide <start_quick_start_admin>` for more information about the Envoy admin interface.
 

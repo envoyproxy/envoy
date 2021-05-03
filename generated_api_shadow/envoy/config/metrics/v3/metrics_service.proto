@@ -38,4 +38,9 @@ message MetricsServiceConfig {
   // Eventually (https://github.com/envoyproxy/envoy/issues/10968) if this value is not set, the
   // sink will take updates from the :ref:`MetricsResponse <envoy_api_msg_service.metrics.v3.StreamMetricsResponse>`.
   google.protobuf.BoolValue report_counters_as_deltas = 2;
+
+  // If true, metrics will have their tags emitted as labels on the metrics objects sent to the MetricsService,
+  // and the tag extracted name will be used instead of the full name, which may contain values used by the tag
+  // extractor or additional tags added during stats creation.
+  bool emit_tags_as_labels = 4;
 }
