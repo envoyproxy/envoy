@@ -453,8 +453,9 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
       exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
       return clean_removed_resources;
     }
-    const envoy::config::route::v3::ScopedRouteConfiguration& scoped_route_config =
+    envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         scope_config_inserted.first->second;
+    // const uint64_t key_fingerprint = ScopedRouteInfo(std::move(scoped_route_config), nullptr).scopeKey().hash();
     const uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
     if (!scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
       exception_msg =

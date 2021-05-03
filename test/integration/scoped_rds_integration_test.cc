@@ -470,6 +470,50 @@ key:
   cleanupUpstreamAndDownstream();
 }
 
+// Test that a bad config update updates the corresponding stats.
+TEST_P(ScopedRdsIntegrationTest, RejectKeyConflict) {
+  if (!isDelta()) {
+    return;
+  }
+  // 'name' will fail to validate due to empty string.
+  const std::string scope_route1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  /*
+  createRdsStream("foo_route1");
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  */
+  // SRDS update with key conflict.
+  const std::string scope_route2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  sendSrdsResponse({scope_route1, scope_route2}, {scope_route2}, {}, "2");
+  sendSrdsResponse({}, {}, {"foo_scope1", "foo_scope2"}, "3");
+}
+
 // Verify SRDS works when reference via a xdstp:// collection locator.
 TEST_P(ScopedRdsIntegrationTest, XdsTpCollection) {
   if (!isDelta()) {
