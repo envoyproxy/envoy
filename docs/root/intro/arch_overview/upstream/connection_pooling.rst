@@ -71,7 +71,7 @@ stream, but if both TCP and QUIC connections are established, QUIC will eventual
 
 Upcoming versions of HTTP/3 support will include only selecting HTTP/3 if the upstream advertises support
 either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_,
-`HTTPS DNS RR <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_, "QUIC hints" which
+`HTTPS DNS RR <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_, or "QUIC hints" which
 will be manually configured. This path is alpha and rapidly undergoing improvements with the goal of having
 the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
 to stay aprised of the latest and greatest changes.

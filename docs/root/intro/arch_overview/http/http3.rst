@@ -18,8 +18,14 @@ listener is advertising http/3 support via alt-svc header. Advertising HTTP/3 is
 in-house deployments where HTTP/3 is explicitly configured, but is needed for internet facing deployments
 where TCP is the default, and clients such as Chrome will only attempt HTTP/3 if it is explicitly advertised.
 
-By default the example configuration uses kernel UDP support, but for production performance, use of
-BPF is strongly advised. BPF docs `coming soon <https://github.com/envoyproxy/envoy/issues/15845>`_
+By default the example configuration uses kernel UDP support, but for production performance on Linux, use of
+BPF is strongly advised. Note that while Envoy will attepmt to use BPF by default, but only works if
+
+  #. Envoy is running as root
+  #. BPF has been configured to run by non-root users. This can be configured for
+
+    * for kernels >= 5.8, Envoy is run with sudo setcap cap_bpf+ep <envoy binary>
+    * for kernels < 5.8, Envoy is run with sudo cap_net_admin,cap_sys_admin+ep <envoy binary>
 
 HTTP3 upstream
 ===============
