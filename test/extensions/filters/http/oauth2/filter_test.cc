@@ -219,6 +219,19 @@ generic_secret:
   token_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
   EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+
+  const std::string yaml_client_recheck = R"EOF(
+name: client
+generic_secret:
+  secret:
+    inline_string: "client_test_recheck"
+)EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_client_recheck), typed_secret);
+  const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
+
+  client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
+  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
 }
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
