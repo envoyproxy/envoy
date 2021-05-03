@@ -315,6 +315,11 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
 
+  // Adjust the upstream route with larger timeout if running tsan. This is the duration between
+  // whole request being processed and whole response received.
+  static void adjustUpstreamTimeoutForTsan(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm);
+
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
