@@ -119,8 +119,8 @@ message ExtAuthz {
   // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
 
-  // Specifies if HTTP status codes for gRPC calls reflect gRPC status
-  // https://github.com/envoyproxy/envoy/issues/11079
+  // Specifies whether HTTP status codes for gRPC calls are passed intact from
+  // the called service back to the caller on gRPC DENIED.
   //
   // When this field is true, Envoy's HTTP response to gRPC calls which receive
   // a DENIED response will retain the status code from the called service's
