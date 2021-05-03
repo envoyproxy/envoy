@@ -1327,10 +1327,14 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
     // header size to avoid QUIC_HEADERS_TOO_LARGE stream error.
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(96); });
+                hcm) -> void {
+          hcm.mutable_max_request_headers_kb()->set_value(96);
+          hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(8000);
+        });
   }
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
     setMaxRequestHeadersKb(96);
+    setMaxRequestHeadersCount(8000);
   }
   initialize();
 
@@ -1593,8 +1597,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {
-  // QUICHE doesn't limit number of headers.
-  EXCLUDE_DOWNSTREAM_HTTP3
   // Send 101 empty headers with limit 60 kB and 100 headers.
   testLargeRequestHeaders(0, 101, 60, 80);
 }
@@ -1605,14 +1607,15 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
-  // QUICHE doesn't limit number of headers.
-  EXCLUDE_DOWNSTREAM_HTTP3
-  // The default configured header (and trailer) count limit is 100.
+  // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   Http::TestRequestTrailerMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
-    request_trailers.addCopy("trailer", std::string(1, 'a'));
+    // TODO(alyssawilk) QUIC fails without the trailers being distinct because
+    // the checks are done before transformation. Either make the transformation
+    // use commas, or do QUIC checks before and after.
+    request_trailers.addCopy(absl::StrCat("trailer", i), std::string(1, 'a'));
   }
 
   initialize();
@@ -1620,6 +1623,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
