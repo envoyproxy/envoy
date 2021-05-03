@@ -1,10 +1,14 @@
 #include "common/quic/envoy_quic_utils.h"
 
+#include <memory>
+
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
+
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -100,11 +104,25 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   }
 }
 
-Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error) {
-  if (error == quic::QUIC_NO_ERROR) {
-    return Http::StreamResetReason::ConnectionTermination;
-  } else {
+Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error) {
+  switch (error) {
+  case quic::QUIC_HANDSHAKE_FAILED:
+  case quic::QUIC_HANDSHAKE_TIMEOUT:
     return Http::StreamResetReason::ConnectionFailure;
+  case quic::QUIC_HTTP_FRAME_ERROR:
+    return Http::StreamResetReason::ProtocolError;
+  default:
+    return Http::StreamResetReason::ConnectionTermination;
+  }
+}
+
+Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCode error) {
+  switch (error) {
+  case quic::QUIC_HANDSHAKE_FAILED:
+  case quic::QUIC_HANDSHAKE_TIMEOUT:
+    return Http::StreamResetReason::ConnectionFailure;
+  default:
+    return Http::StreamResetReason::ConnectionTermination;
   }
 }
 
@@ -207,6 +225,22 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     *error_details = "Invalid leaf cert, only RSA and ECDSA certificates are supported";
   }
   return sign_alg;
+}
+
+Network::ConnectionSocketPtr
+createServerConnectionSocket(Network::IoHandle& io_handle,
+                             const quic::QuicSocketAddress& self_address,
+                             const quic::QuicSocketAddress& peer_address,
+                             const std::string& hostname, absl::string_view alpn) {
+  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+      std::make_unique<QuicIoHandleWrapper>(io_handle),
+      quicAddressToEnvoyAddressInstance(self_address),
+      quicAddressToEnvoyAddressInstance(peer_address));
+  connection_socket->setDetectedTransportProtocol(
+      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
+  connection_socket->setRequestedServerName(hostname);
+  connection_socket->setRequestedApplicationProtocols({alpn});
+  return connection_socket;
 }
 
 } // namespace Quic

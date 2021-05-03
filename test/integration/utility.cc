@@ -124,10 +124,11 @@ private:
 };
 
 Network::TransportSocketFactoryPtr
-IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api,
+IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
@@ -204,7 +205,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
 #ifdef ENVOY_ENABLE_QUIC
   Network::TransportSocketFactoryPtr transport_socket_factory =
-      createQuicUpstreamTransportSocketFactory(api, "spiffe://lyft.com/backend-team");
+      createQuicUpstreamTransportSocketFactory(api, mock_stats_store,
+                                               "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
   persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);

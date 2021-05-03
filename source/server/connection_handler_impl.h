@@ -19,36 +19,6 @@
 namespace Envoy {
 namespace Server {
 
-#define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
-  COUNTER(downstream_cx_destroy)                                                                   \
-  COUNTER(downstream_cx_overflow)                                                                  \
-  COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_overload_reject)                                                           \
-  COUNTER(downstream_global_cx_overflow)                                                           \
-  COUNTER(downstream_pre_cx_timeout)                                                               \
-  COUNTER(no_filter_chain_match)                                                                   \
-  GAUGE(downstream_cx_active, Accumulate)                                                          \
-  GAUGE(downstream_pre_cx_active, Accumulate)                                                      \
-  HISTOGRAM(downstream_cx_length_ms, Milliseconds)
-
-/**
- * Wrapper struct for listener stats. @see stats_macros.h
- */
-struct ListenerStats {
-  ALL_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
-
-#define ALL_PER_HANDLER_LISTENER_STATS(COUNTER, GAUGE)                                             \
-  COUNTER(downstream_cx_total)                                                                     \
-  GAUGE(downstream_cx_active, Accumulate)
-
-/**
- * Wrapper struct for per-handler listener stats. @see stats_macros.h
- */
-struct PerHandlerListenerStats {
-  ALL_PER_HANDLER_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
-
 class ActiveUdpListenerBase;
 class ActiveTcpListener;
 
@@ -92,21 +62,6 @@ public:
 
   // Network::UdpConnectionHandler
   Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
-
-  /**
-   * Wrapper for an active listener owned by this handler.
-   */
-  class ActiveListenerImplBase : public virtual Network::ConnectionHandler::ActiveListener {
-  public:
-    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig* config);
-
-    // Network::ConnectionHandler::ActiveListener.
-    uint64_t listenerTag() override { return config_->listenerTag(); }
-
-    ListenerStats stats_;
-    PerHandlerListenerStats per_worker_stats_;
-    Network::ListenerConfig* config_{};
-  };
 
 private:
   struct ActiveListenerDetails {

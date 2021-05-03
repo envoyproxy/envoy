@@ -207,6 +207,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
+      http3_options_(Http3::Utility::initializeAndValidateOptions(
+          config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
+          config.stream_error_on_invalid_http_message())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
@@ -471,8 +474,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   const auto& filters = config.http_filters();
+  DependencyManager dependency_manager;
   for (int32_t i = 0; i < filters.size(); i++) {
-    processFilter(filters[i], i, "http", filter_factories_, "http", i == filters.size() - 1);
+    processFilter(filters[i], i, "http", "http", i == filters.size() - 1, filter_factories_,
+                  dependency_manager);
+  }
+  // TODO(auni53): Validate encode dependencies too.
+  auto status = dependency_manager.validDecodeDependencies();
+  if (!status.ok()) {
+    throw EnvoyException(std::string(status.message()));
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -485,10 +495,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
+      DependencyManager upgrade_dependency_manager;
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
-        processFilter(upgrade_config.filters(j), j, name, *factories, "http upgrade",
-                      j == upgrade_config.filters().size() - 1);
+        processFilter(upgrade_config.filters(j), j, name, "http upgrade",
+                      j == upgrade_config.filters().size() - 1, *factories,
+                      upgrade_dependency_manager);
       }
+      // TODO(auni53): Validate encode dependencies too.
+      auto status = upgrade_dependency_manager.validDecodeDependencies();
+      if (!status.ok()) {
+        throw EnvoyException(std::string(status.message()));
+      }
+
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     } else {
@@ -502,8 +520,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
-    int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-    const char* filter_chain_type, bool last_filter_in_current_config) {
+    int i, const std::string& prefix, const std::string& filter_chain_type,
+    bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
+    DependencyManager& dependency_manager) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   if (proto_config.config_type_case() ==
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::ConfigTypeCase::
@@ -521,7 +540,8 @@ void HttpConnectionManagerConfig::processFilter(
       proto_config, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  bool is_terminal = factory.isTerminalFilter();
+  dependency_manager.registerFilter(factory.name(), *factory.dependencies());
+  bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
   Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
@@ -539,7 +559,7 @@ void HttpConnectionManagerConfig::processFilter(
 
 void HttpConnectionManagerConfig::processDynamicFilterConfig(
     const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-    FilterFactoriesList& filter_factories, const char* filter_chain_type,
+    FilterFactoriesList& filter_factories, const std::string& filter_chain_type,
     bool last_filter_in_current_config) {
   ENVOY_LOG(debug, "      dynamic filter name: {}", name);
   if (config_discovery.apply_default_config_without_warming() &&
@@ -555,12 +575,11 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
       throw EnvoyException(
           fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
     }
-    Config::Utility::validateTerminalFilters(name, factory->name(), filter_chain_type,
-                                             factory->isTerminalFilter(),
-                                             last_filter_in_current_config);
   }
+
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery, name, context_, stats_prefix_);
+      config_discovery, name, context_, stats_prefix_, last_filter_in_current_config,
+      filter_chain_type);
   filter_factories.push_back(std::move(filter_config_provider));
 }
 
@@ -585,7 +604,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
+        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;

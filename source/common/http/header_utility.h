@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "envoy/common/regex.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
@@ -184,9 +185,19 @@ public:
 
   /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
+   * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.
    */
-  static void stripPortFromHost(RequestHeaderMap& headers, absl::optional<uint32_t> listener_port);
+  static absl::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
+                                                    absl::optional<uint32_t> listener_port);
+
+  /**
+   * @brief Return the index of the port, or npos if the host has no port
+   *
+   * Note this does not do validity checks on the port, it just finds the
+   * trailing : which is not a part of an IP address.
+   */
+  static absl::string_view::size_type getPortStart(absl::string_view host);
 
   /* Does a common header check ensuring required headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and
@@ -209,6 +220,35 @@ public:
    * may not be modified.
    */
   static bool isModifiableHeader(absl::string_view header);
+
+  enum class HeaderValidationResult {
+    ACCEPT = 0,
+    DROP,
+    REJECT,
+  };
+
+  /**
+   * Check if the given header_name has underscore.
+   * Return HeaderValidationResult and populate the given counters based on
+   * headers_with_underscores_action.
+   */
+  static HeaderValidationResult checkHeaderNameForUnderscores(
+      const std::string& header_name,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action,
+      Stats::Counter& dropped_headers_with_underscores,
+      Stats::Counter& requests_rejected_with_underscores_in_headers);
+
+  /**
+   * Check if header_value represents a valid value for HTTP content-length header.
+   * Return HeaderValidationResult and populate should_close_connection
+   * according to override_stream_error_on_invalid_http_message.
+   */
+  static HeaderValidationResult
+  validateContentLength(absl::string_view header_value,
+                        bool override_stream_error_on_invalid_http_message,
+                        bool& should_close_connection);
 };
+
 } // namespace Http
 } // namespace Envoy
