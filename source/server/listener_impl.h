@@ -130,6 +130,9 @@ public:
   bool drainClose() const override {
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override {
+    return server_.drainManager().addOnDrainCloseCb(cb);
+  }
   Server::DrainManager& drainManager();
 
 private:

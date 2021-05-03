@@ -24,14 +24,14 @@ public:
   virtual bool drainClose() const PURE;
 
   /**
-   * @brief Register a callback to be called practively when a drain decision enters into a
+   * @brief Register a callback to be called proactively when a drain decision enters into a
    *        'close' state.
    *
    * @param cb Callback to be called once drain decision enters close state
    * @return handle to remove callback
    */
   ABSL_MUST_USE_RESULT
-  virtual Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) PURE;
+  virtual Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const PURE;
 };
 
 } // namespace Network

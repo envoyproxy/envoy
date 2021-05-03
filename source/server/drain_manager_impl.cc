@@ -52,7 +52,7 @@ bool DrainManagerImpl::drainClose() const {
          (server_.api().randomGenerator().random() % server_.options().drainTime().count());
 }
 
-Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) {
+Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
   return cbs_.add(cb);
 }
 
@@ -67,6 +67,10 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
   drain_deadline_ = server_.dispatcher().timeSource().monotonicTime() + drain_delay;
+
+  if (cbs_.size() == 0) {
+    return;
+  }
 
   // Call registered on-drain callbacks - immediately
   if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {

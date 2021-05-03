@@ -35,6 +35,10 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
 }
+Common::CallbackHandlePtr
+PerFilterChainFactoryContextImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
+  return parent_context_.drainDecision().addOnDrainCloseCb(cb);
+}
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
 

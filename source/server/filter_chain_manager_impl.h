@@ -48,6 +48,7 @@ public:
 
   // DrainDecision
   bool drainClose() const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override;
 
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;

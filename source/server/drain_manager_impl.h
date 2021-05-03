@@ -28,7 +28,7 @@ public:
 
   // Network::DrainDecision
   bool drainClose() const override;
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override;
 
   // Server::DrainManager
   void startDrainSequence(std::function<void()> drain_complete_cb) override;
@@ -42,7 +42,7 @@ private:
   std::atomic<bool> draining_{false};
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;
-  Common::ThreadSafeCallbackManager<std::chrono::milliseconds> cbs_;
+  mutable Common::ThreadSafeCallbackManager<std::chrono::milliseconds> cbs_;
 
   Event::TimerPtr parent_shutdown_timer_;
 };

@@ -1,5 +1,6 @@
 #include <chrono>
 
+#include "envoy/common/callback.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #include "server/drain_manager_impl.h"
@@ -10,7 +11,10 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AllOf;
+using testing::Ge;
 using testing::InSequence;
+using testing::Le;
 using testing::Return;
 
 namespace Envoy {
@@ -149,6 +153,42 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
     simTime().advanceTimeWait(std::chrono::seconds(1));
     EXPECT_TRUE(drain_manager.drainClose());
   }
+}
+
+TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
+  const bool drain_gradually = GetParam();
+  ON_CALL(server_.options_, drainStrategy())
+      .WillByDefault(Return(drain_gradually ? Server::DrainStrategy::Gradual
+                                            : Server::DrainStrategy::Immediate));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(4)));
+
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  // Register callbacks (store in array to keep in scope for test)
+  std::array<testing::MockFunction<void(std::chrono::milliseconds)>, 20> cbs;
+  std::array<Common::CallbackHandlePtr, 20> cb_handles;
+  for (auto i = 0; i < 20; i++) {
+    auto& cb = cbs[i];
+    if (drain_gradually) {
+      auto step = 1000 / 20;
+      EXPECT_CALL(cb, Call(_))
+          .Times(1)
+          .WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
+            // Everything should happen withinthe first 1/4 of the drain time
+            EXPECT_LT(delay.count(), 1001);
+
+            // Validate that our wait times are spread out (within some small error)
+            EXPECT_EQ(delay.count(), i * step);
+          }));
+    } else {
+      EXPECT_CALL(cb, Call(std::chrono::milliseconds{0}));
+    }
+
+    cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
+  }
+
+  drain_manager.startDrainSequence([] {});
+  EXPECT_TRUE(drain_manager.draining());
 }
 
 INSTANTIATE_TEST_SUITE_P(DrainStrategies, DrainManagerImplTest, testing::Bool());

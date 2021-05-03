@@ -83,7 +83,7 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
-                                             Network::DrainDecision& drain_close,
+                                             const Network::DrainDecision& drain_close,
                                              Random::RandomGenerator& random_generator,
                                              Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
