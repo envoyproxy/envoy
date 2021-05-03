@@ -544,8 +544,8 @@ TEST(HttpUtility, TestParseCookie) {
       {"cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
       {"cookie", "key2=value2; key3=value3"}};
 
-  std::string key{"token"};
-  std::string value = Utility::parseCookieValue(headers, key);
+  absl::string_view key{"token"};
+  absl::string_view value = Utility::parseCookieValue(headers, key);
   EXPECT_EQ(value, "abc123");
 }
 
@@ -572,6 +572,23 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "dquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "quoteddquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, TestParseCookieMultipleValues) {
+  TestRequestHeaderMapImpl headers{{"cookie", "somekey=foo"},
+                                   {"cookie", "somekey=bar; somekey=toto"}};
+
+  absl::string_view key{"somekey"};
+
+  auto values = Utility::parseCookieValues(headers, key, 0);
+  // Headers are parsed in reversed order
+  EXPECT_THAT(values, testing::ElementsAre("bar", "toto", "foo"));
+
+  values = Utility::parseCookieValues(headers, key, 1);
+  EXPECT_THAT(values, testing::ElementsAre("bar"));
+
+  values = Utility::parseCookieValues(headers, key, 2);
+  EXPECT_THAT(values, testing::ElementsAre("bar", "toto"));
 }
 
 TEST(HttpUtility, TestMakeSetCookieValue) {

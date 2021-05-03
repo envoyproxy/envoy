@@ -381,11 +381,11 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   return path_str;
 }
 
-std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
+absl::InlinedVector<absl::string_view, 2>
+Utility::parseCookieValues(const HeaderMap& headers, const absl::string_view key, size_t max_vals) {
+  absl::InlinedVector<absl::string_view, 2> ret;
 
-  std::string ret;
-
-  headers.iterateReverse([&key, &ret](const HeaderEntry& header) -> HeaderMap::Iterate {
+  headers.iterateReverse([&key, &ret, max_vals](const HeaderEntry& header) -> HeaderMap::Iterate {
     // Find the cookie headers in the request (typically, there's only one).
     if (header.key() == Http::Headers::get().Cookie.get()) {
 
@@ -409,8 +409,10 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
           if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
             v = v.substr(1, v.size() - 2);
           }
-          ret = std::string{v};
-          return HeaderMap::Iterate::Break;
+          ret.push_back(v);
+          if (max_vals > 0 && ret.size() == max_vals) {
+            return HeaderMap::Iterate::Break;
+          }
         }
       }
     }
@@ -418,6 +420,14 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
   });
 
   return ret;
+}
+
+absl::string_view Utility::parseCookieValue(const HeaderMap& headers, const absl::string_view key) {
+  const auto ret = parseCookieValues(headers, key, 1);
+  if (ret.size() == 1) {
+    return ret[0];
+  }
+  return {};
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
