@@ -149,10 +149,6 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
 
 Network::InternalListenerCallbacksOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
-  std::for_each(listeners_.begin(), listeners_.end(), [address](auto& p) {
-    ENVOY_LOG(debug, "iterating listeners current listener address = {}, desired = {}", p.first->asString(),
-              address->asString());
-  });
   auto listener_it =
       std::find_if(listeners_.begin(), listeners_.end(),
                    [&address](std::pair<Network::Address::InstanceConstSharedPtr,

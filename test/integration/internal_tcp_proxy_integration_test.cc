@@ -1,5 +1,3 @@
-#include "test/integration/tcp_proxy_integration_test.h"
-
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -18,6 +16,7 @@
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
+#include "test/integration/tcp_proxy_integration_test.h"
 #include "test/integration/tcp_proxy_integration_test.pb.h"
 #include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"

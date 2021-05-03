@@ -179,14 +179,16 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
       if (internal_listener.has_value()) {
         // TODO: also check if disabled
         internal_listener.value().get().onAccept(std::move(accepted_socket));
-         FANCY_LOG(info, "lambdai: find internal listener {} ", address->asStringView());
+        FANCY_LOG(info, "lambdai: find internal listener {} ", address->asStringView());
       } else {
-        FANCY_LOG(info, "lambdai: cannot find internal listener {} from internal listener manager", address->asStringView());
+        FANCY_LOG(info, "lambdai: cannot find internal listener {} from internal listener manager",
+                  address->asStringView());
         // injected error into client_conn;
         io_handle_server->close();
       }
     } else {
-      FANCY_LOG(info, "lambdai: cannot find from internal listener manager while connecting to {}", address->asStringView());
+      FANCY_LOG(info, "lambdai: cannot find from internal listener manager while connecting to {}",
+                address->asStringView());
       // injected error into client_conn;
       io_handle_server->close();
     }
