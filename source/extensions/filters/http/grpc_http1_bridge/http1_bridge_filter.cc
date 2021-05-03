@@ -18,16 +18,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
-                      headers.GrpcStatus());
-}
-
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);
-  if (grpc_request) {
-    setupStatTracking(headers);
-  }
 
   const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
@@ -40,9 +32,6 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
 
 Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                            bool end_stream) {
-  if (doStatTracking()) {
-    chargeStat(headers);
-  }
 
   if (!do_bridging_ || end_stream) {
     return Http::FilterHeadersStatus::Continue;
@@ -62,9 +51,6 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end
 }
 
 Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  if (doStatTracking()) {
-    chargeStat(trailers);
-  }
 
   if (do_bridging_) {
     // Here we check for grpc-status. If it's not zero, we change the response code. We assume
@@ -94,14 +80,6 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end
   //       the chunk encoded response which is what we want.
   return Http::FilterTrailersStatus::Continue;
-}
-
-void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
-  cluster_ = decoder_callbacks_->clusterInfo();
-  if (!cluster_) {
-    return;
-  }
-  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
 } // namespace GrpcHttp1Bridge
