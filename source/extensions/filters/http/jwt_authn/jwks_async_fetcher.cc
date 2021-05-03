@@ -24,11 +24,16 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
       done_fn_(done_fn) {
   debug_name_ = absl::StrCat("Jwks async fetching url=", remote_jwks_.http_uri().uri());
 
+  // if async_fetch is not enabled, do nothing.
+  if (!remote_jwks_.has_async_fetch() || !remote_jwks_.async_fetch().enable()) {
+    return;
+  }
+
   refresh_duration_ = getCacheDuration(remote_jwks_);
   refresh_timer_ = context_.dispatcher().createTimer([this]() -> void { refresh(); });
 
-  // If activate listener right away, just trigger a fetch
-  if (remote_jwks_.async_fetch().activate_listener()) {
+  // For fast_listener, just trigger a refresh, not register with init_manager.
+  if (remote_jwks_.async_fetch().fast_listener()) {
     refresh();
     return;
   }

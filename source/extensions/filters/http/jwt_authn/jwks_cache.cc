@@ -51,8 +51,8 @@ public:
         setJwksToAllThreads(std::move(jwks));
       }
     } else {
-      // enable remote jwks async fetch
-      if (jwt_provider_.has_remote_jwks() && jwt_provider_.remote_jwks().has_async_fetch()) {
+      // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
+      if (jwt_provider_.has_remote_jwks()) {
         async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
             jwt_provider_.remote_jwks(), context, fetcher_cb, stats,
             [this](google::jwt_verify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });

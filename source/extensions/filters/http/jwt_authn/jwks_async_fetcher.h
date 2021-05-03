@@ -26,7 +26,8 @@ using CreateJwksFetcherCb = std::function<Common::JwksFetcherPtr(Upstream::Clust
 using JwksDoneFetched = std::function<void(google::jwt_verify::JwksPtr&& jwks)>;
 
 // This class handles fetching Jwks asynchronously.
-// At its constructor, it will start to fetch Jwks, register with init_manager
+// It will be no-op if async_fetch is not enabled.
+// At its constructor, it will start to fetch Jwks, register with init_manager if not fast_listener.
 // and handle fetching response. When cache is expired, it will fetch again.
 // When a Jwks is fetched, done_fn is called to set the Jwks.
 class JwksAsyncFetcher : public Logger::Loggable<Logger::Id::jwt>,
