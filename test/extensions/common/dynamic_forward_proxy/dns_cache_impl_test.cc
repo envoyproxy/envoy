@@ -2,6 +2,7 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
 #include "common/config/utility.h"
+#include "common/network/resolver_impl.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
@@ -92,6 +93,10 @@ MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {
 
 MATCHER(DnsHostInfoAddressIsNull, "") { return arg->address() == nullptr; }
 
+MATCHER_P(CustomDnsResolversSizeEquals, expectedResolvers, "") {
+  return expectedResolvers.size() == arg.size();
+}
+
 // Basic successful resolution and then re-resolution.
 TEST_F(DnsCacheImplTest, ResolveSuccess) {
   initialize();
@@ -105,7 +110,6 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -169,7 +173,6 @@ TEST_F(DnsCacheImplTest, Ipv4Address) {
   auto result = dns_cache_->loadDnsCacheEntry("127.0.0.1", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(
       update_callbacks_,
@@ -194,7 +197,6 @@ TEST_F(DnsCacheImplTest, Ipv4AddressWithPort) {
   auto result = dns_cache_->loadDnsCacheEntry("127.0.0.1:10000", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("127.0.0.1:10000",
@@ -219,7 +221,6 @@ TEST_F(DnsCacheImplTest, Ipv6Address) {
   auto result = dns_cache_->loadDnsCacheEntry("[::1]", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("[::1]", DnsHostInfoEquals("[::1]:80", "::1", true)));
@@ -242,7 +243,6 @@ TEST_F(DnsCacheImplTest, Ipv6AddressWithPort) {
   auto result = dns_cache_->loadDnsCacheEntry("[::1]:10000", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("[::1]:10000", DnsHostInfoEquals("[::1]:10000", "::1", true)));
@@ -265,7 +265,6 @@ TEST_F(DnsCacheImplTest, TTL) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -310,7 +309,6 @@ TEST_F(DnsCacheImplTest, TTL) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
   checkStats(3 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
              2 /* added */, 1 /* removed */, 1 /* num hosts */);
 }
@@ -330,7 +328,6 @@ TEST_F(DnsCacheImplTest, TTLWithCustomParameters) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
@@ -366,7 +363,6 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
   auto result = dns_cache_->loadDnsCacheEntry("localhost", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("localhost", _, _))
@@ -398,7 +394,6 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
@@ -412,9 +407,6 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
-  ASSERT_NE(absl::nullopt, result.host_info_);
-  ASSERT_NE(nullptr, *result.host_info_);
-  EXPECT_EQ(nullptr, (*result.host_info_)->address());
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
@@ -444,7 +436,6 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
@@ -459,9 +450,6 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
-  ASSERT_NE(absl::nullopt, result.host_info_);
-  ASSERT_NE(nullptr, *result.host_info_);
-  EXPECT_EQ(nullptr, (*result.host_info_)->address());
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
@@ -487,7 +475,6 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithEmptyResult) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
@@ -502,9 +489,6 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithEmptyResult) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
-  ASSERT_NE(absl::nullopt, result.host_info_);
-  ASSERT_NE(nullptr, *result.host_info_);
-  EXPECT_EQ(nullptr, (*result.host_info_)->address());
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
@@ -530,7 +514,6 @@ TEST_F(DnsCacheImplTest, CancelResolve) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   result.handle_.reset();
   EXPECT_CALL(update_callbacks_,
@@ -552,13 +535,11 @@ TEST_F(DnsCacheImplTest, MultipleResolveSameHost) {
   auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks1);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result1.status_);
   EXPECT_NE(result1.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result1.host_info_);
 
   MockLoadDnsCacheEntryCallbacks callbacks2;
   auto result2 = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks2);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result2.status_);
   EXPECT_NE(result2.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result2.host_info_);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
@@ -582,7 +563,6 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks1);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result1.status_);
   EXPECT_NE(result1.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result1.host_info_);
   EXPECT_EQ(dns_cache_->getHost("foo.com"), absl::nullopt);
 
   MockLoadDnsCacheEntryCallbacks callbacks2;
@@ -592,7 +572,6 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   auto result2 = dns_cache_->loadDnsCacheEntry("bar.com", 443, callbacks2);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result2.status_);
   EXPECT_NE(result2.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result2.host_info_);
   EXPECT_EQ(dns_cache_->getHost("bar.com"), absl::nullopt);
 
   EXPECT_CALL(update_callbacks_,
@@ -637,7 +616,6 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
@@ -649,8 +627,6 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
-  ASSERT_NE(absl::nullopt, result.host_info_);
-  EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("10.0.0.1:80", "foo.com", false));
 }
 
 // Make sure we destroy active queries if the cache goes away.
@@ -665,7 +641,6 @@ TEST_F(DnsCacheImplTest, CancelActiveQueriesOnDestroy) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(resolver_->active_query_, cancel());
   dns_cache_.reset();
@@ -683,7 +658,6 @@ TEST_F(DnsCacheImplTest, InvalidPort) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com:abc", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete(DnsHostInfoAddressIsNull()));
@@ -700,7 +674,6 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Overflow, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_);
   EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.host_overflow")->value());
 }
 
@@ -778,6 +751,42 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   config4.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
   EXPECT_THROW_WITH_MESSAGE(cache_manager.getCache(config4), EnvoyException,
                             "config specified DNS cache 'foo' with different settings");
+}
+
+TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolverConfig) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  std::vector<Network::Address::InstanceConstSharedPtr> expectedEmptyDnsResolvers;
+  EXPECT_CALL(dispatcher, createDnsResolver(expectedEmptyDnsResolvers, _)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
+TEST(DnsCacheConfigOptionsTest, CustomDnsResolverConfig) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  envoy::config::core::v3::Address* dns_resolver = config.add_dns_resolvers();
+  dns_resolver->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolver->mutable_socket_address()->set_port_value(8080);
+
+  std::vector<Network::Address::InstanceConstSharedPtr> expectedDnsResolverConfig;
+  envoy::config::core::v3::Address *address = new envoy::config::core::v3::Address();
+  address->mutable_socket_address()->set_address("1.2.3.4");
+  address->mutable_socket_address()->set_port_value(8080);
+  expectedDnsResolverConfig.push_back(Network::Address::resolveProtoAddress(*address));
+  EXPECT_CALL(dispatcher, createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolverConfig), _)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
 // Note: this test is done here, rather than a TYPED_TEST_SUITE in
