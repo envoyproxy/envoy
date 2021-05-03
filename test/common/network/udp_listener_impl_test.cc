@@ -227,7 +227,7 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   num_packets_received_by_listener_ = 0u;
-  // Though the mocked callback wants to read more, only 16 reads maxmium are allowed.
+  // Though the mocked callback wants to read more, only 16 reads maximum are allowed.
   num_packets_expected_per_loop = MAX_NUM_PACKETS_PER_EVENT_LOOP + 1u;
   std::string payload3(10, 'd');
   for (uint64_t i = 0; i < num_packets_expected_per_loop; ++i) {
