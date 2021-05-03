@@ -5,7 +5,6 @@ package envoy.extensions.common.matching.v3;
 import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/extension.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 

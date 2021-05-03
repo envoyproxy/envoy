@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.v3;
 
-import "udpa/annotations/status.proto";
-
 import public "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import public "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 import public "envoy/extensions/transport_sockets/tls/v3/tls.proto";

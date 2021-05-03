@@ -5,7 +5,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -16,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/delegating_route_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -134,7 +135,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
-  RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;

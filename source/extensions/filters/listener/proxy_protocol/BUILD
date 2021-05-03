@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -39,6 +40,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    category = "envoy.filters.listener",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",

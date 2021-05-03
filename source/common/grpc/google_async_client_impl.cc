@@ -258,12 +258,22 @@ void GoogleAsyncStreamImpl::writeQueued() {
 }
 
 void GoogleAsyncStreamImpl::onCompletedOps() {
-  Thread::LockGuard lock(completed_ops_lock_);
-  while (!completed_ops_.empty()) {
+  // The items in completed_ops_ execute in the order they were originally added to the queue since
+  // both the post callback scheduled by the completionThread and the deferred deletion of the
+  // GoogleAsyncClientThreadLocal happen on the dispatcher thread.
+  std::deque<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops;
+  {
+    Thread::LockGuard lock(completed_ops_lock_);
+    completed_ops = std::move(completed_ops_);
+    // completed_ops_ should be empty after the move.
+    ASSERT(completed_ops_.empty());
+  }
+
+  while (!completed_ops.empty()) {
     GoogleAsyncTag::Operation op;
     bool ok;
-    std::tie(op, ok) = completed_ops_.front();
-    completed_ops_.pop_front();
+    std::tie(op, ok) = completed_ops.front();
+    completed_ops.pop_front();
     handleOpCompletion(op, ok);
   }
 }

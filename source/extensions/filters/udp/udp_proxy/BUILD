@@ -45,6 +45,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.udp_listener",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":udp_proxy_filter_lib",

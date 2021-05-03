@@ -209,7 +209,7 @@ void ActiveMessage::onQueryTopicRoute() {
     TopicRouteData topic_route_data(std::move(queue_data_list), std::move(broker_data_list));
     ProtobufWkt::Struct data_struct;
     topic_route_data.encode(data_struct);
-    std::string json = MessageUtil::getJsonStringFromMessage(data_struct);
+    std::string json = MessageUtil::getJsonStringFromMessageOrDie(data_struct);
     ENVOY_LOG(trace, "Serialize TopicRouteData for {} OK:\n{}", cluster_name, json);
     RemotingCommandPtr response = std::make_unique<RemotingCommand>(
         static_cast<int>(ResponseCode::Success), downstreamRequest()->version(),

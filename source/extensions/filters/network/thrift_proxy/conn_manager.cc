@@ -55,6 +55,11 @@ void ConnectionManager::dispatch() {
     return;
   }
 
+  if (requests_overflow_) {
+    ENVOY_CONN_LOG(debug, "thrift filter requests overflow", read_callbacks_->connection());
+    return;
+  }
+
   try {
     bool underflow = false;
     while (!underflow) {
@@ -67,7 +72,7 @@ void ConnectionManager::dispatch() {
 
     return;
   } catch (const AppException& ex) {
-    ENVOY_LOG(error, "thrift application exception: {}", ex.what());
+    ENVOY_LOG(debug, "thrift application exception: {}", ex.what());
     if (rpcs_.empty()) {
       MessageMetadata metadata;
       sendLocalReply(metadata, ex, true);
@@ -75,7 +80,7 @@ void ConnectionManager::dispatch() {
       sendLocalReply(*(*rpcs_.begin())->metadata_, ex, true);
     }
   } catch (const EnvoyException& ex) {
-    ENVOY_CONN_LOG(error, "thrift error: {}", read_callbacks_->connection(), ex.what());
+    ENVOY_CONN_LOG(debug, "thrift error: {}", read_callbacks_->connection(), ex.what());
 
     if (rpcs_.empty()) {
       // Transport/protocol mismatch (including errors in automatic detection). Just hang up
@@ -139,6 +144,9 @@ void ConnectionManager::continueDecoding() {
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
+  if (requests_overflow_ && rpcs_.empty()) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 }
 
 void ConnectionManager::resetAllRpcs(bool local_reset) {
@@ -181,9 +189,15 @@ bool ConnectionManager::passthroughEnabled() const {
     return false;
   }
 
-  // This is called right after the metadata has been parsed, and the ActiveRpc being processed must
-  // be in the rpcs_ list.
-  ASSERT(!rpcs_.empty());
+  // If the rpcs list is empty, a local response happened.
+  //
+  // TODO(rgs1): we actually could still enable passthrough for local
+  // responses as long as the transport is framed and the protocol is
+  // not Twitter.
+  if (rpcs_.empty()) {
+    return false;
+  }
+
   return (*rpcs_.begin())->passthroughSupported();
 }
 
@@ -323,12 +337,26 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderF
     for (; entry != decoder_filters_.end(); entry++) {
       const FilterStatus status = filter_action_((*entry)->handle_.get());
       if (local_response_sent_) {
-        // The filter called sendLocalReply: stop processing filters and return
-        // FilterStatus::Continue irrespective of the current result.
+        // The filter called sendLocalReply but _did not_ close the connection.
+        // We return FilterStatus::Continue irrespective of the current result,
+        // which is fine because subsequent calls to this method will skip
+        // filters anyway.
+        //
+        // Note: we need to return FilterStatus::Continue here, in order for decoding
+        // to proceed. This is important because as noted above, the connection remains
+        // open so we need to consume the remaining bytes.
         break;
       }
 
       if (status != FilterStatus::Continue) {
+        // If we got FilterStatus::StopIteration and a local reply happened but
+        // local_response_sent_ was not set, the connection was closed.
+        //
+        // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
+        // dispatch() stops the processing.
+        //
+        // In other words, after a local reply closes the connection and StopIteration
+        // is returned we are done.
         return status;
       }
     }
@@ -383,6 +411,14 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   pending_transport_end_ = false;
 
   parent_.stats_.request_.inc();
+
+  parent_.accumulated_requests_++;
+  if (parent_.config_.maxRequestsPerConnection() > 0 &&
+      parent_.accumulated_requests_ >= parent_.config_.maxRequestsPerConnection()) {
+    parent_.read_callbacks_->connection().readDisable(true);
+    parent_.requests_overflow_ = true;
+    parent_.stats_.downstream_cx_max_requests_.inc();
+  }
 
   bool destroy_rpc = false;
   switch (original_msg_type_) {

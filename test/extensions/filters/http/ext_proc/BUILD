@@ -14,6 +14,7 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "config_test",
+    size = "small",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -25,6 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_test",
+    size = "small",
     srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -32,6 +34,22 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc",
         "//test/common/http:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ordering_test",
+    size = "small",
+    srcs = ["ordering_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        ":mock_server_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/common/http:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:test_runtime_lib",
     ],
@@ -39,6 +57,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "client_test",
+    size = "small",
     srcs = ["client_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -53,6 +72,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "mutation_utils_test",
+    size = "small",
     srcs = ["mutation_utils_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -64,6 +84,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ext_proc_integration_test",
+    size = "medium",
     srcs = ["ext_proc_integration_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -95,6 +116,7 @@ envoy_extension_cc_test_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

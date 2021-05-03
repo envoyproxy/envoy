@@ -14,6 +14,11 @@ namespace ExternalProcessing {
 using Http::Headers;
 using Http::LowerCaseString;
 
+using envoy::service::ext_proc::v3alpha::BodyMutation;
+using envoy::service::ext_proc::v3alpha::BodyResponse;
+using envoy::service::ext_proc::v3alpha::HeaderMutation;
+using envoy::service::ext_proc::v3alpha::HeadersResponse;
+
 void MutationUtils::buildHttpHeaders(const Http::HeaderMap& headers_in,
                                      envoy::config::core::v3::HeaderMap& headers_out) {
   headers_in.iterate([&headers_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
@@ -24,11 +29,23 @@ void MutationUtils::buildHttpHeaders(const Http::HeaderMap& headers_in,
   });
 }
 
-void MutationUtils::applyHeaderMutations(
-    const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation, Http::HeaderMap& headers) {
+void MutationUtils::applyCommonHeaderResponse(const HeadersResponse& response,
+                                              Http::HeaderMap& headers) {
+  if (response.has_response()) {
+    const auto& common_response = response.response();
+    if (common_response.has_header_mutation()) {
+      applyHeaderMutations(common_response.header_mutation(), headers);
+    }
+  }
+}
+
+void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::HeaderMap& headers) {
   for (const auto& remove_header : mutation.remove_headers()) {
     if (Http::HeaderUtility::isRemovableHeader(remove_header)) {
+      ENVOY_LOG(trace, "Removing header {}", remove_header);
       headers.remove(LowerCaseString(remove_header));
+    } else {
+      ENVOY_LOG(debug, "Header {} is not removable", remove_header);
     }
   }
 
@@ -41,12 +58,45 @@ void MutationUtils::applyHeaderMutations(
       // filter. However, the router handles this same protobuf and uses "true"
       // as the default instead.
       const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
+      ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
       if (append) {
         headers.addCopy(LowerCaseString(sh.header().key()), sh.header().value());
       } else {
         headers.setCopy(LowerCaseString(sh.header().key()), sh.header().value());
       }
+    } else {
+      ENVOY_LOG(debug, "Header {} is not settable", sh.header().key());
     }
+  }
+}
+
+void MutationUtils::applyCommonBodyResponse(const BodyResponse& response, Http::HeaderMap* headers,
+                                            Buffer::Instance& buffer) {
+  if (response.has_response()) {
+    const auto& common_response = response.response();
+    if (headers != nullptr && common_response.has_header_mutation()) {
+      applyHeaderMutations(common_response.header_mutation(), *headers);
+    }
+    if (common_response.has_body_mutation()) {
+      applyBodyMutations(common_response.body_mutation(), buffer);
+    }
+  }
+}
+
+void MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
+  switch (mutation.mutation_case()) {
+  case BodyMutation::MutationCase::kClearBody:
+    if (mutation.clear_body()) {
+      buffer.drain(buffer.length());
+    }
+    break;
+  case BodyMutation::MutationCase::kBody:
+    buffer.drain(buffer.length());
+    buffer.add(mutation.body());
+    break;
+  default:
+    // Nothing to do on default
+    break;
   }
 }
 

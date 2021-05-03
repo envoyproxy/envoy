@@ -50,7 +50,7 @@ SquashFilterConfig::SquashFilterConfig(
 std::string SquashFilterConfig::getAttachment(const ProtobufWkt::Struct& attachment_template) {
   ProtobufWkt::Struct attachment_json(attachment_template);
   updateTemplateInStruct(attachment_json);
-  return MessageUtil::getJsonStringFromMessage(attachment_json);
+  return MessageUtil::getJsonStringFromMessageOrDie(attachment_json);
 }
 
 void SquashFilterConfig::updateTemplateInStruct(ProtobufWkt::Struct& attachment_template) {

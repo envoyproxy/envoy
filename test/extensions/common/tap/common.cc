@@ -10,7 +10,7 @@ namespace tap {
 namespace v3 {
 
 std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace) {
-  return os << Envoy::MessageUtil::getJsonStringFromMessage(trace, true, false);
+  return os << Envoy::MessageUtil::getJsonStringFromMessageOrDie(trace, true, false);
 }
 
 } // namespace v3

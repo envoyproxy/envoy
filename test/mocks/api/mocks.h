@@ -31,14 +31,18 @@ public:
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr
+  allocateDispatcher(const std::string& name,
+                     const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,
                                           Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   TimeSource& timeSource() override { return time_system_; }
 
   MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_, (const std::string&, Event::TimeSystem&));
   MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_,
-              (const std::string&, Buffer::WatermarkFactoryPtr&& watermark_factory,
-               Event::TimeSystem&));
+              (const std::string&,
+               const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory,
+               Buffer::WatermarkFactoryPtr&& watermark_factory, Event::TimeSystem&));
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(Stats::Scope&, rootScope, ());
@@ -65,6 +69,10 @@ public:
   MOCK_METHOD(SysCallSocketResult, accept, (os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen));
   MOCK_METHOD(SysCallIntResult, bind, (os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD(SysCallIntResult, ioctl, (os_fd_t sockfd, unsigned long int request, void* argp));
+  MOCK_METHOD(SysCallIntResult, ioctl,
+              (os_fd_t sockfd, unsigned long control_code, void* in_buffer,
+               unsigned long in_buffer_len, void* out_buffer, unsigned long out_buffer_len,
+               unsigned long* bytes_returned));
   MOCK_METHOD(SysCallIntResult, close, (os_fd_t));
   MOCK_METHOD(SysCallSizeResult, writev, (os_fd_t, const iovec*, int));
   MOCK_METHOD(SysCallSizeResult, sendmsg, (os_fd_t fd, const msghdr* msg, int flags));

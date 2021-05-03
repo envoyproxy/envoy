@@ -234,6 +234,8 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
@@ -284,6 +286,8 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
@@ -310,6 +314,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
           Invoke([&](Upstream::ResourcePriority, auto,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             // this is the hash of :path header value "/"
+            // the hash stability across releases is expected, so test the hash value directly here.
             EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
             return &cm_.thread_local_cluster_.conn_pool_;
           }));
@@ -326,6 +331,97 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
   Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(":path");
   options.setHashPolicy(hash_policy);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
+TEST_F(AsyncClientImplTest, WithoutMetadata) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+      .WillOnce(
+          Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+            return &cm_.thread_local_cluster_.conn_pool_;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+
+  AsyncClient::RequestOptions options;
+  envoy::config::core::v3::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
+  options.setMetadata(metadata);
+
+  auto* request = client_.send(std::move(message_), callbacks_, options);
+  EXPECT_NE(request, nullptr);
+
+  expectSuccess(request, 200);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
+TEST_F(AsyncClientImplTest, WithMetadata) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+      .WillOnce(
+          Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_NE(context->metadataMatchCriteria(), nullptr);
+            EXPECT_EQ(context->metadataMatchCriteria()->metadataMatchCriteria().at(0)->name(),
+                      "fake_test_key");
+            return &cm_.thread_local_cluster_.conn_pool_;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+
+  AsyncClient::RequestOptions options;
+  envoy::config::core::v3::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      {Envoy::Config::MetadataFilters::get().ENVOY_LB,
+       MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
+  options.setMetadata(metadata);
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
@@ -1018,6 +1114,8 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -1103,6 +1201,8 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
@@ -1288,6 +1388,8 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("504")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UT")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))

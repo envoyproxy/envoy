@@ -20,7 +20,7 @@ using InitializeFn = std::function<void()>;
  * and resets it later in `ready`. Users needn't care about this implementation detail, they only
  * need to provide an `InitializeFn` above when constructing a target.
  */
-using InternalInitalizeFn = std::function<void(WatcherHandlePtr)>;
+using InternalInitializeFn = std::function<void(WatcherHandlePtr)>;
 
 /**
  * A TargetHandleImpl functions as a weak reference to a TargetImpl. It is how a ManagerImpl safely
@@ -32,7 +32,7 @@ private:
   friend class SharedTargetImpl;
 
   TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
-                   std::weak_ptr<InternalInitalizeFn> fn);
+                   std::weak_ptr<InternalInitializeFn> fn);
 
 public:
   // Init::TargetHandle
@@ -48,7 +48,7 @@ private:
   const std::string name_;
 
   // The target's callback function, only called if the weak pointer can be "locked"
-  const std::weak_ptr<InternalInitalizeFn> fn_;
+  const std::weak_ptr<InternalInitializeFn> fn_;
 };
 
 /**
@@ -86,7 +86,7 @@ private:
   WatcherHandlePtr watcher_handle_;
 
   // The callback function, called via TargetHandleImpl by the manager
-  const std::shared_ptr<InternalInitalizeFn> fn_;
+  const std::shared_ptr<InternalInitializeFn> fn_;
 };
 
 /**
@@ -124,7 +124,7 @@ private:
   std::vector<WatcherHandlePtr> watcher_handles_;
 
   // The callback function, called via TargetHandleImpl by the manager
-  const std::shared_ptr<InternalInitalizeFn> fn_;
+  const std::shared_ptr<InternalInitializeFn> fn_;
 
   // The state so as to signal the manager when a ready target is added.
   bool initialized_{false};

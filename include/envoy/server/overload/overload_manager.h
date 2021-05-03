@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "common/singleton/const_singleton.h"
@@ -69,6 +70,11 @@ public:
    * an alternative to registering a callback for overload action state changes.
    */
   virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
+
+  /**
+   * Get a factory for constructing scaled timer managers that respond to overload state.
+   */
+  virtual Event::ScaledRangeTimerManagerFactory scaledTimerFactory() PURE;
 };
 
 } // namespace Server

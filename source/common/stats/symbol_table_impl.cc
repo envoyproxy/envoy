@@ -246,12 +246,12 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
 
     ASSERT(decode_search != decode_map_.end(),
            "Please see "
-           "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
+           "https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#"
            "debugging-symbol-table-assertions");
     auto encode_search = encode_map_.find(decode_search->second->toStringView());
     ASSERT(encode_search != encode_map_.end(),
            "Please see "
-           "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
+           "https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#"
            "debugging-symbol-table-assertions");
 
     ++encode_search->second.ref_count_;

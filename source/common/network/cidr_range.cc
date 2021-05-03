@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -183,7 +184,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
 
     absl::uint128 ip6_htonl = Utility::Ip6htonl(ip6);
     static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
-    memcpy(&sa6.sin6_addr.s6_addr, &ip6_htonl, sizeof(absl::uint128));
+    safeMemcpy(&sa6.sin6_addr.s6_addr, &ip6_htonl);
     return std::make_shared<Ipv6Instance>(sa6);
   }
   }

@@ -59,6 +59,6 @@ Health checking interactions
 
 If Envoy is configured for either active or passive :ref:`health checking
 <arch_overview_health_checking>`, all connection pool connections will be closed on behalf of a host
-that transitions from a available state to an unavailable state. If the host reenters the load
+that transitions from an available state to an unavailable state. If the host reenters the load
 balancing rotation it will create fresh connections which will maximize the chance of working
 around a bad flow (due to ECMP route or something else).

@@ -3,8 +3,8 @@ to the [envoy docs](https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/
 
 # gRPC HTTP/1.1 to HTTP/2 bridge
 
-This is an example of a key-value store where a client CLI, written in Python, updates a remote store, written in Go, using the stubs generated for both languages. 
- 
+This is an example of a key-value store where a client CLI, written in Python, updates a remote store, written in Go, using the stubs generated for both languages.
+
 Running clients that uses gRPC stubs and sends messages through a proxy
 that upgrades the HTTP requests from http/1.1 to http/2. This is a more detailed
 implementation of the Envoy documentation at https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/grpc_bridge

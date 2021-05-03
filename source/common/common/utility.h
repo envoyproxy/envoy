@@ -177,6 +177,30 @@ public:
    * @return uint64_t the number of milliseconds since the epoch.
    */
   static uint64_t nowToMilliseconds(TimeSource& time_source);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number os seconds since the epoch.
+   */
+  static uint64_t nowToSeconds(TimeSource& time_source);
+};
+
+/**
+ * Utility routines for working with integers.
+ */
+class IntUtil {
+public:
+  /**
+   * Round `val` up to the next multiple. Examples:
+   *   roundUpToMultiple(3, 8) -> 8
+   *   roundUpToMultiple(9, 8) -> 16
+   *   roundUpToMultiple(8, 8) -> 8
+   */
+  static uint64_t roundUpToMultiple(uint64_t val, uint32_t multiple) {
+    ASSERT(multiple > 0);
+    ASSERT((val + multiple) >= val, "Unsigned overflow");
+    return ((val + multiple - 1) / multiple) * multiple;
+  }
 };
 
 /**
@@ -381,6 +405,16 @@ public:
    * @return escaped string.
    */
   static std::string escape(const std::string& source);
+
+  /**
+   * Outputs the string to the provided ostream, while escaping \n, \r, \t, and "
+   * (double quote), ' (single quote), and \ (backslash) escaped.
+   * This may be particularly useful if you cannot allocate memory, and the
+   * ostream being written to is backed by an entity that won't allocate memory.
+   * @param os the ostream to output to.
+   * @param view a string view to output
+   */
+  static void escapeToOstream(std::ostream& os, absl::string_view view);
 
   /**
    * Provide a default value for a string if empty.
@@ -619,8 +653,8 @@ template <class Value> struct TrieLookupTable {
   }
 
   /**
-   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix, key
-   * length))
+   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix,
+   * key length)).
    * @param key the key used to find.
    * @return the value matching the longest prefix based on the key.
    */
@@ -750,6 +784,19 @@ private:
 
   uint32_t size_;
   char data_[];
+};
+
+class SetUtil {
+public:
+  // Use instead of std::set_difference for unordered absl::flat_hash_set containers.
+  template <typename T>
+  static void setDifference(const absl::flat_hash_set<T>& original_set,
+                            const absl::flat_hash_set<T>& remove_set,
+                            absl::flat_hash_set<T>& result_set) {
+    std::copy_if(original_set.begin(), original_set.end(),
+                 std::inserter(result_set, result_set.begin()),
+                 [&remove_set](const T& v) -> bool { return remove_set.count(v) == 0; });
+  }
 };
 
 } // namespace Envoy

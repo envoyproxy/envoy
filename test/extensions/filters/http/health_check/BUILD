@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/http/health_check:health_check_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

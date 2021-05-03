@@ -6,6 +6,15 @@
 
 namespace Envoy {
 namespace Server {
+
+class MockBootstrapExtension : public BootstrapExtension {
+public:
+  MockBootstrapExtension();
+  ~MockBootstrapExtension() override;
+
+  MOCK_METHOD(void, onServerInitialized, (), (override));
+};
+
 namespace Configuration {
 class MockBootstrapExtensionFactory : public BootstrapExtensionFactory {
 public:

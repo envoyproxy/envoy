@@ -89,9 +89,9 @@ public:
    * Logic...: used by gauges to cache how they should be combined with a parent's value.
    */
   struct Flags {
-    static const uint8_t Used = 0x01;
-    static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t NeverImport = 0x04;
+    static constexpr uint8_t Used = 0x01;
+    static constexpr uint8_t LogicAccumulate = 0x02;
+    static constexpr uint8_t NeverImport = 0x04;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;

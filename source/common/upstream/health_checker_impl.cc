@@ -22,7 +22,6 @@
 #include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "absl/strings/match.h"
@@ -275,7 +274,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
        {Http::Headers::get().Path, parent_.path_},
        {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}});
   Router::FilterUtility::setUpstreamScheme(
-      *request_headers, host_->transportSocketFactory().implementsSecureTransport());
+      *request_headers,
+      // Here there is no downstream connection so scheme will be based on
+      // upstream crypto
+      host_->transportSocketFactory().implementsSecureTransport(),
+      host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
                                          local_address_provider_);
   stream_info.onUpstreamHostSelected(host_);
@@ -334,11 +337,20 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
-  uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
+  const uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
   if (!parent_.http_status_checker_.inRange(response_code)) {
+    // If the HTTP response code would indicate failure AND the immediate health check
+    // failure header is set, exclude the host from LB.
+    // TODO(mattklein123): We could consider doing this check for any HTTP response code, but this
+    // seems like the least surprising behavior and we could consider relaxing this in the future.
+    // TODO(mattklein123): This will not force a host set rebuild of the host was already failed.
+    // This is something we could do in the future but seems unnecessary right now.
+    if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
+      host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+    }
     return HealthCheckResult::Failed;
   }
 
@@ -372,7 +384,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleSuccess(true);
     break;
   case HealthCheckResult::Failed:
-    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
     handleFailure(envoy::data::core::v3::ACTIVE);
     break;
   }
@@ -395,35 +406,12 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     return true;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
-    return Http::HeaderUtility::shouldCloseConnection(client_->protocol(), *response_headers_);
-  }
-
-  if (response_headers_->Connection()) {
-    const bool close =
-        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-    if (close) {
-      return true;
-    }
-  }
-
-  if (response_headers_->ProxyConnection() && protocol_ < Http::Protocol::Http2) {
-    const bool close =
-        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-    if (close) {
-      return true;
-    }
-  }
-
-  return false;
+  return Http::HeaderUtility::shouldCloseConnection(client_->protocol(), *response_headers_);
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   request_in_flight_ = false;
   if (client_) {
-    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
     ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                    HostUtility::healthFlagsToString(*host_));
 
@@ -511,6 +499,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "total pending buffer={}", *client_, data.length());
+  // TODO(lilika): The TCP health checker does generic pattern matching so we can't differentiate
+  // between wrong data and not enough data. We could likely do better here and figure out cases in
+  // which a match is not possible but that is not done now.
   if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
     ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
     data.drain(data.length());
@@ -519,8 +510,6 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
       expect_close_ = true;
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
-  } else {
-    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
   }
 }
 
@@ -568,9 +557,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 
     expect_close_ = false;
     client_->connect();
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
-      client_->noDelay(true);
-    }
+    client_->noDelay(true);
   }
 
   if (!parent_.send_bytes_.empty()) {
@@ -585,7 +572,6 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
   expect_close_ = true;
-  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -738,7 +724,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   Grpc::Common::toGrpcTimeout(parent_.timeout_, headers_message->headers());
 
   Router::FilterUtility::setUpstreamScheme(
-      headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());
+      headers_message->headers(),
+      // Here there is no downstream connection so scheme will be based on
+      // upstream crypto
+      host_->transportSocketFactory().implementsSecureTransport(),
+      host_->transportSocketFactory().implementsSecureTransport());
 
   auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);
   // Encoding will only fail if required headers are missing.
