@@ -52,12 +52,6 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
     const quic::ParsedQuicVersion& version, absl::string_view sni) {
   quic::QuicConfig quic_config = config();
-  // TODO(danzh) setup flow control window via config.
-  quic_config.SetInitialStreamFlowControlWindowToSend(
-      Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-  quic_config.SetInitialSessionFlowControlWindowToSend(
-      1.5 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(sni), alpn);
   const Network::FilterChain* filter_chain =
