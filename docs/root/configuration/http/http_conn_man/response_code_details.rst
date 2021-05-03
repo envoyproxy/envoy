@@ -41,7 +41,6 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    request_payload_exceeded_retry_buffer_limit, Envoy is doing streaming proxying but too much data arrived while waiting to attempt a retry.
    request_payload_too_large, Envoy is doing non-streaming proxying and the request payload exceeded configured limits.
    response_payload_too_large, Envoy is doing non-streaming proxying and the response payload exceeded configured limits.
-   response_payload_too_large, Envoy is doing non-streaming proxying and the response payload exceeded configured limits.
    route_configuration_not_found, The request was rejected because there was no route configuration found.
    route_not_found, The request was rejected because there was no route found.
    stream_idle_timeout, The per-stream keepalive timeout was exceeded.
@@ -100,3 +99,19 @@ All http2 details are rooted at *http2.*
     http2.unexpected_underscore, Envoy was configured to drop requests with header keys beginning with underscores.
     http2.unknown.nghttp2.error, An unknown error was encountered by nghttp2
     http2.violation.of.messaging.rule, The stream was in violation of a HTTP/2 messaging rule.
+
+Http3 details
+~~~~~~~~~~~~~
+
+All http3 details are rooted at *http3.*
+
+.. csv-table::
+   :header: Name, Description
+   :widths: 1, 2
+
+    http3.invalid_header_field, One of the HTTP/3 headers was invalid
+    http3.headers_too_large, The size of headers (or trailers) exceeded the configured limits
+    http3.unexpected_underscore, Envoy was configured to drop or reject requests with header keys beginning with underscores.
+    http3.too_many_headers, Either incoming request or response headers contained too many headers.
+    http3.too_many_trailers, Either incoming request or response trailers contained too many entries.
+

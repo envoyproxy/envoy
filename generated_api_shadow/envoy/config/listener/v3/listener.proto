@@ -5,7 +5,6 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
@@ -16,6 +15,7 @@ import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -35,7 +35,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 27]
+// [#next-free-field: 29]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -88,7 +88,12 @@ message Listener {
     }
   }
 
-  reserved 14;
+  // Configuration for envoy internal listener. All the future internal listener features should be added here.
+  // [#not-implemented-hide:]
+  message InternalListenerConfig {
+  }
+
+  reserved 14, 23;
 
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -99,6 +104,11 @@ message Listener {
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
   core.v3.Address address = 2 [(validate.rules).message = {required: true}];
+
+  // Optional prefix to use on listener stats. If empty, the stats will be rooted at
+  // `listener.<address as string>.`. If non-empty, stats will be rooted at
+  // `listener.<stat_prefix>.`.
+  string stat_prefix = 28;
 
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_api_msg_config.listener.v3.FilterChain>` with the most specific
@@ -129,7 +139,8 @@ message Listener {
   core.v3.Metadata metadata = 6;
 
   // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 7 [deprecated = true];
+  DeprecatedV1 deprecated_v1 = 7
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The type of draining to perform at a listener-wide level.
   DrainType drain_type = 8;
@@ -205,14 +216,14 @@ message Listener {
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
 
   // Specifies the intended direction of the traffic relative to the local Envoy.
+  // This property is required on Windows for listeners using the original destination filter,
+  // see :ref:`Original Destination <config_listener_filters_original_dst>`.
   core.v3.TrafficDirection traffic_direction = 16;
 
   // If the protocol in the listener socket address in :ref:`protocol
   // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
-  // listener to create, i.e. :ref:`udp_listener_name
-  // <envoy_api_field_config.listener.v3.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
-  // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
+  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies UDP
+  // listener specific configuration.
   UdpListenerConfig udp_listener_config = 18;
 
   // Used to represent an API listener, which is used in non-proxy clients. The type of API
@@ -236,6 +247,12 @@ message Listener {
   // The listener's connection balancer configuration, currently only applicable to TCP listeners.
   // If no configuration is specified, Envoy will not attempt to balance active connections between
   // worker threads.
+  //
+  // In the scenario that the listener X redirects all the connections to the listeners Y1 and Y2
+  // by setting :ref:`use_original_dst <envoy_api_field_config.listener.v3.Listener.use_original_dst>` in X
+  // and :ref:`bind_to_port <envoy_api_field_config.listener.v3.Listener.bind_to_port>` to false in Y1 and Y2,
+  // it is recommended to disable the balance config in listener X to avoid the cost of balancing, and
+  // enable the balance config in Y1 and Y2 to balance the connections among the workers.
   ConnectionBalanceConfig connection_balance_config = 20;
 
   // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
@@ -254,16 +271,6 @@ message Listener {
   // emitted by this listener.
   repeated accesslog.v3.AccessLog access_log = 22;
 
-  // If the protocol in the listener socket address in :ref:`protocol
-  // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
-  // writer to create, i.e. :ref:`name <envoy_api_field_config.core.v3.TypedExtensionConfig.name>`
-  //    = "udp_default_writer" for creating a udp writer with writing in passthrough mode,
-  //    = "udp_gso_batch_writer" for creating a udp writer with writing in batch mode.
-  // If not present, treat it as "udp_default_writer".
-  // [#not-implemented-hide:]
-  core.v3.TypedExtensionConfig udp_writer_config = 23;
-
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.
   google.protobuf.UInt32Value tcp_backlog_size = 24;
@@ -273,4 +280,26 @@ message Listener {
   // :ref:`use_original_dst <envoy_api_field_config.listener.v3.Listener.use_original_dst>`
   // to true. Default is true.
   google.protobuf.BoolValue bind_to_port = 26;
+
+  // The exclusive listener type and the corresponding config.
+  // TODO(lambdai): https://github.com/envoyproxy/envoy/issues/15372
+  // Will create and add TcpListenerConfig. Will add UdpListenerConfig and ApiListener.
+  // [#not-implemented-hide:]
+  oneof listener_specifier {
+    // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
+    // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
+    // The internal listener acts as a tcp listener. It supports listener filters and network filter chains.
+    // The internal listener require :ref:`address <envoy_api_field_config.listener.v3.Listener.address>` has
+    // field `envoy_internal_address`.
+    //
+    // There are some limitations are derived from the implementation. The known limitations include
+    //
+    // * :ref:`ConnectionBalanceConfig <envoy_api_msg_config.listener.v3.Listener.ConnectionBalanceConfig>` is not
+    //   allowed because both cluster connection and listener connection must be owned by the same dispatcher.
+    // * :ref:`tcp_backlog_size <envoy_api_field_config.listener.v3.Listener.tcp_backlog_size>`
+    // * :ref:`freebind <envoy_api_field_config.listener.v3.Listener.freebind>`
+    // * :ref:`transparent <envoy_api_field_config.listener.v3.Listener.transparent>`
+    // [#not-implemented-hide:]
+    InternalListenerConfig internal_listener = 27;
+  }
 }

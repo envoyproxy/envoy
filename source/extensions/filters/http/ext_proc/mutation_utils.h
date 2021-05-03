@@ -1,14 +1,17 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class MutationUtils {
+class MutationUtils : public Logger::Loggable<Logger::Id::filter> {
 public:
   // Convert a header map until a protobuf
   static void buildHttpHeaders(const Http::HeaderMap& headers_in,
@@ -23,6 +26,15 @@ public:
   static void
   applyHeaderMutations(const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation,
                        Http::HeaderMap& headers);
+
+  // Apply mutations that are common to body responses.
+  // Mutations will be applied to the header map if it is not null.
+  static void applyCommonBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& body,
+                                      Http::HeaderMap* headers, Buffer::Instance& buffer);
+
+  // Modify a buffer based on a set of mutations from a protobuf
+  static void applyBodyMutations(const envoy::service::ext_proc::v3alpha::BodyMutation& mutation,
+                                 Buffer::Instance& buffer);
 
 private:
   static bool isSettableHeader(absl::string_view key);

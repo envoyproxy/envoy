@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -155,6 +155,16 @@ public:
     Common::Redis::Client::PoolRequest* request =
         this->conn_pool_->makeRequest("hash_key", value, callbacks);
     EXPECT_NE(nullptr, request);
+  }
+
+  std::string getAuthUsername() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_;
+  }
+
+  std::string getAuthPassword() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_;
   }
 
   absl::node_hash_map<Upstream::HostConstSharedPtr, InstanceImpl::ThreadLocalActiveClientPtr>&
@@ -517,6 +527,44 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
   // MurmurHash of "foo" is 9631199822919835226U
   makeSimpleRequest(true, "foo", 9631199822919835226U);
+
+  // Remove the cluster to make sure we safely destruct with no cluster.
+  EXPECT_CALL(*client_, close());
+  update_callbacks_->onClusterRemoval("fake_cluster");
+}
+
+// ConnPool created when no cluster exists at creation time. Dynamic cluster
+// creation and removal work correctly. Username and password are updated with
+// dynamic cluster.
+TEST_F(RedisConnPoolImplTest, AuthInfoUpdate) {
+  InSequence s;
+
+  // Initialize username and password.
+  auth_username_ = "testusername";
+  auth_password_ = "testpassword";
+
+  setup(false);
+
+  EXPECT_EQ(auth_username_, getAuthUsername());
+  EXPECT_EQ(auth_password_, getAuthPassword());
+
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", value, callbacks);
+  EXPECT_EQ(nullptr, request);
+
+  // The username and password will be updated to empty when cluster updates
+  auth_username_ = "";
+  auth_password_ = "";
+
+  // Now add the cluster. Request to the cluster should succeed.
+  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+  // MurmurHash of "foo" is 9631199822919835226U
+  makeSimpleRequest(true, "foo", 9631199822919835226U);
+
+  EXPECT_EQ(auth_username_, getAuthUsername());
+  EXPECT_EQ(auth_password_, getAuthPassword());
 
   // Remove the cluster to make sure we safely destruct with no cluster.
   EXPECT_CALL(*client_, close());

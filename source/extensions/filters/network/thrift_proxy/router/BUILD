@@ -21,7 +21,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
-        "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/router/v3:pkg_cc_proto",
     ],
 )
 

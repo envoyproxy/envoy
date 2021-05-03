@@ -1,6 +1,5 @@
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
 
 #include "gtest/gtest.h"
 
@@ -9,53 +8,45 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-TEST(MessageMetadataTest, Fields) {
-  MessageMetadata metadata;
-  auto invo = std::make_shared<RpcInvocationImpl>();
+TEST(MessageMetadataTest, MessageMetadataTest) {
+  auto invocation_info = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata meta;
 
-  EXPECT_FALSE(metadata.hasInvocationInfo());
-  metadata.setInvocationInfo(invo);
-  EXPECT_TRUE(metadata.hasInvocationInfo());
+  EXPECT_EQ(false, meta.hasInvocationInfo());
 
-  EXPECT_THROW(metadata.timeout().value(), absl::bad_optional_access);
-  metadata.setTimeout(3);
-  EXPECT_TRUE(metadata.timeout().has_value());
+  meta.setInvocationInfo(invocation_info);
 
-  invo->setMethodName("method");
-  EXPECT_EQ("method", invo->methodName());
+  EXPECT_EQ(true, meta.hasInvocationInfo());
+  EXPECT_EQ(invocation_info.get(), &meta.invocationInfo());
 
-  EXPECT_FALSE(invo->serviceVersion().has_value());
-  EXPECT_THROW(invo->serviceVersion().value(), absl::bad_optional_access);
-  invo->setServiceVersion("1.0.0");
-  EXPECT_TRUE(invo->serviceVersion().has_value());
-  EXPECT_EQ("1.0.0", invo->serviceVersion().value());
+  meta.setProtocolType(ProtocolType::Dubbo);
+  EXPECT_EQ(ProtocolType::Dubbo, meta.protocolType());
 
-  EXPECT_FALSE(invo->serviceGroup().has_value());
-  EXPECT_THROW(invo->serviceGroup().value(), absl::bad_optional_access);
-  invo->setServiceGroup("group");
-  EXPECT_TRUE(invo->serviceGroup().has_value());
-  EXPECT_EQ("group", invo->serviceGroup().value());
-}
+  meta.setProtocolVersion(27);
+  EXPECT_EQ(27, meta.protocolVersion());
 
-TEST(MessageMetadataTest, Headers) {
-  MessageMetadata metadata;
-  auto invo = std::make_shared<RpcInvocationImpl>();
+  meta.setMessageType(MessageType::Request);
+  EXPECT_EQ(MessageType::Request, meta.messageType());
 
-  EXPECT_FALSE(invo->hasHeaders());
-  invo->addHeader("k", "v");
-  EXPECT_EQ(invo->headers().size(), 1);
-}
+  meta.setRequestId(1234567);
+  EXPECT_EQ(1234567, meta.requestId());
 
-TEST(MessageMetadataTest, Parameters) {
-  MessageMetadata metadata;
-  auto invo = std::make_shared<RpcInvocationImpl>();
+  EXPECT_EQ(false, meta.timeout().has_value());
+  meta.setTimeout(6000);
+  EXPECT_EQ(6000, meta.timeout().value());
 
-  EXPECT_FALSE(invo->hasParameters());
-  invo->addParameterValue(0, "test");
-  EXPECT_TRUE(invo->hasParameters());
-  EXPECT_EQ(invo->parameters().size(), 1);
-  EXPECT_EQ(invo->getParameterValue(0), "test");
-  EXPECT_EQ(invo->getParameterValue(1), "");
+  meta.setTwoWayFlag(true);
+  EXPECT_EQ(true, meta.isTwoWay());
+
+  meta.setSerializationType(SerializationType::Hessian2);
+  EXPECT_EQ(SerializationType::Hessian2, meta.serializationType());
+
+  EXPECT_EQ(false, meta.hasResponseStatus());
+
+  meta.setResponseStatus(ResponseStatus::ServerTimeout);
+  EXPECT_EQ(ResponseStatus::ServerTimeout, meta.responseStatus());
+
+  EXPECT_EQ(true, meta.hasResponseStatus());
 }
 
 } // namespace DubboProxy

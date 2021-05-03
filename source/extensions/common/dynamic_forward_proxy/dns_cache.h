@@ -86,8 +86,10 @@ public:
 
     /**
      * Called when the DNS cache load is complete (or failed).
+     *
+     * @param host_info the DnsHostInfo for the resolved host.
      */
-    virtual void onLoadDnsCacheComplete() PURE;
+    virtual void onLoadDnsCacheComplete(const DnsHostInfoSharedPtr& host_info) PURE;
   };
 
   /**
@@ -160,6 +162,7 @@ public:
   struct LoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandlePtr handle_;
+    absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
@@ -215,15 +218,6 @@ public:
 };
 
 using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
-
-/**
- * Get the singleton cache manager for the entire server.
- */
-DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
-                                         Event::Dispatcher& main_thread_dispatcher,
-                                         ThreadLocal::SlotAllocator& tls,
-                                         Random::RandomGenerator& random, Runtime::Loader& loader,
-                                         Stats::Scope& root_scope);
 
 /**
  * Factory for getting a DNS cache manager.

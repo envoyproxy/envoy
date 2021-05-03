@@ -13,6 +13,8 @@
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
+#include "exe/platform_impl.h"
+
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
@@ -42,18 +44,27 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
+MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                                ListenerHooks& listener_hooks,
                                Server::ComponentFactory& component_factory,
+                               std::unique_ptr<Server::Platform> platform_impl,
                                std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                               Thread::ThreadFactory& thread_factory,
-                               Filesystem::Instance& file_system,
                                std::unique_ptr<ProcessContext> process_context)
-    : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
-      file_system_(file_system), stats_allocator_(symbol_table_) {
+    : platform_impl_(std::move(platform_impl)), options_(options),
+      component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
   OptionsImpl::disableExtensions(options.disabledExtensions());
+
+  // Enable core dumps as early as possible.
+  if (options_.coreDumpEnabled()) {
+    const auto ret = platform_impl_->enableCoreDump();
+    if (ret) {
+      ENVOY_LOG_MISC(info, "core dump enabled");
+    } else {
+      ENVOY_LOG_MISC(warn, "failed to enable core dump");
+    }
+  }
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
@@ -79,7 +90,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     server_ = std::make_unique<Server::InstanceImpl>(
         *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
         *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
-        thread_factory_, file_system_, std::move(process_context));
+        platform_impl_->threadFactory(), platform_impl_->fileSystem(), std::move(process_context));
 
     break;
   }
@@ -116,10 +127,12 @@ void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_gener
         // HotRestartImpl is going to multiply this value by 10, so leave head room.
         base_id = static_cast<uint32_t>(random_generator.random()) & 0x0FFFFFFF;
 
-        try {
+        TRY_ASSERT_MAIN_THREAD {
           restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0, options_.socketPath(),
                                                                options_.socketMode());
-        } catch (Server::HotRestartDomainSocketInUseException& ex) {
+        }
+        END_TRY
+        catch (Server::HotRestartDomainSocketInUseException& ex) {
           // No luck, try again.
           ENVOY_LOG_MISC(debug, "dynamic base id: {}", ex.what());
         }
@@ -163,8 +176,8 @@ bool MainCommonBase::run() {
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_, thread_factory_,
-                                  file_system_);
+    return Server::validateConfig(options_, local_address, component_factory_,
+                                  platform_impl_->threadFactory(), platform_impl_->fileSystem());
   }
   case Server::Mode::InitOnly:
     PERF_DUMP();
@@ -185,11 +198,17 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   });
 }
 
+MainCommon::MainCommon(const std::vector<std::string>& args)
+    : options_(args, &MainCommon::hotRestartVersion, spdlog::level::info),
+      base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
+            std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
+            nullptr) {}
+
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-            std::make_unique<Random::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
-            platform_impl_.fileSystem(), nullptr) {}
+            std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
+            nullptr) {}
 
 std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART
@@ -213,18 +232,22 @@ int MainCommon::main(int argc, char** argv, PostServerHook hook) {
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     main_common = std::make_unique<Envoy::MainCommon>(argc, argv);
     Envoy::Server::Instance* server = main_common->server();
     if (server != nullptr && hook != nullptr) {
       hook(*server);
     }
-  } catch (const Envoy::NoServingException& e) {
+  }
+  END_TRY
+  catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
-  } catch (const Envoy::MalformedArgvException& e) {
+  }
+  catch (const Envoy::MalformedArgvException& e) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
-  } catch (const Envoy::EnvoyException& e) {
+  }
+  catch (const Envoy::EnvoyException& e) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }

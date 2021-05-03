@@ -358,6 +358,9 @@ following features are available:
   :ref:`config_http_conn_man_headers_x-envoy-force-trace` and
   :ref:`config_http_conn_man_headers_x-client-trace-id` headers.
 
+See the architecture overview on
+:ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
+
 .. _config_http_conn_man_headers_x-ot-span-context:
 
 x-ot-span-context
@@ -469,6 +472,15 @@ The *sw8* HTTP header is used by the SkyWalking tracer in Envoy. It contains the
 tracing context for the SkyWalking tracer and is used to establish the relationship between
 the tracing spans of downstream and Envoy. See more on SkyWalking tracing
 `here <https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md>`__.
+
+.. _config_http_conn_man_headers_x-amzn-trace-id:
+
+x-amzn-trace-id
+---------------
+
+The *x-amzn-trace-id* HTTP header is used by the AWS X-Ray tracer in Envoy. The trace ID,
+parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
+`here <https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader>`__.
 
 .. _config_http_conn_man_headers_custom_request_headers:
 
@@ -605,11 +617,17 @@ Supported variable names are:
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_start>`.
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_end>`.
 
 %HOSTNAME%
     The system hostname.

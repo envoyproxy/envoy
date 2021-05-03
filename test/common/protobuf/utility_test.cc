@@ -8,6 +8,10 @@
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -50,7 +54,7 @@ public:
                          Stats::Gauge::ImportMode::NeverImport)) {
     if (allow_deprecated_v2_api) {
       Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
           {"envoy.features.enable_all_deprecated_features", "true"},
       });
     }
@@ -258,9 +262,9 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
   ProtobufWkt::Any source_any;
   source_any.set_type_url("type.googleapis.com/bad.type.url");
   source_any.set_value("asdf");
-  EXPECT_THAT(MessageUtil::getJsonStringFromMessage(source_any, true).status(),
-              AllOf(Property(&ProtobufUtil::Status::ok, false),
-                    Property(&ProtobufUtil::Status::ToString, testing::HasSubstr("bad.type.url"))));
+  auto status = MessageUtil::getJsonStringFromMessage(source_any, true).status();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.ToString(), testing::HasSubstr("bad.type.url"));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
@@ -1197,10 +1201,14 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
             "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
 }
 
-TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlException) {
+TEST(LoadFromYamlExceptionTest, BadConversion) {
   std::string bad_yaml = R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: /dev/null
   address:
     socket_address:
       address: {{ ntop_ip_loopback_address }}
@@ -1208,6 +1216,20 @@ admin:
 )EOF";
 
   EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "bad conversion");
+  EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
+                             "Unexpected YAML exception");
+}
+
+TEST(LoadFromYamlExceptionTest, ParserException) {
+  std::string bad_yaml = R"EOF(
+systemLog:
+    destination: file
+    path:"G:\file\path"
+storage:
+    dbPath:"G:\db\data"
+)EOF";
+
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "illegal map value");
   EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
                              "Unexpected YAML exception");
 }
@@ -1243,6 +1265,29 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   EXPECT_EQ(set.size(), 2); // hv1 == hv2
   EXPECT_NE(set.find(hv1), set.end());
   EXPECT_NE(set.find(hv3), set.end());
+}
+
+TEST_F(ProtobufUtilityTest, AnyBytes) {
+  {
+    ProtobufWkt::StringValue source;
+    source.set_value("abc");
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "abc");
+  }
+  {
+    ProtobufWkt::BytesValue source;
+    source.set_value("\x01\x02\x03");
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
+  }
+  {
+    envoy::config::cluster::v3::Filter filter;
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(filter);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), source_any.value());
+  }
 }
 
 // MessageUtility::anyConvert() with the wrong type throws.
@@ -1310,6 +1355,19 @@ TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersion) {
   MessageUtil::unpackTo(source_any, dst);
   EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
+}
+
+// MessageUtility::unpackTo() with API message works across version and doesn't register
+// deprecations for allowlisted v2 protos.
+TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersionV2Allowed) {
+  API_NO_BOOST(envoy::config::health_checker::redis::v2::Redis) source;
+  source.set_key("foo");
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source);
+  API_NO_BOOST(envoy::extensions::health_checkers::redis::v3::Redis) dst;
+  MessageUtil::unpackTo(source_any, dst);
+  EXPECT_EQ(runtime_deprecated_feature_use_.value(), 0);
+  EXPECT_EQ(dst.key(), "foo");
 }
 
 // Validate warning messages on v2 upgrades.

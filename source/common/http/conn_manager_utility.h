@@ -5,6 +5,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/tracing/trace_reason.h"
 
 #include "common/http/conn_manager_impl.h"
 #include "common/http/http1/codec_stats.h"
@@ -73,15 +74,17 @@ public:
   static bool maybeNormalizePath(RequestHeaderMap& request_headers,
                                  const ConnectionManagerConfig& config);
 
-  static void maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                 const ConnectionManagerConfig& config, uint32_t port);
+  static absl::optional<uint32_t> maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                                     const ConnectionManagerConfig& config,
+                                                     uint32_t port);
 
   /**
    * Mutate request headers if request needs to be traced.
+   * @return the trace reason selected after header mutation to be stored in stream info.
    */
-  static void mutateTracingRequestHeader(RequestHeaderMap& request_headers,
-                                         Runtime::Loader& runtime, ConnectionManagerConfig& config,
-                                         const Router::Route* route);
+  ABSL_MUST_USE_RESULT static Tracing::Reason
+  mutateTracingRequestHeader(RequestHeaderMap& request_headers, Runtime::Loader& runtime,
+                             ConnectionManagerConfig& config, const Router::Route* route);
 
 private:
   static void mutateXfccRequestHeader(RequestHeaderMap& request_headers,

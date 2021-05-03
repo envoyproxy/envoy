@@ -22,10 +22,10 @@ if is_windows; then
   # CI sets it to a Linux-specific value. Undo this once https://github.com/envoyproxy/envoy/issues/13272
   # is resolved.
   ENVOY_DOCKER_OPTIONS=()
-  DEFAULT_ENVOY_DOCKER_BUILD_DIR=C:/Windows/Temp/envoy-docker-build
+  # Replace MSYS style drive letter (/c/) with Windows drive letter designation (C:/)
+  DEFAULT_ENVOY_DOCKER_BUILD_DIR=$(echo "${TEMP}" | sed -E "s#^/([a-zA-Z])/#\1:/#")/envoy-docker-build
   BUILD_DIR_MOUNT_DEST=C:/build
-  # Replace MSYS style drive letter (/c/) with driver letter designation (C:/)
-  SOURCE_DIR=$(echo "${PWD}" | sed -E "s#/([a-zA-Z])/#\1:/#")
+  SOURCE_DIR=$(echo "${PWD}" | sed -E "s#^/([a-zA-Z])/#\1:/#")
   SOURCE_DIR_MOUNT_DEST=C:/source
   START_COMMAND=("bash" "-c" "cd source && $*")
 else
@@ -94,6 +94,6 @@ docker run --rm \
        -e REPO_URI \
        -e SYSTEM_STAGEDISPLAYNAME \
        -e SYSTEM_JOBDISPLAYNAME \
-       -e SYSTEM_PULLREQUEST_PULLREQUESTID \
+       -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        "${ENVOY_BUILD_IMAGE}" \
        "${START_COMMAND[@]}"

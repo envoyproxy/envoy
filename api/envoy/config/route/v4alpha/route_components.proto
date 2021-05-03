@@ -16,7 +16,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -137,6 +136,9 @@ message VirtualHost {
   // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
+  // [#comment: An entry's value may be wrapped in a
+  // :ref:`FilterConfig<envoy_api_msg_config.route.v4alpha.FilterConfig>`
+  // message to specify additional options.]
   map<string, google.protobuf.Any> typed_per_filter_config = 15;
 
   // Decides whether the :ref:`x-envoy-attempt-count
@@ -198,7 +200,7 @@ message FilterAction {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_config.route.v4alpha.HeaderMatcher>`.
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.Route";
 
@@ -225,11 +227,17 @@ message Route {
     DirectResponseAction direct_response = 7;
 
     // [#not-implemented-hide:]
-    // If true, a filter will define the action (e.g., it could dynamically generate the
-    // RouteAction).
+    // A filter-defined action (e.g., it could dynamically generate the RouteAction).
     // [#comment: TODO(samflattery): Remove cleanup in route_fuzz_test.cc when
     // implemented]
     FilterAction filter_action = 17;
+
+    // [#not-implemented-hide:]
+    // An action used when the route will generate a response directly,
+    // without forwarding to an upstream host. This will be used in non-proxy
+    // xDS clients like the gRPC server. It could also be used in the future
+    // in Envoy for a filter that directly generates responses for requests.
+    NonForwardingAction non_forwarding_action = 18;
   }
 
   // The Metadata field can be used to provide additional information
@@ -247,6 +255,9 @@ message Route {
   // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
+  // [#comment: An entry's value may be wrapped in a
+  // :ref:`FilterConfig<envoy_api_msg_config.route.v4alpha.FilterConfig>`
+  // message to specify additional options.]
   map<string, google.protobuf.Any> typed_per_filter_config = 13;
 
   // Specifies a set of headers that will be added to requests matching this
@@ -362,6 +373,9 @@ message WeightedCluster {
     // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
+    // [#comment: An entry's value may be wrapped in a
+    // :ref:`FilterConfig<envoy_api_msg_config.route.v4alpha.FilterConfig>`
+    // message to specify additional options.]
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
   }
 
@@ -448,7 +462,7 @@ message RouteMatch {
     // where Extended CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
     // Note that CONNECT support is currently considered alpha in Envoy.
-    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
+    // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectMatcher connect_matcher = 12;
   }
 
@@ -757,7 +771,7 @@ message RouteAction {
     // Configuration for sending data upstream as a raw data payload. This is used for
     // CONNECT requests, when forwarding CONNECT payload as raw TCP.
     // Note that CONNECT support is currently considered alpha in Envoy.
-    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
+    // [#comment: TODO(htuch): Replace the above comment with an alpha tag.]
     ConnectConfig connect_config = 3;
   }
 
@@ -1061,6 +1075,7 @@ message RetryPolicy {
 
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
+    // [#extension-category: envoy.retry_priorities]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
@@ -1076,6 +1091,7 @@ message RetryPolicy {
 
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
+    // [#extension-category: envoy.retry_host_predicates]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
@@ -1401,6 +1417,12 @@ message DirectResponseAction {
   core.v4alpha.DataSource body = 2;
 }
 
+// [#not-implemented-hide:]
+message NonForwardingAction {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.route.v3.NonForwardingAction";
+}
+
 message Decorator {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.Decorator";
 
@@ -1699,6 +1721,7 @@ message RateLimit {
       MetaData metadata = 8;
 
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
+      // [#extension-category: envoy.rate_limit_descriptors]
       core.v4alpha.TypedExtensionConfig extension = 9;
     }
   }
@@ -1901,9 +1924,29 @@ message InternalRedirectPolicy {
   // Specifies a list of predicates that are queried when an upstream response is deemed
   // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
   // the redirect, causing the response to be proxied to downstream.
+  // [#extension-category: envoy.internal_redirect_predicates]
   repeated core.v4alpha.TypedExtensionConfig predicates = 3;
 
   // Allow internal redirect to follow a target URI with a different scheme than the value of
   // x-forwarded-proto. The default is false.
   bool allow_cross_scheme_redirect = 4;
+}
+
+// A simple wrapper for an HTTP filter config. This is intended to be used as a wrapper for the
+// map value in
+// :ref:`VirtualHost.typed_per_filter_config<envoy_api_field_config.route.v4alpha.VirtualHost.typed_per_filter_config>`,
+// :ref:`Route.typed_per_filter_config<envoy_api_field_config.route.v4alpha.Route.typed_per_filter_config>`,
+// or :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_api_field_config.route.v4alpha.WeightedCluster.ClusterWeight.typed_per_filter_config>`
+// to add additional flags to the filter.
+// [#not-implemented-hide:]
+message FilterConfig {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.FilterConfig";
+
+  // The filter config.
+  google.protobuf.Any config = 1;
+
+  // If true, the filter is optional, meaning that if the client does
+  // not support the specified filter, it may ignore the map entry rather
+  // than rejecting the config.
+  bool is_optional = 2;
 }

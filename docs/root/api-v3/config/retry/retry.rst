@@ -6,6 +6,4 @@ Retry Predicates
   :maxdepth: 2
 
   */empty/*
-  */v2/*
-  */v3/*
   ../../extensions/retry/**/v3/*

@@ -27,6 +27,19 @@ using namespace std::chrono_literals;
 namespace Envoy {
 namespace {
 
+// For historical reasons, these v2 protos are allowed in v3 and will not be removed during the v2
+// turn down.
+static const absl::flat_hash_set<absl::string_view>& v2ProtosAllowedInV3() {
+  CONSTRUCT_ON_FIRST_USE(
+      absl::flat_hash_set<absl::string_view>,
+      {"envoy.config.health_checker.redis.v2.Redis",
+       "envoy.config.filter.thrift.router.v2alpha1.Router",
+       "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig",
+       "envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig",
+       "envoy.config.retry.omit_canary_hosts.v2.OmitCanaryHostsPredicate",
+       "envoy.config.retry.previous_hosts.v2.PreviousHostsPredicate"});
+}
+
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind("/");
   if (index == std::string::npos || index == full_path.size()) {
@@ -155,21 +168,23 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   Protobuf::DynamicMessageFactory dmf;
   auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
   ASSERT(earlier_message != nullptr);
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EarlierVersion);
     // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
     // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
     // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
-    try {
-      f(message, MessageVersion::LatestVersionValidate);
-    } catch (EnvoyException& e) {
+    TRY_ASSERT_MAIN_THREAD { f(message, MessageVersion::LatestVersionValidate); }
+    END_TRY
+    catch (EnvoyException& e) {
       MessageUtil::onVersionUpgradeDeprecation(e.what());
     }
     // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
-  } catch (ApiBoostRetryException&) {
+  }
+  END_TRY
+  catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
     f(message, MessageVersion::LatestVersion);
@@ -279,7 +294,7 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
   throw ProtoValidationException(validation_error, message);
 }
 
-void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool reject) {
+void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool /*reject*/) {
   const std::string& warning_str =
       fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
                   "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
@@ -303,8 +318,8 @@ void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool rejec
   if (loader != nullptr) {
     loader->countDeprecatedFeatureUse();
   }
-  if (reject &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
     throw DeprecatedMajorVersionException(fmt::format(
         "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
         "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
@@ -410,7 +425,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
                                                               MessageVersion message_version) {
-      try {
+      TRY_ASSERT_MAIN_THREAD {
         if (message.ParseFromString(contents)) {
           MessageUtil::checkForUnexpectedFields(
               message, message_version == MessageVersion::LatestVersionValidate
@@ -418,7 +433,9 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                            : validation_visitor);
         }
         return;
-      } catch (EnvoyException& ex) {
+      }
+      END_TRY
+      catch (EnvoyException& ex) {
         if (message_version == MessageVersion::LatestVersion ||
             message_version == MessageVersion::LatestVersionValidate) {
           // Failed reading the latest version - pass the same error upwards
@@ -598,17 +615,16 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
     throw EnvoyException(json_or_error.status().ToString());
   }
   YAML::Node node;
-  try {
-    node = YAML::Load(json_or_error.value());
-  } catch (YAML::ParserException& e) {
+  TRY_ASSERT_MAIN_THREAD { node = YAML::Load(json_or_error.value()); }
+  END_TRY
+  catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
+  }
+  catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
-  } catch (std::exception& e) {
-    // There is a potentially wide space of exceptions thrown by the YAML parser,
-    // and enumerating them all may be difficult. Envoy doesn't work well with
-    // unhandled exceptions, so we capture them and record the exception name in
-    // the Envoy Exception text.
+  }
+  catch (std::exception& e) {
+    // Catch unknown YAML parsing exceptions.
     throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
   if (block_print) {
@@ -674,7 +690,10 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      MessageUtil::onVersionUpgradeDeprecation(any_full_name);
+      // We allow some v2 protos in v3 for historical reasons.
+      if (v2ProtosAllowedInV3().count(any_full_name) == 0) {
+        MessageUtil::onVersionUpgradeDeprecation(any_full_name);
+      }
       return;
     }
   }
@@ -868,13 +887,15 @@ void MessageUtil::redact(Protobuf::Message& message) {
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
-  try {
-    return parseYamlNode(YAML::Load(yaml));
-  } catch (YAML::ParserException& e) {
+  TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
+  END_TRY
+  catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
+  }
+  catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
-  } catch (std::exception& e) {
+  }
+  catch (std::exception& e) {
     // There is a potentially wide space of exceptions thrown by the YAML parser,
     // and enumerating them all may be difficult. Envoy doesn't work well with
     // unhandled exceptions, so we capture them and record the exception name in
