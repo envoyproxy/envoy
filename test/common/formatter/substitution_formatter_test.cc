@@ -107,6 +107,8 @@ TEST(SubstitutionFormatParser, tokenizer) {
 
   std::string command = "COMMAND(item1)";
 
+  // The second parameter indicates where command name and opening bracket ends.
+  // In this case "COMMAND(" ends at index 8 (counting from zero).
   SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
   ASSERT_EQ(tokens.size(), 1);
   ASSERT_EQ(tokens.at(0), "item1");
@@ -129,6 +131,22 @@ TEST(SubstitutionFormatParser, tokenizer) {
   ASSERT_EQ(tokens.at(3), "item4");
   ASSERT_TRUE(max_length.has_value());
   ASSERT_EQ(max_length.value(), 234);
+
+  // Tokenizing the following commands should fail.
+  std::vector<std::string> wrong_commands = {
+      "COMMAND(item1:item2",           // Missing closing bracket.
+      "COMMAND(item1:item2))",         // Unexpected second closing bracket.
+      "COMMAND(item1:item2):",         // Missing length field.
+      "COMMAND(item1:item2):LENGTH",   // Length field must be integer.
+      "COMMAND(item1:item2):100:23",   // Length field must be integer.
+      "COMMAND(item1:item2):100):23"}; // Extra fields after length.
+
+  for (const auto& test_command : wrong_commands) {
+    EXPECT_THROW(
+        SubstitutionFormatParser::tokenizeCommand(test_command, 8, ':', tokens, max_length),
+        EnvoyException)
+        << test_command;
+  }
 }
 
 // Test tests multiple versions of variadic template method parseCommand
