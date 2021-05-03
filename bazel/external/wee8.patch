@@ -1,7 +1,7 @@
 # 1. Fix linking with unbundled toolchain on macOS.
 # 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix MSAN linking.
-# 4. Fix "thread_in_wasm flag was not set" crash in debug builds (https://chromium-review.googlesource.com/c/v8/v8/+/2817598).
+# 4. Fix "thread_in_wasm flag was not set" crash in debug builds (https://chromium-review.googlesource.com/c/v8/v8/+/2817598, https://chromium-review.googlesource.com/c/v8/v8/+/2867468).
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -109,3 +109,25 @@
          return FoundHandler(Context(), wasm_code->instruction_start(), offset,
                              wasm_code->constant_pool(), return_sp, frame->fp());
        }
+--- wee8/src/compiler/wasm-compiler.cc
++++ wee8/src/compiler/wasm-compiler.cc
+@@ -7030,6 +7030,7 @@ class WasmWrapperGraphBuilder : public WasmGraphBuilder {
+
+     BuildModifyThreadInWasmFlag(true);
+
++    Node* old_effect = effect();
+     Node* exception_branch = graph()->NewNode(
+         mcgraph()->common()->Branch(BranchHint::kTrue),
+         gasm_->WordEqual(return_value, mcgraph()->IntPtrConstant(0)),
+@@ -7046,9 +7047,8 @@ class WasmWrapperGraphBuilder : public WasmGraphBuilder {
+     gasm_->Call(call_descriptor, call_target, return_value);
+     TerminateThrow(effect(), control());
+
+-    SetEffectControl(
+-        return_value,
+-        graph()->NewNode(mcgraph()->common()->IfTrue(), exception_branch));
++    SetEffectControl(old_effect, graph()->NewNode(mcgraph()->common()->IfTrue(),
++                                                  exception_branch));
+     DCHECK_LT(sig_->return_count(), wasm::kV8MaxWasmFunctionMultiReturns);
+     size_t return_count = sig_->return_count();
+     if (return_count == 0) {
