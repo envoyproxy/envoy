@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Quic {
 namespace {
 
-constexpr size_t kMaxSessionCacheEntries = 1024;
+constexpr size_t MaxSessionCacheEntries = 1024;
 
 // Returns false if the SSL |session| doesn't exist or it is expired at |system_time|.
 bool isSessionValid(SSL_SESSION* session, SystemTime system_time) {
@@ -107,7 +107,7 @@ void EnvoyQuicSessionCache::prune() {
     if (!isSessionValid(session, system_time)) {
       it = cache_.erase(it);
     } else {
-      if (cache_.size() >= kMaxSessionCacheEntries) {
+      if (cache_.size() >= MaxSessionCacheEntries) {
         // Only save oldest if we are at the size limit.
         const uint64_t session_expiration =
             SSL_SESSION_get_time(session) + SSL_SESSION_get_timeout(session);
@@ -119,7 +119,7 @@ void EnvoyQuicSessionCache::prune() {
       ++it;
     }
   }
-  if (cache_.size() >= kMaxSessionCacheEntries) {
+  if (cache_.size() >= MaxSessionCacheEntries) {
     cache_.erase(oldest_id);
   }
 }
@@ -129,7 +129,7 @@ void EnvoyQuicSessionCache::createAndInsertEntry(const quic::QuicServerId& serve
                                                  const quic::TransportParameters& params,
                                                  const quic::ApplicationState* application_state) {
   prune();
-  ASSERT(cache_.size() < kMaxSessionCacheEntries);
+  ASSERT(cache_.size() < MaxSessionCacheEntries);
   Entry entry;
   entry.pushSession(std::move(session));
   entry.params = std::make_unique<quic::TransportParameters>(params);
