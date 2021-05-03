@@ -9,7 +9,9 @@ namespace Network {
 
 class IoSocketError : public Api::IoError {
 public:
-  explicit IoSocketError(int sys_errno) : errno_(sys_errno) {}
+  explicit IoSocketError(int sys_errno) : errno_(sys_errno), error_code_(errorCodeFromErrno()) {}
+  explicit IoSocketError(int sys_errno, Api::IoError::IoErrorCode error_code)
+      : errno_(sys_errno), error_code_(error_code) {}
 
   ~IoSocketError() override = default;
 
@@ -31,6 +33,9 @@ public:
 
 private:
   int errno_;
+  Api::IoError::IoErrorCode error_code_;
+
+  Api::IoError::IoErrorCode errorCodeFromErrno() const;
 };
 
 } // namespace Network
