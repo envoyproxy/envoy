@@ -174,7 +174,7 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
       EXPECT_CALL(cb, Call(_))
           .Times(1)
           .WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
-            // Everything should happen withinthe first 1/4 of the drain time
+            // Everything should happen within the first 1/4 of the drain time
             EXPECT_LT(delay.count(), 1001);
 
             // Validate that our wait times are spread out (within some small error)
