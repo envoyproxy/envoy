@@ -26,7 +26,7 @@ Tapping can be configured on :ref:`Listener
 <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>` transport sockets, providing the ability to interpose on
 downstream and upstream L4 connections respectively.
 
-To configure traffic tapping, add an `envoy.transport_sockets.tap` transport socket
+To configure traffic tapping, add an ``envoy.transport_sockets.tap`` transport socket
 :ref:`configuration <envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap>` to the listener
 or cluster. For a plain text socket this might look like:
 
@@ -74,8 +74,8 @@ where the TLS context configuration replaces any existing :ref:`downstream
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`
 TLS configuration on the listener or cluster, respectively.
 
-Each unique socket instance will generate a trace file prefixed with `path_prefix`. E.g.
-`/some/tap/path_0.pb`.
+Each unique socket instance will generate a trace file prefixed with ``path_prefix``. E.g.
+``/some/tap/path_0.pb``.
 
 Buffered data limits
 --------------------
@@ -109,7 +109,7 @@ PCAP generation
 The generated trace file can be converted to `libpcap format
 <https://wiki.wireshark.org/Development/LibpcapFileFormat>`_, suitable for
 analysis with tools such as `Wireshark <https://www.wireshark.org/>`_ with the
-`tap2pcap` utility, e.g.:
+``tap2pcap`` utility, e.g.:
 
 .. code-block:: bash
 
