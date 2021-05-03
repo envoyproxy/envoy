@@ -124,7 +124,7 @@ void Filter::onComplete(const Status& status) {
         code, ::google::jwt_verify::getStatusString(status),
         [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
           std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
-          if(status != Status::JwtMissed) {
+          if (status != Status::JwtMissed) {
             absl::StrAppend(&value, ", error=\"", INVALID_TOKEN_ERROR_STRING, "\"");
           }
           headers.setCopy(Http::LowerCaseString("www-authenticate"), value);

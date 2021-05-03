@@ -141,7 +141,8 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_EQ(1, response->headers().get(WwwAuthenticateHeader).size());
-  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"", response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
+  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"",
+            response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, MissingToken) {
@@ -160,7 +161,8 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ("Bearer realm=\"http://host/\"", response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
+  EXPECT_EQ("Bearer realm=\"http://host/\"",
+            response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
@@ -180,7 +182,8 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"", response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
+  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"",
+            response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
 
   EXPECT_NE("0", response->headers().getContentLengthValue());
   EXPECT_THAT(response->body(), ::testing::IsEmpty());
@@ -429,7 +432,8 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"", response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
+  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"",
+            response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
 
   cleanup();
 }
@@ -450,7 +454,8 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"", response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
+  EXPECT_EQ("Bearer realm=\"http://host/\", error=\"invalid_token\"",
+            response->headers().get(WwwAuthenticateHeader)[0]->value().getStringView());
   cleanup();
 }
 
