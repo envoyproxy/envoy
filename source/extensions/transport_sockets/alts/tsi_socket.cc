@@ -318,7 +318,7 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
     // Envoy ALTS implements asynchronous tsi_handshaker_next() interface
     // which returns immediately after scheduling a handshake request to
     // the handshake service. The handshake response will be handled by a
-    // dedicated thread in a seperate API within which handshake_complete_
+    // dedicated thread in a separate API within which handshake_complete_
     // will be set to true if the handshake completes.
     ASSERT(!handshake_complete_);
     ASSERT(action == Network::PostIoAction::KeepOpen);
