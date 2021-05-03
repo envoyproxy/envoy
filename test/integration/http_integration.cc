@@ -1251,7 +1251,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
   // time-consuming asserts when using a large number of headers.
   setMaxRequestHeadersKb(96);
-  setMaxRequestHeadersCount(10005);
+  setMaxRequestHeadersCount(10010);
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

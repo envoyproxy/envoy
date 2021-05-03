@@ -606,7 +606,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
         Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
-        maxRequestHeadersKb(), headersWithUnderscoresAction());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
