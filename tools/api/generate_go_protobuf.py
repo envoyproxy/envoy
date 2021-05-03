@@ -122,7 +122,8 @@ def updated(repo):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Generate Go protobuf files and sync with go-control-plane')
+    parser = argparse.ArgumentParser(
+        description='Generate Go protobuf files and sync with go-control-plane')
     parser.add_argument('--sync', action='store_true')
     parser.add_argument('--output_base', default='build_go')
     args = parser.parse_args()
