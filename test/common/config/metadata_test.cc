@@ -110,6 +110,7 @@ protected:
   Registry::InjectFactory<TypedMetadataFactory> registered_factory_baz_;
 };
 
+// Tests data parsing and retrieving when only Struct field present in the metadata.
 TEST_F(TypedMetadataTest, OkTestStruct) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
@@ -121,6 +122,7 @@ TEST_F(TypedMetadataTest, OkTestStruct) {
   EXPECT_EQ(nullptr, typed.get<Qux>(foo_factory_.name()));
 }
 
+// Tests data parsing and retrieving when only Any field present in the metadata.
 TEST_F(TypedMetadataTest, OkTestAny) {
   envoy::config::core::v3::Metadata metadata;
   ProtobufWkt::Any any;
@@ -132,6 +134,8 @@ TEST_F(TypedMetadataTest, OkTestAny) {
   EXPECT_EQ("fred", typed.get<Foo>(bar_factory_.name())->name_);
 }
 
+// Tests data parsing and retrieving when only Any field present in the metadata,
+// also Any data parsing method just return nullptr.
 TEST_F(TypedMetadataTest, OkTestAnyParseReturnNullptr) {
   envoy::config::core::v3::Metadata metadata;
   ProtobufWkt::Any any;
@@ -142,6 +146,8 @@ TEST_F(TypedMetadataTest, OkTestAnyParseReturnNullptr) {
   EXPECT_EQ(nullptr, typed.get<Foo>(baz_factory_.name()));
 }
 
+// Tests data parsing and retrieving when both Struct and Any field
+// present in the metadata, and in the same factory.
 TEST_F(TypedMetadataTest, OkTestBothSameFactory) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
@@ -157,6 +163,8 @@ TEST_F(TypedMetadataTest, OkTestBothSameFactory) {
   EXPECT_EQ("fred", typed.get<Foo>(foo_factory_.name())->name_);
 }
 
+// Tests data parsing and retrieving when both Struct and Any field
+// present in the metadata, but in different factory.
 TEST_F(TypedMetadataTest, OkTestBothDifferentFactory) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
@@ -176,6 +184,9 @@ TEST_F(TypedMetadataTest, OkTestBothDifferentFactory) {
   EXPECT_EQ("fred", typed.get<Foo>(bar_factory_.name())->name_);
 }
 
+// Tests data parsing and retrieving when both Struct and Any field
+// present in the metadata, and in the same factory, but with the case
+// that Any field parse() method returns nullptr.
 TEST_F(TypedMetadataTest, OkTestBothSameFactoryAnyParseReturnNullptr) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[baz_factory_.name()] =
@@ -192,6 +203,7 @@ TEST_F(TypedMetadataTest, OkTestBothSameFactoryAnyParseReturnNullptr) {
   EXPECT_EQ("garply", typed.get<Foo>(baz_factory_.name())->name_);
 }
 
+// Tests data parsing and retrieving when no data present in the metadata.
 TEST_F(TypedMetadataTest, NoMetadataTest) {
   envoy::config::core::v3::Metadata metadata;
   TypedMetadataImpl<TypedMetadataFactory> typed(metadata);
@@ -199,6 +211,7 @@ TEST_F(TypedMetadataTest, NoMetadataTest) {
   EXPECT_EQ(nullptr, typed.get<Foo>(foo_factory_.name()));
 }
 
+// Tests data parsing and retrieving when Struct metadata updates.
 TEST_F(TypedMetadataTest, StructMetadataRefreshTest) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
@@ -220,6 +233,7 @@ TEST_F(TypedMetadataTest, StructMetadataRefreshTest) {
   EXPECT_EQ(nullptr, typed3.get<Foo>(foo_factory_.name()));
 }
 
+// Tests data parsing and retrieving when Any metadata updates.
 TEST_F(TypedMetadataTest, AnyMetadataRefreshTest) {
   envoy::config::core::v3::Metadata metadata;
   ProtobufWkt::Any any;
@@ -244,6 +258,7 @@ TEST_F(TypedMetadataTest, AnyMetadataRefreshTest) {
   EXPECT_EQ(nullptr, typed3.get<Foo>(bar_factory_.name()));
 }
 
+// Tests emptry Struct metadata parsing case.
 TEST_F(TypedMetadataTest, InvalidStructMetadataTest) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] = ProtobufWkt::Struct();
@@ -252,6 +267,7 @@ TEST_F(TypedMetadataTest, InvalidStructMetadataTest) {
                             "Cannot create a Foo when Struct metadata is empty.");
 }
 
+// Tests emptry Any metadata parsing case.
 TEST_F(TypedMetadataTest, InvalidAnyMetadataTest) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_typed_filter_metadata())[bar_factory_.name()] = ProtobufWkt::Any();

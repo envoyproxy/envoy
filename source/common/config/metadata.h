@@ -120,7 +120,7 @@ protected:
     for (const auto& [factory_name, factory] :
          Registry::FactoryRegistry<factoryClass>::factories()) {
       const auto& typed_meta_iter = typed_data_by_key.find(factory_name);
-      // If the key exists in Any metadata, and parse() not return nullptr,
+      // If the key exists in Any metadata, and parse() does not return nullptr,
       // populate data_.
       if (typed_meta_iter != typed_data_by_key.end()) {
         auto result = factory->parse(typed_meta_iter->second);

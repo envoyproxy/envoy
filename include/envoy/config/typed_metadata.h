@@ -56,8 +56,7 @@ public:
   ~TypedMetadataFactory() override = default;
 
   /**
-   * Convert the google.protobuf.Struct or google.protobuf.Any
-   * into an instance of TypedMetadata::Object.
+   * Convert the google.protobuf.Struct into an instance of TypedMetadata::Object.
    * It should throw an EnvoyException in case the conversion can't be completed.
    * @param data config data stored as a protobuf struct.
    * @return a derived class object pointer of TypedMetadata.
@@ -66,6 +65,14 @@ public:
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& data) const PURE;
 
+   /**
+   * Convert the google.protobuf.Any into an instance of TypedMetadata::Object.
+   * It should throw an EnvoyException in case the conversion can't be completed.
+   * @param data config data stored as a protobuf any.
+   * @return a derived class object pointer of TypedMetadata or return nullptr if
+   * one doesn't implement parse() method.
+   * @throw EnvoyException if the parsing can't be done.
+   */
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Any& data) const PURE;
 
