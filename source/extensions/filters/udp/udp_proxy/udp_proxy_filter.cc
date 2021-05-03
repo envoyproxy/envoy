@@ -223,7 +223,7 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
       socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
       cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
   if (result == nullptr) {
-     socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;
   }
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {

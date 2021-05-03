@@ -576,10 +576,10 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time, bool prefer_gro,
+                                                MonotonicTime receive_time, bool use_gro,
                                                 uint32_t* packets_dropped) {
 
-  if (prefer_gro && handle.supportsUdpGro()) {
+  if (use_gro) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -700,18 +700,18 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
   // once.
   size_t num_packets_to_read = std::min(MAX_NUM_PACKETS_PER_EVENT_LOOP,
                                         udp_packet_processor.numPacketsExpectedPerEventLoop());
+  const bool use_gro = prefer_gro && handle.supportsUdpGro();
   size_t num_reads =
-      handle.supportsMmsg()
-          ? (num_packets_to_read / NUM_DATAGRAMS_PER_MMSG_RECEIVE)
-          : (handle.supportsUdpGro() ? (num_packets_to_read / NUM_DATAGRAMS_PER_GRO_RECEIVE)
-                                     : num_packets_to_read);
+      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_GRO_RECEIVE)
+              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_MMSG_RECEIVE)
+                                       : num_packets_to_read);
   // Make sure at least read once.
   num_reads = std::max(1ul, num_reads);
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, prefer_gro, &packets_dropped);
+        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.

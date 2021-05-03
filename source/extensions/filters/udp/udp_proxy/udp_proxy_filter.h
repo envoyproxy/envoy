@@ -180,8 +180,8 @@ private:
     }
     size_t numPacketsExpectedPerEventLoop() const final {
       // Use 32k to read the same amount as a TCP connection.
-    return 32u;
-  }
+      return 32u;
+    }
 
     ClusterInfo& cluster_;
     const bool use_original_src_ip_;

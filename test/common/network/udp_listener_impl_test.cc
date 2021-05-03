@@ -434,7 +434,6 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, supportsMmsg()).Times(2u);
-  EXPECT_CALL(os_sys_calls, supportsUdpGro());
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
 
@@ -547,7 +546,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, supportsUdpGro).WillRepeatedly(Return(true));
-  EXPECT_CALL(os_sys_calls, supportsMmsg);
+  EXPECT_CALL(os_sys_calls, supportsMmsg).Times(0);
 
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, msghdr* msg, int) {
