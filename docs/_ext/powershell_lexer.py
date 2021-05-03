@@ -1,5 +1,5 @@
-from pygments.lexers import get_lexer_by_name
+from pygments.lexers import PowerShellLexer
 
 
 def setup(app):
-    app.add_lexer('powershell', get_lexer_by_name('powershell'))
+    app.add_lexer('powershell', PowerShellLexer)

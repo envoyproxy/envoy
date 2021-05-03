@@ -53,8 +53,8 @@ Route Scope
 -----------
 
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
-A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
-For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
+A :ref:`Route Scope <envoy_v3_api_msg_config.route.v3.scopedrouteconfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
+For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table <envoy_v3_api_msg_config.route.v3.routeconfiguration>`.
 RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
@@ -110,7 +110,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
-* **Retry budgets**: Envoy can limit the proportion of active requests via :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>` that can be retries to
+* **Retry budgets**: Envoy can limit the proportion of active requests via :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.circuitbreakers.thresholds.retry_budget>` that can be retries to
   prevent their contribution to large increases in traffic volume.
 * **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
   selection logic when selecting hosts for retries. Specifying a
@@ -122,7 +122,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 
 Note that Envoy retries requests when :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_set>` is present. It is recommended to either configure
-:ref:`retry budgets (preferred) <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>` or set
+:ref:`retry budgets (preferred) <envoy_v3_api_field_config.cluster.v3.circuitbreakers.thresholds.retry_budget>` or set
 :ref:`maximum active retries circuit breaker <arch_overview_circuit_break>` to an appropriate value to avoid retry storms.
 
 .. _arch_overview_http_routing_hedging:

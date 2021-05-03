@@ -31,7 +31,7 @@ public:
     typed_config:
         "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3alpha.CacheConfig"
         typed_config:
-           "@type": "type.googleapis.com/envoy.source.extensions.filters.http.cache.SimpleHttpCacheConfig"
+           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
 };

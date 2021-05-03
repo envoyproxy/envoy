@@ -43,6 +43,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//source/common/common:assert_lib",
         "@com_googlesource_quiche//:quic_core_flags_list_lib",
         "@com_googlesource_quiche//:quic_core_protocol_flags_list_lib",
     ],
@@ -263,7 +264,6 @@ envoy_cc_library(
         "spdy_containers_impl.h",
         "spdy_logging_impl.h",
         "spdy_string_utils_impl.h",
-        "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
     ],
     external_deps = [
