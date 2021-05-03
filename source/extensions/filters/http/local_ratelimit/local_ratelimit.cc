@@ -38,6 +38,8 @@ FilterConfig::FilterConfig(
               : absl::nullopt),
       response_headers_parser_(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
+      request_headers_parser_(Envoy::Router::HeaderParser::configure(
+          config.request_headers_to_add_when_not_enforced())),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
@@ -90,6 +92,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   config->stats().rate_limited_.inc();
 
   if (!config->enforced()) {
+    config->requestHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
     return Http::FilterHeadersStatus::Continue;
   }
 

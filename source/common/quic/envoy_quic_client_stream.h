@@ -65,7 +65,7 @@ public:
 
 protected:
   // EnvoyQuicStream
-  void switchStreamBlockState(bool should_block) override;
+  void switchStreamBlockState() override;
   uint32_t streamId() override;
   Network::Connection* connection() override;
 
@@ -84,7 +84,8 @@ private:
 
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection);
+  void onStreamError(absl::optional<bool> should_close_connection,
+                     quic::QuicRstStreamErrorCode rst_code);
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 

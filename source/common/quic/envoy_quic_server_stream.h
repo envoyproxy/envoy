@@ -76,7 +76,7 @@ public:
 
 protected:
   // EnvoyQuicStream
-  void switchStreamBlockState(bool should_block) override;
+  void switchStreamBlockState() override;
   uint32_t streamId() override;
   Network::Connection* connection() override;
 
