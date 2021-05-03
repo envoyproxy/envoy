@@ -14,7 +14,7 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  Http1BridgeFilter() {}
+  explicit Http1BridgeFilter() {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
