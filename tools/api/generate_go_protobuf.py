@@ -7,6 +7,7 @@ import glob
 import os
 import shlex
 import shutil
+import sys
 import re
 
 # Needed for CI to pass down bazel options.
@@ -129,16 +130,17 @@ if __name__ == "__main__":
     workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
     output = os.path.join(workspace, args.output_base)
     generate_protobufs(output)
-    if args.sync:
-        repo = os.path.join(workspace, REPO_BASE)
-        clone_go_protobufs(repo)
-        sync_go_protobufs(output, repo)
-        last_sha = find_last_sync_sha(repo)
-        changes = updated_since_sha(repo, last_sha)
-        if updated(repo):
-            print('Changes detected: %s' % changes)
-            new_sha = changes[0]
-            write_revision_info(repo, new_sha)
-            publish_go_protobufs(repo, new_sha)
-    else:
+    if not args.sync:
         print('Skipping sync with go-control-plane')
+        sys.exit()
+
+    repo = os.path.join(workspace, REPO_BASE)
+    clone_go_protobufs(repo)
+    sync_go_protobufs(output, repo)
+    last_sha = find_last_sync_sha(repo)
+    changes = updated_since_sha(repo, last_sha)
+    if updated(repo):
+        print('Changes detected: %s' % changes)
+        new_sha = changes[0]
+        write_revision_info(repo, new_sha)
+        publish_go_protobufs(repo, new_sha)
