@@ -66,9 +66,6 @@ public:
   ~FilterConfig() override = default;
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit protoConfig() const {
-    return proto_config_;
-  }
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
@@ -119,7 +116,6 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
-  const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit proto_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
