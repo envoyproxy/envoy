@@ -132,12 +132,12 @@ CONNECT. An example set up proxying HTTP would look something like this:
 [TCP Server] --- raw TCP --- [L2 Envoy]  --- TCP tunneled over HTTP/2 or HTTP/1.1 POST --- [Intermidate Proxies] --- HTTP/2 or HTTP/1.1 POST --- [L1 Envoy]  --- raw TCP  --- [TCP Client]
 
 Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
-For HTTP/1.1 CONNECT run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
-and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http1_connect.yaml`.
-For HTTP/2 CONNECT run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
-and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_connect.yaml`.
-For HTTP/2 POST run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_post.yaml --base-id 1`
-and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_post.yaml`.
+For HTTP/1.1 CONNECT run ``bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1``
+and ``bazel-bin/source/exe/envoy-static --config-path configs/terminate_http1_connect.yaml``.
+For HTTP/2 CONNECT run ``bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1``
+and ``bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_connect.yaml``.
+For HTTP/2 POST run ``bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_post.yaml --base-id 1``
+and ``bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_post.yaml``.
 
 In all cases you will be running a first Envoy listening for TCP traffic on port 10000 and
 encapsulating it in an HTTP CONNECT or HTTP POST request, and a second one listening on 10001,
