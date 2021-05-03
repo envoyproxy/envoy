@@ -176,15 +176,17 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
           std::move(io_handle_server), address, source_address);
       // It's either in main thread or the worker is not yet started.
       auto internal_listener = internal_listener_manager.value().get().findByAddress(address);
-      return client_conn;
       if (internal_listener.has_value()) {
         // TODO: also check if disabled
         internal_listener.value().get().onAccept(std::move(accepted_socket));
+         FANCY_LOG(info, "lambdai: find internal listener {} ", address->asStringView());
       } else {
+        FANCY_LOG(info, "lambdai: cannot find internal listener {} from internal listener manager", address->asStringView());
         // injected error into client_conn;
         io_handle_server->close();
       }
     } else {
+      FANCY_LOG(info, "lambdai: cannot find from internal listener manager while connecting to {}", address->asStringView());
       // injected error into client_conn;
       io_handle_server->close();
     }
