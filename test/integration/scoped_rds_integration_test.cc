@@ -470,12 +470,10 @@ key:
   cleanupUpstreamAndDownstream();
 }
 
-// Test that a bad config update updates the corresponding stats.
-TEST_P(ScopedRdsIntegrationTest, RejectKeyConflict) {
+TEST_P(ScopedRdsIntegrationTest, RejectKeyConflictInDeltaUpdate) {
   if (!isDelta()) {
     return;
   }
-  // 'name' will fail to validate due to empty string.
   const std::string scope_route1 = R"EOF(
 name: foo_scope1
 route_configuration_name: foo_route1
@@ -488,21 +486,7 @@ key:
     sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
   };
   initialize();
-  /*
-  createRdsStream("foo_route1");
-  const std::string route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-)EOF";
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
-  */
-  // SRDS update with key conflict.
+  // Delta SRDS update with key conflict, should be rejected.
   const std::string scope_route2 = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_route1

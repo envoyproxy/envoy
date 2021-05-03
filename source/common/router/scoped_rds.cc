@@ -455,8 +455,8 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     }
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         scope_config_inserted.first->second;
-    // const uint64_t key_fingerprint = ScopedRouteInfo(std::move(scoped_route_config), nullptr).scopeKey().hash();
-    const uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
+    const uint64_t key_fingerprint =
+        ScopedRouteInfo(std::move(scoped_route_config), nullptr).scopeKey().hash();
     if (!scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
       exception_msg =
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
