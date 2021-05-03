@@ -586,7 +586,9 @@ message HttpConnectionManager {
 
   // Determines if the port part should be removed from host/authority header before any processing
   // of request by HTTP filters or routing. The port would be removed only if it is equal to the :ref:`listener's<envoy_api_field_config.listener.v3.Listener.address>`
-  // local port and request method is not CONNECT. This affects the upstream host header as well.
+  // local port. This affects the upstream host header unless the method is
+  // CONNECT in which case if no filter adds a port the original port will be restored before headers are
+  // sent upstream.
   // Without setting this option, incoming requests with host `example:443` will not match against
   // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
@@ -596,8 +598,9 @@ message HttpConnectionManager {
 
   oneof strip_port_mode {
     // Determines if the port part should be removed from host/authority header before any processing
-    // of request by HTTP filters or routing. The port would be removed only if request method is not CONNECT.
-    // This affects the upstream host header as well.
+    // of request by HTTP filters or routing.
+    // This affects the upstream host header unless the method is CONNECT in
+    // which case if no filter adds a port the original port will be restored before headers are sent upstream.
     // Without setting this option, incoming requests with host `example:443` will not match against
     // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
     // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.

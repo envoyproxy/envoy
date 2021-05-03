@@ -93,6 +93,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "active_tcp_listener_test",
+    srcs = ["active_tcp_listener_test.cc"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:connection_balancer_lib",
+        "//source/common/stats:stats_lib",
+        "//source/server:active_raw_udp_listener_config",
+        "//source/server:connection_handler_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "drain_manager_impl_test",
     srcs = ["drain_manager_impl_test.cc"],
     deps = [

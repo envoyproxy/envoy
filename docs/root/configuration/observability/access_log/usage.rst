@@ -262,6 +262,15 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%REQUEST_TX_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the last byte sent upstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %RESPONSE_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the first byte read from the

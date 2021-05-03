@@ -79,6 +79,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
+        "//source/server:active_listener_base",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
@@ -274,6 +275,8 @@ envoy_cc_test_library(
     external_deps = ["bazel_runfiles"],
     tags = ["nofips"],
     deps = [
+        "//source/common/quic:envoy_quic_client_connection_lib",
+        "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/test_common:environment_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",

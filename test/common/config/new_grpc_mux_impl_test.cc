@@ -164,7 +164,7 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   add_response_resource("x", "2000", *response);
   add_response_resource("y", "3000", *response);
   // Pause EDS to allow the ACK to be cached.
-  auto resume_cds = grpc_mux_->pause(type_url);
+  auto resume_eds = grpc_mux_->pause(type_url);
   grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   // Now disconnect.
   // Grpc stream retry timer will kick in and reconnection will happen.
@@ -177,6 +177,90 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   // Destruction of the EDS subscription will issue an "unsubscribe" request.
   expectSendMessage(type_url, {}, {"x", "y"});
+}
+
+// Validate resources are not sent on wildcard watch reconnection.
+// Regression test of https://github.com/envoyproxy/envoy/issues/16063.
+TEST_F(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Send a wildcard request on new connection.
+  expectSendMessage(type_url, {}, {});
+  grpc_mux_->start();
+
+  // An helper function to create a response with a single load_assignment resource
+  // (load_assignment's cluster_name will be updated).
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  auto create_response = [&load_assignment, &type_url](const std::string& name,
+                                                       const std::string& version,
+                                                       const std::string& nonce)
+      -> std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse> {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info(version);
+    response->set_nonce(nonce);
+    auto res = response->add_resources();
+    res->set_name(name);
+    res->set_version(version);
+    load_assignment.set_cluster_name(name);
+    res->mutable_resource()->PackFrom(load_assignment);
+    return response;
+  };
+
+  // Send a response with a single resource that should be received by Envoy,
+  // followed by an ack with the nonce.
+  {
+    auto response = create_response("x", "1000", "111");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1000"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        }));
+    // Expect an ack with the nonce.
+    expectSendMessage(type_url, {}, {}, "111");
+    grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
+  // Send another response with a different resource, but where EDS is paused.
+  auto resume_eds = grpc_mux_->pause(type_url);
+  {
+    auto response = create_response("y", "2000", "222");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2000"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        }));
+    // No ack reply is expected in this case, as EDS is suspended.
+    grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
+
+  // Now disconnect.
+  // Grpc stream retry timer will kick in and reconnection will happen.
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // initial_resource_versions should contain client side all resource:version info, and no
+  // added resources because this is a wildcard request.
+  expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                    {{"x", "1000"}, {"y", "2000"}});
+  grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+  // Destruction of wildcard will not issue unsubscribe requests for the resources.
 }
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.
