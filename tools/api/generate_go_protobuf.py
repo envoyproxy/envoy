@@ -2,6 +2,7 @@
 
 from subprocess import check_output
 from subprocess import check_call
+import argparse
 import glob
 import os
 import shlex
@@ -13,7 +14,6 @@ BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 TARGETS = '@envoy_api//...'
 IMPORT_BASE = 'github.com/envoyproxy/go-control-plane'
-OUTPUT_BASE = 'build_go'
 REPO_BASE = 'go-control-plane'
 BRANCH = 'main'
 MIRROR_MSG = 'Mirrored from envoyproxy/envoy @ '
@@ -121,16 +121,24 @@ def updated(repo):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate Go protobuf files and sync with go-control-plane')
+    parser.add_argument('--skip_sync', action='store_true')
+    parser.add_argument('--output_base', default='build_go')
+    args = parser.parse_args()
+
     workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
-    output = os.path.join(workspace, OUTPUT_BASE)
+    output = os.path.join(workspace, args.output_base)
     generate_protobufs(output)
-    repo = os.path.join(workspace, REPO_BASE)
-    clone_go_protobufs(repo)
-    sync_go_protobufs(output, repo)
-    last_sha = find_last_sync_sha(repo)
-    changes = updated_since_sha(repo, last_sha)
-    if updated(repo):
-        print('Changes detected: %s' % changes)
-        new_sha = changes[0]
-        write_revision_info(repo, new_sha)
-        publish_go_protobufs(repo, new_sha)
+    if args.skip_sync:
+        print('Skipping sync with go-control-plane')
+    else:
+        repo = os.path.join(workspace, REPO_BASE)
+        clone_go_protobufs(repo)
+        sync_go_protobufs(output, repo)
+        last_sha = find_last_sync_sha(repo)
+        changes = updated_since_sha(repo, last_sha)
+        if updated(repo):
+            print('Changes detected: %s' % changes)
+            new_sha = changes[0]
+            write_revision_info(repo, new_sha)
+            publish_go_protobufs(repo, new_sha)
