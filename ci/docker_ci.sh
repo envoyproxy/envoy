@@ -157,7 +157,7 @@ fi
 docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-  if [[ "$BUILD_TYPE" == "distroless" ]]; then
+  if [[ "$BUILD_TYPE" == "-distroless" ]]; then
     continue
   fi
   push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
