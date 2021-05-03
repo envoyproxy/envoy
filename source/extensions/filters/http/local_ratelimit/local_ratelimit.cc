@@ -47,7 +47,7 @@ FilterConfig::FilterConfig(
       request_headers_parser_(Envoy::Router::HeaderParser::configure(
           config.request_headers_to_add_when_not_enforced())),
       stage_(static_cast<uint64_t>(config.stage())),
-      has_descriptors_(!config.descriptors().empty()), proto_config_(config) {
+      has_descriptors_(!config.descriptors().empty()) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
