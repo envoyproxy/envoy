@@ -985,6 +985,9 @@ public:
   virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const PURE;
 
+  virtual const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const PURE;
+
   /**
    * @return the Http1 Codec Stats.
    */

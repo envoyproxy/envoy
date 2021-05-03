@@ -192,7 +192,7 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    OptRef<AlternateProtocolsCache> alternate_protocols,
+    AlternateProtocolsCacheSharedPtr alternate_protocols,
     std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
@@ -339,7 +339,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
     return false;
   }
-  if (!alternate_protocols_.has_value()) {
+  if (!alternate_protocols_) {
     ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}'.",
               host_->hostname());
     return true;

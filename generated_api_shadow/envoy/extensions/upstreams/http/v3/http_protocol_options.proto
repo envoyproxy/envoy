@@ -104,6 +104,8 @@ message HttpProtocolOptions {
     // via HTTP/3, and if the HTTP/3 connection fails, TCP (HTTP/1 or HTTP/2
     // based on ALPN) will be used instead.
     config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
+
+    config.core.v3.AlternateProtocolsCacheOptions alternate_protocols_cache_options = 4;
   }
 
   // This contains options common across HTTP/1 and HTTP/2

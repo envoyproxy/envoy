@@ -1,6 +1,7 @@
-#include "common/http/alternate_protocols_cache.h"
+#include "common/http/alternate_protocols_cache_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
+#include "test/mocks/thread_local/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -10,9 +11,10 @@ namespace Http {
 namespace {
 class AlternateProtocolsCacheTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  AlternateProtocolsCacheTest() : protocols_(simTime()) {}
+  AlternateProtocolsCacheTest() : protocols_(tls_, simTime()) {}
 
-  AlternateProtocolsCache protocols_;
+  testing::NiceMock<ThreadLocal::MockInstance> tls_;
+  AlternateProtocolsCacheImpl protocols_;
   const std::string hostname1_ = "hostname1";
   const std::string hostname2_ = "hostname2";
   const uint32_t port1_ = 1;

@@ -663,6 +663,11 @@ public:
     return http_protocol_options_->upstream_http_protocol_options_;
   }
 
+  const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const override {
+    return http_protocol_options_->alternate_protocol_cache_options_;
+  }
+
   absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;

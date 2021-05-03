@@ -1,12 +1,14 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 
 #include "absl/strings/string_view.h"
 
@@ -22,7 +24,8 @@ public:
   // Represents an HTTP origin to be connected too.
   struct Origin {
   public:
-    Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port);
+    Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port)
+        : scheme_(scheme), hostname_(hostname), port_(port) {}
 
     bool operator==(const Origin& other) const {
       return std::tie(scheme_, hostname_, port_) ==
@@ -59,7 +62,8 @@ public:
   // Represents an alternative protocol that can be used to connect to an origin.
   struct AlternateProtocol {
   public:
-    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port);
+    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port)
+        : alpn_(alpn), hostname_(hostname), port_(port) {}
 
     bool operator==(const AlternateProtocol& other) const {
       return std::tie(alpn_, hostname_, port_) ==
@@ -73,34 +77,55 @@ public:
     uint32_t port_;
   };
 
-  explicit AlternateProtocolsCache(TimeSource& time_source);
+  virtual ~AlternateProtocolsCache() = default;
 
   // Sets the possible alternative protocols which can be used to connect to the
   // specified origin. Expires after the specified expiration time.
-  void setAlternatives(const Origin& origin, const std::vector<AlternateProtocol>& protocols,
-                       const MonotonicTime& expiration);
+  virtual void setAlternatives(const Origin& origin,
+                               const std::vector<AlternateProtocol>& protocols,
+                               const MonotonicTime& expiration) PURE;
 
   // Returns the possible alternative protocols which can be used to connect to the
   // specified origin, or nullptr if not alternatives are found. The returned pointer
-  // is owned by the AlternateProtocolsCache and is valid until the next operation on
-  // AlternateProtocolsCache.
-  OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin);
+  // is owned by the AlternateProtocols and is valid until the next operation on
+  // AlternateProtocols.
+  virtual OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) PURE;
 
   // Returns the number of entries in the map.
-  size_t size() const;
+  virtual size_t size() const PURE;
+};
 
-private:
-  struct Entry {
-    std::vector<AlternateProtocol> protocols_;
-    MonotonicTime expiration_;
-  };
+using AlternateProtocolsCacheSharedPtr = std::shared_ptr<AlternateProtocolsCache>;
 
-  // Time source used to check expiration of entries.
-  TimeSource& time_source_;
+/**
+ * A manager for multiple alternate protocols caches.
+ */
+class AlternateProtocolsCacheManager {
+public:
+  virtual ~AlternateProtocolsCacheManager() = default;
 
-  // Map from hostname to list of alternate protocols.
-  // TODO(RyanTheOptimist): Add a limit to the size of this map and evict based on usage.
-  std::map<Origin, Entry> protocols_;
+  /**
+   * Get a alternate protocols cache.
+   * @param config supplies the cache parameters. If a cache exists with the same parameters it
+   *               will be returned, otherwise a new one will be created.
+   */
+  virtual AlternateProtocolsCacheSharedPtr getCache(
+      const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) PURE;
+};
+
+using AlternateProtocolsCacheManagerSharedPtr = std::shared_ptr<AlternateProtocolsCacheManager>;
+
+/**
+ * Factory for getting an alternate protocols cache manager.
+ */
+class AlternateProtocolsCacheManagerFactory {
+public:
+  virtual ~AlternateProtocolsCacheManagerFactory() = default;
+
+  /**
+   * Get a DNS cache manager.
+   */
+  virtual AlternateProtocolsCacheManagerSharedPtr get() PURE;
 };
 
 } // namespace Http

@@ -29,6 +29,8 @@
 #include "common/common/cleanup.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
+#include "common/http/alternate_protocols_cache.h"
+#include "common/http/alternate_protocols_cache_manager_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
@@ -58,7 +60,8 @@ public:
         router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
         dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), options_(options) {}
+        singleton_manager_(singleton_manager), options_(options),
+        alternate_protocols_cache_manager_factory_(singleton_manager, main_thread_dispatcher.timeSource(), tls_) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -66,6 +69,7 @@ public:
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
+                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>& alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state) override;
@@ -101,6 +105,7 @@ protected:
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
   const Server::Options& options_;
+  Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -230,7 +235,7 @@ public:
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context);
+                     Router::Context& router_context, Singleton::Manager& singleton_manager);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -609,6 +614,7 @@ private:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+  Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
 
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
