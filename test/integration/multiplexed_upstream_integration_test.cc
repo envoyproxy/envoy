@@ -322,7 +322,6 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
 }
 
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
-  EXCLUDE_UPSTREAM_HTTP3;                     // Times out waiting for reset.
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
   std::vector<Http::RequestEncoder*> encoders;
@@ -368,6 +367,9 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
     ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
     upstream_requests[i]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_requests[i]->encodeData(100, false);
+    // Make sure at least the headers go through, to ensure stream reset rather
+    // than disconnect.
+    responses[i]->waitForHeaders();
   }
   // Close the connection.
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -441,8 +443,6 @@ typed_config:
 // Tests the default limit for the number of response headers is 100. Results in a stream reset if
 // exceeds.
 TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
-  EXCLUDE_UPSTREAM_HTTP3; // no 503.
-
   // Default limit for response headers is 100.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

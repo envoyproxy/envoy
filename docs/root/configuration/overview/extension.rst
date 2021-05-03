@@ -3,10 +3,10 @@
 Extension configuration
 -----------------------
 
-Each configuration resource in Envoy has a type URL in the `typed_config`. This
+Each configuration resource in Envoy has a type URL in the ``typed_config``. This
 type corresponds to a versioned schema. If the type URL uniquely identifies an
 extension capable of interpreting the configuration, then the extension is
-selected regardless of the `name` field. In this case the `name` field becomes
+selected regardless of the ``name`` field. In this case the ``name`` field becomes
 optional and can be used as an identifier or as an annotation for the
 particular instance of the extension configuration. For example, the following
 filter configuration snippet is permitted:
@@ -35,7 +35,7 @@ filter configuration snippet is permitted:
         dynamic_stats: true
 
 In case the control plane lacks the schema definitions for an extension,
-`udpa.type.v1.TypedStruct` should be used as a generic container. The type URL
+``udpa.type.v1.TypedStruct`` should be used as a generic container. The type URL
 inside it is then used by a client to convert the contents to a typed
 configuration resource. For example, the above example could be written as
 follows:

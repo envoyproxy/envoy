@@ -26,12 +26,12 @@ which will then attempt to evaluate the matching rules with the provided data, t
 action if match evaluation completes in an action.
 
 In the above example, we are specifying that we want to match on the incoming request header
-`some-header` by setting the `input` to
+``some-header`` by setting the ``input`` to
 :ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>`
 and configuring the header key to use. Using the value contained by this header, the provided
-`exact_match_map` specifies which values we care about: we've configured a single value
-(`some_value_to_match_on`) to match against. As a result, this config means that if we
-receive a request which contains `some-header: some_value_to_match_on` as a header, the
+``exact_match_map`` specifies which values we care about: we've configured a single value
+(``some_value_to_match_on``) to match against. As a result, this config means that if we
+receive a request which contains ``some-header: some_value_to_match_on`` as a header, the
 :ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>`
 action will be resolved (causing the associated HTTP filter to be skipped). If no such header is
 present, no action will be resolved and the filter will be applied as usual.
@@ -43,8 +43,8 @@ Above is a slightly more complicated example which combines a top level tree mat
 linear matcher. While the tree matchers provide very efficient matching, they are not very
 expressive. The list matcher can be used to provide a much richer matching API, and can be combined
 with the tree matcher in an arbitrary order. The example describes the following match logic: skip
-the filter if `some-header: skip_filter` is present and `second-header` is set to *either* `foo` or
-`bar`.
+the filter if ``some-header: skip_filter`` is present and ``second-header`` is set to *either* ``foo`` or
+``bar``.
 
 .. _arch_overview_matching_api_iteration_impact:
 
