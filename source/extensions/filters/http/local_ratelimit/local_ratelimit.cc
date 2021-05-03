@@ -90,7 +90,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     populateDescriptors(descriptors, headers);
   }
 
-  bool isRequestAllowed = config->protoConfig().per_connection()
+  bool isRequestAllowed = config->protoConfig().local_rate_limit_per_downstream_connection()
                               ? requestAllowed(descriptors)
                               : config->requestAllowed(descriptors);
 

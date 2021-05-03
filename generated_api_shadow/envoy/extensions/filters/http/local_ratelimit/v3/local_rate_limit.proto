@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -104,5 +104,5 @@ message LocalRateLimit {
   // If set to true, a token bucket is allocated for each connection.
   // Thus the rate limits are applied per connection thereby allowing
   // one to rate limit requests on a per connection basis.
-  bool per_connection = 10;
+  bool local_rate_limit_per_downstream_connection = 11;
 }
