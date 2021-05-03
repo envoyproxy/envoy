@@ -763,7 +763,8 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolverConfig) {
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
   std::vector<Network::Address::InstanceConstSharedPtr> expectedEmptyDnsResolvers;
-  EXPECT_CALL(dispatcher, createDnsResolver(expectedEmptyDnsResolvers, _)).WillOnce(Return(resolver));
+  EXPECT_CALL(dispatcher, createDnsResolver(expectedEmptyDnsResolvers, _))
+      .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
@@ -781,11 +782,13 @@ TEST(DnsCacheConfigOptionsTest, CustomDnsResolverConfig) {
   dns_resolver->mutable_socket_address()->set_port_value(8080);
 
   std::vector<Network::Address::InstanceConstSharedPtr> expectedDnsResolverConfig;
-  envoy::config::core::v3::Address *address = new envoy::config::core::v3::Address();
+  envoy::config::core::v3::Address* address = new envoy::config::core::v3::Address();
   address->mutable_socket_address()->set_address("1.2.3.4");
   address->mutable_socket_address()->set_port_value(8080);
   expectedDnsResolverConfig.push_back(Network::Address::resolveProtoAddress(*address));
-  EXPECT_CALL(dispatcher, createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolverConfig), _)).WillOnce(Return(resolver));
+  EXPECT_CALL(dispatcher,
+              createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolverConfig), _))
+      .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
