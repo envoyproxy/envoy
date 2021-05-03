@@ -134,7 +134,8 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   if (!headers_decompressed() || header_list.empty()) {
-    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
+                  quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
 
@@ -143,16 +144,18 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
-      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list, *this);
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
   if (headers == nullptr) {
-    onStreamError(close_connection_upon_invalid_header_);
+    onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
     return;
   }
   const absl::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusNoThrow(*headers);
   if (!optional_status.has_value()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
+                  quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
   const uint64_t status = optional_status.value();
@@ -239,6 +242,11 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
+      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+      onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+      return;
+    }
     response_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
@@ -299,7 +307,8 @@ QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection(
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
 }
 
-void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection) {
+void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,
+                                          quic::QuicRstStreamErrorCode rst_code) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
@@ -313,7 +322,7 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
   if (close_connection_upon_invalid_header) {
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
   } else {
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    Reset(rst_code);
   }
 }
 

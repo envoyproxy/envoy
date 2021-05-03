@@ -32,6 +32,27 @@
 namespace Envoy {
 namespace Quic {
 
+// Changes or additions to details should be reflected in
+// docs/root/configuration/http/http_conn_man/response_code_details.rst
+class Http3ResponseCodeDetailValues {
+public:
+  // Invalid HTTP header field was received and stream is going to be
+  // closed.
+  static constexpr absl::string_view invalid_http_header = "http3.invalid_header_field";
+  // The size of headers (or trailers) exceeded the configured limits.
+  static constexpr absl::string_view headers_too_large = "http3.headers_too_large";
+  // Envoy was configured to drop requests with header keys beginning with underscores.
+  static constexpr absl::string_view invalid_underscore = "http3.unexpected_underscore";
+  // The peer refused the stream.
+  static constexpr absl::string_view remote_refused = "http3.remote_refuse";
+  // The peer reset the stream.
+  static constexpr absl::string_view remote_reset = "http3.remote_reset";
+  // Too many trailers were sent.
+  static constexpr absl::string_view too_many_trailers = "http3.too_many_trailers";
+  // Too many headers were sent.
+  static constexpr absl::string_view too_many_headers = "http3.too_many_headers";
+};
+
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
 // the heap allocation is too expensive.
 Network::Address::InstanceConstSharedPtr
@@ -48,14 +69,21 @@ public:
 
 // The returned header map has all keys in lower case.
 template <class T>
-std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list,
-                                             HeaderValidator& validator) {
+std::unique_ptr<T>
+quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidator& validator,
+                          uint32_t max_headers_allowed, absl::string_view& details) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
+    if (max_headers_allowed == 0) {
+      details = Http3ResponseCodeDetailValues::too_many_headers;
+      return nullptr;
+    }
+    max_headers_allowed--;
     Http::HeaderUtility::HeaderValidationResult result =
         validator.validateHeader(entry.first, entry.second);
     switch (result) {
     case Http::HeaderUtility::HeaderValidationResult::REJECT:
+      // The validator sets the details to Http3ResponseCodeDetailValues::invalid_underscore
       return nullptr;
     case Http::HeaderUtility::HeaderValidationResult::DROP:
       continue;
