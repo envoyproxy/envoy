@@ -48,7 +48,6 @@ public:
   }
 
 private:
-
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::ResponseHeaderMap* response_headers_{};
