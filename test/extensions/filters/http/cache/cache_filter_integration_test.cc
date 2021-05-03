@@ -1,6 +1,8 @@
 #include <initializer_list>
 #include <optional>
 
+#include "envoy/common/optref.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -68,12 +70,12 @@ public:
   }
 
   std::function<void()> simulateUpstreamResponse(const Http::TestResponseHeaderMapImpl& headers,
-                                                 const std::string* body) {
+                                                 OptRef<const std::string> body) {
     return [this, headers = std::move(headers), body = std::move(body)]() {
       waitForNextUpstreamRequest();
       upstream_request_->encodeHeaders(headers, /*end_stream=*/!body);
-      if (body) {
-        upstream_request_->encodeData(*body, /*end_stream=*/true);
+      if (body.has_value()) {
+        upstream_request_->encodeData(body.ref(), /*end_stream=*/true);
       }
     };
   }
@@ -105,7 +107,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   // Send first request, and get response from upstream.
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, &response_body));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
@@ -141,7 +143,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
   // Send first request, and get response from upstream.
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, &response_body));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
@@ -176,8 +178,8 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
 
-    // A response that has been validated should not contain an Age header as it is equivalent to a
-    // freshly served response from the origin, unless the 304 response has an Age header, which
+    // A response that has been validated should not contain an Age header as it is equivalent to
+    // a freshly served response from the origin, unless the 304 response has an Age header, which
     // means it was served by an upstream cache.
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
 
@@ -199,7 +201,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(
         response_body, /*cache_control=*/"max-age=10", /*extra_headers=*/{{"etag", "a1"}});
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, &response_body));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
@@ -284,8 +286,9 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
   {
     // Since it is a head request, no need to encodeData => the response_body is absl::nullopt.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers,
-                                                  /*response_body*/ nullptr));
+        request_headers,
+        simulateUpstreamResponse(response_headers,
+                                 /*response_body*/ makeOptRefFromPtr<const std::string>(nullptr)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body().size(), 0);
@@ -295,13 +298,14 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
   // Advance time, to verify the original date header is preserved.
   simTime().advanceTimeWait(Seconds(10));
 
-  // Send second request, and get response from upstream, since the head requests are not stored in
-  // cache.
+  // Send second request, and get response from upstream, since the head requests are not stored
+  // in cache.
   {
     // Since it is a head request, no need to encodeData => the response_body is empty.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers,
-                                                  /*response_body*/ nullptr));
+        request_headers,
+        simulateUpstreamResponse(response_headers,
+                                 /*response_body*/ makeOptRefFromPtr<const std::string>(nullptr)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body().size(), 0);
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
@@ -321,7 +325,7 @@ TEST_P(CacheIntegrationTest, ServeHeadFromCacheAfterGetRequest) {
     const Http::TestRequestHeaderMapImpl request_headers =
         httpRequestHeader("GET", /*authority=*/"ServeHeadFromCacheAfterGetRequest");
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, &response_body));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
@@ -359,8 +363,9 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
         httpRequestHeader("HEAD", "ServeGetFromUpstreamAfterHeadRequest");
     // No need to encode the data, therefore response_body is empty.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers,
-                                                  /*response_body*/ nullptr));
+        request_headers,
+        simulateUpstreamResponse(response_headers,
+                                 /*response_body*/ makeOptRefFromPtr<const std::string>(nullptr)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body().size(), 0);
@@ -376,7 +381,7 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
     const Http::TestRequestHeaderMapImpl request_headers =
         httpRequestHeader("GET", /*authority=*/"ServeGetFromUpstreamAfterHeadRequest");
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, &response_body));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
@@ -396,7 +401,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead304WithValidation) {
         httpRequestHeader("GET", /*authority=*/"ServeGetFollowedByHead304WithValidation");
 
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, &response_body));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
@@ -435,8 +440,8 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead304WithValidation) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body().size(), 0);
 
-    // A response that has been validated should not contain an Age header as it is equivalent to a
-    // freshly served response from the origin, unless the 304 response has an Age header, which
+    // A response that has been validated should not contain an Age header as it is equivalent to
+    // a freshly served response from the origin, unless the 304 response has an Age header, which
     // means it was served by an upstream cache.
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
 
@@ -458,7 +463,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
         response_body, /*cache-control*/ "max-age=10", /*extra_headers=*/{{"etag", "a1"}});
 
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, &response_body));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body)));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
