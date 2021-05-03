@@ -16,6 +16,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 namespace {
+const std::string INVALID_TOKEN_ERROR_STRING = "invalid_token";
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_method_handle(Http::CustomHeaders::get().AccessControlRequestMethod);
@@ -121,9 +122,12 @@ void Filter::onComplete(const Status& status) {
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(
         code, ::google::jwt_verify::getStatusString(status),
-        [uri = this->original_uri_](Http::ResponseHeaderMap& headers) {
-          headers.setCopy(Http::LowerCaseString("www-authenticate"),
-                          absl::StrCat("Bearer realm=\"", uri, "\""));
+        [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
+          std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
+          if(status != Status::JwtMissed) {
+            absl::StrAppend(&value, ", error=\"", INVALID_TOKEN_ERROR_STRING, "\"");
+          }
+          headers.setCopy(Http::LowerCaseString("www-authenticate"), value);
         },
         absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
