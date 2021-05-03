@@ -15,8 +15,8 @@ public:
   AlternateProtocols protocols_;
   const std::string hostname1_ = "hostname1";
   const std::string hostname2_ = "hostname2";
-  const int port1_ = 1;
-  const int port2_ = 2;
+  const uint32_t port1_ = 1;
+  const uint32_t port2_ = 2;
   const std::string https_ = "https";
   const std::string http_ = "http";
 

@@ -4,10 +4,10 @@ namespace Envoy {
 namespace Http {
 
 AlternateProtocols::AlternateProtocol::AlternateProtocol(absl::string_view alpn,
-                                                         absl::string_view hostname, int port)
+                                                         absl::string_view hostname, uint32_t port)
     : alpn_(alpn), hostname_(hostname), port_(port) {}
 
-AlternateProtocols::Origin::Origin(absl::string_view scheme, absl::string_view hostname, int port)
+AlternateProtocols::Origin::Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port)
     : scheme_(scheme), hostname_(hostname), port_(port) {}
 
 AlternateProtocols::AlternateProtocols(TimeSource& time_source) : time_source_(time_source) {}

@@ -4,6 +4,7 @@
 #include "common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "common/http/alternate_protocols.h"
 
 namespace Envoy {
 namespace Http {
@@ -131,6 +132,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                   AlternateProtocols& alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
@@ -170,6 +172,10 @@ private:
   // drained_callbacks_ once all pools have drained.
   void onDrainReceived();
 
+  // Returns true if HTTP/3 should be attempted because there is an alternate protocol
+  // that specifies HTTP/3 and  HTTP/3 is not broken.
+  bool shouldAttemptHttp3();
+
   // Creates the next pool in the priority list, or absl::nullopt if all pools
   // have been created.
   virtual absl::optional<PoolIterator> createNextPool();
@@ -185,6 +191,7 @@ private:
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
+  AlternateProtocols& alternate_protocols_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and

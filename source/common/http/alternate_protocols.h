@@ -22,7 +22,7 @@ public:
   // Represents an HTTP origin to be connected too.
   struct Origin {
   public:
-    Origin(absl::string_view scheme, absl::string_view hostname, int port);
+    Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port);
 
     bool operator==(const Origin& other) const {
       return std::tie(scheme_, hostname_, port_) ==
@@ -53,13 +53,13 @@ public:
 
     std::string scheme_;
     std::string hostname_;
-    int port_{};
+    uint32_t port_{};
   };
 
   // Represents an alternative protocol that can be used to connect to an origin.
   struct AlternateProtocol {
   public:
-    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, int port);
+    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port);
 
     bool operator==(const AlternateProtocol& other) const {
       return std::tie(alpn_, hostname_, port_) ==
@@ -70,7 +70,7 @@ public:
 
     std::string alpn_;
     std::string hostname_;
-    int port_;
+    uint32_t port_;
   };
 
   explicit AlternateProtocols(TimeSource& time_source);
