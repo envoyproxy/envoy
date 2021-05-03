@@ -577,6 +577,16 @@ TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
   }
 }
 
+TEST_P(EnvoyQuicClientStreamTest, MetadataNotSupported) {
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  quic_stream_->encodeMetadata(metadata_map_vector);
+  EXPECT_EQ(1, TestUtility::findCounter(scope_, "http3.metadata_not_supported_error")->value());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
 // Tests that posted stream block callback won't cause use-after-free crash.
 TEST_P(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
