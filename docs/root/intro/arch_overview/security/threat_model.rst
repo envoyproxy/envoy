@@ -66,7 +66,7 @@ The control plane management server is generally trusted. We do not consider wir
 against the xDS transport protocol to be a concern as a result. However, the configuration delivered
 to Envoy over xDS may originate from untrusted sources and may not be fully sanitized. An example of
 this might be a service operator that hosts multiple tenants on an Envoy, where tenants may specify
-a regular expression on a header match in `RouteConfiguration`. In this case, we expect that Envoy
+a regular expression on a header match in ``RouteConfiguration``. In this case, we expect that Envoy
 is resilient against the risks posed by malicious configuration from a confidentiality, integrity
 and availability perspective, as described above.
 
