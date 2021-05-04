@@ -8,44 +8,44 @@ namespace Envoy {
 namespace Quic {
 namespace {
 
-constexpr uint32_t kTimeout = 1000;
-const quic::QuicVersionLabel kFakeVersionLabel = 0x01234567;
-const quic::QuicVersionLabel kFakeVersionLabel2 = 0x89ABCDEF;
-const uint64_t kFakeIdleTimeoutMilliseconds = 12012;
-const uint8_t kFakeStatelessResetTokenData[16] = {0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
-                                                  0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F};
-const uint64_t kFakeMaxPacketSize = 9001;
-const uint64_t kFakeInitialMaxData = 101;
-const bool kFakeDisableMigration = true;
-const auto kCustomParameter1 = static_cast<quic::TransportParameters::TransportParameterId>(0xffcd);
-const char* kCustomParameter1Value = "foo";
-const auto kCustomParameter2 = static_cast<quic::TransportParameters::TransportParameterId>(0xff34);
-const char* kCustomParameter2Value = "bar";
+constexpr uint32_t Timeout = 1000;
+const quic::QuicVersionLabel FakeVersionLabel = 0x01234567;
+const quic::QuicVersionLabel FakeVersionLabel2 = 0x89ABCDEF;
+const uint64_t FakeIdleTimeoutMilliseconds = 12012;
+const uint8_t FakeStatelessResetTokenData[16] = {0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                                                 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F};
+const uint64_t FakeMaxPacketSize = 9001;
+const uint64_t FakeInitialMaxData = 101;
+const bool FakeDisableMigration = true;
+const auto CustomParameter1 = static_cast<quic::TransportParameters::TransportParameterId>(0xffcd);
+const char* CustomParameter1Value = "foo";
+const auto CustomParameter2 = static_cast<quic::TransportParameters::TransportParameterId>(0xff34);
+const char* CustomParameter2Value = "bar";
 
 std::vector<uint8_t> createFakeStatelessResetToken() {
-  return std::vector<uint8_t>(kFakeStatelessResetTokenData,
-                              kFakeStatelessResetTokenData + sizeof(kFakeStatelessResetTokenData));
+  return std::vector<uint8_t>(FakeStatelessResetTokenData,
+                              FakeStatelessResetTokenData + sizeof(FakeStatelessResetTokenData));
 }
 
 // Make a TransportParameters that has a few fields set to help test comparison.
 std::unique_ptr<quic::TransportParameters> makeFakeTransportParams() {
   auto params = std::make_unique<quic::TransportParameters>();
   params->perspective = quic::Perspective::IS_CLIENT;
-  params->version = kFakeVersionLabel;
-  params->supported_versions.push_back(kFakeVersionLabel);
-  params->supported_versions.push_back(kFakeVersionLabel2);
-  params->max_idle_timeout_ms.set_value(kFakeIdleTimeoutMilliseconds);
+  params->version = FakeVersionLabel;
+  params->supported_versions.push_back(FakeVersionLabel);
+  params->supported_versions.push_back(FakeVersionLabel2);
+  params->max_idle_timeout_ms.set_value(FakeIdleTimeoutMilliseconds);
   params->stateless_reset_token = createFakeStatelessResetToken();
-  params->max_udp_payload_size.set_value(kFakeMaxPacketSize);
-  params->initial_max_data.set_value(kFakeInitialMaxData);
-  params->disable_active_migration = kFakeDisableMigration;
-  params->custom_parameters[kCustomParameter1] = kCustomParameter1Value;
-  params->custom_parameters[kCustomParameter2] = kCustomParameter2Value;
+  params->max_udp_payload_size.set_value(FakeMaxPacketSize);
+  params->initial_max_data.set_value(FakeInitialMaxData);
+  params->disable_active_migration = FakeDisableMigration;
+  params->custom_parameters[CustomParameter1] = CustomParameter1Value;
+  params->custom_parameters[CustomParameter2] = CustomParameter2Value;
   return params;
 }
 
 // Generated with SSL_SESSION_to_bytes.
-static constexpr char kCachedSession[] =
+static constexpr char CachedSession[] =
     "3082068702010102020304040213010420b9c2a657e565db0babd09e192a9fc4d768fbd706"
     "9f03f9278a4a0be62392e55b0420d87ed2ab8cafc986fd2e288bd2d654cd57c3a2bed1d532"
     "20726e55fed39d021ea10602045ed16771a205020302a300a382025f3082025b30820143a0"
@@ -118,9 +118,9 @@ public:
         params_(makeFakeTransportParams()) {}
 
 protected:
-  bssl::UniquePtr<SSL_SESSION> makeSession(uint32_t timeout = kTimeout) {
+  bssl::UniquePtr<SSL_SESSION> makeSession(uint32_t timeout = Timeout) {
     std::string cached_session =
-        absl::HexStringToBytes(absl::string_view(kCachedSession, sizeof(kCachedSession)));
+        absl::HexStringToBytes(absl::string_view(CachedSession, sizeof(CachedSession)));
     SSL_SESSION* session =
         SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(cached_session.data()),
                                cached_session.size(), ssl_ctx_.get());
@@ -317,7 +317,7 @@ TEST_F(EnvoyQuicSessionCacheTest, Expiration) {
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
 
-  bssl::UniquePtr<SSL_SESSION> session2 = makeSession(3 * kTimeout);
+  bssl::UniquePtr<SSL_SESSION> session2 = makeSession(3 * Timeout);
   SSL_SESSION* unowned2 = session2.get();
   quic::QuicServerId id2("b.com", 443);
 
@@ -326,7 +326,7 @@ TEST_F(EnvoyQuicSessionCacheTest, Expiration) {
 
   EXPECT_EQ(2u, cache_.size());
   // Expire the session.
-  time_source_.advance(kTimeout * 2);
+  time_source_.advance(Timeout * 2);
   // The entry has not been removed yet.
   EXPECT_EQ(2u, cache_.size());
 
