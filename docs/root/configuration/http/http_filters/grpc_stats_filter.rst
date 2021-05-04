@@ -8,7 +8,7 @@ gRPC Statistics
 * This filter should be configured with the name *envoy.filters.http.grpc_stats*.
 * This filter can be enabled to emit a :ref:`filter state object
   <envoy_v3_api_msg_extensions.filters.http.grpc_stats.v3.FilterObject>`
-* The filter state object textual representation is `request_message_count,response_message_count`.
+* The filter state object textual representation is ``request_message_count,response_message_count``.
 
 This filter enables telemetry of gRPC calls. It counts the number of successful
 and failed calls, optionally grouping them by the gRPC method name.
@@ -18,7 +18,7 @@ emits the message counts for both uni-directional and bi-directional calls.
 See more info on the wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
 
 The filter emits statistics in the *cluster.<route target cluster>.grpc.* namespace. Depending on the
-configuration, the stats may be prefixed with `<grpc service>.<grpc method>.`; the stats in the table below
+configuration, the stats may be prefixed with ``<grpc service>.<grpc method>.``; the stats in the table below
 are shown in this form. See the documentation for
 :ref:`individual_method_stats_allowlist <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.individual_method_stats_allowlist>`
 and :ref:`stats_for_all_methods <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>`.
