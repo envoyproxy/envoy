@@ -30,7 +30,7 @@ private:
     Entry(Entry&&) noexcept;
     ~Entry();
 
-    // Adds a new |session| onto sessions, dropping the oldest one if two are
+    // Adds a new session onto sessions, dropping the oldest one if two are
     // already stored.
     void pushSession(bssl::UniquePtr<SSL_SESSION> session);
 
@@ -51,7 +51,7 @@ private:
   // size limit, instead remove the oldest entry. This walks the entire list of entries.
   void prune();
 
-  // Creates a new entry and insert into |cache_|. This walks the entire list of entries.
+  // Creates a new entry and insert into cache_. This walks the entire list of entries.
   void createAndInsertEntry(const quic::QuicServerId& server_id,
                             bssl::UniquePtr<SSL_SESSION> session,
                             const quic::TransportParameters& params,
