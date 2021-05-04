@@ -421,7 +421,7 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureRetryFetchAndRefresh) {
   // refetch again after cache duration interval: network failure.
   EXPECT_EQ(fetch_receiver_array_.size(), 3);
   fetch_receiver_array_[2]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
-  // retry 1: network failure agin
+  // retry 1: network failure again
   EXPECT_EQ(fetch_receiver_array_.size(), 4);
   fetch_receiver_array_[3]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
 

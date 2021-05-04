@@ -240,7 +240,7 @@ message RemoteJwks {
   //
   // * The Jwks is fetched on-demand when the requests come. During the fetching, first
   //   few requests are paused until the Jwks is fetched.
-  // * Each worker thread fetchs its own Jwks since Jwks cache is per worker thread.
+  // * Each worker thread fetches its own Jwks since Jwks cache is per worker thread.
   //
   // If this feature is enabled:
   //
@@ -253,7 +253,7 @@ message RemoteJwks {
 
 // Fetch Jwks asynchronously in the main thread when the filter config is parsed.
 // The listener is activated only after the Jwks is fetched.
-// When the Jwks is expired in the cache, it is refetched again in the main thread.
+// When the Jwks is expired in the cache, it is fetched again in the main thread.
 // The fetched Jwks from the main thread can be used by all worker threads.
 message JwksAsyncFetch {
   option (udpa.annotations.versioning).previous_message_type =
