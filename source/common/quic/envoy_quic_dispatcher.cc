@@ -92,5 +92,13 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   return quic_session;
 }
 
+quic::QuicConnectionId EnvoyQuicDispatcher::ReplaceLongServerConnectionId(
+    const quic::ParsedQuicVersion& /*version*/, const quic::QuicConnectionId& server_connection_id,
+    uint8_t expected_server_connection_id_length) const {
+  quic::QuicConnectionId new_connection_id = server_connection_id;
+  new_connection_id.set_length(expected_server_connection_id_length);
+  return new_connection_id;
+}
+
 } // namespace Quic
 } // namespace Envoy
