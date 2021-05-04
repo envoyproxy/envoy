@@ -135,7 +135,8 @@ generate_api_rst v3
 # Fixup anchors and references in v3 so they form a distinct namespace.
 # TODO(htuch): Do this in protodoc generation in the future.
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
+# TODO(phlax): Remove this once above is removed
+find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_v2_api_#envoy_api_#g"
 
 # xDS protocol spec.
 mkdir -p "${GENERATED_RST_DIR}/api-docs"
@@ -159,6 +160,10 @@ rsync -av \
       "${SCRIPT_DIR}"/redirects.txt \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
+
+# Merge generated redirects
+# TODO(phlax): Move updating redirects to separate bazel task
+cat /tmp/redirects.txt >> "${GENERATED_RST_DIR}"/redirects.txt
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
