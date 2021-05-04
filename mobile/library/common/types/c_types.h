@@ -76,6 +76,11 @@ typedef void (*envoy_release_f)(void* context);
  */
 void envoy_noop_release(void* context);
 
+/**
+ * Const version of no-op release callback.
+ */
+void envoy_noop_const_release(const void* context);
+
 #ifdef __cplusplus
 } // release function
 #endif
@@ -297,7 +302,7 @@ typedef void (*envoy_on_engine_running_f)(void* context);
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*envoy_logger_log_f)(envoy_data data, void* context);
+typedef void (*envoy_logger_log_f)(envoy_data data, const void* context);
 
 /**
  * Called when Envoy is done with the logger.
@@ -305,7 +310,7 @@ typedef void (*envoy_logger_log_f)(envoy_data data, void* context);
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*envoy_logger_release_f)(void* context);
+typedef void (*envoy_logger_release_f)(const void* context);
 
 #ifdef __cplusplus
 } // function pointers
@@ -343,5 +348,5 @@ typedef struct {
   envoy_logger_log_f log;
   envoy_logger_release_f release;
   // Context passed through to callbacks to provide dispatch and execution state.
-  void* context;
+  const void* context;
 } envoy_logger;

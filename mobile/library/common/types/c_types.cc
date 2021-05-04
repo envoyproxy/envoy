@@ -26,6 +26,8 @@ void* safe_calloc(size_t count, size_t size) {
 
 void envoy_noop_release(void* context) { (void)context; }
 
+void envoy_noop_const_release(const void* context) { (void)context; }
+
 void release_envoy_data_map(envoy_map map) {
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     envoy_map_entry entry = map.entries[i];
