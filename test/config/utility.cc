@@ -624,6 +624,16 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
       }
     }
   }
+
+  // Ensure we have a basic admin-capable runtime layer.
+  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
+    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    static_layer->set_name("static_layer");
+    static_layer->mutable_static_layer();
+    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    admin_layer->set_name("admin");
+    admin_layer->mutable_admin_layer();
+  }
 }
 
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
@@ -741,14 +751,6 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
 }
 
 void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
-  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
-    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
-    static_layer->set_name("static_layer");
-    static_layer->mutable_static_layer();
-    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
-    admin_layer->set_name("admin");
-    admin_layer->mutable_admin_layer();
-  }
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
