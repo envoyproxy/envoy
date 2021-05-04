@@ -765,7 +765,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
 // The retry priority will always target P1, which would otherwise never be hit due to P0 being
 // healthy.
 TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
-  EXCLUDE_UPSTREAM_HTTP3; // Timed out waiting for new stream.
   const Upstream::HealthyLoad healthy_priority_load({0u, 100u});
   const Upstream::DegradedLoad degraded_priority_load({0u, 100u});
   NiceMock<Upstream::MockRetryPriority> retry_priority(healthy_priority_load,
@@ -1571,8 +1570,12 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-  EXCLUDE_DOWNSTREAM_HTTP3;
-  EXCLUDE_UPSTREAM_HTTP3;
+#ifdef WIN32
+  // TODO(alyssawilk, wrowe) debug.
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+    return;
+  }
+#endif
   // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
   testLargeRequestHeaders(2048, 1, 1024, 100);
 }
