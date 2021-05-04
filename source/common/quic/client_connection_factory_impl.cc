@@ -31,7 +31,6 @@ namespace {
 // This was preexisting but should either be removed or potentially moved inside
 // PersistentQuicInfoImpl.
 struct StaticInfo {
-  quic::QuicConfig quic_config_;
   quic::QuicClientPushPromiseIndex push_promise_index_;
 
   static StaticInfo& get() { MUTABLE_CONSTRUCT_ON_FIRST_USE(StaticInfo); }
@@ -51,10 +50,15 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
       info_impl->alarm_factory_, quic::ParsedQuicVersionVector{info_impl->supported_versions_[0]},
       local_addr, dispatcher, nullptr);
   auto& static_info = StaticInfo::get();
+
+  ASSERT(!info_impl->supported_versions_.empty());
+  // QUICHE client session always use the 1st version to start handshake.
+  // TODO(alyssawilk) pass in ClusterInfo::perConnectionBufferLimitBytes() for
+  // send_buffer_limit instead of using 0.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
-      static_info.quic_config_, info_impl->supported_versions_, std::move(connection),
+      info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
-      dispatcher, 0);
+      dispatcher, /*send_buffer_limit=*/0);
   return ret;
 }
 

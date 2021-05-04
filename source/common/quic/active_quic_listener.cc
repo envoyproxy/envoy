@@ -232,6 +232,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
+  configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(

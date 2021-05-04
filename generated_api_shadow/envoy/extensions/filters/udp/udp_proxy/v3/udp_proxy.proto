@@ -33,6 +33,13 @@ message UdpProxyConfig {
 
       // The source IP will be used to compute the hash used by hash-based load balancing algorithms.
       bool source_ip = 1 [(validate.rules).bool = {const: true}];
+
+      // A given key will be used to compute the hash used by hash-based load balancing algorithms.
+      // In certain cases there is a need to direct different UDP streams jointly towards the selected set of endpoints.
+      // A possible use-case is VoIP telephony, where media (RTP) and its corresponding control (RTCP) belong to the same logical session,
+      // although they travel in separate streams. To ensure that these pair of streams are load-balanced on session level
+      // (instead of individual stream level), dynamically created listeners can use the same hash key for each stream in the session.
+      string key = 2 [(validate.rules).string = {min_len: 1}];
     }
   }
 
