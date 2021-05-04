@@ -3,8 +3,6 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/grpc/context_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -14,7 +12,7 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  explicit Http1BridgeFilter() = default;
+  Http1BridgeFilter() = default;
 
   // Http::StreamFilterBase
   void onDestroy() override {}
