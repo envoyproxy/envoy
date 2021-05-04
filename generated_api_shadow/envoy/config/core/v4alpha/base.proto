@@ -73,7 +73,7 @@ message Locality {
 
   // Defines the local service zone where Envoy is running. Though optional, it
   // should be set if discovery service routing is used and the discovery
-  // service exposes :ref:`zone data <envoy_api_field_config.endpoint.v4alpha.LocalityLbEndpoints.locality>`,
+  // service exposes :ref:`zone data <envoy_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`,
   // either in this message or via :option:`--service-zone`. The meaning of zone
   // is context dependent, e.g. `Availability Zone (AZ)
   // <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
@@ -235,12 +235,8 @@ message Metadata {
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.
-  map<string, google.protobuf.Struct> hidden_envoy_deprecated_filter_metadata = 1
-      [deprecated = true];
+  map<string, google.protobuf.Struct> filter_metadata = 1;
 
-  // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
-  // namespace is reserved for Envoy's built-in filters.
-  // The value is encoded as google.protobuf.Any.
   map<string, google.protobuf.Any> typed_filter_metadata = 2;
 }
 

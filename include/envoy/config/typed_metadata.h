@@ -65,7 +65,7 @@ public:
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& data) const PURE;
 
-   /**
+  /**
    * Convert the google.protobuf.Any into an instance of TypedMetadata::Object.
    * It should throw an EnvoyException in case the conversion can't be completed.
    * @param data config data stored as a protobuf any.
