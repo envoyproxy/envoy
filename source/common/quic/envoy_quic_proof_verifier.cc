@@ -29,7 +29,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       sk_X509_push(intermediates.get(), cert.release());
     }
   }
-  // We down cast rather than add verifyCertChain to Envoy::Ssl::Context becasue
+  // We down cast rather than add verifyCertChain to Envoy::Ssl::Context because
   // verifyCertChain uses a bunch of SSL-specific structs which we want to keep
   // out of the interface definition.
   bool success = static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
