@@ -17,7 +17,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -157,11 +156,10 @@ public:
   Event::SimulatedTimeSystem test_time_;
 };
 
-// Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret
+// Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret.
 TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   NiceMock<Server::MockConfigTracker> config_tracker;
-  std::unique_ptr<Secret::SecretManager> secret_manager(
-      new Secret::SecretManagerImpl(config_tracker));
+  Secret::SecretManagerImpl secret_manager{config_tracker};
   envoy::config::core::v3::ConfigSource config_source;
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
@@ -182,10 +180,10 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
       }));
 
   auto client_secret_provider =
-      secret_manager->findOrCreateGenericSecretProvider(config_source, "client", secret_context);
+      secret_manager.findOrCreateGenericSecretProvider(config_source, "client", secret_context);
   auto client_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
   auto token_secret_provider =
-      secret_manager->findOrCreateGenericSecretProvider(config_source, "token", secret_context);
+      secret_manager.findOrCreateGenericSecretProvider(config_source, "token", secret_context);
   auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
 
   SDSSecretReader secret_reader(client_secret_provider, token_secret_provider, *api);
@@ -200,7 +198,7 @@ generic_secret:
 )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_client), typed_secret);
+  TestUtility::loadFromYaml(yaml_client, typed_secret);
   const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
 
   client_callback->onConfigUpdate(decoded_resources_client.refvec_, "");
@@ -213,7 +211,7 @@ generic_secret:
   secret:
     inline_string: "token_test"
 )EOF";
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_token), typed_secret);
+  TestUtility::loadFromYaml(yaml_token, typed_secret);
   const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
 
   token_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
@@ -226,7 +224,7 @@ generic_secret:
   secret:
     inline_string: "client_test_recheck"
 )EOF";
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_client_recheck), typed_secret);
+  TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
   const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
 
   client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "");
