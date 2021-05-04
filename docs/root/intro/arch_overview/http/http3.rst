@@ -20,15 +20,8 @@ where TCP is the default, and clients such as Chrome will only attempt HTTP/3 if
 
 By default the example configuration uses kernel UDP support, but for production performance on Linux, use of
 BPF is strongly advised if Envoy is running with multiple worker threads. Envoy will attepmt to
-use BPF by default if multiple worker threads are configured, but only works if
-
-  #. Envoy is running as root
-  #. BPF has been configured to run by non-root users. This can be configured for
-
-    * for kernels >= 5.8, Envoy is run with sudo setcap cap_bpf+ep <envoy binary>
-    * for kernels < 5.8, Envoy is run with sudo cap_net_admin,cap_sys_admin+ep <envoy binary>
-
-Envoy will log a warning on start-up if BPF is attempted and fails.
+use BPF by default if multiple worker threads are configured, but may require root, or at least sudo-with-permissions
+(e.g. sudo setcap cap_bpf+ep). Envoy will log a warning on start-up if BPF is attempted and fails.
 
 HTTP3 upstream
 ===============
