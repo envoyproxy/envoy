@@ -24,8 +24,7 @@ namespace Network {
 namespace {
 
 TEST(IoSocketHandleImplTest, TestIoSocketError) {
-  IoSocketError error1(SOCKET_ERROR_AGAIN);
-  EXPECT_DEBUG_DEATH(error1.getErrorCode(),
+  EXPECT_DEBUG_DEATH(IoSocketError(SOCKET_ERROR_AGAIN),
                      ".*assert failure: .* Details: Didn't use getIoSocketEagainInstance.*");
   EXPECT_EQ(errorDetails(SOCKET_ERROR_AGAIN),
             IoSocketError::getIoSocketEagainInstance()->getErrorDetails());
