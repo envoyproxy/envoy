@@ -160,6 +160,10 @@ rsync -av \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
 
+# Merge generated redirects
+cat /tmp/redirects.txt >> "${GENERATED_RST_DIR}"/redirects.txt
+cat "${GENERATED_RST_DIR}"/redirects.txt
+
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
 

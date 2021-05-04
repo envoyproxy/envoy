@@ -30,6 +30,8 @@ NEXT_MAJOR_VERSION_ANNOTATION = 'next-major-version'
 # Comment. Just used for adding text that will not go into the docs at all.
 COMMENT_ANNOTATION = 'comment'
 
+REDIRECT_ANNOTATION = "protodoc-redirect"
+
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
     EXTENSION_ANNOTATION,
@@ -38,6 +40,7 @@ VALID_ANNOTATIONS = set([
     NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
+    REDIRECT_ANNOTATION,
 ])
 
 # These can propagate from file scope to message/enum scope (and be overridden).

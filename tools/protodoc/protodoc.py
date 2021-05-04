@@ -31,10 +31,14 @@ from tools.config_validation import validate_fragment
 from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2
+from udpa.annotations import versioning_pb2
 from validate import validate_pb2
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
+
+# Last documented v2 api version
+ENVOY_LAST_V2_VERSION = "1.17.2"
 
 # Namespace prefix for Envoy top-level APIs.
 ENVOY_PREFIX = '.envoy.'
@@ -57,7 +61,7 @@ EXTENSION_TEMPLATE = Template(
     """
 .. _extension_{{extension}}:
 
-This extension may be referenced by the qualified name *{{extension}}*
+This extension may be referenced by the qualified name ``{{extension}}``
 
 .. note::
   {{status}}
@@ -123,6 +127,9 @@ EXTENSION_CATEGORIES = {}
 for _k, _v in EXTENSION_DB.items():
     for _cat in _v['categories']:
         EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
+
+
+REDIRECTS_FILE = "/tmp/redirects.txt"
 
 
 class ProtodocError(Exception):
@@ -681,7 +688,14 @@ class RstFormatVisitor(visitor.Visitor):
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'message')
         if hide_not_implemented(leading_comment):
             return ''
-        return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
+
+        previous_version = ""
+        if msg_proto.options.HasExtension(versioning_pb2.versioning):
+            _previous_version = msg_proto.options.Extensions[versioning_pb2.versioning].previous_message_type
+            _previous_version_url = f"v{ENVOY_LAST_V2_VERSION}:envoy_api_msg_{_previous_version.split('.')[1:]}"
+            previous_version = f".. tip::\n    PREVIOUS VERSION: :ref:`{_previous_version} <{_previous_version_url}>`\n\n"
+
+        return anchor + header + proto_link + formatted_leading_comment + previous_version + format_message_as_json(
             type_context, msg_proto) + format_message_as_definition_list(
                 type_context, msg_proto,
                 self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
@@ -690,6 +704,10 @@ class RstFormatVisitor(visitor.Visitor):
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
+
+        if annotations.REDIRECT_ANNOTATION in type_context.source_code_info.file_level_annotations:
+            with open(REDIRECTS_FILE, "a") as f:
+                f.write(f"api-v2/{type_context.source_code_info.file_level_annotations[annotations.REDIRECT_ANNOTATION]}.rst\tapi-v3/{'/'.join(file_proto.name.split('/')[1:])}.rst\n")
 
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
