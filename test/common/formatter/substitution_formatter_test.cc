@@ -100,6 +100,119 @@ private:
   std::string raw_string_;
 };
 
+// Test tests command tokenize utility.
+TEST(SubstitutionFormatParser, tokenizer) {
+  std::vector<absl::string_view> tokens;
+  absl::optional<size_t> max_length;
+
+  std::string command = "COMMAND(item1)";
+
+  // The second parameter indicates where command name and opening bracket ends.
+  // In this case "COMMAND(" ends at index 8 (counting from zero).
+  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
+  ASSERT_EQ(tokens.size(), 1);
+  ASSERT_EQ(tokens.at(0), "item1");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  command = "COMMAND(item1:item2:item3)";
+  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
+  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.at(0), "item1");
+  ASSERT_EQ(tokens.at(1), "item2");
+  ASSERT_EQ(tokens.at(2), "item3");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  command = "COMMAND(item1:item2:item3:item4):234";
+  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
+  ASSERT_EQ(tokens.size(), 4);
+  ASSERT_EQ(tokens.at(0), "item1");
+  ASSERT_EQ(tokens.at(1), "item2");
+  ASSERT_EQ(tokens.at(2), "item3");
+  ASSERT_EQ(tokens.at(3), "item4");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 234);
+
+  // Tokenizing the following commands should fail.
+  std::vector<std::string> wrong_commands = {
+      "COMMAND(item1:item2",           // Missing closing bracket.
+      "COMMAND(item1:item2))",         // Unexpected second closing bracket.
+      "COMMAND(item1:item2):",         // Missing length field.
+      "COMMAND(item1:item2):LENGTH",   // Length field must be integer.
+      "COMMAND(item1:item2):100:23",   // Length field must be integer.
+      "COMMAND(item1:item2):100):23"}; // Extra fields after length.
+
+  for (const auto& test_command : wrong_commands) {
+    EXPECT_THROW(
+        SubstitutionFormatParser::tokenizeCommand(test_command, 8, ':', tokens, max_length),
+        EnvoyException)
+        << test_command;
+  }
+}
+
+// Test tests multiple versions of variadic template method parseCommand
+// extracting tokens.
+TEST(SubstitutionFormatParser, commandParser) {
+  std::vector<absl::string_view> tokens;
+  absl::optional<size_t> max_length;
+  std::string token1;
+
+  std::string command = "COMMAND(item1)";
+  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  std::string token2;
+  command = "COMMAND(item1:item2)";
+  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1, token2);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  // Three tokens with optional length.
+  std::string token3;
+  command = "COMMAND(item1?item2?item3):345";
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(token3, "item3");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+
+  // Command string has 4 tokens but 3 are expected.
+  // The first 3 will be read, the fourth will be ignored.
+  command = "COMMAND(item1?item2?item3?item4):345";
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(token3, "item3");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+
+  // Command string has 2 tokens but 3 are expected.
+  // The third extracted token should be empty.
+  command = "COMMAND(item1?item2):345";
+  token3.erase();
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_TRUE(token3.empty());
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+
+  // Command string has 4 tokens. Get first 2 into the strings
+  // and remaining 2 into a vector of strings.
+  command = "COMMAND(item1?item2?item3?item4):345";
+  std::vector<std::string> bucket;
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, bucket);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(bucket.size(), 2);
+  ASSERT_EQ(bucket.at(0), "item3");
+  ASSERT_EQ(bucket.at(1), "item4");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+}
+
 TEST(SubstitutionFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0",
             SubstitutionFormatUtils::protocolToString(Http::Protocol::Http10).value().get());
