@@ -23,7 +23,7 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -q common/ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ ; then
             echo "Tests will run."
             echo "::set-output name=run_tests::true"
           else
