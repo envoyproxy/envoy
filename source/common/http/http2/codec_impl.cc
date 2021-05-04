@@ -587,6 +587,12 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
   }
 }
 
+void ConnectionImpl::StreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr account) {
+  buffer_memory_account_ = account;
+  pending_recv_data_->bindAccount(buffer_memory_account_);
+  pending_send_data_->bindAccount(buffer_memory_account_);
+}
+
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                Random::RandomGenerator& random_generator,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
@@ -1539,12 +1545,6 @@ void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_le
   } else {
     DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
   }
-}
-
-void ConnectionImpl::StreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr account) {
-  buffer_memory_account_ = account;
-  pending_recv_data_->bindAccount(buffer_memory_account_);
-  pending_send_data_->bindAccount(buffer_memory_account_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
