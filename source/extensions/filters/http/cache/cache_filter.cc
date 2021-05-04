@@ -93,7 +93,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     processSuccessfulValidation(headers);
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
     if (is_head_request_) {
-      // Return  since head requests are not cached
+      // Return since HEAD requests are not cached
       return Http::FilterHeadersStatus::Continue;
     } else {
       return Http::FilterHeadersStatus::StopIteration;
