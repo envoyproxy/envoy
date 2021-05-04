@@ -4,7 +4,7 @@ import Foundation
 import XCTest
 
 final class ReceiveDataTests: XCTestCase {
-  func testReceiveData() throws {
+  func testReceiveData() {
     // swiftlint:disable:next line_length
     let apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
@@ -49,7 +49,7 @@ final class ReceiveDataTests: XCTestCase {
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     """
-    let client = try EngineBuilder(yaml: config)
+    let client = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
       .addPlatformFilter(factory: DemoFilter.init)
       .build()

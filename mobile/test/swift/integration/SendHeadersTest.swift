@@ -4,7 +4,7 @@ import Foundation
 import XCTest
 
 final class SendHeadersTests: XCTestCase {
-  func testSendHeaders() throws {
+  func testSendHeaders() {
     // swiftlint:disable:next line_length
     let apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
@@ -48,7 +48,7 @@ final class SendHeadersTests: XCTestCase {
                   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     """
     let expectation = self.expectation(description: "Run called with expected http status")
-    let client = try EngineBuilder(yaml: config)
+    let client = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
       .addPlatformFilter(factory: DemoFilter.init)
       .build()

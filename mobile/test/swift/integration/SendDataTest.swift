@@ -51,7 +51,7 @@ final class SendDataTests: XCTestCase {
                   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     """
     let expectation = self.expectation(description: "Run called with expected http status")
-    let client = try EngineBuilder(yaml: config)
+    let client = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
       .addPlatformFilter(factory: DemoFilter.init)
       .build()

@@ -18,6 +18,7 @@
 #include "library/common/extensions/filters/http/assertion/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
+#include "library/common/extensions/filters/http/route_cache_reset/config.h"
 #include "library/common/extensions/filters/http/test_accessor/config.h"
 
 namespace Envoy {

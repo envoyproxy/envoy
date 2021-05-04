@@ -4,7 +4,7 @@ import Foundation
 import XCTest
 
 final class ReceiveErrorTests: XCTestCase {
-  func testReceiveError() throws {
+  func testReceiveError() {
     // swiftlint:disable:next line_length
     let hcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
@@ -72,7 +72,7 @@ final class ReceiveErrorTests: XCTestCase {
     let runExpectation = self.expectation(description: "Run called with expected error")
     let filterExpectation = self.expectation(description: "Filter called with expected error")
 
-    let client = try EngineBuilder(yaml: config)
+    let client = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .addPlatformFilter(
         name: "error_validation_filter",

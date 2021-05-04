@@ -253,7 +253,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /// Typed configuration that may be used for starting Envoy.
 @interface EnvoyConfiguration : NSObject
 
-@property (nonatomic, strong) NSString *statsDomain;
+@property (nonatomic, strong, nullable) NSString *statsDomain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
@@ -262,6 +262,8 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
 @property (nonatomic, strong) NSString *virtualClusters;
+@property (nonatomic, strong) NSString *directResponseMatchers;
+@property (nonatomic, strong) NSString *directResponses;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
@@ -269,7 +271,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /**
  Create a new instance of the configuration.
  */
-- (instancetype)initWithStatsDomain:(NSString *)statsDomain
+- (instancetype)initWithStatsDomain:(nullable NSString *)statsDomain
               connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
@@ -278,6 +280,8 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
                     virtualClusters:(NSString *)virtualClusters
+             directResponseMatchers:(NSString *)directResponseMatchers
+                    directResponses:(NSString *)directResponses
                   nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                 platformFilterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
                     stringAccessors:

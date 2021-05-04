@@ -30,6 +30,32 @@ extern const char* platform_filter_template;
 extern const char* native_filter_template;
 
 /**
+ * Template that enables the route cache reset filter in the chain.
+ * Should only be added when the route cache should be cleared on every request
+ * going through the filter chain between initial route resolution and the router
+ * filter's invocation on the request path. Typically only used for enabling
+ * direct responses to mutate headers which are then later used for routing.
+ */
+extern const char* route_cache_reset_filter_template;
+
+/**
+ * Template configuration used for creating "fake" remote clusters which enable
+ * local responses to be returned via direct response configurations.
+ */
+extern const char* fake_remote_cluster_template;
+
+/**
+ * Template configuration used for creating "fake" remote listeners which enable
+ * local responses to be returned via direct response configurations.
+ */
+extern const char* fake_remote_listener_template;
+
+/**
+ * Template used for setting up the stats sink.
+ */
+extern const char* stats_sink_template;
+
+/**
  * Initialize an underlying HTTP stream.
  * @param engine, handle to the engine that will manage this stream.
  * @return envoy_stream_t, handle to the underlying stream.
