@@ -234,42 +234,37 @@ message RemoteJwks {
   google.protobuf.Duration cache_duration = 2;
 
   // Fetch Jwks asynchronously in the main thread before the listener is activated.
-  // Fetched Jwks can be used by all worker threads. Refetch due to cache expiration
-  // is done in the main thread too. The request Jwt verification don't need to wait
-  // for Jwks fetching.
+  // Fetched Jwks can be used by all worker threads.
   //
-  // If this feature is NOT enabled:
+  // If this feature is not enabled:
   //
-  // * The Jwks is fetched when the requests come. During the fetching, these requests
-  //   will be paused until the Jwks is fetched.
-  // * Each worker thread needs to fetch its own remote Jwks since Jwks cache is per
-  //   worker thread.
+  // * The Jwks is fetched on-demand when the requests come. During the fetching, first
+  //   few requests are paused until the Jwks is fetched.
+  // * Each worker thread fetchs its own Jwks since Jwks cache is per worker thread.
   //
   // If this feature is enabled:
   //
-  // * Fetched Jwks is done in the main thread and it can be used by all worker threads.
-  //   Each worker thread doesn't need to fetch its own.
-  // * Jwks is ready when the requests come, their Jwt can be verified right away, not
-  //   need to wait for the Jwks fetching.
+  // * Fetched Jwks is done in the main thread before the listener is activated. Its fetched
+  //   Jwks can be used by all worker threads. Each worker thread doesn't need to fetch its own.
+  // * Jwks is ready when the requests come, not need to wait for the Jwks fetching.
   //
   JwksAsyncFetch async_fetch = 3;
 }
 
-// Fetch JWKS asynchronously in the main thread. When the filter config is processed
-// in the main thread, a call to fetch the remote Jwks is started.
-// The listerner is activated only after the Jwks is fetched.
-// When the Jwks cache is expired, the Jwks is refetched in the main thread too.
-// The fetched Jwks can be used by all worker threads.
+// Fetch Jwks asynchronously in the main thread when the filter config is parsed.
+// The listener is activated only after the Jwks is fetched.
+// When the Jwks is expired in the cache, it is refetched again in the main thread.
+// The fetched Jwks from the main thread can be used by all worker threads.
 message JwksAsyncFetch {
   // If true, enable this feature.
   bool enable = 1;
 
-  // If true, the listener is activated without waiting for the initial fetch to be completed.
   // If false, the listener is activated after the initial fetch is completed.
+  // If true, it is activated without waiting for the initial fetch to complete.
   // Default is false.
   bool fast_listener = 2;
 
-  // The number of retries when Jwks fetch failed with networking errors.
+  // The number of retries when Jwks fetch fails with the networking error.
   // Default is no retry.
   uint32 network_fail_retries = 3;
 }
@@ -489,8 +484,7 @@ message FilterStateRule {
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.
-  map<string, JwtRequirement>
-  requires = 3;
+  map<string, JwtRequirement> requires = 3;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
