@@ -13,11 +13,6 @@ static_resources:
           protocol: TCP
           address: 0.0.0.0
           port_value: 10000
-      reuse_port: true
-      udp_listener_config:
-        quic_options: {}
-        downstream_socket_config:
-          prefer_gro: true
       filter_chains:
         transport_socket:
           name: envoy.transport_sockets.tls
