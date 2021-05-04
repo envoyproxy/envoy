@@ -54,6 +54,9 @@ public:
    */
   virtual bool verifyCertChain(x509_st& /*leaf_cert*/, stack_st_X509& /*intermediates*/,
                                std::string& /*error_details*/) {
+    // Unlike the other functions here, this can not easily be pure virtual. Members
+    // are forward-declared structs from ssl libraries, and the test mock context then
+    // doesn't have definisions for x509_st and stack_st_X509.
     return false;
   }
 };
