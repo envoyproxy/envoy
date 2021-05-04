@@ -48,7 +48,7 @@ private:
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
   explicit TestInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) override { return result_; }
+  DataInputGetResult get(const TestData&) const override { return result_; }
 
   DataInputGetResult result_;
 };

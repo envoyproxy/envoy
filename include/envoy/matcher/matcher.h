@@ -209,7 +209,7 @@ template <class DataType> class DataInput {
 public:
   virtual ~DataInput() = default;
 
-  virtual DataInputGetResult get(const DataType& data) PURE;
+  virtual DataInputGetResult get(const DataType& data) const PURE;
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;

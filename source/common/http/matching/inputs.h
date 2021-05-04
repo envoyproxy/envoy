@@ -22,7 +22,7 @@ public:
   virtual absl::optional<std::reference_wrapper<const HeaderType>>
   headerMap(const HttpMatchingData& data) const PURE;
 
-  Matcher::DataInputGetResult get(const HttpMatchingData& data) override {
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
