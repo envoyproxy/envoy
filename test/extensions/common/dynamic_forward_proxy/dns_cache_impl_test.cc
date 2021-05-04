@@ -777,15 +777,12 @@ TEST(DnsCacheConfigOptionsTest, CustomDnsResolverConfig) {
   Stats::IsolatedStoreImpl store;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
-  envoy::config::core::v3::Address* dns_resolver = config.add_dns_resolvers();
-  dns_resolver->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolver->mutable_socket_address()->set_port_value(8080);
+  envoy::config::core::v3::Address* dns_resolvers = config.add_dns_resolvers();
+  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolvers->mutable_socket_address()->set_port_value(8080);
 
   std::vector<Network::Address::InstanceConstSharedPtr> expectedDnsResolverConfig;
-  envoy::config::core::v3::Address* address = new envoy::config::core::v3::Address();
-  address->mutable_socket_address()->set_address("1.2.3.4");
-  address->mutable_socket_address()->set_port_value(8080);
-  expectedDnsResolverConfig.push_back(Network::Address::resolveProtoAddress(*address));
+  expectedDnsResolverConfig.push_back(Network::Address::resolveProtoAddress(*dns_resolvers));
   EXPECT_CALL(dispatcher,
               createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolverConfig), _))
       .WillOnce(Return(resolver));
