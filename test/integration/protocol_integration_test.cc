@@ -53,12 +53,6 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
-// TODO(#14829) categorize or fix all failures.
-#define EXCLUDE_UPSTREAM_HTTP3                                                                     \
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {                                     \
-    return;                                                                                        \
-  }
-
 // TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {                                    \
@@ -771,7 +765,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
 // The retry priority will always target P1, which would otherwise never be hit due to P0 being
 // healthy.
 TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
-  EXCLUDE_UPSTREAM_HTTP3; // Timed out waiting for new stream.
   const Upstream::HealthyLoad healthy_priority_load({0u, 100u});
   const Upstream::DegradedLoad degraded_priority_load({0u, 100u});
   NiceMock<Upstream::MockRetryPriority> retry_priority(healthy_priority_load,
@@ -825,6 +818,10 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+    // Make sure waitForNextUpstreamRequest waits for a new connection.
+    fake_upstream_connection_.reset();
+  }
   waitForNextUpstreamRequest(1);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
@@ -1078,10 +1075,7 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
 
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
-TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) {
-  EXCLUDE_UPSTREAM_HTTP3;
-  testTwoRequests(true);
-}
+TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
 
 TEST_P(ProtocolIntegrationTest, BasicMaxStreamDuration) { testMaxStreamDuration(); }
 
@@ -1576,8 +1570,12 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-  EXCLUDE_DOWNSTREAM_HTTP3;
-  EXCLUDE_UPSTREAM_HTTP3;
+#ifdef WIN32
+  // TODO(alyssawilk, wrowe) debug.
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+    return;
+  }
+#endif
   // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
   testLargeRequestHeaders(2048, 1, 1024, 100);
 }
