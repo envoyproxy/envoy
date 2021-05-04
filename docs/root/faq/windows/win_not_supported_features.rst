@@ -4,7 +4,7 @@ Which Envoy features are not supported on Windows?
 The vast majority of Envoy features are supported on Windows. There are few exceptions that are documented explicitly.
 The most notable features that are not supported on Windows are:
 
-* :ref:`Watchdog <watchdog_overview>`
+* :ref:`Watchdog <watchdog_api_reference>`
 * :ref:`Tracers <http_tracers>`
 * :ref:`Original Src HTTP Filter <arch_overview_ip_transparency_original_src_http>`.
 * :ref:`Hot restart <arch_overview_hot_restart>`

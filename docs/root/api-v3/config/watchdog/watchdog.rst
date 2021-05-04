@@ -1,4 +1,4 @@
-.. _watchdog_overview:
+.. _watchdog_api_reference:
 
 Watchdog
 ========
