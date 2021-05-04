@@ -24,7 +24,7 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
       stats_(stats), done_fn_(done_fn), cache_duration_(getCacheDuration(remote_jwks)),
       debug_name_(absl::StrCat("Jwks async fetching url=", remote_jwks_.http_uri().uri())) {
   // if async_fetch is not enabled, do nothing.
-  if (!remote_jwks_.has_async_fetch() || !remote_jwks_.async_fetch().enable()) {
+  if (!remote_jwks_.has_async_fetch()) {
     return;
   }
 
@@ -70,7 +70,6 @@ void JwksAsyncFetcher::handleFetchDone() {
     init_target_.reset();
   }
 
-  fail_retry_count_ = 0;
   cache_duration_timer_->enableTimer(cache_duration_);
 }
 
@@ -82,18 +81,11 @@ void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   handleFetchDone();
 }
 
-void JwksAsyncFetcher::onJwksError(Failure reason) {
+void JwksAsyncFetcher::onJwksError(Failure) {
   fetcher_.reset();
   stats_.jwks_fetch_failed_.inc();
 
   ENVOY_LOG(warn, "{}: failed", debug_name_);
-  if (reason == Common::JwksFetcher::JwksReceiver::Failure::Network) {
-    if (++fail_retry_count_ <= remote_jwks_.async_fetch().network_fail_retries()) {
-      fetch();
-      return;
-    }
-  }
-
   handleFetchDone();
 }
 

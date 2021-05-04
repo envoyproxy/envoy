@@ -40,13 +40,12 @@ public:
 
   // init manager is used in is_slow_listener mode
   bool init_manager_used() const {
-    return config_.has_async_fetch() && config_.async_fetch().enable() &&
-           !config_.async_fetch().fast_listener();
+    return config_.has_async_fetch() && !config_.async_fetch().fast_listener();
   }
 
   void setupAsyncFetcher(const std::string& config_str) {
     TestUtility::loadFromYaml(config_str, config_);
-    if (config_.has_async_fetch() && config_.async_fetch().enable()) {
+    if (config_.has_async_fetch()) {
       // Param is for fast_listener,
       if (GetParam()) {
         config_.mutable_async_fetch()->set_fast_listener(true);
@@ -61,7 +60,7 @@ public:
     }
 
     // if async_fetch is enabled, timer is created
-    if (config_.has_async_fetch() && config_.async_fetch().enable()) {
+    if (config_.has_async_fetch()) {
       timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
       expected_duration_ = JwksAsyncFetcher::getCacheDuration(config_);
     }
@@ -117,34 +116,12 @@ TEST_P(JwksAsyncFetcherTest, TestNotAsyncFetch) {
   EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
 }
 
-TEST_P(JwksAsyncFetcherTest, TestNotEnabled) {
-  const char config[] = R"(
-      http_uri:
-        uri: https://pubkey_server/pubkey_path
-        cluster: pubkey_cluster
-      async_fetch:
-        enable: false
-)";
-
-  setupAsyncFetcher(config);
-  // fetch is not called
-  EXPECT_EQ(fetch_receiver_array_.size(), 0);
-  // Not Jwks output
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-  // init_watcher ready is not called.
-  init_watcher_.expectReady().Times(0);
-
-  EXPECT_EQ(0U, stats_.jwks_fetch_success_.value());
-  EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
-}
-
 TEST_P(JwksAsyncFetcherTest, TestGoodFetch) {
   const char config[] = R"(
       http_uri:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
-      async_fetch:
-        enable: true
+      async_fetch: {}
 )";
 
   setupAsyncFetcher(config);
@@ -175,8 +152,7 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetch) {
       http_uri:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
-      async_fetch:
-        enable: true
+      async_fetch: {}
 )";
 
   // Just start the Jwks fetch call
@@ -203,169 +179,12 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetch) {
   EXPECT_EQ(1U, stats_.jwks_fetch_failed_.value());
 }
 
-TEST_P(JwksAsyncFetcherTest, TestNetworkFailureRetryFetch) {
-  const char config[] = R"(
-      http_uri:
-        uri: https://pubkey_server/pubkey_path
-        cluster: pubkey_cluster
-      async_fetch:
-        enable: true
-        network_fail_retries: 1
-)";
-
-  // Just start the Jwks fetch call
-  setupAsyncFetcher(config);
-  // Jwks response is not received yet
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-
-  // Trigger the Jwks response
-  EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
-
-  if (init_manager_used()) {
-    // Verify ready is not called.
-    init_watcher_.expectReady().Times(0);
-    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(&init_watcher_));
-    // Verify ready is called
-    init_watcher_.expectReady();
-  }
-
-  // retry 1: network failure
-  EXPECT_EQ(fetch_receiver_array_.size(), 2);
-  fetch_receiver_array_[1]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
-
-  // did not trigger new fetch
-  EXPECT_EQ(fetch_receiver_array_.size(), 2);
-
-  // Output 0 jwks.
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-
-  EXPECT_EQ(0U, stats_.jwks_fetch_success_.value());
-  EXPECT_EQ(2U, stats_.jwks_fetch_failed_.value());
-}
-
-TEST_P(JwksAsyncFetcherTest, TestNetworkFailureRetrySuccessFetch) {
-  const char config[] = R"(
-      http_uri:
-        uri: https://pubkey_server/pubkey_path
-        cluster: pubkey_cluster
-      async_fetch:
-        enable: true
-        network_fail_retries: 10
-)";
-
-  // Just start the Jwks fetch call
-  setupAsyncFetcher(config);
-  // Jwks response is not received yet
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-
-  // Trigger the Jwks response
-  EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
-
-  if (init_manager_used()) {
-    // Verify ready is not called.
-    init_watcher_.expectReady().Times(0);
-    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(&init_watcher_));
-    // Verify ready is called
-    init_watcher_.expectReady();
-  }
-
-  // retry 1: success
-  EXPECT_EQ(fetch_receiver_array_.size(), 2);
-  auto jwks = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
-  fetch_receiver_array_[1]->onJwksSuccess(std::move(jwks));
-
-  // Once it is success, did not trigger new fetch
-  EXPECT_EQ(fetch_receiver_array_.size(), 2);
-
-  // Output 1 jwks.
-  EXPECT_EQ(out_jwks_array_.size(), 1);
-
-  EXPECT_EQ(1U, stats_.jwks_fetch_success_.value());
-  EXPECT_EQ(1U, stats_.jwks_fetch_failed_.value());
-}
-
-TEST_P(JwksAsyncFetcherTest, TestInvalidJwksFetch) {
-  const char config[] = R"(
-      http_uri:
-        uri: https://pubkey_server/pubkey_path
-        cluster: pubkey_cluster
-      async_fetch:
-        enable: true
-)";
-
-  // Just start the Jwks fetch call
-  setupAsyncFetcher(config);
-  // Jwks response is not received yet
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-
-  if (init_manager_used()) {
-    // Verify ready is not called.
-    init_watcher_.expectReady().Times(0);
-    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(&init_watcher_));
-    // Verify ready is called
-    init_watcher_.expectReady();
-  }
-
-  // Trigger the Jwks response
-  EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::InvalidJwks);
-
-  // did not trigger retry
-  EXPECT_EQ(fetch_receiver_array_.size(), 1);
-
-  // Output 0 jwks.
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-
-  EXPECT_EQ(0U, stats_.jwks_fetch_success_.value());
-  EXPECT_EQ(1U, stats_.jwks_fetch_failed_.value());
-}
-
-TEST_P(JwksAsyncFetcherTest, TestInvalidJwksRetryFetch) {
-  const char config[] = R"(
-      http_uri:
-        uri: https://pubkey_server/pubkey_path
-        cluster: pubkey_cluster
-      async_fetch:
-        enable: true
-        network_fail_retries: 10
-)";
-
-  // Just start the Jwks fetch call
-  setupAsyncFetcher(config);
-  // Jwks response is not received yet
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-
-  if (init_manager_used()) {
-    // Verify ready is not called.
-    init_watcher_.expectReady().Times(0);
-    EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(&init_watcher_));
-    // Verify ready is called
-    init_watcher_.expectReady();
-  }
-
-  // Trigger the Jwks response
-  EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::InvalidJwks);
-
-  // did not trigger retry for InvalidJwks error
-  EXPECT_EQ(fetch_receiver_array_.size(), 1);
-
-  // Output 0 jwks.
-  EXPECT_EQ(out_jwks_array_.size(), 0);
-
-  EXPECT_EQ(0U, stats_.jwks_fetch_success_.value());
-  EXPECT_EQ(1U, stats_.jwks_fetch_failed_.value());
-}
-
 TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   const char config[] = R"(
       http_uri:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
-      async_fetch:
-        enable: true
+      async_fetch: {}
 )";
 
   setupAsyncFetcher(config);
@@ -392,14 +211,12 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
 }
 
-TEST_P(JwksAsyncFetcherTest, TestNetworkFailureRetryFetchAndRefresh) {
+TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchAndRefresh) {
   const char config[] = R"(
       http_uri:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
-      async_fetch:
-        enable: true
-        network_fail_retries: 1
+      async_fetch: {}
 )";
 
   // Just start the Jwks fetch call
@@ -407,9 +224,6 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureRetryFetchAndRefresh) {
   // first fetch: network failure.
   EXPECT_EQ(fetch_receiver_array_.size(), 1);
   fetch_receiver_array_[0]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
-  // retry 1: network failure.
-  EXPECT_EQ(fetch_receiver_array_.size(), 2);
-  fetch_receiver_array_[1]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
 
   // Output 0 jwks.
   EXPECT_EQ(out_jwks_array_.size(), 0);
@@ -419,16 +233,13 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureRetryFetchAndRefresh) {
   timer_->invokeCallback();
 
   // refetch again after cache duration interval: network failure.
-  EXPECT_EQ(fetch_receiver_array_.size(), 3);
-  fetch_receiver_array_[2]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
-  // retry 1: network failure again
-  EXPECT_EQ(fetch_receiver_array_.size(), 4);
-  fetch_receiver_array_[3]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
+  EXPECT_EQ(fetch_receiver_array_.size(), 2);
+  fetch_receiver_array_[1]->onJwksError(Common::JwksFetcher::JwksReceiver::Failure::Network);
 
   // Output 0 jwks.
   EXPECT_EQ(out_jwks_array_.size(), 0);
   EXPECT_EQ(0U, stats_.jwks_fetch_success_.value());
-  EXPECT_EQ(4U, stats_.jwks_fetch_failed_.value());
+  EXPECT_EQ(2U, stats_.jwks_fetch_failed_.value());
 }
 
 } // namespace

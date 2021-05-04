@@ -84,7 +84,6 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
 
   auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
   auto* async_fetch = provider0.mutable_remote_jwks()->mutable_async_fetch();
-  async_fetch->set_enable(true);
   async_fetch->set_fast_listener(fast_listener);
 
   HttpFilter filter;

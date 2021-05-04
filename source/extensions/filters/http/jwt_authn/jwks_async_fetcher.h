@@ -75,9 +75,6 @@ private:
   // The init target.
   std::unique_ptr<Init::TargetImpl> init_target_;
 
-  // The retry count due to network failure
-  uint32_t fail_retry_count_{};
-
   // Used in logs.
   const std::string debug_name_;
 };

@@ -256,17 +256,10 @@ message RemoteJwks {
 // When the Jwks is expired in the cache, it is fetched again in the main thread.
 // The fetched Jwks from the main thread can be used by all worker threads.
 message JwksAsyncFetch {
-  // If true, enable this feature.
-  bool enable = 1;
-
   // If false, the listener is activated after the initial fetch is completed.
   // If true, it is activated without waiting for the initial fetch to complete.
   // Default is false.
-  bool fast_listener = 2;
-
-  // The number of retries when Jwks fetch fails with the networking error.
-  // Default is no retry.
-  uint32 network_fail_retries = 3;
+  bool fast_listener = 1;
 }
 
 // This message specifies a header location to extract JWT token.
