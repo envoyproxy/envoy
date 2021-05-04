@@ -97,7 +97,11 @@ class FakeTimeSource : public TimeSource {
 public:
   // From TimeSource.
   SystemTime systemTime() override { return fake_time_; }
-  MonotonicTime monotonicTime() override { return MonotonicTime(); }
+  MonotonicTime monotonicTime() override {
+    // EnvoyQuicSessionCache does not use monotonic time, return empty value.
+    ADD_FAILURE() << "Unexpected call to monotonicTime";
+    return MonotonicTime();
+  }
 
   void advance(int seconds) { fake_time_ += std::chrono::seconds(seconds); }
 
@@ -109,7 +113,9 @@ private:
 
 class EnvoyQuicSessionCacheTest : public ::testing::Test {
 public:
-  EnvoyQuicSessionCacheTest() : ssl_ctx_(SSL_CTX_new(TLS_method())), cache_(time_source_) {}
+  EnvoyQuicSessionCacheTest()
+      : ssl_ctx_(SSL_CTX_new(TLS_method())), cache_(time_source_),
+        params_(makeFakeTransportParams()) {}
 
 protected:
   bssl::UniquePtr<SSL_SESSION> makeSession(uint32_t timeout = kTimeout) {
@@ -126,11 +132,11 @@ protected:
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   FakeTimeSource time_source_;
   EnvoyQuicSessionCache cache_;
+  std::unique_ptr<quic::TransportParameters> params_;
 };
 
 // Tests that simple insertion and lookup work correctly.
 TEST_F(EnvoyQuicSessionCacheTest, SingleSession) {
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
 
@@ -143,12 +149,12 @@ TEST_F(EnvoyQuicSessionCacheTest, SingleSession) {
   EXPECT_EQ(nullptr, cache_.Lookup(id2, ssl_ctx_.get()));
   EXPECT_EQ(0u, cache_.size());
 
-  cache_.Insert(id1, std::move(session), *params, nullptr);
+  cache_.Insert(id1, std::move(session), *params_, nullptr);
   EXPECT_EQ(1u, cache_.size());
   std::unique_ptr<quic::QuicResumptionState> resumption_state = cache_.Lookup(id1, ssl_ctx_.get());
   ASSERT_NE(resumption_state, nullptr);
   ASSERT_NE(resumption_state->transport_params, nullptr);
-  EXPECT_EQ(*params, *(resumption_state->transport_params));
+  EXPECT_EQ(*params_, *(resumption_state->transport_params));
   EXPECT_EQ(nullptr, cache_.Lookup(id2, ssl_ctx_.get()));
   // No session is available for id1, even though the entry exists.
   EXPECT_EQ(1u, cache_.size());
@@ -159,7 +165,7 @@ TEST_F(EnvoyQuicSessionCacheTest, SingleSession) {
   bssl::UniquePtr<SSL_SESSION> session3 = makeSession();
   SSL_SESSION* unowned3 = session3.get();
   quic::QuicServerId id3("c.com", 443);
-  cache_.Insert(id3, std::move(session3), *params, nullptr);
+  cache_.Insert(id3, std::move(session3), *params_, nullptr);
   cache_.Insert(id2, std::move(session2), *params2, nullptr);
   EXPECT_EQ(2u, cache_.size());
   std::unique_ptr<quic::QuicResumptionState> resumption_state2 = cache_.Lookup(id2, ssl_ctx_.get());
@@ -177,7 +183,6 @@ TEST_F(EnvoyQuicSessionCacheTest, SingleSession) {
 }
 
 TEST_F(EnvoyQuicSessionCacheTest, MultipleSessions) {
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
   bssl::UniquePtr<SSL_SESSION> session2 = makeSession();
@@ -185,9 +190,9 @@ TEST_F(EnvoyQuicSessionCacheTest, MultipleSessions) {
   bssl::UniquePtr<SSL_SESSION> session3 = makeSession();
   SSL_SESSION* unowned3 = session3.get();
 
-  cache_.Insert(id1, std::move(session), *params, nullptr);
-  cache_.Insert(id1, std::move(session2), *params, nullptr);
-  cache_.Insert(id1, std::move(session3), *params, nullptr);
+  cache_.Insert(id1, std::move(session), *params_, nullptr);
+  cache_.Insert(id1, std::move(session2), *params_, nullptr);
+  cache_.Insert(id1, std::move(session3), *params_, nullptr);
   // The latest session is popped first.
   std::unique_ptr<quic::QuicResumptionState> resumption_state1 = cache_.Lookup(id1, ssl_ctx_.get());
   ASSERT_NE(resumption_state1, nullptr);
@@ -202,27 +207,25 @@ TEST_F(EnvoyQuicSessionCacheTest, MultipleSessions) {
 // Test that when a different TransportParameter is inserted for
 // the same server id, the existing entry is removed.
 TEST_F(EnvoyQuicSessionCacheTest, DifferentTransportParams) {
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
   bssl::UniquePtr<SSL_SESSION> session2 = makeSession();
   bssl::UniquePtr<SSL_SESSION> session3 = makeSession();
   SSL_SESSION* unowned3 = session3.get();
 
-  cache_.Insert(id1, std::move(session), *params, nullptr);
-  cache_.Insert(id1, std::move(session2), *params, nullptr);
+  cache_.Insert(id1, std::move(session), *params_, nullptr);
+  cache_.Insert(id1, std::move(session2), *params_, nullptr);
   // tweak the transport parameters a little bit.
-  params->perspective = quic::Perspective::IS_SERVER;
-  cache_.Insert(id1, std::move(session3), *params, nullptr);
+  params_->perspective = quic::Perspective::IS_SERVER;
+  cache_.Insert(id1, std::move(session3), *params_, nullptr);
   std::unique_ptr<quic::QuicResumptionState> resumption_state = cache_.Lookup(id1, ssl_ctx_.get());
   ASSERT_NE(resumption_state, nullptr);
   EXPECT_EQ(unowned3, resumption_state->tls_session.get());
-  EXPECT_EQ(*params.get(), *resumption_state->transport_params);
+  EXPECT_EQ(*params_.get(), *resumption_state->transport_params);
   EXPECT_EQ(nullptr, cache_.Lookup(id1, ssl_ctx_.get()));
 }
 
 TEST_F(EnvoyQuicSessionCacheTest, DifferentApplicationState) {
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
   bssl::UniquePtr<SSL_SESSION> session2 = makeSession();
@@ -231,9 +234,9 @@ TEST_F(EnvoyQuicSessionCacheTest, DifferentApplicationState) {
   quic::ApplicationState state;
   state.push_back('a');
 
-  cache_.Insert(id1, std::move(session), *params, &state);
-  cache_.Insert(id1, std::move(session2), *params, &state);
-  cache_.Insert(id1, std::move(session3), *params, nullptr);
+  cache_.Insert(id1, std::move(session), *params_, &state);
+  cache_.Insert(id1, std::move(session2), *params_, &state);
+  cache_.Insert(id1, std::move(session3), *params_, nullptr);
   std::unique_ptr<quic::QuicResumptionState> resumption_state = cache_.Lookup(id1, ssl_ctx_.get());
   ASSERT_NE(resumption_state, nullptr);
   EXPECT_EQ(unowned3, resumption_state->tls_session.get());
@@ -242,7 +245,6 @@ TEST_F(EnvoyQuicSessionCacheTest, DifferentApplicationState) {
 }
 
 TEST_F(EnvoyQuicSessionCacheTest, BothStatesDifferent) {
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
   bssl::UniquePtr<SSL_SESSION> session2 = makeSession();
@@ -251,14 +253,14 @@ TEST_F(EnvoyQuicSessionCacheTest, BothStatesDifferent) {
   quic::ApplicationState state;
   state.push_back('a');
 
-  cache_.Insert(id1, std::move(session), *params, &state);
-  cache_.Insert(id1, std::move(session2), *params, &state);
-  params->perspective = quic::Perspective::IS_SERVER;
-  cache_.Insert(id1, std::move(session3), *params, nullptr);
+  cache_.Insert(id1, std::move(session), *params_, &state);
+  cache_.Insert(id1, std::move(session2), *params_, &state);
+  params_->perspective = quic::Perspective::IS_SERVER;
+  cache_.Insert(id1, std::move(session3), *params_, nullptr);
   std::unique_ptr<quic::QuicResumptionState> resumption_state = cache_.Lookup(id1, ssl_ctx_.get());
   ASSERT_NE(resumption_state, nullptr);
   EXPECT_EQ(unowned3, resumption_state->tls_session.get());
-  EXPECT_EQ(*params.get(), *resumption_state->transport_params);
+  EXPECT_EQ(*params_, *resumption_state->transport_params);
   EXPECT_EQ(nullptr, resumption_state->application_state);
   EXPECT_EQ(nullptr, cache_.Lookup(id1, ssl_ctx_.get()));
 }
@@ -266,14 +268,13 @@ TEST_F(EnvoyQuicSessionCacheTest, BothStatesDifferent) {
 // When the size limit is exceeded, the oldest entry should be erased.
 TEST_F(EnvoyQuicSessionCacheTest, SizeLimit) {
   constexpr size_t size_limit = 1024;
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   std::array<SSL_SESSION*, size_limit + 1> unowned_sessions;
   for (size_t i = 0; i <= size_limit; i++) {
     time_source_.advance(1);
     bssl::UniquePtr<SSL_SESSION> session = makeSession(/*timeout=*/10000);
     unowned_sessions[i] = session.get();
     quic::QuicServerId id(absl::StrCat("domain", i, ".example.com"), 443);
-    cache_.Insert(id, std::move(session), *params, nullptr);
+    cache_.Insert(id, std::move(session), *params_, nullptr);
   }
   EXPECT_EQ(cache_.size(), size_limit);
   // First entry has been removed.
@@ -290,7 +291,6 @@ TEST_F(EnvoyQuicSessionCacheTest, SizeLimit) {
 
 TEST_F(EnvoyQuicSessionCacheTest, ClearEarlyData) {
   SSL_CTX_set_early_data_enabled(ssl_ctx_.get(), 1);
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
   bssl::UniquePtr<SSL_SESSION> session2 = makeSession();
@@ -298,8 +298,8 @@ TEST_F(EnvoyQuicSessionCacheTest, ClearEarlyData) {
   EXPECT_TRUE(SSL_SESSION_early_data_capable(session.get()));
   EXPECT_TRUE(SSL_SESSION_early_data_capable(session2.get()));
 
-  cache_.Insert(id1, std::move(session), *params, nullptr);
-  cache_.Insert(id1, std::move(session2), *params, nullptr);
+  cache_.Insert(id1, std::move(session), *params_, nullptr);
+  cache_.Insert(id1, std::move(session2), *params_, nullptr);
 
   cache_.ClearEarlyData(id1);
 
@@ -314,7 +314,6 @@ TEST_F(EnvoyQuicSessionCacheTest, ClearEarlyData) {
 // Expired session isn't considered valid and nullptr will be returned upon
 // Lookup.
 TEST_F(EnvoyQuicSessionCacheTest, Expiration) {
-  std::unique_ptr<quic::TransportParameters> params = makeFakeTransportParams();
   bssl::UniquePtr<SSL_SESSION> session = makeSession();
   quic::QuicServerId id1("a.com", 443);
 
@@ -322,8 +321,8 @@ TEST_F(EnvoyQuicSessionCacheTest, Expiration) {
   SSL_SESSION* unowned2 = session2.get();
   quic::QuicServerId id2("b.com", 443);
 
-  cache_.Insert(id1, std::move(session), *params, nullptr);
-  cache_.Insert(id2, std::move(session2), *params, nullptr);
+  cache_.Insert(id1, std::move(session), *params_, nullptr);
+  cache_.Insert(id2, std::move(session2), *params_, nullptr);
 
   EXPECT_EQ(2u, cache_.size());
   // Expire the session.

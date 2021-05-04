@@ -34,22 +34,24 @@ private:
     // already stored.
     void pushSession(bssl::UniquePtr<SSL_SESSION> session);
 
-    // Retrieves the latest session from the entry, meanwhile removing it.
+    // Retrieves and removes the latest session from the entry.
     bssl::UniquePtr<SSL_SESSION> popSession();
 
     SSL_SESSION* peekSession();
 
-    // We only save the last two sessions per server as that is sufficient in practice.
+    // We only save the last two sessions per server as that is sufficient in practice. This is
+    // because we only need one to create a new connection, and that new connection should send
+    // us another ticket. We keep two instead of one in case that connection attempt fails.
     bssl::UniquePtr<SSL_SESSION> sessions[2];
     std::unique_ptr<quic::TransportParameters> params;
     std::unique_ptr<quic::ApplicationState> application_state;
   };
 
-  // Remove all entries that are no longer valid. If after that we are still at the size limit, also
-  // remove the oldest entry.
+  // Remove all entries that are no longer valid. If all entries were valid but the cache is at its
+  // size limit, instead remove the oldest entry. This walks the entire list of entries.
   void prune();
 
-  // Creates a new entry and insert into |cache_|.
+  // Creates a new entry and insert into |cache_|. This walks the entire list of entries.
   void createAndInsertEntry(const quic::QuicServerId& server_id,
                             bssl::UniquePtr<SSL_SESSION> session,
                             const quic::TransportParameters& params,

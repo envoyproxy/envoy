@@ -4,9 +4,11 @@ namespace Envoy {
 namespace Quic {
 namespace {
 
+// This value was chosen arbitrarily. We can make this configurable if needed.
+// TODO(14829) ensure this is tested and scaled for upstream.
 constexpr size_t MaxSessionCacheEntries = 1024;
 
-// Returns false if the SSL |session| doesn't exist or it is expired at |now|.
+// Returns false if the SSL session doesn't exist or it is expired.
 bool isSessionValid(SSL_SESSION* session, SystemTime now) {
   if (session == nullptr) {
     return false;
@@ -108,7 +110,7 @@ void EnvoyQuicSessionCache::prune() {
       it = cache_.erase(it);
     } else {
       if (cache_.size() >= MaxSessionCacheEntries) {
-        // Only save oldest if we are at the size limit.
+        // Only track the oldest session if we are at the size limit.
         const uint64_t session_expiration =
             SSL_SESSION_get_time(session) + SSL_SESSION_get_timeout(session);
         if (session_expiration < oldest_expiration) {
