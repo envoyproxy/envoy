@@ -126,7 +126,8 @@ protected:
             }));
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
-    EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager_));
+    EXPECT_CALL(listener_config_, filterChainManager())
+        .WillRepeatedly(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
             0, connection_handler_, *dispatcher_, listener_config_));
@@ -155,9 +156,9 @@ protected:
   }
 
   void maybeConfigureMocks(int connection_count) {
-    if (quic_version_.UsesTls()) {
-      return;
-    }
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+        .Times(connection_count)
+        .WillRepeatedly(Return(filter_chain_));
     EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
@@ -167,8 +168,10 @@ protected:
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
         }));
-    EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .Times(connection_count);
+    if (!quic_version_.UsesTls()) {
+      EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+          .Times(connection_count);
+    }
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
