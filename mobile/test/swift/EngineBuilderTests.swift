@@ -20,6 +20,10 @@ mock_template:
   virtual_clusters: {{ virtual_clusters }}
   native_filter_chain:
 {{ native_filter_chain }}
+{{ fake_remote_listener }}
+{{ fake_cluster_matchers }}
+{{ route_reset_filter }}
+{{ fake_remote_cluster }}
 """
 
 private struct TestFilter: Filter {}
@@ -31,90 +35,90 @@ final class EngineBuilderTests: XCTestCase {
     MockEnvoyEngine.onRunWithTemplate = nil
   }
 
-  func testCustomConfigTemplateUsesSpecifiedYAMLWhenRunningEnvoy() throws {
+  func testCustomConfigTemplateUsesSpecifiedYAMLWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithTemplate = { yaml, _, _ in
       XCTAssertEqual("foobar", yaml)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder(yaml: "foobar")
+    _ = EngineBuilder(yaml: "foobar")
       .addEngineType(MockEnvoyEngine.self)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingLogLevelAddsLogLevelWhenRunningEnvoy() throws {
+  func testAddingLogLevelAddsLogLevelWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { _, logLevel in
       XCTAssertEqual("trace", logLevel)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addLogLevel(.trace)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingStatsDomainAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingStatsDomainAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual("stats.envoyproxy.io", config.statsDomain)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsDomain("stats.envoyproxy.io")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingConnectTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingConnectTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual(12345, config.connectTimeoutSeconds)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addConnectTimeoutSeconds(12345)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingDNSRefreshSecondsAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingDNSRefreshSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual(23, config.dnsRefreshSeconds)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSRefreshSeconds(23)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingPlatformFiltersToConfigurationWhenRunningEnvoy() throws {
+  func testAddingPlatformFiltersToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual(1, config.httpPlatformFilterFactories.count)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addPlatformFilter(factory: TestFilter.init)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingDNSFailureRefreshSecondsAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingDNSFailureRefreshSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual(1234, config.dnsFailureRefreshSecondsBase)
@@ -122,91 +126,91 @@ final class EngineBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSFailureRefreshSeconds(base: 1234, max: 5678)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingStatsFlushSecondsAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingStatsFlushSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual(42, config.statsFlushSeconds)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsFlushSeconds(42)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingAppVersionAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingAppVersionAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual("v1.2.3", config.appVersion)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppVersion("v1.2.3")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingAppIdAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingAppIdAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual("com.envoymobile.ios", config.appId)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppId("com.envoymobile.ios")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() throws {
+  func testAddingVirtualClustersAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual("[test]", config.virtualClusters)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addVirtualClusters("[test]")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingNativeFiltersToConfigurationWhenRunningEnvoy() throws {
+  func testAddingNativeFiltersToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual(1, config.nativeFilterChain.count)
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addNativeFilter(name: "test_name", typedConfig: "config")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingStringAccessorToConfigurationWhenRunningEnvoy() throws {
+  func testAddingStringAccessorToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual("hello", config.stringAccessors["name"]?.getEnvoyString())
       expectation.fulfill()
     }
 
-    _ = try EngineBuilder()
+    _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStringAccessor(name: "name", accessor: { "hello" })
       .build()
@@ -214,22 +218,26 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
-    let filterFactory = EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init)
-    let config = EnvoyConfiguration(statsDomain: "stats.envoyproxy.io",
-                                    connectTimeoutSeconds: 200,
-                                    dnsRefreshSeconds: 300,
-                                    dnsFailureRefreshSecondsBase: 400,
-                                    dnsFailureRefreshSecondsMax: 500,
-                                    statsFlushSeconds: 600,
-                                    appVersion: "v1.2.3",
-                                    appId: "com.envoymobile.ios",
-                                    virtualClusters: "[test]",
-                                    nativeFilterChain:
-                                      [EnvoyNativeFilterConfig(name: "filter_name",
-                                                               typedConfig: "test_config"),
-                                      ],
-                                    platformFilterChain: [filterFactory],
-                                    stringAccessors: [:])
+    let config = EnvoyConfiguration(
+      statsDomain: "stats.envoyproxy.io",
+      connectTimeoutSeconds: 200,
+      dnsRefreshSeconds: 300,
+      dnsFailureRefreshSecondsBase: 400,
+      dnsFailureRefreshSecondsMax: 500,
+      statsFlushSeconds: 600,
+      appVersion: "v1.2.3",
+      appId: "com.envoymobile.ios",
+      virtualClusters: "[test]",
+      directResponseMatchers: "",
+      directResponses: "",
+      nativeFilterChain: [
+        EnvoyNativeFilterConfig(name: "filter_name", typedConfig: "test_config"),
+      ],
+      platformFilterChain: [
+        EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init),
+      ],
+      stringAccessors: [:]
+    )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.envoyproxy.io"))
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
@@ -247,18 +255,22 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
-    let config = EnvoyConfiguration(statsDomain: "stats.envoyproxy.io",
-                                    connectTimeoutSeconds: 200,
-                                    dnsRefreshSeconds: 300,
-                                    dnsFailureRefreshSecondsBase: 400,
-                                    dnsFailureRefreshSecondsMax: 500,
-                                    statsFlushSeconds: 600,
-                                    appVersion: "v1.2.3",
-                                    appId: "com.envoymobile.ios",
-                                    virtualClusters: "[test]",
-                                    nativeFilterChain: [],
-                                    platformFilterChain: [],
-                                    stringAccessors: [:])
+    let config = EnvoyConfiguration(
+      statsDomain: "stats.envoyproxy.io",
+      connectTimeoutSeconds: 200,
+      dnsRefreshSeconds: 300,
+      dnsFailureRefreshSecondsBase: 400,
+      dnsFailureRefreshSecondsMax: 500,
+      statsFlushSeconds: 600,
+      appVersion: "v1.2.3",
+      appId: "com.envoymobile.ios",
+      virtualClusters: "[test]",
+      directResponseMatchers: "",
+      directResponses: "",
+      nativeFilterChain: [],
+      platformFilterChain: [],
+      stringAccessors: [:]
+    )
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }
 }

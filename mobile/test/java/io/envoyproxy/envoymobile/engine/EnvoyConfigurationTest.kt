@@ -36,6 +36,20 @@ private const val NATIVE_FILTER_CONFIG =
       typed_config: {{ native_filter_typed_config }}
 """
 
+private const val STATS_SINK_CONFIG =
+"""
+stats_sinks:
+  - name: envoy.metrics_service
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
+      transport_api_version: V3
+      report_counters_as_deltas: true
+      emit_tags_as_labels: true
+      grpc_service:
+        envoy_grpc:
+          cluster_name: stats
+"""
+
 class EnvoyConfigurationTest {
 
   @Test
@@ -46,7 +60,9 @@ class EnvoyConfigurationTest {
       emptyList(), emptyMap()
     )
 
-    val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG)
+    val resolvedTemplate = envoyConfiguration.resolveTemplate(
+      TEST_CONFIG, STATS_SINK_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG
+    )
     assertThat(resolvedTemplate).contains("stats_domain: stats.foo.com")
     assertThat(resolvedTemplate).contains("connect_timeout: 123s")
     assertThat(resolvedTemplate).contains("dns_refresh_rate: 234s")
@@ -69,7 +85,7 @@ class EnvoyConfigurationTest {
     )
 
     try {
-      envoyConfiguration.resolveTemplate("{{ missing }}", "", "")
+      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "")
       fail("Unresolved configuration keys should trigger exception.")
     } catch (e: EnvoyConfiguration.ConfigurationException) {
       assertThat(e.message).contains("missing")

@@ -16,27 +16,21 @@ final class ViewController: UITableViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    do {
-      NSLog("starting Envoy...")
-      let engine = try EngineBuilder()
-        .addLogLevel(.debug)
-        .addPlatformFilter(factory: DemoFilter.init)
-        .addPlatformFilter(factory: BufferDemoFilter.init)
-        .addPlatformFilter(factory: AsyncDemoFilter.init)
-        .addNativeFilter(name: "envoy.filters.http.buffer",
-                         // swiftlint:disable:next line_length
-                         typedConfig: "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
-        .addNativeFilter(name: "envoy.filters.http.test_accessor",
-                         // swiftlint:disable:next line_length
-                         typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_accessor.TestAccessor\",\"accessor_name\":\"demo-accessor\",\"expected_string\":\"PlatformString\"}")
-        .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
-        .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
-        .build()
-      self.streamClient = engine.streamClient()
-      self.pulseClient = engine.pulseClient()
-    } catch let error {
-      NSLog("starting Envoy failed: \(error)")
-    }
+
+    let engine = EngineBuilder()
+      .addLogLevel(.debug)
+      .addPlatformFilter(factory: DemoFilter.init)
+      .addPlatformFilter(factory: BufferDemoFilter.init)
+      .addPlatformFilter(factory: AsyncDemoFilter.init)
+      // swiftlint:disable:next line_length
+      .addNativeFilter(name: "envoy.filters.http.buffer", typedConfig: "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
+      // swiftlint:disable:next line_length
+      .addNativeFilter(name: "envoy.filters.http.test_accessor", typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_accessor.TestAccessor\",\"accessor_name\":\"demo-accessor\",\"expected_string\":\"PlatformString\"}")
+      .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
+      .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
+      .build()
+    self.streamClient = engine.streamClient()
+    self.pulseClient = engine.pulseClient()
 
     NSLog("started Envoy, beginning requests...")
     self.startRequests()

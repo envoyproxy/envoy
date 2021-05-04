@@ -23,7 +23,7 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl(onEngineRunning, logger) }
   private var logLevel = LogLevel.INFO
-  private var statsDomain = "0.0.0.0"
+  private var statsDomain: String? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
@@ -50,12 +50,13 @@ open class EngineBuilder(
 
   /**
    * Add a domain to flush stats to.
+   * Passing nil disables stats emission.
    *
-   * @param statsDomain the domain to flush stats to.
+   * @param statsDomain The domain to use for stats.
    *
    * @return this builder.
    */
-  fun addStatsDomain(statsDomain: String): EngineBuilder {
+  fun addStatsDomain(statsDomain: String?): EngineBuilder {
     this.statsDomain = statsDomain
     return this
   }

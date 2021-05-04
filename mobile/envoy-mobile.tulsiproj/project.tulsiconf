@@ -19,7 +19,8 @@
     "library/swift",
     "test/swift",
     "examples/objective-c/hello_world",
-    "examples/swift/hello_world"
+    "examples/swift/hello_world",
+    "test/swift/integration"
   ],
   "projectName" : "envoy-mobile",
   "workspaceRoot" : ".."

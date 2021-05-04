@@ -4,7 +4,7 @@ import Foundation
 import XCTest
 
 final class CancelStreamTests: XCTestCase {
-  func testCancelStream() throws {
+  func testCancelStream() {
     // swiftlint:disable:next line_length
     let hcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
@@ -99,7 +99,7 @@ final class CancelStreamTests: XCTestCase {
     let runExpectation = self.expectation(description: "Run called with expected cancellation")
     let filterExpectation = self.expectation(description: "Filter called with cancellation")
 
-    let client = try EngineBuilder(yaml: config)
+    let client = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .addPlatformFilter(
         name: "cancel_validation_filter",

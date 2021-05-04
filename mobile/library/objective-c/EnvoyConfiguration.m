@@ -4,7 +4,7 @@
 
 @implementation EnvoyConfiguration
 
-- (instancetype)initWithStatsDomain:(NSString *)statsDomain
+- (instancetype)initWithStatsDomain:(nullable NSString *)statsDomain
               connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
@@ -13,6 +13,8 @@
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
                     virtualClusters:(NSString *)virtualClusters
+             directResponseMatchers:(NSString *)directResponseMatchers
+                    directResponses:(NSString *)directResponses
                   nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                 platformFilterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
                     stringAccessors:
@@ -31,6 +33,8 @@
   self.appVersion = appVersion;
   self.appId = appId;
   self.virtualClusters = virtualClusters;
+  self.directResponseMatchers = directResponseMatchers;
+  self.directResponses = directResponses;
   self.nativeFilterChain = nativeFilterChain;
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
@@ -59,9 +63,27 @@
     nativeFilterConfigChain = [nativeFilterConfigChain stringByAppendingString:nativeFilterConfig];
   }
 
+  // Some direct response templates need to be resolved first because they have nested content.
+  BOOL hasDirectResponses = self.directResponses.length > 0;
+  if (hasDirectResponses) {
+    NSString *listenerTemplate =
+        [[NSString alloc] initWithUTF8String:fake_remote_listener_template];
+    listenerTemplate =
+        [listenerTemplate stringByReplacingOccurrencesOfString:@"{{ direct_responses }}"
+                                                    withString:self.directResponses];
+    templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"{{ fake_remote_listener }}"
+                                                           withString:listenerTemplate];
+  } else {
+    templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"{{ fake_remote_listener }}"
+                                                           withString:@""];
+  }
+
   NSDictionary<NSString *, NSString *> *templateKeysToValues = @{
     @"platform_filter_chain" : platformFilterConfigChain,
-    @"stats_domain" : self.statsDomain,
+    @"stats_domain" : self.statsDomain != nil ? self.statsDomain : @"0.0.0.0",
+    @"stats_sink" : self.statsDomain != nil
+        ? [[NSString alloc] initWithUTF8String:stats_sink_template]
+        : @"",
     @"connect_timeout_seconds" :
         [NSString stringWithFormat:@"%lu", (unsigned long)self.connectTimeoutSeconds],
     @"dns_refresh_rate_seconds" :
@@ -76,7 +98,15 @@
     @"app_version" : self.appVersion,
     @"app_id" : self.appId,
     @"virtual_clusters" : self.virtualClusters,
+    @"direct_responses" : self.directResponses,
     @"native_filter_chain" : nativeFilterConfigChain,
+    @"fake_remote_cluster" : hasDirectResponses
+        ? [[NSString alloc] initWithUTF8String:fake_remote_cluster_template]
+        : @"",
+    @"fake_cluster_matchers" : hasDirectResponses ? self.directResponseMatchers : @"",
+    @"route_reset_filter" : hasDirectResponses
+        ? [[NSString alloc] initWithUTF8String:route_cache_reset_filter_template]
+        : @"",
   };
 
   for (NSString *templateKey in templateKeysToValues) {
@@ -86,7 +116,7 @@
                                                 withString:templateKeysToValues[templateKey]];
   }
 
-  if ([templateYAML rangeOfString:@"{{"].length != 0) {
+  if ([templateYAML containsString:@"{{"]) {
     NSLog(@"[Envoy] error: could not resolve all template keys in config:\n%@", templateYAML);
     return nil;
   }

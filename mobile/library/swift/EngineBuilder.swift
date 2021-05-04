@@ -3,7 +3,7 @@ import Foundation
 
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
-public final class EngineBuilder: NSObject {
+public class EngineBuilder: NSObject {
   private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
@@ -13,7 +13,7 @@ public final class EngineBuilder: NSObject {
     case custom(String)
   }
 
-  private var statsDomain: String = "0.0.0.0"
+  private var statsDomain: String?
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsRefreshSeconds: UInt32 = 60
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
@@ -27,6 +27,7 @@ public final class EngineBuilder: NSObject {
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
+  private var directResponses: [DirectResponse] = []
 
   // MARK: - Public
 
@@ -44,12 +45,13 @@ public final class EngineBuilder: NSObject {
   }
 
   /// Add a stats domain for Envoy to flush stats to.
+  /// Passing nil disables stats emission.
   ///
-  /// - parameter statsDomain: the domain to use.
+  /// - parameter statsDomain: The domain to use for stats.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addStatsDomain(_ statsDomain: String) -> EngineBuilder {
+  public func addStatsDomain(_ statsDomain: String?) -> Self {
     self.statsDomain = statsDomain
     return self
   }
@@ -60,7 +62,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addLogLevel(_ logLevel: LogLevel) -> EngineBuilder {
+  public func addLogLevel(_ logLevel: LogLevel) -> Self {
     self.logLevel = logLevel
     return self
   }
@@ -72,9 +74,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addConnectTimeoutSeconds(_ connectTimeoutSeconds: UInt32)
-    -> EngineBuilder
-  {
+  public func addConnectTimeoutSeconds(_ connectTimeoutSeconds: UInt32) -> Self {
     self.connectTimeoutSeconds = connectTimeoutSeconds
     return self
   }
@@ -85,7 +85,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> EngineBuilder {
+  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> Self {
     self.dnsRefreshSeconds = dnsRefreshSeconds
     return self
   }
@@ -97,7 +97,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSFailureRefreshSeconds(base: UInt32, max: UInt32) -> EngineBuilder {
+  public func addDNSFailureRefreshSeconds(base: UInt32, max: UInt32) -> Self {
     self.dnsFailureRefreshSecondsBase = base
     self.dnsFailureRefreshSecondsMax = max
     return self
@@ -109,7 +109,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> EngineBuilder {
+  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> Self {
     self.statsFlushSeconds = statsFlushSeconds
     return self
   }
@@ -124,7 +124,7 @@ public final class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func addPlatformFilter(name: String = UUID().uuidString,
-                                factory: @escaping () -> Filter) -> EngineBuilder
+                                factory: @escaping () -> Filter) -> Self
   {
     self.platformFilterChain.append(EnvoyHTTPFilterFactory(filterName: name, factory: factory))
     return self
@@ -139,9 +139,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addNativeFilter(name: String = UUID().uuidString,
-                              typedConfig: String) -> EngineBuilder
-  {
+  public func addNativeFilter(name: String = UUID().uuidString, typedConfig: String) -> Self {
     self.nativeFilterChain.append(EnvoyNativeFilterConfig(name: name, typedConfig: typedConfig))
     return self
   }
@@ -153,8 +151,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns this builder.
   @discardableResult
-  public func addStringAccessor(name: String,
-                                accessor: @escaping () -> String) -> EngineBuilder {
+  public func addStringAccessor(name: String, accessor: @escaping () -> String) -> Self {
     self.stringAccessors[name] = EnvoyStringAccessor(block: accessor)
     return self
   }
@@ -165,7 +162,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setOnEngineRunning(closure: @escaping () -> Void) -> EngineBuilder {
+  public func setOnEngineRunning(closure: @escaping () -> Void) -> Self {
     self.onEngineRunning = closure
     return self
   }
@@ -176,7 +173,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setLogger(closure: @escaping (String) -> Void) -> EngineBuilder {
+  public func setLogger(closure: @escaping (String) -> Void) -> Self {
     self.logger = closure
     return self
   }
@@ -187,7 +184,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addAppVersion(_ appVersion: String) -> EngineBuilder {
+  public func addAppVersion(_ appVersion: String) -> Self {
     self.appVersion = appVersion
     return self
   }
@@ -198,7 +195,7 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addAppId(_ appId: String) -> EngineBuilder {
+  public func addAppId(_ appId: String) -> Self {
     self.appId = appId
     return self
   }
@@ -209,29 +206,35 @@ public final class EngineBuilder: NSObject {
   ///
   /// returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> EngineBuilder {
+  public func addVirtualClusters(_ virtualClusters: String) -> Self {
     self.virtualClusters = virtualClusters
     return self
   }
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
-  /// - returns: A new instance of Envoy.
-  public func build() throws -> Engine {
+  public func build() -> Engine {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger)
     let config = EnvoyConfiguration(
-        statsDomain: self.statsDomain,
-        connectTimeoutSeconds: self.connectTimeoutSeconds,
-        dnsRefreshSeconds: self.dnsRefreshSeconds,
-        dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
-        dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-        statsFlushSeconds: self.statsFlushSeconds,
-        appVersion: self.appVersion,
-        appId: self.appId,
-        virtualClusters: self.virtualClusters,
-        nativeFilterChain: self.nativeFilterChain,
-        platformFilterChain: self.platformFilterChain,
-        stringAccessors: self.stringAccessors)
+      statsDomain: self.statsDomain,
+      connectTimeoutSeconds: self.connectTimeoutSeconds,
+      dnsRefreshSeconds: self.dnsRefreshSeconds,
+      dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
+      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+      statsFlushSeconds: self.statsFlushSeconds,
+      appVersion: self.appVersion,
+      appId: self.appId,
+      virtualClusters: self.virtualClusters,
+      directResponseMatchers: self.directResponses
+        .map { $0.resolvedRouteMatchYAML() }
+        .joined(separator: "\n"),
+      directResponses: self.directResponses
+        .map { $0.resolvedDirectResponseYAML() }
+        .joined(separator: "\n"),
+      nativeFilterChain: self.nativeFilterChain,
+      platformFilterChain: self.platformFilterChain,
+      stringAccessors: self.stringAccessors
+    )
 
     switch self.base {
     case .custom(let yaml):
@@ -248,8 +251,17 @@ public final class EngineBuilder: NSObject {
   /// Used for testing, as initializing with `EnvoyEngine.Type` results in a
   /// segfault: https://github.com/lyft/envoy-mobile/issues/334
   @discardableResult
-  func addEngineType(_ engineType: EnvoyEngine.Type) -> EngineBuilder {
+  func addEngineType(_ engineType: EnvoyEngine.Type) -> Self {
     self.engineType = engineType
     return self
+  }
+
+  /// Add a direct response to be used when configuring the engine.
+  /// This function is internal so it is not publicly exposed to production builders,
+  /// but is available for use by the `TestEngineBuilder`.
+  ///
+  /// - parameter directResponse: The response configuration to add.
+  func addDirectResponseInternal(_ directResponse: DirectResponse) {
+    self.directResponses.append(directResponse)
   }
 }

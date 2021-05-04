@@ -37,21 +37,17 @@ NSString *_REQUEST_SCHEME = @"https";
 
 - (void)startEnvoy {
   NSLog(@"starting Envoy...");
-  NSError *error;
   EngineBuilder *builder = [[EngineBuilder alloc] init];
   [builder addLogLevel:LogLevelDebug];
   [builder setOnEngineRunningWithClosure:^{
     NSLog(@"Envoy async internal setup completed");
   }];
-  id<Engine> engine = [builder buildAndReturnError:&error];
-  if (error) {
-    NSLog(@"starting Envoy failed: %@", error);
-  } else {
-    NSLog(@"started Envoy, beginning requests...");
-    self.streamClient = [engine streamClient];
-    self.pulseClient = [engine pulseClient];
-    [self startRequests];
-  }
+
+  id<Engine> engine = [builder build];
+  NSLog(@"started Envoy, beginning requests...");
+  self.streamClient = [engine streamClient];
+  self.pulseClient = [engine pulseClient];
+  [self startRequests];
 }
 
 - (void)dealloc {

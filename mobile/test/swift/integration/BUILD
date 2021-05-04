@@ -14,6 +14,55 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "direct_response_contains_headers_integration_test",
+    srcs = [
+        "DirectResponseContainsHeadersMatchIntegrationTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "direct_response_exact_headers_match_integration_test",
+    srcs = [
+        "DirectResponseExactHeadersMatchIntegrationTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "direct_response_exact_path_match_integration_test",
+    srcs = [
+        "DirectResponseExactPathMatchIntegrationTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "direct_response_filter_mutation_integration_test",
+    srcs = [
+        "DirectResponseFilterMutationIntegrationTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "direct_response_prefix_headers_match_integration_test",
+    srcs = [
+        "DirectResponsePrefixHeadersMatchIntegrationTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "direct_response_prefix_path_match_integration_test",
+    srcs = [
+        "DirectResponsePrefixPathMatchIntegrationTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "direct_response_suffix_path_match_integration_test",
+    srcs = [
+        "DirectResponseSuffixHeadersMatchIntegrationTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "receive_data_test",
     srcs = [
         "DemoFilter.swift",
