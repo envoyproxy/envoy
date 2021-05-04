@@ -340,8 +340,17 @@ void HttpIntegrationTest::initialize() {
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
-  quic_connection_persistent_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
+  auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       *dispatcher_, *quic_transport_socket_factory_, stats_store_, timeSystem(), server_addr);
+  // Config IETF QUIC flow control window.
+  quic_connection_persistent_info->quic_config_
+      .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
+          Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  // Config Google QUIC flow control window.
+  quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
+
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -1155,7 +1164,8 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 }
 
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
-                                                  uint32_t max_count) {
+                                                  uint32_t max_count,
+                                                  std::chrono::milliseconds timeout) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
@@ -1196,7 +1206,8 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
       codec_client_->close();
     }
   } else {
-    auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
+    auto response =
+        sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, timeout);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }

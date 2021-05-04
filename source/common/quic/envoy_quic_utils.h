@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/platform.h"
+#include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
@@ -16,6 +17,7 @@
 #endif
 
 #include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/core/quic_config.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -161,6 +163,10 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
                              const quic::QuicSocketAddress& self_address,
                              const quic::QuicSocketAddress& peer_address,
                              const std::string& hostname, absl::string_view alpn);
+
+// Set initial flow control windows in quic_config according to the given Envoy config.
+void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
+                                        quic::QuicConfig& quic_config);
 
 } // namespace Quic
 } // namespace Envoy
