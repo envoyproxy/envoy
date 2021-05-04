@@ -483,7 +483,7 @@ key:
 )EOF";
   on_server_init_function_ = [this, &scope_route1]() {
     createScopedRdsStream();
-    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+    sendSrdsResponse({}, {scope_route1}, {}, "1");
   };
   initialize();
   // Delta SRDS update with key conflict, should be rejected.
@@ -494,7 +494,7 @@ key:
   fragments:
     - string_key: foo
 )EOF";
-  sendSrdsResponse({scope_route1, scope_route2}, {scope_route2}, {}, "2");
+  sendSrdsResponse({}, {scope_route2}, {}, "2");
   sendSrdsResponse({}, {}, {"foo_scope1", "foo_scope2"}, "3");
 }
 

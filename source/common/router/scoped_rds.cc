@@ -297,6 +297,8 @@ ScopedRdsConfigSubscription::removeScopes(
             std::move(rds_config_provider_helper_iter->second));
         route_provider_by_scope_.erase(rds_config_provider_helper_iter);
       }
+      ASSERT(scope_name_by_hash_.find(iter->second->scopeKey().hash()) !=
+             scope_name_by_hash_.end());
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
       removed_scope_names.push_back(scope_name);
