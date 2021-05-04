@@ -5,28 +5,28 @@ Attributes
 
 Attributes refer to contextual properties provided by Envoy during request and
 connection processing. They are named by a dot-separated path (e.g.
-`request.path`), have a fixed type (e.g. `string` or `int`), and may be
+``request.path``), have a fixed type (e.g. ``string`` or ``int``), and may be
 absent or present depending on the context. Attributes are exposed to CEL
 runtime in :ref:`RBAC filter <arch_overview_rbac>`, as well as Wasm extensions
-via `get_property` ABI method.
+via ``get_property`` ABI method.
 
 Attribute value types are limited to:
 
-* `string` for UTF-8 strings
-* `bytes` for byte buffers
-* `int` for 64-bit signed integers
-* `uint` for 64-bit unsigned integers
-* `bool` for booleans
-* `list` for lists of values
-* `map` for associative arrays with string keys
-* `timestamp` for timestamps as specified by `Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_
-* `duration` for durations as specified by `Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_
+* ``string`` for UTF-8 strings
+* ``bytes`` for byte buffers
+* ``int`` for 64-bit signed integers
+* ``uint`` for 64-bit unsigned integers
+* ``bool`` for booleans
+* ``list`` for lists of values
+* ``map`` for associative arrays with string keys
+* ``timestamp`` for timestamps as specified by `Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_
+* ``duration`` for durations as specified by `Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_
 * Protocol buffer message types
 
 CEL provides standard helper functions for operating on abstract types such as
-`getMonth` for `timestamp` values. Note that integer literals (e.g. `7`) are of
-type `int`, which is distinct from `uint` (e.g. `7u`), and the arithmetic
-conversion is not automatic (use `uint(7)` for explicit conversion).
+``getMonth`` for ``timestamp`` values. Note that integer literals (e.g. ``7``) are of
+type ``int``, which is distinct from ``uint`` (e.g. ``7u``), and the arithmetic
+conversion is not automatic (use ``uint(7)`` for explicit conversion).
 
 Wasm extensions receive the attribute values as a serialized buffer according
 to the type of the attribute. Strings and bytes are passed as-is, integers are
@@ -56,10 +56,10 @@ processing, which makes them suitable for RBAC policies:
    request.referer, string, Referer request header
    request.useragent, string, User agent request header
    request.time, timestamp, Time of the first byte received
-   request.id, string, Request ID corresponding to `x-request-id` header value
+   request.id, string, Request ID corresponding to ``x-request-id`` header value
    request.protocol, string, "Request protocol ('"HTTP/1.0'", '"HTTP/1.1'", '"HTTP/2'", or '"HTTP/3'")"
 
-Header values in `request.headers` associative array are comma-concatenated in case of multiple values.
+Header values in ``request.headers`` associative array are comma-concatenated in case of multiple values.
 
 Additional attributes are available once the request completes:
 
@@ -185,7 +185,7 @@ Path expressions
 
 Path expressions allow access to inner fields in structured attributes via a
 sequence of field names, map, and list indexes following an attribute name. For
-example, `get_property({"node", "id"})` in Wasm ABI extracts the value of `id`
-field in `node` message attribute, while `get_property({"request", "headers",
-"my-header"})` refers to the comma-concatenated value of a particular request
+example, ``get_property({"node", "id"})`` in Wasm ABI extracts the value of ``id``
+field in ``node`` message attribute, while ``get_property({"request", "headers",
+"my-header"})`` refers to the comma-concatenated value of a particular request
 header.

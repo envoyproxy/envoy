@@ -71,8 +71,8 @@ How do I configure SNI for clusters?
 ====================================
 
 For clusters, a fixed SNI can be set in :ref:`UpstreamTlsContext <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni>`.
-To derive SNI from HTTP `host` or `:authority` header, turn on
+To derive SNI from HTTP ``host`` or ``:authority`` header, turn on
 :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>` to override the fixed SNI in
 `UpstreamTlsContext`. If upstream will present certificates with the hostname in SAN, turn on
 :ref:`auto_san_validation <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_san_validation>` too.
-It still needs a trust CA in validation context in `UpstreamTlsContext` for trust anchor.
+It still needs a trust CA in validation context in ``UpstreamTlsContext`` for trust anchor.

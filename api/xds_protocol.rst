@@ -772,12 +772,12 @@ Later the xDS client spontaneously requests the "wc" resource.
 
 On reconnect the Incremental xDS client may tell the server of its known
 resources to avoid resending them over the network by sending them in
-:ref:`initial_resource_versions <envoy_api_field_DeltaDiscoveryRequest.initial_resource_versions>`.
+:ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`.
 Because no state is assumed to be preserved from the previous stream, the reconnecting
 client must provide the server with all resource names it is interested in. Note that for wildcard
 requests (CDS/LDS/SRDS), the request must have no resources in both
-:ref:`resource_names_subscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>` and
-:ref:`resource_names_unsubscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_unsubscribe>`.
+:ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_subscribe>` and
+:ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_unsubscribe>`.
 
 .. figure:: diagrams/incremental-reconnect.svg
    :alt: Incremental reconnect example

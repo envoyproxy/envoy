@@ -113,7 +113,8 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
-  // TODO(danzh): add stats for metadata not supported error.
+  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
+  stats_.metadata_not_supported_error_.inc();
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
@@ -160,7 +161,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
-      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list, *this);
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_);
     return;
@@ -242,6 +244,11 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
+      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+      onStreamError(close_connection_upon_invalid_header_);
+      return;
+    }
     request_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
