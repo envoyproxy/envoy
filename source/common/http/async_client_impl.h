@@ -428,6 +428,10 @@ private:
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
+  void restoreContextOnContinue(
+      std::vector<std::reference_wrapper<const ScopeTrackedObject>>& tracked_objects) override {
+    tracked_objects.push_back(*this);
+  }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
 

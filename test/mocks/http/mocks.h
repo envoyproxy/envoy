@@ -107,6 +107,8 @@ public:
   MOCK_METHOD(void, onLocalReply, (Code code));
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(void, restoreContextOnContinue,
+              (std::vector<std::reference_wrapper<const ScopeTrackedObject>>&));
   MOCK_METHOD(bool, enableInternalRedirectsWithBody, (), (const));
 
   ResponseHeaderMapPtr continue_headers_;
@@ -213,6 +215,8 @@ public:
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(void, restoreContextOnContinue,
+              (std::vector<std::reference_wrapper<const ScopeTrackedObject>>&));
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));

@@ -46,6 +46,9 @@ public:
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
+  void dumpState(std::ostream&, int) const override {
+    // TODO(kbaichoo): Implement dumpState for H3.
+  }
 
   // Network::ClientConnection
   // Set up socket and start handshake.

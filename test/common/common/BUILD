@@ -431,3 +431,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "opaque_scope_tracker_test",
+    srcs = ["opaque_scope_tracker_test.cc"],
+    deps = [
+        "//source/common/common:opaque_scope_tracker",
+        "//source/common/common:utility_lib",
+    ],
+)

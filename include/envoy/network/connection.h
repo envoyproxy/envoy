@@ -7,6 +7,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
@@ -74,7 +75,9 @@ enum class ConnectionCloseType {
 /**
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
-class Connection : public Event::DeferredDeletable, public FilterManager {
+class Connection : public Event::DeferredDeletable,
+                   public FilterManager,
+                   public ScopeTrackedObject {
 public:
   enum class State { Open, Closing, Closed };
 

@@ -283,6 +283,17 @@ public:
    * @return the ScopeTrackedObject for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
+
+  /**
+   * Should be used when we continue processing a request or response from a filter's callback
+   * to restore crash context. If not explicitly used by the filter itself, this
+   * gets invoked in ActiveStreamFilterBase::commonContinue().
+   *
+   * @return an opaque ScopeTrackedObject that should be registered on the
+   * dispatcher.
+   */
+  virtual void restoreContextOnContinue(
+      std::vector<std::reference_wrapper<const ScopeTrackedObject>>& tracked_objects) PURE;
 };
 
 /**

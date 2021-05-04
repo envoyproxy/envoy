@@ -1,9 +1,12 @@
 #include "common/http/filter_manager.h"
 
+#include <functional>
+
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/opaque_scope_tracker.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -51,6 +54,17 @@ void ActiveStreamFilterBase::commonContinue() {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
     return;
+  }
+
+  // Set ScopeTrackerScopeState if there's no existing crash context.
+  absl::optional<OpaqueScopeTrackedObject> encapsulated_object;
+  absl::optional<ScopeTrackerScopeState> state;
+  if (parent_.dispatcher_.trackedObjectStackIsEmpty()) {
+    std::vector<std::reference_wrapper<const ScopeTrackedObject>> tracked_objects;
+    restoreContextOnContinue(tracked_objects);
+
+    encapsulated_object.emplace(std::move(tracked_objects));
+    state.emplace(&encapsulated_object.value(), parent_.dispatcher_);
   }
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
@@ -228,6 +242,11 @@ Tracing::Span& ActiveStreamFilterBase::activeSpan() {
 
 const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
+}
+
+void ActiveStreamFilterBase::restoreContextOnContinue(
+    std::vector<std::reference_wrapper<const ScopeTrackedObject>>& tracked_objects) {
+  parent_.contextOnContinue(tracked_objects);
 }
 
 Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
@@ -1299,6 +1318,12 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
   if (buffered_response_data_) {
     buffered_response_data_->setWatermarks(buffer_limit_);
   }
+}
+
+void FilterManager::contextOnContinue(
+    std::vector<std::reference_wrapper<const ScopeTrackedObject>>& tracked_objects) {
+  tracked_objects.push_back(connection_);
+  tracked_objects.push_back(filter_manager_callbacks_.scope());
 }
 
 bool FilterManager::createFilterChain() {

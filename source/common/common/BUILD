@@ -325,6 +325,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "opaque_scope_tracker",
+    hdrs = ["opaque_scope_tracker.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
+    deps = [
+        "//include/envoy/common:scope_tracker_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
 )

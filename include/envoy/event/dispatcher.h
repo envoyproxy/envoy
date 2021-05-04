@@ -117,6 +117,11 @@ public:
   virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
 
   /**
+   * Whether there are no tracked objects registered
+   */
+  virtual bool trackedObjectStackIsEmpty() const PURE;
+
+  /**
    * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
    * current thread of execution is on the same thread upon which the dispatcher loop is running.
    */
