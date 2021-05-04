@@ -63,7 +63,9 @@ message IPTagging {
   // The type of request the filter should apply to.
   RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // Specifies the path to the IP tags file from filesystem.
+  // Specifies the absolute path to the IP tags file from filesystem.
+  // Supports both JSON and YAML file formats for IP Tags.
+  // Either one of path or ip_tags can be specified.
   string path = 5 [
     (validate.rules).string = {min_len: 1},
     (udpa.annotations.field_migrate).oneof_promotion = "path_list_specifier"

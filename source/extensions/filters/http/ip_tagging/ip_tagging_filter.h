@@ -59,8 +59,6 @@ public:
 
   void incTotal() { incCounter(total_); }
 
-  ~IpTaggingFilterStats();
-
 private:
   void incCounter(Stats::StatName name);
 
@@ -111,11 +109,9 @@ public:
       : TagSetWatcher(factory_context, factory_context.dispatcher(), factory_context.api(),
                       std::move(filename), scope, stat_prefix) {}
 
-  ~TagSetWatcher();
-
   const std::string& filename() { return filename_; }
 
-  std::shared_ptr<LcTrieWithStats> get() const { return triestat_; }
+  LcTrieWithStats& get() const { return *triestat_; }
 
 private:
   Envoy::ProtobufMessage::ValidationVisitor& protoValidator() const {

@@ -25,8 +25,6 @@ void IpTaggingFilterStats::incCounter(Stats::StatName name) {
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
-IpTaggingFilterStats::~IpTaggingFilterStats() = default;
-
 LcTrieWithStats::LcTrieWithStats(const TrieVector& trie, Stats::Scope& scope,
                                  const std::string& stats_prefix)
     : trie_(trie), filter_stats_(scope, stats_prefix) {
@@ -81,7 +79,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         TagSetWatcher::create(factory_context, config.path(), scope, stat_prefix);
 
     resolver_ = [watcherPtr](const Network::Address::InstanceConstSharedPtr& address) {
-      return watcherPtr->get()->resolveTagsForIpAddress(address);
+      return watcherPtr->get().resolveTagsForIpAddress(address);
     };
 
   } else if (!config.ip_tags().empty()) {
@@ -135,6 +133,8 @@ TagSetWatcher::create(Server::Configuration::FactoryContext& factory_context, st
   return ptr;
 }
 
+// We support either Yaml or Json file format. Json is a subset of Yaml.
+// Check if it's Yaml first, if not assume Json.
 TagSetWatcher::TagSetWatcher(Server::Configuration::FactoryContext& factory_context,
                              Event::Dispatcher& dispatcher, Api::Api& api, std::string filename,
                              Stats::Scope& scope, const std::string& stat_prefix)
@@ -190,8 +190,6 @@ TagSetWatcher::fileContentsAsTagSet_(const std::string& contents) const {
   return std::make_shared<LcTrieWithStats>(tag_data, scope_, stat_prefix_);
 }
 
-TagSetWatcher::~TagSetWatcher() = default;
-
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
 
 IpTaggingFilter::~IpTaggingFilter() = default;
@@ -210,7 +208,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   std::vector<std::string> tags =
-      config_->getResolver()(callbacks_->streamInfo().downstreamRemoteAddress());
+      config_->getResolver()(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
 
   if (!tags.empty()) {
     headers.appendEnvoyIpTags(absl::StrJoin(tags, ","), ",");

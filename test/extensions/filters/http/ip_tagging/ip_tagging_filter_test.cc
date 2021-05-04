@@ -131,8 +131,7 @@ ip_tags:
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddress("1.2.3.4");
-  EXPECT_CALL(filter_callbacks_.stream_info_, downstreamRemoteAddress())
-      .WillOnce(ReturnRef(remote_address));
+  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
