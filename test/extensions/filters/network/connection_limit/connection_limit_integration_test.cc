@@ -45,11 +45,9 @@ typed_config:
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  simTime().advanceTimeWait(std::chrono::milliseconds(200));
 
-  EXPECT_EQ(
-      0,
-      test_server_->gauge("connection_limit.connection_limit_stats.active_connections")->value());
+  test_server_->waitForGaugeEq("connection_limit.connection_limit_stats.active_connections", 0,
+                               std::chrono::milliseconds(200));
 
   EXPECT_EQ(0, test_server_->counter("connection_limit.connection_limit_stats.limited_connections")
                    ->value());
@@ -63,7 +61,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.connection_limit.v3.ConnectionLimit
   stat_prefix: connection_limit_stats
   max_connections: 1
-  delay: 0s
+  delay: 0.2s
 )EOF");
 
   IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("listener_0"));
@@ -74,20 +72,21 @@ typed_config:
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1) ||
               fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
 
+  EXPECT_EQ(1, test_server_->counter("connection_limit.connection_limit_stats.limited_connections")
+                   ->value());
   EXPECT_EQ(
-      1,
+      2,
       test_server_->gauge("connection_limit.connection_limit_stats.active_connections")->value());
+  test_server_->waitForGaugeEq("connection_limit.connection_limit_stats.active_connections", 1,
+                               std::chrono::milliseconds(200));
 
   tcp_client1->close();
   tcp_client2->close();
-  simTime().advanceTimeWait(std::chrono::milliseconds(200));
-
-  EXPECT_EQ(
-      0,
-      test_server_->gauge("connection_limit.connection_limit_stats.active_connections")->value());
 
   EXPECT_EQ(1, test_server_->counter("connection_limit.connection_limit_stats.limited_connections")
                    ->value());
+  test_server_->waitForGaugeEq("connection_limit.connection_limit_stats.active_connections", 0,
+                               std::chrono::milliseconds(200));
 }
 
 } // namespace
