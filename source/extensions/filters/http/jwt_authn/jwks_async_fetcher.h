@@ -44,10 +44,10 @@ public:
   getCacheDuration(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks);
 
 private:
-  // Start to fetch Jwks
-  void refresh();
+  // Fetch the Jwks
+  void fetch();
   // Handle fetch done.
-  void handle_fetch_done();
+  void handleFetchDone();
 
   // Override the functions from Common::JwksFetcher::JwksReceiver
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
@@ -58,22 +58,28 @@ private:
   // the factory context
   Server::Configuration::FactoryContext& context_;
   // the jwks fetcher creator function
-  CreateJwksFetcherCb fetcher_fn_;
+  const CreateJwksFetcherCb create_fetcher_fn_;
   // stats
   JwtAuthnFilterStats& stats_;
   // the Jwks done function.
-  JwksDoneFetched done_fn_;
+  const JwksDoneFetched done_fn_;
 
   // The Jwks fetcher object
   Common::JwksFetcherPtr fetcher_;
 
-  Envoy::Event::TimerPtr refresh_timer_;
+  // The cache duration.
+  const std::chrono::seconds cache_duration_;
+  // The timer to trigger fetch due to cache duration.
+  Envoy::Event::TimerPtr cache_duration_timer_;
+
+  // The init target.
   std::unique_ptr<Init::TargetImpl> init_target_;
 
+  // The retry count due to network failure
   uint32_t fail_retry_count_{};
-  std::chrono::seconds refresh_duration_;
+
   // Used in logs.
-  std::string debug_name_;
+  const std::string debug_name_;
 };
 
 using JwksAsyncFetcherPtr = std::unique_ptr<JwksAsyncFetcher>;

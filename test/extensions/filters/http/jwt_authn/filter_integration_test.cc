@@ -508,8 +508,8 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetch) {
 }
 
 TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
+  on_server_init_function_ = [this]() { waitForJwksResponse("200", PublicKey); };
   initializeAsyncFetchFilter(true);
-  waitForJwksResponse("200", PublicKey);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -561,8 +561,8 @@ TEST_P(RemoteJwksIntegrationTest, WithFailedJwksAsyncFetch) {
 }
 
 TEST_P(RemoteJwksIntegrationTest, WithFailedJwksAsyncFetchFast) {
+  on_server_init_function_ = [this]() { waitForJwksResponse("500", ""); };
   initializeAsyncFetchFilter(true);
-  waitForJwksResponse("500", "");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
