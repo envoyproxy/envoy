@@ -2314,4 +2314,29 @@ TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// Tests a filter that returns a FilterHeadersStatus::Continue after a local reply without
+// processing new metadata generated in decodeHeader
+TEST_P(DownstreamProtocolIntegrationTest, ContinueAfterLocalReplyWithMetadata) {
+  config_helper_.addFilter(R"EOF(
+  name: continue-after-local-reply-with-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send a headers only request.
+  IntegrationStreamDecoderPtr response;
+  EXPECT_ENVOY_BUG(
+      {
+        response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        ASSERT_TRUE(response->waitForEndStream());
+        ASSERT_TRUE(response->complete());
+        ASSERT_EQ("200", response->headers().getStatusValue());
+        ENVOY_LOG(info, "test upstream request");
+      },
+      "envoy bug failure: !continue_iteration || !state_.local_complete_. "
+      "Details: Filter did not return StopAll or StopIteration after sending a local reply.");
+}
+
 } // namespace Envoy
