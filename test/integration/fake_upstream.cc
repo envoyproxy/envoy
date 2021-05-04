@@ -346,7 +346,8 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
-        fake_upstream.http3Options(), max_request_headers_kb, headers_with_underscores_action);
+        fake_upstream.http3Options(), max_request_headers_kb, max_request_headers_count,
+        headers_with_underscores_action);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -552,7 +553,7 @@ void FakeUpstream::cleanUp() {
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   absl::MutexLock lock(&lock_);
-  if (read_disable_on_new_connection_) {
+  if (read_disable_on_new_connection_ && http_type_ != FakeHttpConnection::Type::HTTP3) {
     // Disable early close detection to avoid closing the network connection before full
     // initialization is complete.
     connection.detectEarlyCloseWhenReadDisabled(false);
@@ -589,6 +590,7 @@ void FakeUpstream::threadRoutine() {
   {
     absl::MutexLock lock(&lock_);
     new_connections_.clear();
+    quic_connections_.clear();
     consumed_connections_.clear();
   }
 }
@@ -709,7 +711,8 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
          connection_wrapper->connection().dispatcher().isThreadSafe());
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
-  if (read_disable_on_new_connection_ && connection_wrapper->connected()) {
+  if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
+      http_type_ != FakeHttpConnection::Type::HTTP3) {
     // Re-enable read and early close detection.
     auto& connection = connection_wrapper->connection();
     connection.detectEarlyCloseWhenReadDisabled(true);
