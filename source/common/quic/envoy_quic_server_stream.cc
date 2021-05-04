@@ -45,7 +45,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {
-  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+  ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
+         "Send buffer limit should be larger than 8KB.");
 }
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(
@@ -113,7 +114,8 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
-  // TODO(danzh): add stats for metadata not supported error.
+  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
+  stats_.metadata_not_supported_error_.inc();
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {

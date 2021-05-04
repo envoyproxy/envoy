@@ -1,11 +1,11 @@
 .. _config_http_filters_kill_request:
 
 Kill Request
-===============
+============
 
 The KillRequest filter can be used to crash Envoy when receiving a Kill request.
 By default, KillRequest filter is not built into Envoy binary. If you want to use this extension,
-build Envoy with `--//source/extensions/filters/http/kill_request:enabled`.
+build Envoy with ``--//source/extensions/filters/http/kill_request:enabled``.
 
 Configuration
 -------------
@@ -40,4 +40,3 @@ The following is an example configuration:
     "@type": type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest
     probability:
       numerator: 100
-
