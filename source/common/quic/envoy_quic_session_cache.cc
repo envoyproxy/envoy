@@ -25,7 +25,8 @@ bool isSessionValid(SSL_SESSION* session, SystemTime now) {
   return session_time <= now_u64 + 1 && now_u64 < session_expiration;
 }
 
-bool doApplicationStatesMatch(const quic::ApplicationState* state, quic::ApplicationState* other) {
+bool doApplicationStatesMatch(const quic::ApplicationState* state,
+                              const quic::ApplicationState* other) {
   if (state == other) {
     return true;
   }
