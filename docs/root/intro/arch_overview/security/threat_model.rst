@@ -79,7 +79,7 @@ Core and extensions
 
 Anything in the Envoy core may be used in both untrusted and trusted deployments, with the exception
 of features explicitly marked as experimental; experimental features are only supported in trusted deployments
-and do not qualify for treatment under the threat model below.  As a consequence, the stable core should be hardened
+and do not qualify for treatment under the threat model below. As a consequence, the stable core should be hardened
 with this model in mind. Security issues related to core code will usually trigger the security release process as
 described in this document.
 
