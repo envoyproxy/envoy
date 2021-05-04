@@ -106,7 +106,7 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_logger null_logger{
       .log = nullptr,
-      .release = envoy_noop_release,
+      .release = envoy_noop_const_release,
       .context = nullptr,
   };
 

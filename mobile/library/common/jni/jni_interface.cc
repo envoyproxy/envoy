@@ -43,7 +43,7 @@ static void jvm_on_engine_running(void* context) {
   env->DeleteGlobalRef(j_context);
 }
 
-static void jvm_on_log(envoy_data data, void* context) {
+static void jvm_on_log(envoy_data data, const void* context) {
   if (context == nullptr) {
     return;
   }
@@ -51,19 +51,13 @@ static void jvm_on_log(envoy_data data, void* context) {
   JNIEnv* env = get_env();
   jstring str = native_data_to_string(env, data);
 
-  jobject j_context = static_cast<jobject>(context);
+  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jclass jcls_JvmLoggerContext = env->GetObjectClass(j_context);
   jmethodID jmid_onLog = env->GetMethodID(jcls_JvmLoggerContext, "log", "(Ljava/lang/String;)V");
   env->CallVoidMethod(j_context, jmid_onLog, str);
 
   env->DeleteLocalRef(str);
   env->DeleteLocalRef(jcls_JvmLoggerContext);
-}
-
-static void jvm_logger_release(void* context) {
-  JNIEnv* env = get_env();
-  jobject j_context = static_cast<jobject>(context);
-  env->DeleteGlobalRef(j_context);
 }
 
 static void jvm_on_exit(void*) {
@@ -82,10 +76,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   envoy_engine_callbacks native_callbacks = {jvm_on_engine_running, jvm_on_exit,
                                              retained_on_start_context};
 
-  jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
+  const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
   envoy_logger logger = {nullptr, nullptr, nullptr};
   if (envoy_logger_context != nullptr) {
-    logger = {jvm_on_log, jvm_logger_release, retained_logger_context};
+    logger = envoy_logger{jvm_on_log, jni_delete_const_global_ref, retained_logger_context};
   }
   return init_engine(native_callbacks, logger);
 }
