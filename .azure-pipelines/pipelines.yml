@@ -74,7 +74,6 @@ stages:
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
             displayName: "Run check format scripts"
-            continueOnError: true
 
           - task: PublishBuildArtifacts@1
             inputs:
