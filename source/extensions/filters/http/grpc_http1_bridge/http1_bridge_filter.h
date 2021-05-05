@@ -48,11 +48,11 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const { 
+  bool doStatTracking() const {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_stats_disabled")) {
       return false;
     }
-    return request_stat_names_.has_value(); 
+    return request_stat_names_.has_value();
   }
 
 private:
