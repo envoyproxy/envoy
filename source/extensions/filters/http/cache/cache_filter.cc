@@ -56,7 +56,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
-  if (!CacheabilityUtils::isCacheableRequest(headers)) {
+  if (!CacheabilityUtils::canServeRequestFromCache(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
@@ -65,6 +65,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
+  is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
   ASSERT(lookup_);
@@ -91,12 +92,17 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
-    return Http::FilterHeadersStatus::StopIteration;
+    if (is_head_request_) {
+      // Return since HEAD requests are not cached
+      return Http::FilterHeadersStatus::Continue;
+    } else {
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   // Either a cache miss or a cache entry that is no longer valid.
   // Check if the new response can be cached.
-  if (request_allows_inserts_ &&
+  if (request_allows_inserts_ && !is_head_request_ &&
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
@@ -445,7 +451,8 @@ void CacheFilter::encodeCachedResponse() {
                          "does not point to a cache lookup result");
 
   response_has_trailers_ = lookup_result_->has_trailers_;
-  const bool end_stream = (lookup_result_->content_length_ == 0 && !response_has_trailers_);
+  const bool end_stream =
+      (lookup_result_->content_length_ == 0 && !response_has_trailers_) || is_head_request_;
 
   // Set appropriate response flags and codes.
   Http::StreamFilterCallbacks* callbacks =
@@ -463,8 +470,11 @@ void CacheFilter::encodeCachedResponse() {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
                                       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
   }
-
-  if (lookup_result_->content_length_ > 0) {
+  if (filter_state_ == FilterState::EncodeServingFromCache && is_head_request_) {
+    filter_state_ = FilterState::ResponseServedFromCache;
+    return;
+  }
+  if (lookup_result_->content_length_ > 0 && !is_head_request_) {
     // No range has been added, so we add entire body to the response.
     if (remaining_ranges_.empty()) {
       remaining_ranges_.emplace_back(0, lookup_result_->content_length_);
