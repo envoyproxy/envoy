@@ -17,7 +17,7 @@ namespace Http {
 // See https://tools.ietf.org/html/rfc7838 for HTTP Alternate Services and
 // https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04 for the
 // "HTTPS" DNS resource record.
-class AlternateProtocols {
+class AlternateProtocolsCache {
 public:
   // Represents an HTTP origin to be connected too.
   struct Origin {
@@ -73,7 +73,7 @@ public:
     uint32_t port_;
   };
 
-  explicit AlternateProtocols(TimeSource& time_source);
+  explicit AlternateProtocolsCache(TimeSource& time_source);
 
   // Sets the possible alternative protocols which can be used to connect to the
   // specified origin. Expires after the specified expiration time.
@@ -82,8 +82,8 @@ public:
 
   // Returns the possible alternative protocols which can be used to connect to the
   // specified origin, or nullptr if not alternatives are found. The returned pointer
-  // is owned by the AlternateProtocols and is valid until the next operation on
-  // AlternateProtocols.
+  // is owned by the AlternateProtocolsCache and is valid until the next operation on
+  // AlternateProtocolsCache.
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin);
 
   // Returns the number of entries in the map.

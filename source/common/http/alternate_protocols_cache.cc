@@ -3,16 +3,16 @@
 namespace Envoy {
 namespace Http {
 
-AlternateProtocols::AlternateProtocol::AlternateProtocol(absl::string_view alpn,
+AlternateProtocolsCache::AlternateProtocol::AlternateProtocol(absl::string_view alpn,
                                                          absl::string_view hostname, uint32_t port)
     : alpn_(alpn), hostname_(hostname), port_(port) {}
 
-AlternateProtocols::Origin::Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port)
+AlternateProtocolsCache::Origin::Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port)
     : scheme_(scheme), hostname_(hostname), port_(port) {}
 
-AlternateProtocols::AlternateProtocols(TimeSource& time_source) : time_source_(time_source) {}
+AlternateProtocolsCache::AlternateProtocolsCache(TimeSource& time_source) : time_source_(time_source) {}
 
-void AlternateProtocols::setAlternatives(const Origin& origin,
+void AlternateProtocolsCache::setAlternatives(const Origin& origin,
                                          const std::vector<AlternateProtocol>& protocols,
                                          const MonotonicTime& expiration) {
   Entry& entry = protocols_[origin];
@@ -24,23 +24,23 @@ void AlternateProtocols::setAlternatives(const Origin& origin,
   }
 }
 
-OptRef<const std::vector<AlternateProtocols::AlternateProtocol>>
-AlternateProtocols::findAlternatives(const Origin& origin) {
+OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
+AlternateProtocolsCache::findAlternatives(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
-    return makeOptRefFromPtr<const std::vector<AlternateProtocols::AlternateProtocol>>(nullptr);
+    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCache::AlternateProtocol>>(nullptr);
   }
 
   const Entry& entry = entry_it->second;
   if (time_source_.monotonicTime() > entry.expiration_) {
     // Expire the entry.
     protocols_.erase(entry_it);
-    return makeOptRefFromPtr<const std::vector<AlternateProtocols::AlternateProtocol>>(nullptr);
+    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCache::AlternateProtocol>>(nullptr);
   }
   return makeOptRef(entry.protocols_);
 }
 
-size_t AlternateProtocols::size() const { return protocols_.size(); }
+size_t AlternateProtocolsCache::size() const { return protocols_.size(); }
 
 } // namespace Http
 } // namespace Envoy

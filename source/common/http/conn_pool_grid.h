@@ -132,7 +132,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                   OptRef<AlternateProtocols> alternate_protocols,
+                   OptRef<AlternateProtocolsCache> alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
@@ -191,7 +191,7 @@ private:
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
-  OptRef<AlternateProtocols> alternate_protocols_;
+  OptRef<AlternateProtocolsCache> alternate_protocols_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and
