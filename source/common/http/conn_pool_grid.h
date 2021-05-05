@@ -4,7 +4,7 @@
 #include "common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "common/http/alternate_protocols.h"
+#include "common/http/alternate_protocols_cache.h"
 
 namespace Envoy {
 namespace Http {

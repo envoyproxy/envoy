@@ -1,6 +1,6 @@
 #include "common/http/conn_pool_grid.h"
 
-#include "common/http/alternate_protocols.h"
+#include "common/http/alternate_protocols_cache.h"
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

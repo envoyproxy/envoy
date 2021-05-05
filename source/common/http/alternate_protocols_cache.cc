@@ -1,4 +1,4 @@
-#include "common/http/alternate_protocols.h"
+#include "common/http/alternate_protocols_cache.h"
 
 namespace Envoy {
 namespace Http {
