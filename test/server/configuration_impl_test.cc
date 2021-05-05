@@ -99,7 +99,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -133,7 +133,7 @@ TEST_F(ConfigurationImplTest, StatsOnAdmin) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -166,7 +166,7 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -197,7 +197,7 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -257,7 +257,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -309,7 +309,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -357,7 +357,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -417,7 +417,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -451,7 +451,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -491,7 +491,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -529,7 +529,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -566,7 +566,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -640,85 +640,6 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
 }
 
-// An empty deprecated Runtime has an empty static and admin layer injected.
-TEST(InitialImplTest, EmptyDeprecatedRuntime) {
-  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
-  NiceMock<MockOptions> options;
-  NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server);
-
-  const std::string expected_yaml = R"EOF(
-  layers:
-  - name: base
-    static_layer: {}
-  - name: admin
-    admin_layer: {}
-  )EOF";
-  const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
-  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
-}
-
-// A deprecated Runtime is transformed to the equivalent LayeredRuntime.
-TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string bootstrap_yaml = R"EOF(
-  runtime:
-    symlink_root: /srv/runtime/current
-    subdirectory: envoy
-    override_subdirectory: envoy_override
-    base:
-      health_check:
-        min_interval: 5
-  )EOF";
-  const auto bootstrap =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
-  NiceMock<MockOptions> options;
-  NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server);
-
-  const std::string expected_yaml = R"EOF(
-  layers:
-  - name: base
-    static_layer:
-      health_check:
-        min_interval: 5
-  - name: root
-    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
-  - name: override
-    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
-  - name: admin
-    admin_layer: {}
-  )EOF";
-  const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
-  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
-}
-
-// A v2 bootstrap implies runtime override for API features.
-TEST(InitialImplTest, V2BootstrapRuntimeInjection) {
-  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
-  NiceMock<MockOptions> options;
-  absl::optional<uint32_t> version{2};
-  EXPECT_CALL(options, bootstrapVersion()).WillOnce(ReturnRef(version));
-  NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server);
-
-  const std::string expected_yaml = R"EOF(
-  layers:
-  - name: base
-    static_layer: {}
-  - name: admin
-    admin_layer: {}
-  - name: "enabled_deprecated_v2_api (auto-injected)"
-    static_layer:
-      envoy.test_only.broken_in_production.enable_deprecated_v2_api: true
-  )EOF";
-  const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
-  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
-}
-
 TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   std::string json = R"EOF(
   {
@@ -726,7 +647,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -780,7 +701,7 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -868,7 +789,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -982,7 +903,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -1102,7 +1023,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }

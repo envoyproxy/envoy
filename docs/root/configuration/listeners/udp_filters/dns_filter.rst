@@ -123,7 +123,7 @@ adhere to the convention outlined in the RFC.
 
 The filter can also consume its domain configuration from an external DNS table. The same entities
 appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
-using the :ref:`external_dns_table DataSource <envoy_api_msg_core.DataSource>` directive:
+using the :ref:`external_dns_table DataSource <envoy_v3_api_msg_config.core.v3.datasource>` directive:
 
 Example External DnsTable Configuration
 ---------------------------------------

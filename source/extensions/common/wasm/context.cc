@@ -88,8 +88,6 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
 
-constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
-
 } // namespace
 
 // Test support.
@@ -657,10 +655,16 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
   case WasmHeaderMapType::RequestHeaders:
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
+    if (request_trailers_ == nullptr && request_body_buffer_ && end_of_stream_) {
+      request_trailers_ = &decoder_callbacks_->addDecodedTrailers();
+    }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
+    if (response_trailers_ == nullptr && response_body_buffer_ && end_of_stream_) {
+      response_trailers_ = &encoder_callbacks_->addEncodedTrailers();
+    }
     return response_trailers_;
   default:
     return nullptr;
@@ -997,7 +1001,19 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
                              uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
+      return WasmResult::ParseFailure;
+    }
   }
   uint32_t token = nextGrpcCallToken();
   auto& handler = grpc_call_request_[token];
@@ -1055,7 +1071,19 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
                                uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
+      return WasmResult::ParseFailure;
+    }
   }
   uint32_t token = nextGrpcStreamToken();
   auto& handler = grpc_stream_[token];
@@ -1536,6 +1564,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
       wasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
     }
     break;
+  case WasmStreamType::Downstream:
+    if (network_read_filter_callbacks_) {
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { network_read_filter_callbacks_->continueReading(); });
+    }
+    return WasmResult::Ok;
+  case WasmStreamType::Upstream:
+    return WasmResult::Unimplemented;
   default:
     return WasmResult::BadArgument;
   }
@@ -1546,12 +1582,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
   return WasmResult::Ok;
 }
 
+constexpr absl::string_view CloseStreamResponseDetails = "wasm_close_stream";
+
 WasmResult Context::closeStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
     if (decoder_callbacks_) {
       if (!decoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
-        decoder_callbacks_->streamInfo().setResponseCodeDetails(FailStreamResponseDetails);
+        decoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       decoder_callbacks_->resetStream();
     }
@@ -1559,7 +1597,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
   case WasmStreamType::Response:
     if (encoder_callbacks_) {
       if (!encoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
-        encoder_callbacks_->streamInfo().setResponseCodeDetails(FailStreamResponseDetails);
+        encoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       encoder_callbacks_->resetStream();
     }
@@ -1571,11 +1609,46 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
-    network_write_filter_callbacks_->connection().close(
-        Envoy::Network::ConnectionCloseType::FlushWrite);
+    if (network_write_filter_callbacks_) {
+      network_write_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;
+}
+
+constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
+
+void Context::failStream(WasmStreamType stream_type) {
+  switch (stream_type) {
+  case WasmStreamType::Request:
+    if (decoder_callbacks_) {
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                         FailStreamResponseDetails);
+    }
+    break;
+  case WasmStreamType::Response:
+    if (encoder_callbacks_) {
+      encoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                         FailStreamResponseDetails);
+    }
+    break;
+  case WasmStreamType::Downstream:
+    if (network_read_filter_callbacks_) {
+      network_read_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
+    break;
+  case WasmStreamType::Upstream:
+    if (network_write_filter_callbacks_) {
+      network_write_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
+    break;
+  }
 }
 
 WasmResult Context::sendLocalResponse(uint32_t response_code, absl::string_view body_text,
@@ -1613,7 +1686,6 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, absl::string_view 
 
 Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   onCreate();
-  http_request_started_ = true;
   request_headers_ = &headers;
   end_of_stream_ = end_stream;
   auto result = convertFilterHeadersStatus(onRequestHeaders(headerSize(&headers), end_stream));
@@ -1624,7 +1696,7 @@ Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers
 }
 
 Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
   request_body_buffer_ = &data;
@@ -1648,7 +1720,7 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trailers) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterTrailersStatus::Continue;
   }
   request_trailers_ = &trailers;
@@ -1660,7 +1732,7 @@ Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trai
 }
 
 Http::FilterMetadataStatus Context::decodeMetadata(Http::MetadataMap& request_metadata) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterMetadataStatus::Continue;
   }
   request_metadata_ = &request_metadata;
@@ -1681,7 +1753,7 @@ Http::FilterHeadersStatus Context::encode100ContinueHeaders(Http::ResponseHeader
 
 Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                  bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterHeadersStatus::Continue;
   }
   response_headers_ = &headers;
@@ -1694,7 +1766,7 @@ Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
   response_body_buffer_ = &data;
@@ -1718,7 +1790,7 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterTrailersStatus::Continue;
   }
   response_trailers_ = &trailers;
@@ -1730,7 +1802,7 @@ Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& tra
 }
 
 Http::FilterMetadataStatus Context::encodeMetadata(Http::MetadataMap& response_metadata) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterMetadataStatus::Continue;
   }
   response_metadata_ = &response_metadata;

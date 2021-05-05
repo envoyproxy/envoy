@@ -10,11 +10,14 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http3/well_known_names.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/codec_impl.h"
+#endif
 
 #include "server/connection_handler_impl.h"
 
@@ -339,11 +342,15 @@ FakeHttpConnection::FakeHttpConnection(
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     ASSERT(type == Type::HTTP3);
-    envoy::config::core::v3::Http3ProtocolOptions http3_options;
-    codec_ = std::unique_ptr<Http::ServerConnection>(
-        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(shared_connection_.connection(), *this));
+#ifdef ENVOY_ENABLE_QUIC
+    Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
+    codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
+        fake_upstream.http3Options(), max_request_headers_kb, max_request_headers_count,
+        headers_with_underscores_action);
+#else
+    ASSERT(false, "running a QUIC integration test without compiling QUIC");
+#endif
   }
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
@@ -514,6 +521,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
+      http3_options_(config.http3_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
@@ -545,7 +553,7 @@ void FakeUpstream::cleanUp() {
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   absl::MutexLock lock(&lock_);
-  if (read_disable_on_new_connection_) {
+  if (read_disable_on_new_connection_ && http_type_ != FakeHttpConnection::Type::HTTP3) {
     // Disable early close detection to avoid closing the network connection before full
     // initialization is complete.
     connection.detectEarlyCloseWhenReadDisabled(false);
@@ -582,6 +590,7 @@ void FakeUpstream::threadRoutine() {
   {
     absl::MutexLock lock(&lock_);
     new_connections_.clear();
+    quic_connections_.clear();
     consumed_connections_.clear();
   }
 }
@@ -702,7 +711,8 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
          connection_wrapper->connection().dispatcher().isThreadSafe());
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
-  if (read_disable_on_new_connection_ && connection_wrapper->connected()) {
+  if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
+      http_type_ != FakeHttpConnection::Type::HTTP3) {
     // Re-enable read and early close detection.
     auto& connection = connection_wrapper->connection();
     connection.detectEarlyCloseWhenReadDisabled(true);

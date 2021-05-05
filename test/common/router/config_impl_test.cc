@@ -583,6 +583,7 @@ virtual_hosts:
     EXPECT_EQ("/rewrote?works=true", route->currentUrlPathAfterRewrite(headers));
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("bat3.com", headers.get_(Http::Headers::get().Host));
   }
   // Prefix rewrite for CONNECT without path (for non-crashing)
   {
@@ -591,6 +592,26 @@ virtual_hosts:
     ASSERT(redirect != nullptr);
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
+  }
+
+  stream_info.filterState()->setData(
+      Router::OriginalConnectPort::key(), std::make_unique<Router::OriginalConnectPort>(10),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+  // Port addition for CONNECT without port
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("bat3.com:10", headers.get_(Http::Headers::get().Host));
+  }
+  // No port addition for CONNECT with port
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com:20", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("bat3.com:20", headers.get_(Http::Headers::get().Host));
   }
 
   // Header matching (for HTTP/1.1)
@@ -2382,6 +2403,17 @@ virtual_hosts:
     return *config_;
   }
 
+  absl::optional<uint64_t> generateHash(const std::vector<absl::string_view>& header_values) {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Http::LowerCaseString key(std::string("foo_header"));
+    for (auto& value : header_values) {
+      headers.addCopy(key, value);
+    }
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    return route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
+                                                           nullptr);
+  }
+
   envoy::config::route::v3::RouteConfiguration route_config_;
   Http::HashPolicy::AddCookieCallback add_cookie_nop_;
 
@@ -2390,6 +2422,9 @@ private:
 };
 
 TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.hash_multiple_header_values", "false"}});
   firstRouteHashPolicy()->mutable_header()->set_header_name("foo_header");
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
@@ -2411,7 +2446,28 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   }
 }
 
+TEST_F(RouterMatcherHashPolicyTest, HashHeadersWithMultipleValues) {
+  firstRouteHashPolicy()->mutable_header()->set_header_name("foo_header");
+  {
+    EXPECT_FALSE(generateHash({}));
+    EXPECT_TRUE(generateHash({"bar"}));
+
+    EXPECT_NE(0, generateHash({"bar", "foo"}));
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"bar", "foo"})); // deterministic
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"foo", "bar"})); // order independent
+    EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"abc", "def"}));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_EQ(nullptr, route->routeEntry()->hashPolicy());
+  }
+}
+
 TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.hash_multiple_header_values", "false"}});
   // Apply a regex substitution before hashing.
   auto* header = firstRouteHashPolicy()->mutable_header();
   header->set_header_name(":path");
@@ -2429,6 +2485,26 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
                   ->generateHash(nullptr, headers, add_cookie_nop_, nullptr)
                   .value(),
               foo_hash_value);
+  }
+}
+
+TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitutionWithMultipleValues) {
+  // Apply a regex substitution before hashing.
+  auto* header = firstRouteHashPolicy()->mutable_header();
+  header->set_header_name("foo_header");
+  auto* regex_spec = header->mutable_regex_rewrite();
+  regex_spec->set_substitution("\\1");
+  auto* pattern = regex_spec->mutable_pattern();
+  pattern->mutable_google_re2();
+  pattern->set_regex("^/(\\w+)$");
+  {
+    EXPECT_FALSE(generateHash({}));
+    EXPECT_TRUE(generateHash({"/bar"}));
+
+    EXPECT_NE(0, generateHash({"/bar", "/foo"}));
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/bar", "/foo"})); // deterministic
+    EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/foo", "/bar"})); // order independent
+    EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"/abc", "/def"}));
   }
 }
 
