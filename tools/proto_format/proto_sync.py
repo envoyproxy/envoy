@@ -239,8 +239,10 @@ def get_previous_message_type_deps(proto_path):
     matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
     deps = []
     for m in matches:
-        target = '//%s:pkg' % get_directory_from_package(m)
-        deps.append(target)
+        IGNORED = ["envoy/admin/v2alpha"]
+        if get_directory_from_package(m) in IGNORED:
+            target = '//%s:pkg' % get_directory_from_package(m)
+            deps.append(target)
     return deps
 
 
@@ -276,8 +278,8 @@ def build_file_contents(root, files):
         A string containing the canonical BUILD file content for root.
     """
     import_deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
-    history_deps = set(
-        sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files], []))
+    history_deps = set() #
+    # sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files], []))
     deps = import_deps.union(history_deps)
     _has_services = any(has_services(os.path.join(root, f)) for f in files)
     fields = []
