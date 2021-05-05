@@ -21,7 +21,7 @@ public:
   MockOdCdsApi();
   ~MockOdCdsApi() override;
 
-  MOCK_METHOD(void, updateOnDemand, (const std::string& cluster_name));
+  MOCK_METHOD(void, updateOnDemand, (std::string cluster_name));
 };
 
 } // namespace Upstream

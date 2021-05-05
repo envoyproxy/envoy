@@ -11,7 +11,7 @@ using ::testing::NiceMock;
 
 MockOdCdsApiHandle::MockOdCdsApiHandle() {
   ON_CALL(*this, requestOnDemandClusterDiscovery(_, _, _))
-      .WillByDefault(Invoke([](const std::string&, ClusterDiscoveryCallbackWeakPtr,
+      .WillByDefault(Invoke([](absl::string_view, ClusterDiscoveryCallbackPtr,
                                std::chrono::milliseconds) -> ClusterDiscoveryCallbackHandlePtr {
         return std::make_unique<NiceMock<MockClusterDiscoveryCallbackHandle>>();
       }));

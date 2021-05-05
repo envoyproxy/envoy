@@ -1054,12 +1054,12 @@ ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource
 }
 
 ClusterDiscoveryCallbackHandlePtr
-ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, absl::string_view name,
+ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
                                                     ClusterDiscoveryCallbackPtr callback,
                                                     std::chrono::milliseconds timeout) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
-  auto [handle, discovery_in_progress, invoke_context] =
+  auto [handle, discovery_in_progress, invoker] =
       cluster_manager.cdm_.addCallback(name, std::move(callback));
   // This check will catch requests for discoveries from this thread only. If other thread requested
   // the same discovery, we will detect it in the main thread later.
@@ -1078,8 +1078,8 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, abs
       name);
   // This seems to be the first request for discovery of this cluster in this worker thread. Rest of
   // the process may only happen in the main thread.
-  dispatcher_.post([this, odcds = std::move(odcds), timeout, name,
-                    invoke_context = std::move(invoke_context),
+  dispatcher_.post([this, odcds = std::move(odcds), timeout, name = std::move(name),
+                    invoker = std::move(invoker),
                     &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
     // Check for the cluster here too. It might have been added between the time when this closure
     // was posted and when it is being executed.
@@ -1088,8 +1088,8 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, abs
           debug,
           "cm odcds: the requested cluster {} is already known, posting the callback back to {}",
           name, thread_local_dispatcher.name());
-      thread_local_dispatcher.post([invoke_context = std::move(invoke_context)] {
-        invoke_context.invokeCallback(ClusterDiscoveryStatus::Available);
+      thread_local_dispatcher.post([invoker = std::move(invoker)] {
+        invoker.invokeCallback(ClusterDiscoveryStatus::Available);
       });
       return;
     }
@@ -1114,19 +1114,20 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, abs
   return std::move(handle);
 }
 
-void ClusterManagerImpl::notifyExpiredDiscovery(const std::string& name) {
+void ClusterManagerImpl::notifyExpiredDiscovery(absl::string_view name) {
   ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} timed out", name);
   auto map_node_handle = pending_cluster_creations_.extract(name);
   ASSERT(!map_node_handle.empty());
   // Let all the worker threads know that the discovery timed out.
-  tls_.runOnAllThreads([name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    ENVOY_LOG(
-        trace,
-        "cm cdm: starting processing cluster name {} (status {}) from the expired timer in {}",
-        name, enumToInt(ClusterDiscoveryStatus::Timeout),
-        cluster_manager->thread_local_dispatcher_.name());
-    cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Timeout);
-  });
+  tls_.runOnAllThreads(
+      [name = std::string(name)](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        ENVOY_LOG(
+            trace,
+            "cm cdm: starting processing cluster name {} (status {}) from the expired timer in {}",
+            name, enumToInt(ClusterDiscoveryStatus::Timeout),
+            cluster_manager->thread_local_dispatcher_.name());
+        cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Timeout);
+      });
 }
 
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {

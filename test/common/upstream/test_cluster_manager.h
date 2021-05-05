@@ -188,7 +188,7 @@ public:
     return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
   }
 
-  void notifyExpiredDiscovery(const std::string& name) {
+  void notifyExpiredDiscovery(absl::string_view name) {
     ClusterManagerImpl::notifyExpiredDiscovery(name);
   }
 };

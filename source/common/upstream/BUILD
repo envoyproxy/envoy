@@ -69,6 +69,7 @@ envoy_cc_library(
     hdrs = ["cluster_discovery_manager.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:enum_to_int",
         "//source/common/common:minimal_logger_lib",
     ],
 )

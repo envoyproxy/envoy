@@ -46,6 +46,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_discovery_manager_test",
+    srcs = ["cluster_discovery_manager_test.cc"],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/upstream:cluster_discovery_manager_lib",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "cluster_manager_impl_test",
     srcs = ["cluster_manager_impl_test.cc"],
     external_deps = [

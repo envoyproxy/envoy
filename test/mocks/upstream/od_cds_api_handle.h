@@ -18,7 +18,7 @@ public:
   ~MockOdCdsApiHandle() override;
 
   MOCK_METHOD(ClusterDiscoveryCallbackHandlePtr, requestOnDemandClusterDiscovery,
-              (const std::string& name, ClusterDiscoveryCallbackSharedPtr callback,
+              (absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                std::chrono::milliseconds timeout));
 };
 

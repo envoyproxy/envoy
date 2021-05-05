@@ -77,22 +77,22 @@ void OdCdsApiImpl::sendAwaiting() {
   awaiting_names_.clear();
 }
 
-void OdCdsApiImpl::updateOnDemand(const std::string& cluster_name) {
+void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
   switch (status_) {
   case StartStatus::NotStarted:
     ENVOY_LOG(trace, "odcds: starting a subscription with cluster name {}", cluster_name);
     status_ = StartStatus::Started;
-    subscription_->start({cluster_name});
+    subscription_->start({std::move(cluster_name)});
     return;
 
   case StartStatus::Started:
     ENVOY_LOG(trace, "odcds: putting cluster name {} on awaiting list", cluster_name);
-    awaiting_names_.insert(cluster_name);
+    awaiting_names_.insert(std::move(cluster_name));
     return;
 
   case StartStatus::InitialFetchDone:
     ENVOY_LOG(trace, "odcds: requesting for cluster name {}", cluster_name);
-    subscription_->requestOnDemandUpdate({cluster_name});
+    subscription_->requestOnDemandUpdate({std::move(cluster_name)});
     return;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;

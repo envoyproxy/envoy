@@ -22,10 +22,10 @@ namespace Upstream {
  */
 class ClusterLifecycleCallbackHandler {
 public:
-  ~ClusterLifecycleCallbackHandler() = default;
+  virtual ~ClusterLifecycleCallbackHandler() = default;
 
   virtual ClusterUpdateCallbacksHandlePtr
-  addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) = PURE;
+  addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) PURE;
 };
 
 /** A thread-local on-demand cluster discovery manager. It takes care of invoking the discovery
@@ -50,15 +50,17 @@ public:
    * the invocation of the callback back to the thread that made the request. Invoking the request
    * removes it from the manager.
    */
-  class ImmediateInvokeContext {
+  class CallbackInvoker {
   public:
-    void invokeCallback(ClusterDiscoveryStatus cluster_status) {
-      parent_.invokeCallbackFromItem(name, item_weak_ptr_, cluster_status);
+    void invokeCallback(ClusterDiscoveryStatus cluster_status) const {
+      parent_.invokeCallbackFromItem(name_, item_weak_ptr_, cluster_status);
     }
 
   private:
-    ImmediateInvokeContext(ClusterDiscoveryManager& parent, std::string name,
-                           CallbackListItemWeakPtr item_weak_ptr)
+    friend class ClusterDiscoveryManager;
+
+    CallbackInvoker(ClusterDiscoveryManager& parent, std::string name,
+                    CallbackListItemWeakPtr item_weak_ptr)
         : parent_(parent), name_(std::move(name)), item_weak_ptr_(std::move(item_weak_ptr)) {}
 
     ClusterDiscoveryManager& parent_;
@@ -82,14 +84,14 @@ public:
   struct AddedCallbackData {
     ClusterDiscoveryCallbackHandlePtr handle_ptr_;
     bool discovery_in_progress_;
-    ImmediateInvokeContext context_;
+    CallbackInvoker invoker_;
   };
 
   /**
    * Adds the discovery callback. Returns a handle and a boolean indicating whether this worker
    * thread has already requested the discovery of a cluster with a given name.
    */
-  AddedCallbackData addCallback(absl::string_view name, ClusterDiscoveryCallbackPtr callback);
+  AddedCallbackData addCallback(std::string name, ClusterDiscoveryCallbackPtr callback);
 
 private:
   /**
@@ -98,6 +100,8 @@ private:
    * long as the item is alive.
    */
   struct CallbackListItem {
+    CallbackListItem(ClusterDiscoveryCallbackPtr callback) : callback_(std::move(callback)) {}
+
     ClusterDiscoveryCallbackPtr callback_;
     absl::optional<CallbackListIterator> self_iterator_;
   };

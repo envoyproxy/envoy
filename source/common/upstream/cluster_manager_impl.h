@@ -359,7 +359,8 @@ protected:
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                     std::chrono::milliseconds timeout) override {
-      return parent_.requestOnDemandClusterDiscovery(odcds_, name, std::move(callback), timeout);
+      return parent_.requestOnDemandClusterDiscovery(odcds_, std::string(name), std::move(callback),
+                                                     timeout);
     }
 
   private:
@@ -375,7 +376,7 @@ protected:
    * the discovery process for the cluster with a passed name has
    * timed out.
    */
-  void notifyExpiredDiscovery(const std::string& name);
+  void notifyExpiredDiscovery(absl::string_view name);
 
 private:
   /**
@@ -633,7 +634,7 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, absl::string_view name,
+  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
                                   ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout);
 

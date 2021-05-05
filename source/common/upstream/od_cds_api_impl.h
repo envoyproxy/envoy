@@ -34,7 +34,7 @@ class OdCdsApi {
 public:
   virtual ~OdCdsApi() = default;
 
-  virtual void updateOnDemand(const std::string& cluster_name) PURE;
+  virtual void updateOnDemand(std::string cluster_name) PURE;
 };
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
@@ -52,7 +52,7 @@ public:
                                   ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::OdCdsApi
-  void updateOnDemand(const std::string& cluster_name) override;
+  void updateOnDemand(std::string cluster_name) override;
 
 private:
   // Config::SubscriptionCallbacks
