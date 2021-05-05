@@ -41,10 +41,10 @@ message UdpListenerConfig {
   //   are tracked `here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_.
   //   For example QUIC does not currently support in-place filter chain updates, so users
   //   requiring dynamic config reload for QUIC should wait until
-  //   `#13115 <https://github.com/envoyproxy/envoy/issues/13115>_` has been addressed.
+  //   `#13115 <https://github.com/envoyproxy/envoy/issues/13115>`_ has been addressed.
   //
   //   For general feature requests beyond production readiness, you can track
-  //   updates `here <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`.
+  //   updates `here <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_.
   QuicProtocolOptions quic_options = 7;
 }
 
