@@ -361,7 +361,7 @@ public:
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   ClusterConnectivityState& state) PURE;
+                   TimeSource& time_source, ClusterConnectivityState& state) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and

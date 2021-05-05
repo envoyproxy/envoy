@@ -82,7 +82,7 @@ public:
                    std::vector<Http::Protocol>&,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   ClusterConnectivityState& state) override {
+                   TimeSource&, ClusterConnectivityState& state) override {
     return Http::ConnectionPool::InstancePtr{
         allocateConnPool_(host, options, transport_socket_options, state)};
   }

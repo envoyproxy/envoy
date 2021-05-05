@@ -211,8 +211,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  persistent_info =
-      std::make_unique<Quic::PersistentQuicInfoImpl>(*dispatcher, *transport_socket_factory, addr);
+  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      *dispatcher, *transport_socket_factory, time_system, addr);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {

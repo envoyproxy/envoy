@@ -19,6 +19,7 @@ namespace Quic {
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
                          Network::TransportSocketFactory& transport_socket_factory,
+                         TimeSource& time_source,
                          Network::Address::InstanceConstSharedPtr server_addr);
 
   EnvoyQuicConnectionHelper conn_helper_;
