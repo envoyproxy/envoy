@@ -10,7 +10,6 @@ api_proto_package(
         "//envoy/config/core/v4alpha:pkg",
         "//envoy/config/route/v4alpha:pkg",
         "//envoy/config/trace/v4alpha:pkg",
-        "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
         "//envoy/type/http/v3:pkg",
         "//envoy/type/tracing/v3:pkg",
         "//envoy/type/v3:pkg",

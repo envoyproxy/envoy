@@ -8,7 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/config/core/v4alpha:pkg",
         "//envoy/config/route/v4alpha:pkg",
-        "//envoy/extensions/filters/network/rocketmq_proxy/v3:pkg",
         "//envoy/type/matcher/v4alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],

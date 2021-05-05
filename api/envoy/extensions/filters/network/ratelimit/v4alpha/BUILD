@@ -8,7 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/config/ratelimit/v4alpha:pkg",
         "//envoy/extensions/common/ratelimit/v3:pkg",
-        "//envoy/extensions/filters/network/ratelimit/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

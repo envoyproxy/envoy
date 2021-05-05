@@ -9,7 +9,6 @@ api_proto_package(
         "//envoy/config/common/matcher/v4alpha:pkg",
         "//envoy/config/core/v4alpha:pkg",
         "//envoy/config/route/v4alpha:pkg",
-        "//envoy/config/tap/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

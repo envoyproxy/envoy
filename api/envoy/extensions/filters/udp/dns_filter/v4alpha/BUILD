@@ -8,7 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/config/core/v4alpha:pkg",
         "//envoy/data/dns/v4alpha:pkg",
-        "//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )
