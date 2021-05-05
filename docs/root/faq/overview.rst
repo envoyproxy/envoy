@@ -81,3 +81,17 @@ Extensions
   :maxdepth: 2
 
   extensions/contract
+
+Windows
+-------
+
+.. toctree::
+  :maxdepth: 2
+
+  windows/win_requirements
+  windows/win_not_supported_features
+  windows/win_fips_support
+  windows/win_performance
+  windows/win_security
+  windows/win_run_as_service
+
