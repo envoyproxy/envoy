@@ -166,7 +166,11 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
 
   // Try to write raw buffer when next call is done, even this is not in do[Read|Write] stack.
   if (raw_write_buffer_.length() > 0) {
-    return raw_buffer_socket_->doWrite(raw_write_buffer_, false).action_;
+    Network::IoResult result = raw_buffer_socket_->doWrite(raw_write_buffer_, false);
+    if (handshake_complete_ && raw_write_buffer_.length() > 0) {
+      write_buffer_contains_handshake_bytes_ = true;
+    }
+    return result.action_;
   }
 
   return Network::PostIoAction::KeepOpen;
@@ -259,28 +263,84 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
   return repeatReadAndUnprotect(buffer, result);
 }
 
+Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, bool end_stream) {
+  uint64_t total_bytes_written = 0;
+  Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false};
+
+  ASSERT(!write_buffer_contains_handshake_bytes_);
+  while (true) {
+    uint64_t bytes_to_drain_this_iteration =
+        prev_bytes_to_drain_ > 0
+            ? prev_bytes_to_drain_
+            : std::min(buffer.length(), actual_frame_size_to_use_ - frame_overhead_size_);
+    // Consumed all data. Exit.
+    if (bytes_to_drain_this_iteration == 0) {
+      break;
+    }
+    // Short write did not occur previously.
+    if (raw_write_buffer_.length() == 0) {
+      ASSERT(frame_protector_);
+      ASSERT(prev_bytes_to_drain_ == 0);
+
+      // Do protect.
+      ENVOY_CONN_LOG(debug, "TSI: protecting buffer size: {}", callbacks_->connection(),
+                     bytes_to_drain_this_iteration);
+      tsi_result status = frame_protector_->protect(
+          grpc_slice_from_static_buffer(buffer.linearize(bytes_to_drain_this_iteration),
+                                        bytes_to_drain_this_iteration),
+          raw_write_buffer_);
+      ENVOY_CONN_LOG(debug, "TSI: protected buffer left: {} result: {}", callbacks_->connection(),
+                     bytes_to_drain_this_iteration, tsi_result_to_string(status));
+    }
+
+    // Write raw_write_buffer_ to network.
+    ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
+                   raw_write_buffer_.length(), end_stream);
+    result = raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
+
+    // Short write. Exit.
+    if (raw_write_buffer_.length() > 0) {
+      prev_bytes_to_drain_ = bytes_to_drain_this_iteration;
+      break;
+    } else {
+      buffer.drain(bytes_to_drain_this_iteration);
+      prev_bytes_to_drain_ = 0;
+      total_bytes_written += bytes_to_drain_this_iteration;
+    }
+  }
+
+  return {result.action_, total_bytes_written, false};
+}
+
 Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (!handshake_complete_) {
     Network::PostIoAction action = doHandshake();
+    // Envoy ALTS implements asynchronous tsi_handshaker_next() interface
+    // which returns immediately after scheduling a handshake request to
+    // the handshake service. The handshake response will be handled by a
+    // dedicated thread in a separate API within which handshake_complete_
+    // will be set to true if the handshake completes.
+    ASSERT(!handshake_complete_);
     ASSERT(action == Network::PostIoAction::KeepOpen);
     // TODO(lizan): Handle synchronous handshake when TsiHandshaker supports it.
-  }
-
-  if (handshake_complete_) {
+    return {Network::PostIoAction::KeepOpen, 0, false};
+  } else {
     ASSERT(frame_protector_);
-    ENVOY_CONN_LOG(debug, "TSI: protecting buffer size: {}", callbacks_->connection(),
-                   buffer.length());
-    tsi_result status = frame_protector_->protect(buffer, raw_write_buffer_);
-    ENVOY_CONN_LOG(debug, "TSI: protected buffer left: {} result: {}", callbacks_->connection(),
-                   buffer.length(), tsi_result_to_string(status));
+    // Check if we need to flush outstanding handshake bytes.
+    if (write_buffer_contains_handshake_bytes_) {
+      ASSERT(raw_write_buffer_.length() > 0);
+      ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
+                     raw_write_buffer_.length(), end_stream);
+      Network::IoResult result =
+          raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
+      // Check if short write occurred.
+      if (raw_write_buffer_.length() > 0) {
+        return {result.action_, 0, false};
+      }
+      write_buffer_contains_handshake_bytes_ = false;
+    }
+    return repeatProtectAndWrite(buffer, end_stream);
   }
-
-  if (raw_write_buffer_.length() > 0) {
-    ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
-                   raw_write_buffer_.length(), end_stream);
-    return raw_buffer_socket_->doWrite(raw_write_buffer_, end_stream && (buffer.length() == 0));
-  }
-  return {Network::PostIoAction::KeepOpen, 0, false};
 }
 
 void TsiSocket::closeSocket(Network::ConnectionEvent) {
