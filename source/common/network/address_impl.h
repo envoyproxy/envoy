@@ -11,6 +11,8 @@
 #include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
+#include "common/common/statusor.h"
+#include "common/common/thread.h"
 
 namespace Envoy {
 namespace Network {
@@ -25,8 +27,8 @@ namespace Address {
  * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
-                                           bool v6only = true);
+StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
+                                                     bool v6only = true);
 
 /**
  * Base class for all address types.
@@ -51,6 +53,37 @@ protected:
 
 private:
   const Type type_;
+};
+
+class InstanceFactory {
+public:
+  template <typename InstanceType, typename... Args>
+  static StatusOr<InstanceConstPtr> createInstancePtr(Args&&... args) {
+    absl::Status status;
+    status = InstanceType::validateProtocolSupported();
+    if (!status.ok()) {
+      return status;
+    }
+    std::unique_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
+    if (!status.ok()) {
+      return status;
+    }
+    return instance;
+  }
+
+  template <typename InstanceType, typename... Args>
+  static StatusOr<InstanceType> createInstance(Args&&... args) {
+    absl::Status status;
+    status = InstanceType::validateProtocolSupported();
+    if (!status.ok()) {
+      return status;
+    }
+    InstanceType instance(status, std::forward<Args>(args)...);
+    if (!status.ok()) {
+      return status;
+    }
+    return instance;
+  }
 };
 
 /**
@@ -82,6 +115,31 @@ public:
    */
   explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
 
+  /**
+   * Construct from an existing unix IPv4 socket address (IP v4 address and port).
+   */
+  explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
+                        const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
+   */
+  explicit Ipv4Instance(absl::Status& error, const std::string& address,
+                        const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a string IPv4 address such as "1.2.3.4" as well as a port.
+   */
+  Ipv4Instance(absl::Status& error, const std::string& address, uint32_t port,
+               const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a port. The IPv4 address will be set to "any" and is suitable for binding
+   * a port to any available address.
+   */
+  explicit Ipv4Instance(absl::Status& error, uint32_t port,
+                        const SocketInterface* sock_interface = nullptr);
+
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
@@ -99,6 +157,10 @@ public:
    * @return the address in dotted-decimal string format.
    */
   static std::string sockaddrToString(const sockaddr_in& addr);
+
+  // Validate that IPv4 is supported on this platform, raise an exception for the
+  // given address if not.
+  static absl::Status validateProtocolSupported();
 
 private:
   struct Ipv4Helper : public Ipv4 {
@@ -156,6 +218,31 @@ public:
    */
   explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
 
+  /**
+   * Construct from an existing unix IPv6 socket address (IP v6 address and port).
+   */
+  Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
+               const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
+   */
+  explicit Ipv6Instance(absl::Status& error, const std::string& address,
+                        const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a string IPv6 address such as "12:34::5" as well as a port.
+   */
+  Ipv6Instance(absl::Status& error, const std::string& address, uint32_t port,
+               const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
+   * a port to any available address.
+   */
+  explicit Ipv6Instance(absl::Status& error, uint32_t port,
+                        const SocketInterface* sock_interface = nullptr);
+
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
@@ -165,6 +252,9 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+
+  // Validate that IPv6 is supported on this platform
+  static absl::Status validateProtocolSupported();
 
 private:
   struct Ipv6Helper : public Ipv6 {
@@ -218,6 +308,20 @@ public:
    */
   explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0,
                         const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from an existing unix address.
+   */
+  explicit PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len,
+                        mode_t mode = 0, const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a string pipe path.
+   */
+  explicit PipeInstance(absl::Status& error, const std::string& pipe_path, mode_t mode = 0,
+                        const SocketInterface* sock_interface = nullptr);
+
+  static absl::Status validateProtocolSupported() { return absl::OkStatus(); }
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;

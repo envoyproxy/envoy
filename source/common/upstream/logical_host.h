@@ -37,7 +37,7 @@ public:
                      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& port_value = lb_endpoint.endpoint().health_check_config().port_value();
     auto health_check_address =
-        port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
+        port_value == 0 ? address : Network::Utility::getAddressWithPortOrThrow(*address, port_value);
 
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);

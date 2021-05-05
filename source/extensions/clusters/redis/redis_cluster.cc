@@ -261,7 +261,7 @@ void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
   // port in it.
   for (const Network::DnsResponse& res : response) {
     ASSERT(res.address_ != nullptr);
-    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*(res.address_), port));
+    discovery_address_list_.push_back(Network::Utility::getAddressWithPortOrThrow(*(res.address_), port));
   }
 }
 

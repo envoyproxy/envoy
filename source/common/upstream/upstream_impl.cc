@@ -267,7 +267,7 @@ HostDescriptionImpl::HostDescriptionImpl(
   health_check_address_ =
       health_check_config.port_value() == 0
           ? dest_address
-          : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+          : Network::Utility::getAddressWithPortOrThrow(*dest_address, health_check_config.port_value());
 }
 
 Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(

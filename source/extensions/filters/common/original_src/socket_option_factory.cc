@@ -13,7 +13,7 @@ namespace OriginalSrc {
 
 Network::Socket::OptionsSharedPtr
 buildOriginalSrcOptions(Network::Address::InstanceConstSharedPtr source, uint32_t mark) {
-  const auto address_without_port = Network::Utility::getAddressWithPort(*source, 0);
+  const auto address_without_port = Network::Utility::getAddressWithPortOrThrow(*source, 0);
 
   // Note: we don't expect this to change the behaviour of the socket. We expect it to be copied
   // into the upstream connection later.

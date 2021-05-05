@@ -10,6 +10,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -121,10 +122,14 @@ void LogicalDnsCluster::startResolve() {
           info_->stats().update_success_.inc();
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(response.front().address_ != nullptr);
-          Network::Address::InstanceConstSharedPtr new_address =
+          StatusOr<Network::Address::InstanceConstSharedPtr> error_or_address =
               Network::Utility::getAddressWithPort(*(response.front().address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
-
+          if (!error_or_address.ok()) {
+            ENVOY_LOG(debug, "Fail to create new address.");
+            return;
+          }
+          Network::Address::InstanceConstSharedPtr new_address = *error_or_address;
           if (!logical_host_) {
             logical_host_ =
                 std::make_shared<LogicalHost>(info_, hostname_, new_address, localityLbEndpoint(),

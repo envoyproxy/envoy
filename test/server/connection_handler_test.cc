@@ -261,7 +261,7 @@ public:
     // Original dst address nor port number match that of the listener's address.
     Network::Address::InstanceConstSharedPtr original_dst_address(
         new Network::Address::Ipv4Instance("127.0.0.2", 8080));
-    Network::Address::InstanceConstSharedPtr any_address = Network::Utility::getAddressWithPort(
+    Network::Address::InstanceConstSharedPtr any_address = Network::Utility::getAddressWithPortOrThrow(
         *Network::Utility::getIpv4AnyAddress(), normal_address->ip()->port());
     EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(any_address));
     handler_->addListener(absl::nullopt, *test_listener);
@@ -772,7 +772,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
 
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 80));
-  Network::Address::InstanceConstSharedPtr any_address = Network::Utility::getAddressWithPort(
+  Network::Address::InstanceConstSharedPtr any_address = Network::Utility::getAddressWithPortOrThrow(
       *Network::Utility::getIpv4AnyAddress(), normal_address->ip()->port());
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(any_address));
   handler_->addListener(absl::nullopt, *test_listener1);

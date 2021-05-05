@@ -82,12 +82,15 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no
     // effect if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote
     // address if an IPv4 local_address was created from an IPv6 mapped IPv4 address.
-    const Address::InstanceConstSharedPtr& remote_address =
-        (remote_addr.ss_family == AF_UNIX)
-            ? io_handle->peerAddress()
-            : Address::addressFromSockAddr(remote_addr, remote_addr_len,
-                                           local_address->ip()->version() ==
-                                               Address::IpVersion::v6);
+    Address::InstanceConstSharedPtr remote_address;
+    if (remote_addr.ss_family == AF_UNIX) {
+      remote_address = io_handle->peerAddress();
+    } else {
+      StatusOr<Address::InstanceConstSharedPtr> error_or_address = Address::addressFromSockAddr(
+          remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
+      ASSERT(error_or_address.ok());
+      remote_address = *error_or_address;
+    }
 
     cb_.onAccept(
         std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));

@@ -129,10 +129,19 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             // make a new address that has port in it. We need to both support IPv6 as well as
             // potentially move port handling into the DNS interface itself, which would work better
             // for SRV.
+
             ASSERT(resp.address_ != nullptr);
+          StatusOr<Network::Address::InstanceConstSharedPtr> error_or_address =
+              Network::Utility::getAddressWithPort(*(resp.address_),
+                                                   port_);
+          if (!error_or_address.ok()) {
+            ENVOY_LOG(debug, "Fail to create new address.");
+            return;
+          }
+          Network::Address::InstanceConstSharedPtr new_address = *error_or_address;
             new_hosts.emplace_back(new HostImpl(
                 parent_.info_, hostname_,
-                Network::Utility::getAddressWithPort(*(resp.address_), port_),
+                new_address,
                 // TODO(zyfjeff): Created through metadata shared pool
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),

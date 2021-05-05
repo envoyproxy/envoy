@@ -11,6 +11,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -27,6 +28,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
+#include "source/common/common/_virtual_includes/statusor_lib/common/common/statusor.h"
 
 namespace Envoy {
 namespace Network {
@@ -128,18 +130,25 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                                      uint16_t port, bool v6only) {
+  Address::InstanceConstSharedPtr address;
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
-    return std::make_shared<Address::Ipv4Instance>(&sa4);
+    StatusOr<Address::InstanceConstSharedPtr> error_or_address =
+        Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4);
+    ASSERT(error_or_address.ok());
+    return *error_or_address;
   }
   sockaddr_in6 sa6;
   memset(&sa6, 0, sizeof(sa6));
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port);
-    return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
+    StatusOr<Address::InstanceConstSharedPtr> error_or_address =
+        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only);
+    ASSERT(error_or_address.ok());
+    return *error_or_address;
   }
   return nullptr;
 }
@@ -178,7 +187,10 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     }
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port64);
-    return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
+    StatusOr<Address::InstanceConstSharedPtr> error_or_address =
+        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only);
+    ASSERT(error_or_address.ok());
+    return *error_or_address;
   }
   // Treat it as an IPv4 address followed by a port.
   const auto pos = ip_address.rfind(':');
@@ -198,7 +210,10 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   }
   sa4.sin_family = AF_INET;
   sa4.sin_port = htons(port64);
-  return std::make_shared<Address::Ipv4Instance>(&sa4);
+  StatusOr<Address::InstanceConstSharedPtr> error_or_address =
+      Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4);
+  ASSERT(error_or_address.ok());
+  return *error_or_address;
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
@@ -246,8 +261,10 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
         (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      ret = Address::addressFromSockAddr(
+      StatusOr<Address::InstanceConstSharedPtr> error_or_instance = Address::addressFromSockAddr(
           *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+      ASSERT(error_or_instance.ok());
+      ret = *error_or_instance;
       if (!isLoopbackAddress(*ret)) {
         break;
       }
@@ -366,15 +383,26 @@ const std::string& Utility::getIpv6CidrCatchAllAddress() {
   CONSTRUCT_ON_FIRST_USE(std::string, "::/0");
 }
 
-Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
-                                                            uint32_t port) {
+StatusOr<Address::InstanceConstSharedPtr>
+Utility::getAddressWithPort(const Address::Instance& address, uint32_t port) {
   switch (address.ip()->version()) {
   case Address::IpVersion::v4:
-    return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
+    return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
+        address.ip()->addressAsString(), port);
   case Address::IpVersion::v6:
-    return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
+    return Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
+        address.ip()->addressAsString(), port);  
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+Address::InstanceConstSharedPtr Utility::getAddressWithPortOrThrow(const Address::Instance& address,
+                                                                   uint32_t port) {
+  StatusOr<Address::InstanceConstSharedPtr> error_or_address = getAddressWithPort(address, port);
+  if (!error_or_address.ok()) {
+    throw EnvoyException(error_or_address.status().ToString());
+  }
+  return *error_or_address;
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
@@ -404,7 +432,12 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
-  return Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
+  StatusOr<Address::InstanceConstSharedPtr> error_or_address =
+      Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
+  if (!error_or_address.ok()) {
+    throw EnvoyException(error_or_address.status().ToString());
+  }
+  return *error_or_address;
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.

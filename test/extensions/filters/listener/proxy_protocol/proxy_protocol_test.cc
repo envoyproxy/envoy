@@ -1284,7 +1284,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
                                                            nullptr, true)),
-        local_dst_address_(Network::Utility::getAddressWithPort(
+        local_dst_address_(Network::Utility::getAddressWithPortOrThrow(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->addressProvider().localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),

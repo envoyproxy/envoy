@@ -243,7 +243,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   // update. This ensures that a potentially previously resolved address does not stabilize back to
   // 0 hosts.
   const auto new_address = !response.empty()
-                               ? Network::Utility::getAddressWithPort(*(response.front().address_),
+                               ? Network::Utility::getAddressWithPortOrThrow(*(response.front().address_),
                                                                       primary_host_info->port_)
                                : nullptr;
 

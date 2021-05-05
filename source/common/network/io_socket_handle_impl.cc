@@ -9,6 +9,7 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
+#include "source/common/common/_virtual_includes/statusor_lib/common/common/statusor.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -277,22 +278,20 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 
 Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
                                                             socklen_t ss_len, os_fd_t fd) {
-  // TODO(chaoqin-li1123): remove exception catching and make Address::addressFromSockAddr return
-  // null on error.
-  TRY_NEEDS_AUDIT {
-    // Set v6only to false so that mapped-v6 address can be normalize to v4
-    // address. Though dual stack may be disabled, it's still okay to assume the
-    // address is from a dual stack socket. This is because mapped-v6 address
-    // must come from a dual stack socket. An actual v6 address can come from
-    // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
-    // address and the socket is actually v6 only, the returned address will be
-    // regarded as a v6 address from dual stack socket. However, this address is not going to be
-    // used to create socket. Wrong knowledge of dual stack support won't hurt.
-    return Address::addressFromSockAddr(ss, ss_len, /*v6only=*/false);
+  // Set v6only to false so that mapped-v6 address can be normalize to v4
+  // address. Though dual stack may be disabled, it's still okay to assume the
+  // address is from a dual stack socket. This is because mapped-v6 address
+  // must come from a dual stack socket. An actual v6 address can come from
+  // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
+  // address and the socket is actually v6 only, the returned address will be
+  // regarded as a v6 address from dual stack socket. However, this address is not going to be
+  // used to create socket. Wrong knowledge of dual stack support won't hurt.
+  StatusOr<Address::InstanceConstSharedPtr> error_or_addr =
+      Address::addressFromSockAddr(ss, ss_len, /*v6only=*/false);
+  if (!error_or_addr.ok()) {
+    PANIC(fmt::format("Invalid address for fd: {}", fd));
   }
-  catch (const EnvoyException& e) {
-    PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, e.what()));
-  }
+  return *error_or_addr;
 }
 
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
@@ -605,7 +604,9 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
+  StatusOr<Address::InstanceConstSharedPtr> error_or_address =  Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
+  ASSERT(error_or_address.ok());
+  return *error_or_address;
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
@@ -630,7 +631,9 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  return Address::addressFromSockAddr(ss, ss_len);
+  StatusOr<Address::InstanceConstSharedPtr> error_or_address = Address::addressFromSockAddr(ss, ss_len);
+  ASSERT(error_or_address.ok());
+  return *error_or_address;
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
