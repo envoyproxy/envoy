@@ -67,8 +67,8 @@ protected:
                                                        absl::string_view alpn,
                                                        const quic::ParsedQuicVersion& version,
                                                        absl::string_view sni) override;
-  // Overridden to truncate instead of hash, because our BPF filter only looks at the first 4 bytes
-  // of the connection ID. This ensures that the replacement routes to the same dispatcher.
+  // Overridden to restore the first 4 bytes of the connection ID because our BPF filter only looks
+  // at the first 4 bytes. This ensures that the replacement routes to the same quic dispatcher.
   quic::QuicConnectionId
   ReplaceLongServerConnectionId(const quic::ParsedQuicVersion& version,
                                 const quic::QuicConnectionId& server_connection_id,
