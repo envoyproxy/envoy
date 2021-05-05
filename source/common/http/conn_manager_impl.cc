@@ -146,15 +146,19 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   // register callback for drain-close events
   start_drain_cb_ =
       drain_close_.addOnDrainCloseCb([this](std::chrono::milliseconds drain_delay) -> void {
-        start_drain_timer_ =
-            read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-              startDrainSequence();
-              stats_.named_.downstream_cx_drain_close_.inc();
-              for (const auto& stream : streams_) {
-                ENVOY_STREAM_LOG(debug, "drain closing connection", *stream);
-              }
-            });
-        start_drain_timer_->enableTimer(drain_delay);
+        // The "onDrainClose" callback may be called from another thread, so wrap our lambda
+        // body with `post()` to make sure it is executing on this thread.
+        read_callbacks_->connection().dispatcher().post([this, drain_delay]() -> void {
+          start_drain_timer_ =
+              read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
+                startDrainSequence();
+                stats_.named_.downstream_cx_drain_close_.inc();
+                for (const auto& stream : streams_) {
+                  ENVOY_STREAM_LOG(debug, "drain closing connection", *stream);
+                }
+              });
+          start_drain_timer_->enableTimer(drain_delay);
+        });
       });
 }
 
