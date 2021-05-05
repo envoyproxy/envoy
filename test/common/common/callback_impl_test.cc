@@ -8,7 +8,7 @@ using testing::InSequence;
 namespace Envoy {
 namespace Common {
 
-class CallbackManagerTest : public testing::Test {
+class CallbackManagerTest : public testing::TestWithParam<bool> {
 public:
   MOCK_METHOD(void, called, (int arg));
 };
@@ -51,6 +51,31 @@ TEST_F(CallbackManagerTest, DestroyManagerBeforeHandle) {
   EXPECT_NE(nullptr, handle);
   // It should be safe to destruct the handle after the manager.
   handle.reset();
+}
+
+TEST_F(CallbackManagerTest, ThreadSafe__All) {
+  InSequence s;
+
+  ThreadSafeCallbackManager<int> manager;
+  auto handle1 = manager.add([this](int arg) -> void { called(arg); });
+  auto handle2 = manager.add([this](int arg) -> void { called(arg * 2); });
+
+  EXPECT_CALL(*this, called(5));
+  EXPECT_CALL(*this, called(10));
+  manager.runCallbacks(5);
+
+  handle1.reset();
+  EXPECT_CALL(*this, called(10));
+  manager.runCallbacks(5);
+
+  EXPECT_CALL(*this, called(10));
+  EXPECT_CALL(*this, called(20));
+  CallbackHandlePtr handle3 = manager.add([this](int arg) -> void { called(arg * 4); });
+  manager.runCallbacks(5);
+  handle3.reset();
+
+  EXPECT_CALL(*this, called(10));
+  manager.runCallbacks(5);
 }
 
 } // namespace Common

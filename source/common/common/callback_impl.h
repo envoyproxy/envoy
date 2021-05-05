@@ -129,9 +129,8 @@ public:
 
   /**
    * Run all registered callbacks with a custom caller
-   * NOTE: This code is currently safe if a callback deletes ITSELF from within a callback. It is
-   *       not safe if a callback deletes other callbacks. If that is required the code will need
-   *       to change (specifically, it will crash if the next callback in the list is deleted).
+   * NOTE: This code does not currently support callbacks deleting itself or other registered
+   *       callbacks as it will create a deadlock within the callback manager.
    * @param run_with function that is responsible for executing the callbacks and supplying any
    *                 inputs.
    */
@@ -182,8 +181,7 @@ private:
   // This must be held on all read/writes of callbacks_
   mutable Thread::MutexBasicLockable lock_;
 
-  ABSL_GUARDED_BY(lock_)
-  std::list<CallbackHolder*> callbacks_;
+  std::list<CallbackHolder*> callbacks_ ABSL_GUARDED_BY(lock_);
   // This is a sentinel shared_ptr used for keeping track of whether the manager is still alive.
   // It is only held by weak reference in the callback holder above. This is used versus having
   // the manager inherit from shared_from_this to avoid the manager having to be allocated inside
