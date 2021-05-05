@@ -80,7 +80,8 @@ message CommandLineOptions {
   }
 
   enum DrainStrategy {
-    // Gradually discourage connections over the course of the drain period.
+    // Gradually discourage connections over the beginning course of the drain period, discouraging
+    // all connections by the time 25% of the drain-time has expired.
     Gradual = 0;
 
     // Discourage all connections for the duration of the drain sequence.
