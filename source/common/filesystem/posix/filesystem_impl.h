@@ -46,5 +46,6 @@ private:
   friend class FileSystemImplTest;
 };
 
+static InstancePtr makeFilesystemInstance() { return std::make_unique<InstanceImplPosix>(); }
 } // namespace Filesystem
 } // namespace Envoy
