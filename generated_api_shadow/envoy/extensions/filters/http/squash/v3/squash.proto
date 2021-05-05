@@ -6,7 +6,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.squash.v3";
@@ -20,9 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 6]
 message Squash {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.squash.v2.Squash";
-
   // The name of the cluster that hosts the Squash server.
   string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
