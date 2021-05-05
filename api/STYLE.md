@@ -34,6 +34,10 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
+* Use a `[#experimental:]` annotation in comments for messages that are considered experimental
+  and are not subject to the threat model. This differs from the work-in-progress/alpha tagging
+  of extensions in that in can be applied to configuration within the core API.
+
 * Always use plural field names for `repeated` fields, such as `filters`.
 
 * Due to the fact that we consider JSON/YAML to be first class inputs, we cannot easily change a
