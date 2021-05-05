@@ -26,6 +26,7 @@ Minor Behavior Changes
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
 
 
+
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
