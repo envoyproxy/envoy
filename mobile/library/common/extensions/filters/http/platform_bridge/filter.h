@@ -29,7 +29,7 @@ private:
   const envoy_http_filter* platform_filter_;
 };
 
-typedef std::shared_ptr<PlatformBridgeFilterConfig> PlatformBridgeFilterConfigSharedPtr;
+using PlatformBridgeFilterConfigSharedPtr = std::shared_ptr<PlatformBridgeFilterConfig>;
 
 enum class IterationState { Ongoing, Stopped };
 

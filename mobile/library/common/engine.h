@@ -120,4 +120,7 @@ private:
   std::thread main_thread_{}; // Empty placeholder to be populated later.
 };
 
+using EngineSharedPtr = std::shared_ptr<Engine>;
+using EngineWeakPtr = std::weak_ptr<Engine>;
+
 } // namespace Envoy
