@@ -24,7 +24,7 @@ private:
   std::vector<Extensions::Common::Matcher::MatcherPtr> matchers_;
 };
 
-typedef std::shared_ptr<AssertionFilterConfig> AssertionFilterConfigSharedPtr;
+using AssertionFilterConfigSharedPtr = std::shared_ptr<AssertionFilterConfig>;
 
 /**
  * Filter to assert expectations on HTTP requests.

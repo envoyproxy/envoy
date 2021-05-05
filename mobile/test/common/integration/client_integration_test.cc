@@ -107,9 +107,8 @@ api_listener:
   }
 
   std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
-  std::unique_ptr<Event::ProvisionalDispatcher> dispatcher_ =
-      std::make_unique<Event::ProvisionalDispatcher>();
-  std::unique_ptr<Http::Client> http_client_{};
+  Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
+  Http::ClientPtr http_client_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,

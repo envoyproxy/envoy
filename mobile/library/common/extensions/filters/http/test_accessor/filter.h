@@ -30,14 +30,14 @@ using TestAccessorFilterConfigSharedPtr = std::shared_ptr<TestAccessorFilterConf
 
 class TestAccessorFilter final : public Http::PassThroughFilter {
 public:
-  TestAccessorFilter(std::shared_ptr<TestAccessorFilterConfig> config) : config_(config) {}
+  TestAccessorFilter(TestAccessorFilterConfigSharedPtr config) : config_(config) {}
 
   // StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
 private:
-  const std::shared_ptr<TestAccessorFilterConfig> config_;
+  const TestAccessorFilterConfigSharedPtr config_;
 };
 
 } // namespace TestAccessor
