@@ -56,7 +56,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
                                                config_->stats_.downstream_cx_rx_bytes_buffered_,
                                                config_->stats_.downstream_cx_tx_bytes_total_,
                                                config_->stats_.downstream_cx_tx_bytes_buffered_,
-                                               nullptr, nullptr});
+                                               nullptr, nullptr, nullptr, nullptr});
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {

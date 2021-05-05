@@ -191,7 +191,8 @@ public:
           read_filter->callbacks_->connection().addConnectionCallbacks(
               network_connection_callbacks);
           read_filter->callbacks_->connection().setConnectionStats(
-              {read_total, read_current, write_total, write_current, nullptr, nullptr});
+              {read_total, read_current, write_total, write_current, nullptr, nullptr, nullptr,
+               nullptr});
         }});
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
     EXPECT_CALL(filter_chain_manager, findFilterChain(_))
@@ -279,7 +280,8 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
         filter_manager.addReadFilter(read_filter);
         read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
         read_filter->callbacks_->connection().setConnectionStats(
-            {read_total, read_current, write_total, write_current, nullptr, nullptr});
+            {read_total, read_current, write_total, write_current, nullptr, nullptr, nullptr,
+             nullptr});
         // This will not close connection right away, but after it processes the first packet.
         read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       }});

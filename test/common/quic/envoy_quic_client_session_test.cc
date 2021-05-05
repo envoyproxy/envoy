@@ -133,8 +133,9 @@ public:
     setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
-    envoy_quic_session_.setConnectionStats(
-        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
+    envoy_quic_session_.setConnectionStats({read_total_, read_current_, write_total_,
+                                            write_current_, nullptr, nullptr,
+                                            &self_connection_close_error_, nullptr});
     EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
   }
 
@@ -142,6 +143,7 @@ public:
     if (quic_connection_->connected()) {
       EXPECT_CALL(*quic_connection_,
                   SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
+      EXPECT_CALL(self_connection_close_error_, recordValue(0));
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
@@ -181,6 +183,7 @@ protected:
   testing::StrictMock<Stats::MockGauge> read_current_;
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
+  testing::StrictMock<Stats::MockHistogram> self_connection_close_error_;
   Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
@@ -254,6 +257,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
+  EXPECT_CALL(self_connection_close_error_, recordValue(0));
   envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());

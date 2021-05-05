@@ -140,7 +140,9 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   read_callbacks_->connection().setConnectionStats(
       {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
        stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
-       nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
+       nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_,
+       &stats_.named_.downstream_quic_self_connection_close_error_,
+       &stats_.named_.downstream_quic_peer_connection_close_error_});
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {

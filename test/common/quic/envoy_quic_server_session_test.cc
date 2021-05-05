@@ -198,8 +198,9 @@ public:
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
-    read_filter_->callbacks_->connection().setConnectionStats(
-        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
+    read_filter_->callbacks_->connection().setConnectionStats({read_total_, read_current_,
+                                                               write_total_, write_current_,
+                                                               nullptr, nullptr, nullptr, nullptr});
     EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
     EXPECT_CALL(*read_filter_, onNewConnection()).WillOnce(Invoke([this]() {
       // Create ServerConnection instance and setup callbacks for it.

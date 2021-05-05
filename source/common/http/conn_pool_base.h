@@ -118,7 +118,9 @@ public:
          parent_.host()->cluster().stats().upstream_cx_rx_bytes_buffered_,
          parent_.host()->cluster().stats().upstream_cx_tx_bytes_total_,
          parent_.host()->cluster().stats().upstream_cx_tx_bytes_buffered_,
-         &parent_.host()->cluster().stats().bind_errors_, nullptr});
+         &parent_.host()->cluster().stats().bind_errors_, nullptr,
+         &parent_.host()->cluster().stats().upstream_quic_self_connection_close_error_,
+         &parent_.host()->cluster().stats().upstream_quic_peer_connection_close_error_});
   }
 
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }

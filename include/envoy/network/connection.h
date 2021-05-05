@@ -96,6 +96,10 @@ public:
     Stats::Counter* bind_errors_;
     // Optional counter. Delayed close timeouts will not be tracked if this is nullptr.
     Stats::Counter* delayed_close_timeouts_;
+    // Optional histogram, used to track quic self-initiated connection close error if not nullptr.
+    Stats::Histogram* quic_connection_self_close_error_;
+    // Optional histogram, used to track quic peer-initiated connection close error if not nullptr.
+    Stats::Histogram* quic_connection_peer_close_error_;
   };
 
   ~Connection() override = default;

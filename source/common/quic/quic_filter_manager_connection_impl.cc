@@ -161,6 +161,16 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
   transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
                                            " with details: ", frame.error_details);
+
+  if (source == quic::ConnectionCloseSource::FROM_PEER && connection_stats_ &&
+      connection_stats_->quic_connection_peer_close_error_) {
+    connection_stats_->quic_connection_peer_close_error_->recordValue(frame.quic_error_code);
+  }
+  if (source == quic::ConnectionCloseSource::FROM_SELF && connection_stats_ &&
+      connection_stats_->quic_connection_self_close_error_) {
+    connection_stats_->quic_connection_self_close_error_->recordValue(frame.quic_error_code);
+  }
+
   if (network_connection_ != nullptr) {
     // Tell network callbacks about connection close if not detached yet.
     raiseConnectionEvent(source == quic::ConnectionCloseSource::FROM_PEER

@@ -29,7 +29,8 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
                                    host->cluster().stats().upstream_cx_rx_bytes_buffered_,
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
                                    host->cluster().stats().upstream_cx_tx_bytes_buffered_,
-                                   &host->cluster().stats().bind_errors_, nullptr});
+                                   &host->cluster().stats().bind_errors_, nullptr, nullptr,
+                                   nullptr});
   connection_->noDelay(true);
   connection_->connect();
 }
