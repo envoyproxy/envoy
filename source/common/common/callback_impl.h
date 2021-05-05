@@ -92,6 +92,11 @@ template <typename... CallbackArgs> class ThreadSafeCallbackManager {
 public:
   using Callback = std::function<void(CallbackArgs...)>;
 
+  ~ThreadSafeCallbackManager() {
+    // Validate against use-after-free
+    ASSERT(callbacks_.empty());
+  }
+
   /**
    * Add a callback.
    * @param callback supplies the callback to add.
