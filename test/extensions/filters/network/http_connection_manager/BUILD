@@ -27,6 +27,8 @@ envoy_extension_cc_test_library(
         ":config_cc_proto",
         "//source/common/filter/http:filter_config_discovery_lib",
         "//source/common/network:address_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
@@ -34,6 +36,7 @@ envoy_extension_cc_test_library(
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:registry_lib",
     ],
 )
 
@@ -50,7 +53,6 @@ envoy_extension_cc_test(
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
@@ -67,6 +69,18 @@ envoy_extension_cc_test(
         ":config_cc_proto",
         ":config_test_base",
         "//source/extensions/filters/network/http_connection_manager:config",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "config_filter_dependencies_test",
+    srcs = ["config_filter_dependencies_test.cc"],
+    extension_name = "envoy.filters.network.http_connection_manager",
+    deps = [
+        ":config_cc_proto",
+        ":config_test_base",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
     ],
 )
 

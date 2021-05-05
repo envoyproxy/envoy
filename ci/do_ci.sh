@@ -7,9 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
-        "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
-  build_setup_args="-nofetch"
+          "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
+          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+    build_setup_args="-nofetch"
 fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
@@ -465,6 +465,10 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
+  exit 0
+elif [[ "$CI_TARGET" == "tooling" ]]; then
+  echo "Run pytest tooling tests..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" wasm-cc

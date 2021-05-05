@@ -31,6 +31,28 @@ message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
   google.protobuf.UInt32Value max_concurrent_streams = 1;
+
+  // `Initial stream-level flow-control receive window
+  // <https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-4.1>`_ size. Valid values range from
+  // 1 to 16777216 (2^24, maximum supported by QUICHE) and defaults to 65536 (2^16).
+  //
+  // NOTE: 16384 (2^14) is the minimum window size supported in Google QUIC. If configured smaller than it, we will use 16384 instead.
+  // QUICHE IETF Quic implementation supports 1 bytes window. We only support increasing the default window size now, so it's also the minimum.
+  //
+  // This field also acts as a soft limit on the number of bytes Envoy will buffer per-stream in the
+  // QUIC stream send and receive buffers. Once the buffer reaches this pointer, watermark callbacks will fire to
+  // stop the flow of data to the stream buffers.
+  google.protobuf.UInt32Value initial_stream_window_size = 2
+      [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
+
+  // Similar to *initial_stream_window_size*, but for connection-level
+  // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults to 65536 (2^16).
+  // window. Currently, this has the same minimum/default as *initial_stream_window_size*.
+  //
+  // NOTE: 16384 (2^14) is the minimum window size supported in Google QUIC. We only support increasing the default
+  // window size now, so it's also the minimum.
+  google.protobuf.UInt32Value initial_connection_window_size = 3
+      [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 }
 
 message UpstreamHttpProtocolOptions {

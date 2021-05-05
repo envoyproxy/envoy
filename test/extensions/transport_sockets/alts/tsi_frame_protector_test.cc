@@ -31,30 +31,28 @@ protected:
 
 TEST_F(TsiFrameProtectorTest, Protect) {
   {
-    Buffer::OwnedImpl input, encrypted;
-    input.add("foo");
+    Buffer::OwnedImpl encrypted;
 
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK, frame_protector_.protect(grpc_slice_from_static_string("foo"), encrypted));
     EXPECT_EQ("\x07\0\0\0foo"s, encrypted.toString());
   }
 
   {
-    Buffer::OwnedImpl input, encrypted;
-    input.add("foo");
+    Buffer::OwnedImpl encrypted;
 
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK, frame_protector_.protect(grpc_slice_from_static_string("foo"), encrypted));
     EXPECT_EQ("\x07\0\0\0foo"s, encrypted.toString());
 
-    input.add("bar");
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK, frame_protector_.protect(grpc_slice_from_static_string("bar"), encrypted));
     EXPECT_EQ("\x07\0\0\0foo\x07\0\0\0bar"s, encrypted.toString());
   }
 
   {
-    Buffer::OwnedImpl input, encrypted;
-    input.add(std::string(20000, 'a'));
+    Buffer::OwnedImpl encrypted;
 
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK,
+              frame_protector_.protect(
+                  grpc_slice_from_static_string(std::string(20000, 'a').c_str()), encrypted));
 
     // fake frame protector will split long buffer to 2 "encrypted" frames with length 16K.
     std::string expected =
@@ -71,10 +69,10 @@ TEST_F(TsiFrameProtectorTest, ProtectError) {
   };
   raw_frame_protector_->vtable = &mock_vtable;
 
-  Buffer::OwnedImpl input, encrypted;
-  input.add("foo");
+  Buffer::OwnedImpl encrypted;
 
-  EXPECT_EQ(TSI_INTERNAL_ERROR, frame_protector_.protect(input, encrypted));
+  EXPECT_EQ(TSI_INTERNAL_ERROR,
+            frame_protector_.protect(grpc_slice_from_static_string("foo"), encrypted));
 
   raw_frame_protector_->vtable = vtable;
 }

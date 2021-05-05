@@ -687,7 +687,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  max_request_headers_kb: 96
+  max_request_headers_kb: 8192
   route_config:
     name: local_route
   http_filters:
@@ -698,7 +698,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(96, config.maxRequestHeadersKb());
+  EXPECT_EQ(8192, config.maxRequestHeadersKb());
 }
 
 // Validated that an explicit zero stream idle timeout disables.
@@ -1278,7 +1278,7 @@ http_filters:
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -1850,6 +1850,7 @@ http_filters:
     config_source: { resource_api_version: V3, ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+      pass_through_mode: false
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
   )EOF";
