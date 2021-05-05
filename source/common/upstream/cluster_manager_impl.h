@@ -222,7 +222,9 @@ struct ClusterManagerStats {
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
  */
-class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
+class ClusterManagerImpl : public ClusterManager,
+                           public MissingClusterNotifier,
+                           Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory, Stats::Store& stats,
@@ -312,6 +314,9 @@ public:
   const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const override {
     return cluster_timeout_budget_stat_names_;
   }
+
+  // Upstream::MissingClusterNotifier
+  void notifyMissingCluster(absl::string_view name) override;
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
@@ -637,6 +642,8 @@ private:
   requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
                                   ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout);
+
+  void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
 private:
   ClusterManagerFactory& factory_;

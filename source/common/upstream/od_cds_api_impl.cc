@@ -11,19 +11,20 @@ namespace Upstream {
 OdCdsApiSharedPtr
 OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                     ClusterManager& cm, Stats::Scope& scope,
+                     ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return OdCdsApiSharedPtr(
-      new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, scope, validation_visitor));
+  return OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, notifier,
+                                            scope, validation_visitor));
 }
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                           ClusterManager& cm, Stats::Scope& scope,
+                           ClusterManager& cm, MissingClusterNotifier& notifier,
+                           Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
           odcds_config.resource_api_version(), validation_visitor, "name"),
-      helper_(cm, "odcds"), cm_(cm), scope_(scope.createScope("odcds.")),
+      helper_(cm, "odcds"), cm_(cm), notifier_(notifier_), scope_(scope.createScope("odcds.")),
       status_(StartStatus::NotStarted) {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
@@ -51,6 +52,10 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   sendAwaiting();
   status_ = StartStatus::InitialFetchDone;
+  for (const auto& resource_name : removed_resources) {
+    ENVOY_LOG(debug, "odcds: notifying about potential missing cluster {}", resource_name);
+    notifier_.notifyMissingCluster(resource_name);
+  }
   if (!exception_msgs.empty()) {
     throw EnvoyException(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));

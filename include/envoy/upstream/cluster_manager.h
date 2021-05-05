@@ -77,10 +77,14 @@ using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHa
  */
 enum class ClusterDiscoveryStatus {
   /**
-   * The discovery process timed out. This means that there is no such cluster or we haven't yet
-   * received any reply from on-demand CDS about it.
+   * The discovery process timed out. This means that we haven't yet received any reply from
+   * on-demand CDS about it.
    */
   Timeout,
+  /**
+   * The discovery process has concluded and on-demand CDS has no such cluster.
+   */
+  Missing,
   /**
    * Cluster found and currently available through ClusterManager.
    */

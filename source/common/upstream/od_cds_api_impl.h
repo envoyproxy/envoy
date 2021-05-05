@@ -39,6 +39,13 @@ public:
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
 
+class MissingClusterNotifier {
+public:
+  virtual ~MissingClusterNotifier() = default;
+
+  virtual void notifyMissingCluster(absl::string_view name) PURE;
+};
+
 /**
  * ODCDS API implementation that fetches via Subscription.
  */
@@ -48,7 +55,8 @@ class OdCdsApiImpl : public OdCdsApi,
 public:
   static OdCdsApiSharedPtr create(const envoy::config::core::v3::ConfigSource& odcds_config,
                                   OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                                  ClusterManager& cm, Stats::Scope& scope,
+                                  ClusterManager& cm, MissingClusterNotifier& notifier,
+                                  Stats::Scope& scope,
                                   ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::OdCdsApi
@@ -66,11 +74,13 @@ private:
 
   OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
-               Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
+               MissingClusterNotifier& notifier, Stats::Scope& scope,
+               ProtobufMessage::ValidationVisitor& validation_visitor);
   void sendAwaiting();
 
   CdsApiHelper helper_;
   ClusterManager& cm_;
+  MissingClusterNotifier& notifier_;
   Stats::ScopePtr scope_;
   StartStatus status_;
   absl::flat_hash_set<std::string> awaiting_names_;

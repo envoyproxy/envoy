@@ -1048,7 +1048,7 @@ ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a way
   // to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, stats_,
+  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, *this, stats_,
                                     validation_visitor);
   return OdCdsApiHandleImpl::create(*this, std::move(odcds));
 }
@@ -1114,19 +1114,33 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
   return std::move(handle);
 }
 
+void ClusterManagerImpl::notifyMissingCluster(absl::string_view name) {
+  ENVOY_LOG(debug, "cm odcds: cluster {} not found during on-demand discovery", name);
+  notifyClusterDiscoveryStatus(name, ClusterDiscoveryStatus::Missing);
+}
+
 void ClusterManagerImpl::notifyExpiredDiscovery(absl::string_view name) {
   ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} timed out", name);
+  notifyClusterDiscoveryStatus(name, ClusterDiscoveryStatus::Timeout);
+}
+
+void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
+                                                      ClusterDiscoveryStatus status) {
   auto map_node_handle = pending_cluster_creations_.extract(name);
-  ASSERT(!map_node_handle.empty());
+  if (map_node_handle.empty()) {
+    // Not a cluster we are interested in. This may happen when ODCDS
+    // receives some cluster name in removed resources field and
+    // notifies the cluster manager about it.
+    return;
+  }
   // Let all the worker threads know that the discovery timed out.
   tls_.runOnAllThreads(
-      [name = std::string(name)](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+      [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         ENVOY_LOG(
             trace,
             "cm cdm: starting processing cluster name {} (status {}) from the expired timer in {}",
-            name, enumToInt(ClusterDiscoveryStatus::Timeout),
-            cluster_manager->thread_local_dispatcher_.name());
-        cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Timeout);
+            name, enumToInt(status), cluster_manager->thread_local_dispatcher_.name());
+        cluster_manager->cdm_.processClusterName(name, status);
       });
 }
 
