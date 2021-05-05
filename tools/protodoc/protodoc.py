@@ -141,7 +141,7 @@ V2_LINK_TEMPLATE = Template(
 
     As of Envoy v1.18 the v2 API has been removed and is no longer supported.
 
-    If you are upgrading from v2 config you may wish to view the API v2 documentation:
+    If you are upgrading from v2 API config you may wish to view the v2 API documentation:
 
         :ref:`{{v2_text}} <{{v2_url}}>`
 
