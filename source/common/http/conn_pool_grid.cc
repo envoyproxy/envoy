@@ -251,6 +251,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   }
   PoolIterator pool = pools_.begin();
   if (!shouldAttemptHttp3()) {
+    // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;
   }
@@ -345,6 +346,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     return true;
   }
   if (host_->address()->type() != Network::Address::Type::Ip) {
+    ENVOY_LOG(error, "Address is not an IP address");
     ASSERT(false);
     return false;
   }
@@ -354,13 +356,14 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
   OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
       alternate_protocols_->findAlternatives(origin);
   if (!protocols.has_value()) {
-    ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", host_->hostname());
+    ENVOY_LOG(trace, "No alternate protocols available for host '{}', skipping HTTP/3.", host_->hostname());
     return false;
   }
 
   for (const AlternateProtocolsCache::AlternateProtocol& protocol : protocols.ref()) {
     // TODO(RyanTheOptimist): Handle alternate protocols which change hostname or port.
     if (!protocol.hostname_.empty() || protocol.port_ != port) {
+      ENVOY_LOG(trace, "Alternate protocol for host '{}' attempts to change host or port, skipping.", host_->hostname());
       continue;
     }
 
@@ -372,6 +375,8 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
         return true;
       }
     }
+
+    ENVOY_LOG(trace, "Alternate protocol for host '{}' has unsupported ALPN '{}', skipping.", host_->hostname(), protocol.alpn_);
   }
 
   ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", host_->hostname());

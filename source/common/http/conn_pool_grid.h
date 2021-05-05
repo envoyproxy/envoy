@@ -173,7 +173,7 @@ private:
   void onDrainReceived();
 
   // Returns true if HTTP/3 should be attempted because there is an alternate protocol
-  // that specifies HTTP/3 and  HTTP/3 is not broken.
+  // that specifies HTTP/3 and HTTP/3 is not broken.
   bool shouldAttemptHttp3();
 
   // Creates the next pool in the priority list, or absl::nullopt if all pools
