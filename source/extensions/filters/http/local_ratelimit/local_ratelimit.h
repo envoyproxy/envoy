@@ -42,17 +42,21 @@ struct LocalRateLimitStats {
   ALL_LOCAL_RATE_LIMIT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using LocalRateLimiterImplSharedPtr =
-    std::shared_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>;
-
 class PerConnectionRateLimiter : public StreamInfo::FilterState::Object {
 public:
-  PerConnectionRateLimiter(LocalRateLimiterImplSharedPtr rl) : rate_limiter_(rl) {}
+  PerConnectionRateLimiter(
+      const std::chrono::milliseconds& fill_interval, uint32_t max_tokens, uint32_t tokens_per_fill,
+      Envoy::Event::Dispatcher& dispatcher,
+      const Protobuf::RepeatedPtrField<
+          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptor)
+      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor) {}
   static const std::string& key();
-  LocalRateLimiterImplSharedPtr value() const { return rate_limiter_; }
+  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
+    return rate_limiter_;
+  }
 
 private:
-  LocalRateLimiterImplSharedPtr rate_limiter_;
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
 };
 
 /**
@@ -75,11 +79,11 @@ public:
   Http::Code status() const { return status_; }
   uint64_t stage() const { return stage_; }
   bool hasDescriptors() const { return has_descriptors_; }
-  std::chrono::milliseconds fillInterval() const { return fill_interval_; }
+  const std::chrono::milliseconds& fillInterval() const { return fill_interval_; }
   uint32_t maxTokens() const { return max_tokens_; }
   uint32_t tokensPerFill() const { return tokens_per_fill_; }
   const Protobuf::RepeatedPtrField<
-      envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>
+      envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>&
   descriptors() const {
     return descriptors_;
   }
@@ -137,7 +141,7 @@ private:
 
   void populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
-  LocalRateLimiterImplSharedPtr getRateLimiter();
+  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getRateLimiter();
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
   const FilterConfig* getConfig() const;

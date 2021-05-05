@@ -119,20 +119,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 bool Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
-  return getRateLimiter()->requestAllowed(request_descriptors);
+  return getRateLimiter().requestAllowed(request_descriptors);
 }
 
-LocalRateLimiterImplSharedPtr Filter::getRateLimiter() {
+const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getRateLimiter() {
   const auto* config = getConfig();
 
   if (!decoder_callbacks_->streamInfo().filterState()->hasData<PerConnectionRateLimiter>(
           PerConnectionRateLimiter::key())) {
-    auto rate_limiter = std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-        config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
-        decoder_callbacks_->dispatcher(), config->descriptors());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
-        PerConnectionRateLimiter::key(), std::make_unique<PerConnectionRateLimiter>(rate_limiter),
+        PerConnectionRateLimiter::key(),
+        std::make_unique<PerConnectionRateLimiter>(
+            config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
+            decoder_callbacks_->dispatcher(), config->descriptors()),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
