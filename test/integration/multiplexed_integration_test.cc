@@ -79,6 +79,8 @@ TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
+  // https://github.com/envoyproxy/envoy/issues/16335
+  EXCLUDE_DOWNSTREAM_HTTP3;
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
