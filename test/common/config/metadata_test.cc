@@ -258,7 +258,7 @@ TEST_F(TypedMetadataTest, AnyMetadataRefreshTest) {
   EXPECT_EQ(nullptr, typed3.get<Foo>(bar_factory_.name()));
 }
 
-// Tests emptry Struct metadata parsing case.
+// Tests empty Struct metadata parsing case.
 TEST_F(TypedMetadataTest, InvalidStructMetadataTest) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] = ProtobufWkt::Struct();
@@ -267,7 +267,7 @@ TEST_F(TypedMetadataTest, InvalidStructMetadataTest) {
                             "Cannot create a Foo when Struct metadata is empty.");
 }
 
-// Tests emptry Any metadata parsing case.
+// Tests empty Any metadata parsing case.
 TEST_F(TypedMetadataTest, InvalidAnyMetadataTest) {
   envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_typed_filter_metadata())[bar_factory_.name()] = ProtobufWkt::Any();
