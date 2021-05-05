@@ -17,11 +17,12 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, deps = []):
+def envoy_mobile_swift_test(name, srcs, data = [], deps = []):
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
         srcs = srcs,
+        data = data,
         deps = [
             "//library/swift:ios_framework_archive",
         ] + deps,
@@ -31,6 +32,7 @@ def envoy_mobile_swift_test(name, srcs, deps = []):
 
     ios_unit_test(
         name = name,
+        data = data,
         deps = [test_lib_name],
         minimum_os_version = "11.0",
     )

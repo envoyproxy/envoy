@@ -11,6 +11,7 @@ repos:
     - id: check-yaml
       exclude: '.clang-format'
     - id: detect-private-key
+      exclude: 'experimental/swift/QUICStreamTest.swift'
     - id: mixed-line-ending
 - repo: https://github.com/codespell-project/codespell
   rev: v1.16.0
