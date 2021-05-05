@@ -284,6 +284,8 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
         options->push_back(std::make_shared<Network::SocketOptionImpl>(
             envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
             absl::string_view(reinterpret_cast<char*>(&prog), sizeof(prog))));
+      } else {
+        ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
       }
     });
 
