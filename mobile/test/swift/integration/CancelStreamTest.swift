@@ -9,6 +9,7 @@ final class CancelStreamTests: XCTestCase {
     let hcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
     let pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+    let filterName = "cancel_validation_filter"
     let config =
     """
     static_resources:
@@ -53,7 +54,7 @@ final class CancelStreamTests: XCTestCase {
             - name: envoy.filters.http.platform_bridge
               typed_config:
                 "@type": \(pbfType)
-                platform_filter_name: cancel_validation_filter
+                platform_filter_name: \(filterName)
             - name: envoy.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -102,7 +103,7 @@ final class CancelStreamTests: XCTestCase {
     let client = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .addPlatformFilter(
-        name: "cancel_validation_filter",
+        name: filterName,
         factory: { CancelValidationFilter(expectation: filterExpectation) }
       )
       .build()

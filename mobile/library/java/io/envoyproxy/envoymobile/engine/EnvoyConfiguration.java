@@ -39,8 +39,8 @@ public class EnvoyConfiguration {
    * @param appId                        the App ID of the App using this Envoy Client.
    * @param virtualClusters              the JSON list of virtual cluster configs.
    * @param nativeFilterChain            the configuration for native filters.
-   * @param httpPlatformFilterFactories          the configuration for platform filters.
-   * @param stringAccesssors             platform string accessors to register.
+   * @param httpPlatformFilterFactories  the configuration for platform filters.
+   * @param stringAccessors              platform string accessors to register.
    */
   public EnvoyConfiguration(String statsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,

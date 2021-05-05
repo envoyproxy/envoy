@@ -12,7 +12,11 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 internal class MockEnvoyEngine : EnvoyEngine {
   override fun runWithConfig(envoyConfiguration: EnvoyConfiguration?, logLevel: String?): Int = 0
 
-  override fun runWithConfig(configurationYAML: String?, logLevel: String?): Int = 0
+  override fun runWithTemplate(
+    configurationYAML: String,
+    envoyConfiguration: EnvoyConfiguration,
+    logLevel: String
+  ): Int = 0
 
   override fun startStream(callbacks: EnvoyHTTPCallbacks?): EnvoyHTTPStream = MockEnvoyHTTPStream(callbacks!!)
 

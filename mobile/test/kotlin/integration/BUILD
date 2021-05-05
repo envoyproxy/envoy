@@ -27,3 +27,17 @@ envoy_mobile_jni_kt_test(
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
+
+envoy_mobile_jni_kt_test(
+    name = "cancel_stream_test",
+    srcs = [
+        "CancelStreamTest.kt",
+    ],
+    native_deps = [
+        "//library/common/jni:libjava_jni_lib.so",
+        "//library/common/jni:java_jni_lib.jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
