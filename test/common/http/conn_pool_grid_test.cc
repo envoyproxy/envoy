@@ -158,7 +158,8 @@ public:
 TEST_F(ConnectivityGridTest, Success) {
   EXPECT_EQ(grid_.first(), nullptr);
 
-  EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr);
+  EXPECT_LOG_CONTAINS("trace", "No alternate protocols cache. Attempting HTTP/3 to host 'hostname'.",
+                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_EQ(grid_.second(), nullptr);
 

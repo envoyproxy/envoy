@@ -339,7 +339,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
   }
   if (!alternate_protocols_.has_value()) {
   // TODO(RyanTheOptimist): Make the alternate protocols cache required.
-    ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}', skipping.",
+    ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}'.",
               host_->hostname());
     return true;
   }
