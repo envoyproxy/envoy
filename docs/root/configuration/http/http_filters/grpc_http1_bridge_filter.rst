@@ -31,4 +31,26 @@ response trailers to a compliant gRPC server. It works by doing the following:
 * Because this scheme must buffer the response to look for the *grpc-status* trailer it will only
   work with unary gRPC APIs.
 
+This filter also collects stats for all gRPC requests that transit, even if those requests are
+normal gRPC requests over HTTP/2.
+
 More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
+
+.. attention::
+
+   Note that statistics are also collected by the dedicated :ref:`gRPC stats filter
+   <config_http_filters_grpc_stats>`. The use of this filter for gRPC telemetry
+   has been deprecated.
+
+Statistics
+----------
+
+The filter emits statistics in the *cluster.<route target cluster>.grpc.* namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  <grpc service>.<grpc method>.success, Counter, Total successful service/method calls
+  <grpc service>.<grpc method>.failure, Counter, Total failed service/method calls
+  <grpc service>.<grpc method>.total, Counter, Total service/method calls

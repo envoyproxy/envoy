@@ -3,6 +3,9 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/grpc/context_impl.h"
+#include "common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -12,7 +15,7 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  Http1BridgeFilter() = default;
+  explicit Http1BridgeFilter(Grpc::Context& context) : context_(context) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -45,12 +48,24 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
+  bool doStatTracking() const { 
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_stats_disabled")) {
+      return false;
+    }
+    return request_stat_names_.has_value(); 
+  }
+
 private:
+  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
+  void setupStatTracking(const Http::RequestHeaderMap& headers);
+
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
+  Grpc::Context& context_;
 };
 
 } // namespace GrpcHttp1Bridge
