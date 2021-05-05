@@ -1585,8 +1585,12 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   // Allow metadata usage.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
