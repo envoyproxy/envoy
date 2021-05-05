@@ -1726,5 +1726,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
