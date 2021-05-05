@@ -278,7 +278,7 @@ def build_file_contents(root, files):
         A string containing the canonical BUILD file content for root.
     """
     import_deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
-    history_deps = set() #
+    history_deps = set()
     # sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files], []))
     deps = import_deps.union(history_deps)
     _has_services = any(has_services(os.path.join(root, f)) for f in files)
