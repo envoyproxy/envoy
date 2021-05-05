@@ -1,7 +1,10 @@
 .. _arch_overview_http3:
 
+HTTP3 overview
+==============
+
 HTTP3 downstream
-================
+----------------
 
 HTTP/3 downstream support is still in Alpha, and should be used with caution.
 Outstanding issues required for HTTP/3 to go GA can be found
@@ -14,7 +17,7 @@ ensuring the downstream transport socket is a QuicDownstreamTransport.
 See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.template.yaml1>` for example configuration.
 
 Note that the example configuration includes both a TCP and a UDP listener, and the TCP
-listener is advertising http/3 support via an alt-svc header. Advertising HTTP/3 is not necessary for
+listener is advertising http/3 support via an ``alt-svc header``. Advertising HTTP/3 is not necessary for
 in-house deployments where HTTP/3 is explicitly configured, but is needed for internet facing deployments
 where TCP is the default, and clients such as Chrome will only attempt HTTP/3 if it is explicitly advertised.
 
@@ -24,7 +27,7 @@ use BPF by default if multiple worker threads are configured, but may require ro
 (e.g. sudo setcap cap_bpf+ep). Envoy will log a warning on start-up if BPF is attempted and fails.
 
 HTTP3 upstream
-===============
+--------------
 
 HTTP/3 upstream support is still in Alpha, and should be used with caution.
 Outstanding issues required for HTTP/3 to go GA can be found

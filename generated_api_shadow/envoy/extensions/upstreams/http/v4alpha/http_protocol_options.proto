@@ -63,7 +63,7 @@ message HttpProtocolOptions {
       "envoy.extensions.upstreams.http.v3.HttpProtocolOptions";
 
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
-  // Note that HTTP/2 or above should generally be used for upstream clusters doing gRPC.
+  // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
   message ExplicitHttpConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.extensions.upstreams.http.v3.HttpProtocolOptions.ExplicitHttpConfig";
@@ -75,7 +75,7 @@ message HttpProtocolOptions {
 
       config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 
-      // .. note::
+      // .. warning::
       //   QUIC support is currently alpha and should be used with caution.
       //
       //   See comments :ref:`here <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`
@@ -94,7 +94,7 @@ message HttpProtocolOptions {
 
     config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 
-    // .. note::
+    // .. warning::
     //   QUIC support is currently alpha and should be used with caution.
     //
     //   See comments :ref:`here <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`
@@ -125,7 +125,7 @@ message HttpProtocolOptions {
     // See :ref:`here <arch_overview_http3_upstream>` for more information on
     // when HTTP/3 will be used, and when Envoy will fail over to TCP.
     //
-    // .. note::
+    // .. warning::
     //   QUIC support is currently alpha and should be used with caution.
     //   AutoHttpConfig config is undergoing especially rapid change and as it
     //   is alpha is not guaranteed to be API-stable.
