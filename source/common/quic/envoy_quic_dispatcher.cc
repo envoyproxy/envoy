@@ -95,8 +95,11 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
 quic::QuicConnectionId EnvoyQuicDispatcher::ReplaceLongServerConnectionId(
     const quic::ParsedQuicVersion& /*version*/, const quic::QuicConnectionId& server_connection_id,
     uint8_t expected_server_connection_id_length) const {
-  quic::QuicConnectionId new_connection_id = server_connection_id;
-  new_connection_id.set_length(expected_server_connection_id_length);
+  quic::QuicConnectionId new_connection_id = quic::QuicUtils::CreateReplacementConnectionId(
+      server_connection_id, expected_server_connection_id_length);
+  char* new_connection_id_data = new_connection_id.mutable_data();
+  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
+  memcpy(new_connection_id_data, server_connection_id.data(), 4);
   return new_connection_id;
 }
 
