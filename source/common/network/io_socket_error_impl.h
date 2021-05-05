@@ -9,10 +9,11 @@ namespace Network {
 
 class IoSocketError : public Api::IoError {
 public:
-  explicit IoSocketError(int sys_errno) : errno_(sys_errno), error_code_(errorCodeFromErrno()) {}
-  explicit IoSocketError(int sys_errno, Api::IoError::IoErrorCode error_code)
-      : errno_(sys_errno), error_code_(error_code) {}
-
+  explicit IoSocketError(int sys_errno)
+      : errno_(sys_errno), error_code_(errorCodeFromErrno(errno_)) {
+    ASSERT(error_code_ != IoErrorCode::Again,
+           "Didn't use getIoSocketEagainInstance() to generate `Again`.");
+  }
   ~IoSocketError() override = default;
 
   Api::IoError::IoErrorCode getErrorCode() const override;
@@ -23,6 +24,9 @@ public:
   // deleter deleteIoError() below to avoid deallocating memory for this error.
   static IoSocketError* getIoSocketEagainInstance();
 
+  // Similar case for `IoErrorCode::NoSupport`
+  static IoSocketError* getIoSocketInvalidAddressInstance();
+
   // This error is introduced when Envoy create socket for unsupported address. It is either a bug,
   // or this Envoy instance received config which is not yet supported. This should not be fatal
   // error.
@@ -31,11 +35,15 @@ public:
   // Deallocate memory only if the error is not Again.
   static void deleteIoError(Api::IoError* err);
 
-private:
-  int errno_;
-  Api::IoError::IoErrorCode error_code_;
+  // Map a system error code to an Envoy `IoErrorCode`
+  static Api::IoError::IoErrorCode errorCodeFromErrno(int sys_errno);
 
-  Api::IoError::IoErrorCode errorCodeFromErrno() const;
+private:
+  explicit IoSocketError(int sys_errno, Api::IoError::IoErrorCode error_code)
+      : errno_(sys_errno), error_code_(error_code) {}
+
+  const int errno_;
+  const Api::IoError::IoErrorCode error_code_;
 };
 
 } // namespace Network
