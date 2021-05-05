@@ -36,6 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Bootstrap]
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root
 // of the Envoy v2 configuration. See the :ref:`v2 configuration overview
+// TEST CHANGE IN API
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
@@ -99,7 +100,9 @@ message Bootstrap {
     core.v3.ApiConfigSource ads_config = 3;
   }
 
-  reserved 10;
+  reserved 10, 11;
+
+  reserved "runtime";
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
@@ -293,12 +296,6 @@ message Bootstrap {
   // field.
   // [#not-implemented-hide:]
   map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
-
-  Runtime hidden_envoy_deprecated_runtime = 11 [
-    deprecated = true,
-    (envoy.annotations.deprecated_at_minor_version) = "3.0",
-    (envoy.annotations.disallowed_by_default) = true
-  ];
 }
 
 // Administration interface :ref:`operations documentation
