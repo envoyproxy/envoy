@@ -179,8 +179,9 @@ private:
       cluster_.cluster_stats_.sess_rx_datagrams_dropped_.add(dropped);
     }
     size_t numPacketsExpectedPerEventLoop() const final {
-      // Use 32k to read the same amount as a TCP connection.
-      return 32u;
+      // This will be capped by MAX_NUM_PACKETS_PER_EVENT_LOOP packets anyway.
+      // TODO(mattklein123) change this limit to a reasonable number if needed.
+      return std::numeric_limits<size_t>::max();
     }
 
     ClusterInfo& cluster_;

@@ -37,10 +37,6 @@ public:
   void onDatagramsDropped(uint32_t dropped) final {
     udp_stats_.downstream_rx_datagram_dropped_.add(dropped);
   }
-  size_t numPacketsExpectedPerEventLoop() const final {
-    // This will be capped by UDP listener limit anyway.
-    return std::numeric_limits<size_t>::max();
-  }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
@@ -86,6 +82,10 @@ public:
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
+  size_t numPacketsExpectedPerEventLoop() const final {
+    // This will be capped by UDP listener limit anyway.
+    return std::numeric_limits<size_t>::max();
+  }
 
   // Network::UdpWorker
   void onDataWorker(Network::UdpRecvData&& data) override;
