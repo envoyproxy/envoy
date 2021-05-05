@@ -14,7 +14,7 @@ ensuring the downstream transport socket is a QuicDownstreamTransport.
 See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.template.yaml1>` for example configuration.
 
 Note that the example configuration includes both a TCP and a UDP listener, and the TCP
-listener is advertising http/3 support via alt-svc header. Advertising HTTP/3 is not necessary for
+listener is advertising http/3 support via an alt-svc header. Advertising HTTP/3 is not necessary for
 in-house deployments where HTTP/3 is explicitly configured, but is needed for internet facing deployments
 where TCP is the default, and clients such as Chrome will only attempt HTTP/3 if it is explicitly advertised.
 

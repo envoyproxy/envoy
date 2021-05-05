@@ -126,8 +126,9 @@ message HttpProtocolOptions {
     // when HTTP/3 will be used, and when Envoy will fail over to TCP.
     //
     // .. note::
-    //   QUIC support is currently alpha and should be used with caution, and
-    //   the auto config is undergoing especially rapid change.
+    //   QUIC support is currently alpha and should be used with caution.
+    //   AutoHttpConfig config is undergoing especially rapid change and as it
+    //   is alpha is not guaranteed to be API-stable.
     //
     //   See comments :ref:`here <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`
     //   for details.
