@@ -90,7 +90,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
 
   uint32_t step_count = 0;
   cbs_.runCallbacksWith([&](auto cb) {
-    // siwtch to floating-point math to avoid issues with integer division
+    // switch to floating-point math to avoid issues with integer division
     std::chrono::milliseconds delay{static_cast<int64_t>(
         static_cast<double>(step_count) / 4 / cbs_.size() *
         std::chrono::duration_cast<std::chrono::milliseconds>(remaining_time).count())};
