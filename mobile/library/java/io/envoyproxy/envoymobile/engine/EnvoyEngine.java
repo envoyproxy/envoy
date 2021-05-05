@@ -1,8 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
-import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
-import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 import java.util.Map;
@@ -25,11 +23,15 @@ public interface EnvoyEngine {
   /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
+   * The envoyConfiguration is used to resolve the configurationYAML.
+   *
    * @param configurationYAML The configuration yaml with which to start Envoy.
+   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithConfig(String configurationYAML, String logLevel);
+  int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
+                      String logLevel);
 
   /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.

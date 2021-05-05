@@ -223,7 +223,17 @@ open class EngineBuilder(
   fun build(): Engine {
     return when (configuration) {
       is Custom -> {
-        EngineImpl(engineType(), configuration.yaml, logLevel)
+        EngineImpl(
+          engineType(),
+          EnvoyConfiguration(
+            statsDomain, connectTimeoutSeconds,
+            dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
+            statsFlushSeconds, appVersion, appId, virtualClusters, nativeFilterChain,
+            platformFilterChain, stringAccessors
+          ),
+          configuration.yaml,
+          logLevel
+        )
       }
       is Standard -> {
         EngineImpl(
