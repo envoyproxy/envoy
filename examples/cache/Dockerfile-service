@@ -7,4 +7,7 @@ COPY ./start_service.sh /usr/local/bin/start_service.sh
 COPY ./service-envoy.yaml /etc/service-envoy.yaml
 COPY ./service.py /code
 RUN chmod u+x /usr/local/bin/start_service.sh
-ENTRYPOINT /usr/local/bin/start_service.sh
+
+CMD ["python3", "/code/service.py"]
+
+# ENTRYPOINT /usr/local/bin/start_service.sh
