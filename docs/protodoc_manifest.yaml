@@ -6,7 +6,7 @@ fields:
         resource_monitors:
         - name: "envoy.resource_monitors.fixed_heap"
           typed_config:
-            "@type": type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig
+            "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
             max_heap_size_bytes: 1073741824
         actions:
         - name: "envoy.overload_actions.shrink_heap"
@@ -52,3 +52,8 @@ fields:
       example: 300s # 5 mins
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address:
     edge_config: { example: true }
+  envoy.config.listener.v3.QuicProtocolOptions.quic_protocol_options:
+    edge_config:
+      example:
+        initial_stream_window_size: 65536 # 64 KiB
+        initial_connection_window_size: 65536 # 64 KiB

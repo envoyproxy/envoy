@@ -41,20 +41,17 @@ Buffer::OwnedImpl encodeHeaders(nghttp2_hd_deflater* deflater,
   // Estimate the upper bound
   const size_t buflen = nghttp2_hd_deflate_bound(deflater, input_nv.data(), input_nv.size());
 
-  Buffer::RawSlice iovec;
   Buffer::OwnedImpl payload;
-  payload.reserve(buflen, &iovec, 1);
-  ASSERT(iovec.len_ >= buflen);
+  auto reservation = payload.reserveSingleSlice(buflen);
 
   // Encode using nghttp2
-  uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
+  uint8_t* buf = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   ASSERT(input_nv.data() != nullptr);
   const ssize_t result =
       nghttp2_hd_deflate_hd(deflater, buf, buflen, input_nv.data(), input_nv.size());
   ASSERT(result >= 0, absl::StrCat("Failed to decode with result ", result));
 
-  iovec.len_ = result;
-  payload.commit(&iovec, 1);
+  reservation.commit(result);
 
   return payload;
 }

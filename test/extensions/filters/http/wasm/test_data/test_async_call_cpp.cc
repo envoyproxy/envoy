@@ -27,7 +27,7 @@ static RegisterContextFactory register_AsyncCallContext(CONTEXT_FACTORY(AsyncCal
                                                         ROOT_FACTORY(AsyncCallRootContext),
                                                         "async_call");
 
-FilterHeadersStatus AsyncCallContext::onRequestHeaders(uint32_t, bool end_of_stream) {
+FilterHeadersStatus AsyncCallContext::onRequestHeaders(uint32_t, bool) {
   auto context_id = id();
   auto callback = [context_id](uint32_t, size_t body_size, uint32_t) {
     if (body_size == 0) {
@@ -47,29 +47,31 @@ FilterHeadersStatus AsyncCallContext::onRequestHeaders(uint32_t, bool end_of_str
       logWarn(std::string(p.first) + std::string(" -> ") + std::string(p.second));
     }
   };
-  if (end_of_stream) {
+  auto path = getRequestHeader(":path");
+  if (path->view() == "/bad") {
     if (root()->httpCall("cluster", {{":method", "POST"}, {":path", "/"}, {":authority", "foo"}},
-                         "hello world", {{"trail", "cow"}}, 1000, callback) == WasmResult::Ok) {
-      logError("expected failure did not");
+                         "hello world", {{"trail", "cow"}}, 1000, callback) != WasmResult::Ok) {
+      logInfo("async_call rejected");
     }
-    return FilterHeadersStatus::Continue;
+  } else {
+    if (root()->httpCall("bogus cluster",
+                         {{":method", "POST"}, {":path", "/"}, {":authority", "foo"}},
+                         "hello world", {{"trail", "cow"}}, 1000, callback) == WasmResult::Ok) {
+      logError("bogus cluster found error");
+    }
+    if (root()->httpCall("cluster", {{":method", "POST"}, {":path", "/"}, {":authority", "foo"}},
+                         "hello world", {{"trail", "cow"}}, 0xFFFFFFFF,
+                         callback) == WasmResult::Ok) {
+      logError("bogus timeout accepted error");
+    }
+    if (root()->httpCall("cluster", {{":method", "POST"}, {":authority", "foo"}}, "hello world",
+                         {{"trail", "cow"}}, 1000, callback) == WasmResult::Ok) {
+      logError("emissing path accepted error");
+    }
+    root()->httpCall("cluster", {{":method", "POST"}, {":path", "/"}, {":authority", "foo"}},
+                     "hello world", {{"trail", "cow"}}, 1000, callback);
+    logInfo("onRequestHeaders");
   }
-  if (root()->httpCall("bogus cluster",
-                       {{":method", "POST"}, {":path", "/"}, {":authority", "foo"}}, "hello world",
-                       {{"trail", "cow"}}, 1000, callback) == WasmResult::Ok) {
-    logError("bogus cluster found error");
-  }
-  if (root()->httpCall("cluster", {{":method", "POST"}, {":path", "/"}, {":authority", "foo"}},
-                       "hello world", {{"trail", "cow"}}, 0xFFFFFFFF, callback) == WasmResult::Ok) {
-    logError("bogus timeout accepted error");
-  }
-  if (root()->httpCall("cluster", {{":method", "POST"}, {":authority", "foo"}}, "hello world",
-                       {{"trail", "cow"}}, 1000, callback) == WasmResult::Ok) {
-    logError("emissing path accepted error");
-  }
-  root()->httpCall("cluster", {{":method", "POST"}, {":path", "/"}, {":authority", "foo"}},
-                   "hello world", {{"trail", "cow"}}, 1000, callback);
-  logInfo("onRequestHeaders");
   return FilterHeadersStatus::StopIteration;
 }
 

@@ -13,8 +13,6 @@ startup --host_jvm_args=-Xmx2g
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --experimental_strict_action_env=true
 build --host_force_python=PY3
-build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
@@ -26,6 +24,8 @@ build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
 build:linux --features=per_object_debug_info
+build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
+build:linux --action_env=BAZEL_LINKOPTS=-lm
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -72,6 +72,7 @@ build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
 build:macos --cxxopt=-std=c++17
+
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
@@ -143,7 +144,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/common/quic/platform)[/:],//include[/:]"
 build:test-coverage --test_arg="-l trace"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -174,7 +175,7 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/10.0.0/lib/linux
+build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/11.0.1/lib/linux
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
 
@@ -245,8 +246,8 @@ build:remote-clang-cl --config=clang-cl
 build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
-# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:11efa5680d987fff33fde4af3cc5ece105015d04
+# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3d0491e2034287959a292806e3891fd0b7dd2703
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -277,18 +278,41 @@ build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
+
+# Shared fuzzing configuration.
+build:fuzzing --define=ENVOY_CONFIG_ASAN=1
+build:fuzzing --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+build:fuzzing --config=libc++
+
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
+build:plain-fuzzer --config=fuzzing
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
+# The fuzzing rules provide their own instrumentation, but it is currently
+# disabled due to bazelbuild/bazel#12888. Instead, we provide instrumentation at
+# the top level through these options.
 build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
-build:plain-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 
 build:asan-fuzzer --config=plain-fuzzer
 build:asan-fuzzer --config=asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
+
+build:oss-fuzz --config=fuzzing
+build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
+build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=oss-fuzz
+build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none
+build:oss-fuzz --dynamic_mode=off
+build:oss-fuzz --strip=never
+build:oss-fuzz --copt=-fno-sanitize=vptr
+build:oss-fuzz --linkopt=-fno-sanitize=vptr
+build:oss-fuzz --define=tcmalloc=disabled
+build:oss-fuzz --define=signal_trace=disabled
+build:oss-fuzz --copt=-D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
+build:oss-fuzz --define=force_libcpp=enabled
+build:oss-fuzz --linkopt=-lc++
+build:oss-fuzz --linkopt=-pthread
 
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb
@@ -329,7 +353,6 @@ build:clang-cl --copt="-Wno-builtin-macro-redefined"
 #     overrides a member function but is not marked 'override'
 #   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
 build:clang-cl --copt="-Wno-inconsistent-missing-override"
-build:clang-cl --action_env=USE_CLANG_CL=1
 
 # Defaults to 'auto' - Off for windows, so override to linux behavior
 build:windows --enable_runfiles=yes

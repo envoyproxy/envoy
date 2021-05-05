@@ -5,6 +5,7 @@
 #include <string>
 
 #include "common/http/codec_client.h"
+#include "common/http/http3/quic_client_connection_factory.h"
 #include "common/network/filter_impl.h"
 
 #include "test/common/http/http2/http2_frame.h"
@@ -88,13 +89,6 @@ using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
-  // TODO(jmarantz): Remove this once
-  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
-  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::httpProxyConfig())
-      : HttpIntegrationTest(downstream_protocol, version, config) {}
-
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
@@ -105,6 +99,8 @@ public:
                       const std::string& config = ConfigHelper::httpProxyConfig());
   ~HttpIntegrationTest() override;
 
+  void initialize() override;
+
 protected:
   void useAccessLog(absl::string_view format = "",
                     std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
@@ -114,6 +110,9 @@ protected:
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options);
+  // Makes a downstream network connection object based on client codec version.
+  Network::ClientConnectionPtr makeClientConnectionWithOptions(
+      uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   // Makes a http connection object with asserting a connected state.
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
@@ -130,6 +129,8 @@ protected:
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
   // bytes of body downstream.
+  // Waits |time| ms for both the request to be proxied upstream and the
+  // response to be proxied downstream.
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
@@ -184,10 +185,12 @@ protected:
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
   void testRouterVirtualClusters();
+  void testRouterUpstreamProtocolError(const std::string&, const std::string&);
 
-  void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
-                                            bool big_header, bool set_content_length_header = false,
-                                            ConnectionCreationFunction* creator = nullptr);
+  void testRouterRequestAndResponseWithBody(
+      uint64_t request_size, uint64_t response_size, bool big_header,
+      bool set_content_length_header = false, ConnectionCreationFunction* creator = nullptr,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
@@ -210,7 +213,8 @@ protected:
                         uint32_t max_size);
   void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
-                               uint32_t max_count = 100);
+                               uint32_t max_count = 100,
+                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
   void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
@@ -242,6 +246,10 @@ protected:
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);
 
+  Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
+  // Must outlive |codec_client_| because it may not close connection till the end of its life
+  // scope.
+  std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
   // A placeholder for the first upstream connection.
@@ -256,10 +264,11 @@ protected:
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
-  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
-  uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
+
+  bool set_reuse_port_{false};
+  std::string san_to_match_{"spiffe://lyft.com/backend-team"};
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

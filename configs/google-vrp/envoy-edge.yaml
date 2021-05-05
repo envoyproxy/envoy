@@ -3,7 +3,7 @@ overload_manager:
   resource_monitors:
   - name: "envoy.resource_monitors.fixed_heap"
     typed_config:
-      "@type": type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig
+      "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
       # TODO: Tune for your system.
       max_heap_size_bytes: 1073741824 # 1 GiB
   actions:
@@ -78,7 +78,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.router
   clusters:
-    name: service_foo
+  - name: service_foo
     connect_timeout: 5s
     per_connection_buffer_limit_bytes: 32768 # 32 KiB
     load_assignment:

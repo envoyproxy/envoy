@@ -9,7 +9,6 @@ import "envoy/type/percent.proto";
 import "envoy/type/semantic_version.proto";
 
 import "google/protobuf/any.proto";
-import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 

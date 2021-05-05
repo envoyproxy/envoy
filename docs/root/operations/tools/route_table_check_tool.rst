@@ -14,12 +14,12 @@ Usage
       :ref:`config <config_tools_router_check_tool>`.
       The tool config input file specifies urls (composed of authorities and paths)
       and expected route parameter values. Additional parameters such as additional headers are optional.
-      
+
       Schema: All internal schemas in the tool are based on :repo:`proto3 <test/tools/router_check/validation.proto>`.
 
     -c <string>,  --config-path <string>
       Path to a v2 router config file (YAML or JSON). The router config file schema is found in
-      :ref:`config <envoy_api_file_envoy/api/v2/route/route.proto>` and the config file extension
+      :ref:`config <envoy_v3_api_file_envoy/config/route/v3/route.proto>` and the config file extension
       must reflect its file type (for instance, .json for JSON and .yaml for YAML).
 
     -d,  --details
@@ -45,8 +45,8 @@ Output
   The program exits with status EXIT_FAILURE if any test case does not match the expected route parameter
   value.
 
-  If a test fails, details of the failed test cases are printed if ``--details`` flag is provided. 
-  The first field is the expected route parameter value. The second field is the actual route parameter value. 
+  If a test fails, details of the failed test cases are printed if ``--details`` flag is provided.
+  The first field is the expected route parameter value. The second field is the actual route parameter value.
   The third field indicates the parameter that is compared.
   In the following example, Test_2 and Test_5 failed while the other tests
   passed. In the failed test cases, conflict details are printed. ::

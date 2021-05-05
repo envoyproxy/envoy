@@ -6,13 +6,16 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+# TODO(phlax): remove openssl bug workaround when openssl/ubuntu are updated
+#    see #15555 for more info
+touch ~/.rnd
 
 create_self_signed_certs () {
     local domain="$1"
     openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
-	    -subj "/C=US/ST=CA/O=MyExample, Inc./CN=${domain}.example.com" \
-	    -keyout "certs/${domain}.key.pem" \
-	    -out "certs/${domain}.crt.pem"
+            -subj "/C=US/ST=CA/O=MyExample, Inc./CN=${domain}.example.com" \
+            -keyout "certs/${domain}.key.pem" \
+            -out "certs/${domain}.crt.pem"
 }
 
 mkdir -p certs

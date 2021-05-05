@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
@@ -20,7 +20,7 @@ namespace InjectedResourceMonitor {
 class InjectedResourceMonitor : public Server::ResourceMonitor {
 public:
   InjectedResourceMonitor(
-      const envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig&
+      const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context);
 

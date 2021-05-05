@@ -40,7 +40,7 @@ Dependency declarations must:
   and `urls` to reference the version. If you need to reference version `X.Y.Z` as `X_Y_Z`, this
   may appear in a string as `{underscore_version}`, similarly for `X-Y-Z` you can use
   `{dash_version}`.
-* Versions should prefer release versions over master branch GitHub SHA tarballs. A comment is
+* Versions should prefer release versions over main branch GitHub SHA tarballs. A comment is
   necessary if the latter is used. This comment should contain the reason that a non-release
   version is being used.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
@@ -58,10 +58,10 @@ Dependency declarations must:
   be used if no CPE for the project is available in the CPE database. CPEs should be _versionless_
   with a `:*` suffix, since the version can be computed from `version`.
 
-When build or test code references Python modules, they should be imported via `pip3_import` in
+When build or test code references Python modules, they should be specified via `pip_install` in
 [bazel/repositories_extra.bzl](bazel/repositories_extra.bzl). Python modules should not be listed in
 `repository_locations.bzl` entries. `requirements.txt` files for Python dependencies must pin to
-exact versions, e.g. `PyYAML==5.3.1` and ideally also include a [SHA256
+exact versions, e.g. `PyYAML==5.4.1` and ideally also include a [SHA256
 checksum](https://davidwalsh.name/hashin).
 
 Pure developer tooling and documentation builds may reference Python via standalone
@@ -112,7 +112,7 @@ basis:
 
 * Extension [CODEOWNERS](CODEOWNERS) should update extension specific dependencies.
 
-Where possible, we prefer the latest release version for external dependencies, rather than master
+Where possible, we prefer the latest release version for external dependencies, rather than main
 branch GitHub SHA tarballs.
 
 ## Dependency shepherds

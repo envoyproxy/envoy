@@ -1,5 +1,11 @@
+.. _watchdog_api_reference:
+
 Watchdog
 ========
+
+.. note::
+
+ These features are not supported on Windows.
 
 .. toctree::
   :glob:

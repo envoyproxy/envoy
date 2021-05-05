@@ -9,18 +9,21 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+# TODO(phlax): remove openssl bug workaround when openssl/ubuntu are updated
+#    see #15555 for more info
+touch ~/.rnd
 
 interact_ws () {
     local port="$1" \
-	  protocol="$2" \
-	  backend="$3" \
-	  insecure=""
+          protocol="$2" \
+          backend="$3" \
+          insecure=""
     if [ "$protocol" == "wss" ]; then
-       insecure="--insecure"
+        insecure="--insecure"
     fi
     expect <<EOF
 set timeout 1
-spawn docker run --rm -ti --network=host solsson/websocat $insecure $protocol://localhost:$port
+spawn docker run --rm -ti --network=host solsson/websocat $insecure $protocol://127.0.0.1:$port
 set ret 1
 expect "\n"
 send "HELO\n"

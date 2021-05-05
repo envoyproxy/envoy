@@ -13,7 +13,6 @@ A minimal fully static bootstrap config is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -66,7 +65,6 @@ on 127.0.0.1:5678 is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -137,7 +135,7 @@ an otherwise completely dynamic configurations, some static resources need to
 be defined to point Envoy at its xDS management server(s).
 
 It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_v3_api_msg_config.core.v3.TcpKeepalive>`
-in the `tcp_keepalive` block. This will help detect TCP half open connections to the xDS management
+in the ``tcp_keepalive`` block. This will help detect TCP half open connections to the xDS management
 server and re-establish a full connection.
 
 In the above example, the EDS management server could then return a proto encoding of a
@@ -174,7 +172,6 @@ below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 

@@ -64,8 +64,11 @@ public:
 
   template <typename ConvertibleToKey>
   RaiiMapOfListElement(MapOfList& map, const ConvertibleToKey& key, Value value)
-      : map_(map), list_(map_.try_emplace(key).first->second), key_(key), cancelled_(false) {
-    it_ = list_.emplace(list_.begin(), value);
+      : map_(map), key_(key), cancelled_(false) {
+    // The list reference itself cannot be saved because it is not stable in the event of a
+    // absl::flat_hash_map rehash.
+    std::list<Value>& list = map_.try_emplace(key).first->second;
+    it_ = list.emplace(list.begin(), value);
   }
 
   virtual ~RaiiMapOfListElement() {
@@ -79,16 +82,18 @@ public:
 private:
   void erase() {
     ASSERT(!cancelled_);
-    list_.erase(it_);
-    if (list_.empty()) {
+    auto list_it = map_.find(key_);
+    ASSERT(list_it != map_.end());
+
+    list_it->second.erase(it_);
+    if (list_it->second.empty()) {
       map_.erase(key_);
     }
     cancelled_ = true;
   }
 
   MapOfList& map_;
-  std::list<Value>& list_;
-  // Because of absl::flat_hash_map iterator instability we have to keep a copy of the key
+  // Because of absl::flat_hash_map iterator instability we have to keep a copy of the key.
   const Key key_;
   typename MapOfList::mapped_type::iterator it_;
   bool cancelled_;

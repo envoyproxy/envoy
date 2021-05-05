@@ -6,8 +6,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
+#include "extensions/filters/http/cache/cache_custom_headers.h"
 #include "extensions/filters/http/cache/cacheability_utils.h"
-#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
@@ -56,7 +56,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
-  if (!CacheabilityUtils::isCacheableRequest(headers)) {
+  if (!CacheabilityUtils::canServeRequestFromCache(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
@@ -65,6 +65,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
+  is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
   ASSERT(lookup_);
@@ -91,12 +92,17 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
-    return Http::FilterHeadersStatus::StopIteration;
+    if (is_head_request_) {
+      // Return since HEAD requests are not cached
+      return Http::FilterHeadersStatus::Continue;
+    } else {
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   // Either a cache miss or a cache entry that is no longer valid.
   // Check if the new response can be cached.
-  if (request_allows_inserts_ &&
+  if (request_allows_inserts_ && !is_head_request_ &&
       CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
@@ -366,7 +372,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   // freshly served response from the origin, unless the 304 response has an Age header, which
   // means it was served by an upstream cache.
   // Remove any existing Age header in the cached response.
-  lookup_result_->headers_->removeInline(age_handle.handle());
+  lookup_result_->headers_->removeInline(CacheCustomHeaders::age());
 
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
@@ -404,8 +410,9 @@ bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& respons
   // and assuming a single cached response per key:
   // If the 304 response contains a strong validator (etag) that does not match the cached response,
   // the cached response should not be updated.
-  const Http::HeaderEntry* response_etag = response_headers.getInline(etag_handle.handle());
-  const Http::HeaderEntry* cached_etag = lookup_result_->headers_->getInline(etag_handle.handle());
+  const Http::HeaderEntry* response_etag = response_headers.getInline(CacheCustomHeaders::etag());
+  const Http::HeaderEntry* cached_etag =
+      lookup_result_->headers_->getInline(CacheCustomHeaders::etag());
   return !response_etag || (cached_etag && cached_etag->value().getStringView() ==
                                                response_etag->value().getStringView());
 }
@@ -417,24 +424,25 @@ void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_header
          "injectValidationHeaders precondition unsatisfied: the "
          "CacheFilter is not validating a cache lookup result");
 
-  const Http::HeaderEntry* etag_header = lookup_result_->headers_->getInline(etag_handle.handle());
+  const Http::HeaderEntry* etag_header =
+      lookup_result_->headers_->getInline(CacheCustomHeaders::etag());
   const Http::HeaderEntry* last_modified_header =
-      lookup_result_->headers_->getInline(last_modified_handle.handle());
+      lookup_result_->headers_->getInline(CacheCustomHeaders::lastModified());
 
   if (etag_header) {
     absl::string_view etag = etag_header->value().getStringView();
-    request_headers.setInline(if_none_match_handle.handle(), etag);
+    request_headers.setInline(CacheCustomHeaders::ifNoneMatch(), etag);
   }
   if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(last_modified_header))) {
     // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
-    request_headers.setInline(if_modified_since_handle.handle(), last_modified);
+    request_headers.setInline(CacheCustomHeaders::ifModifiedSince(), last_modified);
   } else {
     // Either Last-Modified is missing or invalid, fallback to Date.
     // A correct behaviour according to:
     // https://httpwg.org/specs/rfc7232.html#header.if-modified-since
     absl::string_view date = lookup_result_->headers_->getDateValue();
-    request_headers.setInline(if_modified_since_handle.handle(), date);
+    request_headers.setInline(CacheCustomHeaders::ifModifiedSince(), date);
   }
 }
 
@@ -443,7 +451,8 @@ void CacheFilter::encodeCachedResponse() {
                          "does not point to a cache lookup result");
 
   response_has_trailers_ = lookup_result_->has_trailers_;
-  const bool end_stream = (lookup_result_->content_length_ == 0 && !response_has_trailers_);
+  const bool end_stream =
+      (lookup_result_->content_length_ == 0 && !response_has_trailers_) || is_head_request_;
 
   // Set appropriate response flags and codes.
   Http::StreamFilterCallbacks* callbacks =
@@ -461,8 +470,11 @@ void CacheFilter::encodeCachedResponse() {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
                                       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
   }
-
-  if (lookup_result_->content_length_ > 0) {
+  if (filter_state_ == FilterState::EncodeServingFromCache && is_head_request_) {
+    filter_state_ = FilterState::ResponseServedFromCache;
+    return;
+  }
+  if (lookup_result_->content_length_ > 0 && !is_head_request_) {
     // No range has been added, so we add entire body to the response.
     if (remaining_ranges_.empty()) {
       remaining_ranges_.emplace_back(0, lookup_result_->content_length_);

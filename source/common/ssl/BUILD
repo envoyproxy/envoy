@@ -26,6 +26,7 @@ envoy_cc_library(
     name = "certificate_validation_context_config_impl_lib",
     srcs = ["certificate_validation_context_config_impl.cc"],
     hdrs = ["certificate_validation_context_config_impl.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/ssl:certificate_validation_context_config_interface",

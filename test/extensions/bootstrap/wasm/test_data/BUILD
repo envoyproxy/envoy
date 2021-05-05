@@ -12,6 +12,7 @@ envoy_package()
 wasm_rust_binary(
     name = "logging_rust.wasm",
     srcs = ["logging_rust.rs"],
+    wasi = True,
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
@@ -82,6 +83,11 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "emscripten_cpp.wasm",
     srcs = ["emscripten_cpp.cc"],
+)
+
+envoy_wasm_cc_binary(
+    name = "http_cpp.wasm",
+    srcs = ["http_cpp.cc"],
 )
 
 envoy_wasm_cc_binary(

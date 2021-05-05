@@ -1,29 +1,33 @@
 #include "common/http/path_utility.h"
 
-#include "common/chromium_url/url_canon.h"
-#include "common/chromium_url/url_canon_stdstring.h"
 #include "common/common/logger.h"
+#include "common/http/legacy_path_canonicalizer.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
+#include "url/url_canon.h"
+#include "url/url_canon_stdstring.h"
 
 namespace Envoy {
 namespace Http {
 
 namespace {
 absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
-  std::string canonical_path;
-  chromium_url::Component in_component(0, original_path.size());
-  chromium_url::Component out_component;
-  chromium_url::StdStringCanonOutput output(&canonical_path);
-  if (!chromium_url::CanonicalizePath(original_path.data(), in_component, &output,
-                                      &out_component)) {
-    return absl::nullopt;
-  } else {
-    output.Complete();
-    return absl::make_optional(std::move(canonical_path));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_forked_chromium_url")) {
+    std::string canonical_path;
+    url::Component in_component(0, original_path.size());
+    url::Component out_component;
+    url::StdStringCanonOutput output(&canonical_path);
+    if (!url::CanonicalizePath(original_path.data(), in_component, &output, &out_component)) {
+      return absl::nullopt;
+    } else {
+      output.Complete();
+      return absl::make_optional(std::move(canonical_path));
+    }
   }
+  return LegacyPathCanonicalizer::canonicalizePath(original_path);
 }
 } // namespace
 

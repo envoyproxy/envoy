@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/event/scaled_timer_minimum.h"
+#include "envoy/event/scaled_timer.h"
 #include "envoy/event/timer.h"
 
 #include "common/common/interval_value.h"
@@ -31,6 +31,12 @@ public:
   virtual TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) PURE;
 
   /**
+   * Creates a new timer backed by the manager using the provided timer type to
+   * determine the minimum.
+   */
+  virtual TimerPtr createTimer(ScaledTimerType timer_type, TimerCb callback) PURE;
+
+  /**
    * Sets the scale factor for all timers created through this manager. The value should be between
    * 0 and 1, inclusive. The scale factor affects the amount of time timers spend in their target
    * range. The timers returned by createTimer will fire after (min + (max - min) * scale_factor).
@@ -42,6 +48,9 @@ public:
 };
 
 using ScaledRangeTimerManagerPtr = std::unique_ptr<ScaledRangeTimerManager>;
+
+class Dispatcher;
+using ScaledRangeTimerManagerFactory = std::function<ScaledRangeTimerManagerPtr(Dispatcher&)>;
 
 } // namespace Event
 } // namespace Envoy

@@ -16,6 +16,7 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/api:os_sys_calls_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/common:utility_lib",
     ],

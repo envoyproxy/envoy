@@ -50,6 +50,8 @@ envoy_cc_library(
     deps = [
         ":xds_context_params_lib",
         "//include/envoy/config:context_provider_interface",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 
@@ -443,6 +445,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],

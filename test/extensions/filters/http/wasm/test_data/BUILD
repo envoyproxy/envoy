@@ -1,3 +1,5 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -30,6 +32,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "headers_rust.wasm",
     srcs = ["headers_rust.rs"],
+    wasi = True,
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
@@ -39,6 +42,15 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "metadata_rust.wasm",
     srcs = ["metadata_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+    ],
+)
+
+wasm_rust_binary(
+    name = "panic_rust.wasm",
+    srcs = ["panic_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
@@ -77,6 +89,7 @@ envoy_cc_library(
     srcs = [
         "test_async_call_cpp.cc",
         "test_body_cpp.cc",
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_cpp_null_plugin.cc",
         "test_grpc_call_cpp.cc",
@@ -104,9 +117,11 @@ envoy_wasm_cc_binary(
     srcs = [
         "test_async_call_cpp.cc",
         "test_body_cpp.cc",
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_grpc_call_cpp.cc",
         "test_grpc_stream_cpp.cc",
+        "test_panic_cpp.cc",
         "test_resume_call_cpp.cc",
         "test_shared_data_cpp.cc",
         "test_shared_queue_cpp.cc",

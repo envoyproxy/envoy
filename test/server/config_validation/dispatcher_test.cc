@@ -49,6 +49,15 @@ TEST_P(ConfigValidation, CreateConnection) {
   SUCCEED();
 }
 
+TEST_P(ConfigValidation, CreateScaledTimer) {
+  EXPECT_NE(dispatcher_->createScaledTimer(Event::ScaledTimerType::UnscaledRealTimerForTest, [] {}),
+            nullptr);
+  EXPECT_NE(dispatcher_->createScaledTimer(
+                Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat(0.5f))), [] {}),
+            nullptr);
+  SUCCEED();
+}
+
 // Make sure that creating DnsResolver does not cause crash and each call to create
 // DNS resolver returns the same shared_ptr.
 TEST_F(ConfigValidation, SharedDnsResolver) {
