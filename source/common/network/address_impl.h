@@ -115,6 +115,29 @@ public:
    */
   explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
 
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override;
+  const Ip* ip() const override { return &ip_; }
+  const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
+
+  /**
+   * Convenience function to convert an IPv4 address to canonical string format.
+   * @note This works similarly to inet_ntop() but is faster.
+   * @param addr address to format.
+   * @return the address in dotted-decimal string format.
+   */
+  static std::string sockaddrToString(const sockaddr_in& addr);
+
+  // Validate that IPv4 is supported on this platform, raise an exception for the
+  // given address if not.
+  static absl::Status validateProtocolSupported();
+
+private:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
@@ -140,29 +163,6 @@ public:
   explicit Ipv4Instance(absl::Status& error, uint32_t port,
                         const SocketInterface* sock_interface = nullptr);
 
-  // Network::Address::Instance
-  bool operator==(const Instance& rhs) const override;
-  const Ip* ip() const override { return &ip_; }
-  const Pipe* pipe() const override { return nullptr; }
-  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
-  const sockaddr* sockAddr() const override {
-    return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
-  }
-  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
-
-  /**
-   * Convenience function to convert an IPv4 address to canonical string format.
-   * @note This works similarly to inet_ntop() but is faster.
-   * @param addr address to format.
-   * @return the address in dotted-decimal string format.
-   */
-  static std::string sockaddrToString(const sockaddr_in& addr);
-
-  // Validate that IPv4 is supported on this platform, raise an exception for the
-  // given address if not.
-  static absl::Status validateProtocolSupported();
-
-private:
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
 
@@ -187,6 +187,7 @@ private:
   };
 
   IpHelper ip_;
+  friend class InstanceFactory;
 };
 
 /**
@@ -218,6 +219,20 @@ public:
    */
   explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
 
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override;
+  const Ip* ip() const override { return &ip_; }
+  const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+
+  // Validate that IPv6 is supported on this platform
+  static absl::Status validateProtocolSupported();
+
+private:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    */
@@ -243,20 +258,6 @@ public:
   explicit Ipv6Instance(absl::Status& error, uint32_t port,
                         const SocketInterface* sock_interface = nullptr);
 
-  // Network::Address::Instance
-  bool operator==(const Instance& rhs) const override;
-  const Ip* ip() const override { return &ip_; }
-  const Pipe* pipe() const override { return nullptr; }
-  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
-  const sockaddr* sockAddr() const override {
-    return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
-  }
-  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
-
-  // Validate that IPv6 is supported on this platform
-  static absl::Status validateProtocolSupported();
-
-private:
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
@@ -290,6 +291,7 @@ private:
   };
 
   IpHelper ip_;
+  friend class InstanceFactory;
 };
 
 /**
@@ -307,18 +309,6 @@ public:
    * Construct from a string pipe path.
    */
   explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0,
-                        const SocketInterface* sock_interface = nullptr);
-
-  /**
-   * Construct from an existing unix address.
-   */
-  explicit PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len,
-                        mode_t mode = 0, const SocketInterface* sock_interface = nullptr);
-
-  /**
-   * Construct from a string pipe path.
-   */
-  explicit PipeInstance(absl::Status& error, const std::string& pipe_path, mode_t mode = 0,
                         const SocketInterface* sock_interface = nullptr);
 
   static absl::Status validateProtocolSupported() { return absl::OkStatus(); }
@@ -340,6 +330,17 @@ public:
   }
 
 private:
+  /**
+   * Construct from an existing unix address.
+   */
+  explicit PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len,
+                        mode_t mode = 0, const SocketInterface* sock_interface = nullptr);
+
+  /**
+   * Construct from a string pipe path.
+   */
+  explicit PipeInstance(absl::Status& error, const std::string& pipe_path, mode_t mode = 0,
+                        const SocketInterface* sock_interface = nullptr);
   struct PipeHelper : public Pipe {
 
     bool abstractNamespace() const override { return abstract_namespace_; }
@@ -353,6 +354,7 @@ private:
   };
 
   PipeHelper pipe_;
+  friend class InstanceFactory;
 };
 
 class EnvoyInternalInstance : public InstanceBase {

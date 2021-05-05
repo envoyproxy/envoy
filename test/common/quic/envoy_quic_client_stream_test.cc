@@ -28,10 +28,10 @@ public:
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
-        peer_addr_(Network::Utility::getAddressWithPortOrThrow(*Network::Utility::getIpv6LoopbackAddress(),
-                                                        12345)),
-        self_addr_(Network::Utility::getAddressWithPortOrThrow(*Network::Utility::getIpv6LoopbackAddress(),
-                                                        54321)),
+        peer_addr_(Network::Utility::getAddressWithPortOrThrow(
+            *Network::Utility::getIpv6LoopbackAddress(), 12345)),
+        self_addr_(Network::Utility::getAddressWithPortOrThrow(
+            *Network::Utility::getIpv6LoopbackAddress(), 54321)),
         quic_connection_(new EnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,

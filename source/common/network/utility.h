@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
+
 #include "common/common/statusor.h"
 
 #include "absl/strings/string_view.h"
@@ -265,8 +266,8 @@ public:
    */
   static const std::string& getIpv6CidrCatchAllAddress();
 
-  static StatusOr<Address::InstanceConstSharedPtr> getAddressWithPort(const Address::Instance& address,
-                                                            uint32_t port);
+  static StatusOr<Address::InstanceConstSharedPtr>
+  getAddressWithPort(const Address::Instance& address, uint32_t port);
 
   /**
    * @param address IP address instance.
@@ -274,8 +275,7 @@ public:
    * @return Address::InstanceConstSharedPtr a new address instance with updated port.
    */
   static Address::InstanceConstSharedPtr getAddressWithPortOrThrow(const Address::Instance& address,
-                                                            uint32_t port);
-
+                                                                   uint32_t port);
 
   /**
    * Retrieve the original destination address from an accepted socket.

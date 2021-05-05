@@ -28,7 +28,6 @@
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
-#include "source/common/common/_virtual_includes/statusor_lib/common/common/statusor.h"
 
 namespace Envoy {
 namespace Network {
@@ -391,7 +390,7 @@ Utility::getAddressWithPort(const Address::Instance& address, uint32_t port) {
         address.ip()->addressAsString(), port);
   case Address::IpVersion::v6:
     return Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
-        address.ip()->addressAsString(), port);  
+        address.ip()->addressAsString(), port);
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

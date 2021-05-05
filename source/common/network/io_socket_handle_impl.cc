@@ -9,7 +9,6 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
-#include "source/common/common/_virtual_includes/statusor_lib/common/common/statusor.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -604,7 +603,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  StatusOr<Address::InstanceConstSharedPtr> error_or_address =  Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
+  StatusOr<Address::InstanceConstSharedPtr> error_or_address =
+      Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
   ASSERT(error_or_address.ok());
   return *error_or_address;
 }
@@ -631,7 +631,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  StatusOr<Address::InstanceConstSharedPtr> error_or_address = Address::addressFromSockAddr(ss, ss_len);
+  StatusOr<Address::InstanceConstSharedPtr> error_or_address =
+      Address::addressFromSockAddr(ss, ss_len);
   ASSERT(error_or_address.ok());
   return *error_or_address;
 }

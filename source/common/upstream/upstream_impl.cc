@@ -264,10 +264,10 @@ HostDescriptionImpl::HostDescriptionImpl(
     throw EnvoyException(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
   }
-  health_check_address_ =
-      health_check_config.port_value() == 0
-          ? dest_address
-          : Network::Utility::getAddressWithPortOrThrow(*dest_address, health_check_config.port_value());
+  health_check_address_ = health_check_config.port_value() == 0
+                              ? dest_address
+                              : Network::Utility::getAddressWithPortOrThrow(
+                                    *dest_address, health_check_config.port_value());
 }
 
 Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
