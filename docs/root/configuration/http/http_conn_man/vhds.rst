@@ -69,7 +69,7 @@ on-demand :ref:`scoped RDS <envoy_v3_api_msg_config.route.v3.ScopedRouteConfigur
 and VHDS together will require two on-demand subscriptions per routing scope.
 
 
-* :ref:`v2 API reference <v2_grpc_streaming_endpoints>`
+* :ref:`v3 API reference <v3_grpc_streaming_endpoints>`
 
 Statistics
 ----------

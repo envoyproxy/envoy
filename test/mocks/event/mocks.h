@@ -173,6 +173,10 @@ private:
 class MockTimer : public Timer {
 public:
   MockTimer();
+
+  // Ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
+  // createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
+  // allocated and must not be deleted by it's creator.
   MockTimer(MockDispatcher* dispatcher);
   ~MockTimer() override;
 

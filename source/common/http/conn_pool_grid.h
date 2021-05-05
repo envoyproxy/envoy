@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/http/conn_pool_base.h"
+#include "common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -150,8 +151,17 @@ public:
   // Returns true if pool is the grid's HTTP/3 connection pool.
   bool isPoolHttp3(const ConnectionPool::Instance& pool);
 
-  bool isHttp3Broken() const { return is_http3_broken_; }
-  void setIsHttp3Broken(bool is_http3_broken) { is_http3_broken_ = is_http3_broken; }
+  // Returns true if HTTP/3 is currently broken. While HTTP/3 is broken the grid will not
+  // attempt to make new HTTP/3 connections.
+  bool isHttp3Broken() const;
+
+  // Marks HTTP/3 broken for a period of time subject to exponential backoff. While HTTP/3
+  // is broken the grid will not attempt to make new HTTP/3 connections.
+  void markHttp3Broken();
+
+  // Marks that HTTP/3 is working, which resets the exponential backoff counter in the
+  // event that HTTP/3 is marked broken again.
+  void markHttp3Confirmed();
 
 private:
   friend class ConnectivityGridForTest;
@@ -174,7 +184,7 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  bool is_http3_broken_{};
+  Http3StatusTracker http3_status_tracker_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and

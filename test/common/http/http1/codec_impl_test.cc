@@ -48,6 +48,15 @@ std::string createHeaderFragment(int num_headers) {
   return headers;
 }
 
+std::string createLargeHeaderFragment(int num_headers) {
+  // Create a header field with num_headers headers with each header of size ~64 KiB.
+  std::string headers;
+  for (int i = 0; i < num_headers; i++) {
+    headers += "header" + std::to_string(i) + ": " + std::string(64 * 1024, 'q') + "\r\n";
+  }
+  return headers;
+}
+
 Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t max_slice_size) {
   Buffer::OwnedImpl buffer;
   for (size_t offset = 0; offset < input.size(); offset += max_slice_size) {
@@ -2858,6 +2867,12 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   testRequestHeadersExceedLimit(long_string, "headers size exceeds limit", "");
 }
 
+TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejectedBeyondMaxConfigurable) {
+  max_request_headers_kb_ = 8192;
+  std::string long_string = "big: " + std::string(8193 * 1024, 'q') + "\r\n";
+  testRequestHeadersExceedLimit(long_string, "headers size exceeds limit", "");
+}
+
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersRejected) {
   // Send a request with 101 headers.
@@ -2886,6 +2901,36 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
     status = codec_->dispatch(buffer);
   }
   // the 60th 1kb header should induce overflow
+  buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
+  status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ("http1.headers_too_large", response_encoder->getStream().responseDetails());
+}
+
+TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejectedMaxConfigurable) {
+  max_request_headers_kb_ = 8192;
+  max_request_headers_count_ = 150;
+  initialize();
+
+  std::string exception_reason;
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(buffer);
+
+  std::string long_string = std::string(64 * 1024, 'q');
+  for (int i = 0; i < 127; i++) {
+    buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
+    status = codec_->dispatch(buffer);
+  }
+  // the 128th 64kb header should induce overflow
   buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   status = codec_->dispatch(buffer);
@@ -2924,14 +2969,14 @@ TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersSplitRejected) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersAccepted) {
-  max_request_headers_kb_ = 65;
-  std::string long_string = "big: " + std::string(64 * 1024, 'q') + "\r\n";
+  max_request_headers_kb_ = 4096;
+  std::string long_string = "big: " + std::string(1024 * 1024, 'q') + "\r\n";
   testRequestHeadersAccepted(long_string);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersAcceptedMaxConfigurable) {
-  max_request_headers_kb_ = 96;
-  std::string long_string = "big: " + std::string(95 * 1024, 'q') + "\r\n";
+  max_request_headers_kb_ = 8192;
+  std::string long_string = "big: " + std::string(8191 * 1024, 'q') + "\r\n";
   testRequestHeadersAccepted(long_string);
 }
 
@@ -2940,6 +2985,12 @@ TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersAccepted) {
   max_request_headers_count_ = 150;
   // Create a request with 150 headers.
   testRequestHeadersAccepted(createHeaderFragment(150));
+}
+
+TEST_F(Http1ServerConnectionImplTest, ManyLargeRequestHeadersAccepted) {
+  max_request_headers_kb_ = 8192;
+  // Create a request with 64 headers, each header of size ~64 KiB. Total size ~4MB.
+  testRequestHeadersAccepted(createLargeHeaderFragment(64));
 }
 
 // Tests that incomplete response headers of 80 kB header value fails.

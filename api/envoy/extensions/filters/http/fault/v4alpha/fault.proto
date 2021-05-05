@@ -54,7 +54,7 @@ message FaultAbort {
   type.v3.FractionalPercent percentage = 3;
 }
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message HTTPFault {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.fault.v3.HTTPFault";
@@ -141,4 +141,10 @@ message HTTPFault {
   // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
   // runtime. The default is: fault.http.abort.grpc_status
   string abort_grpc_status_runtime = 14;
+
+  // To control whether stats storage is allocated dynamically for each downstream server.
+  // If set to true, "x-envoy-downstream-service-cluster" field of header will be ignored by this filter.
+  // If set to false, dynamic stats storage will be allocated for the downstream cluster name.
+  // Default value is false.
+  bool disable_downstream_cluster_stats = 15;
 }

@@ -55,4 +55,5 @@ HTTP filters
   ../../../api-v3/service/ext_proc/v3alpha/external_processor.proto
   ../../../api-v3/extensions/filters/http/oauth2/v3alpha/oauth.proto
   ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto
+  ../../../api-v3/extensions/cache/simple_http_cache/v3alpha/config.proto
   ../../../api-v3/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.proto

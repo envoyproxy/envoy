@@ -2,13 +2,13 @@
 
 namespace Envoy {
 
-// These will run with HTTP/3 downstream, and Http and HTTP/2 upstream.
-INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
+// These will run with HTTP/3 downstream, and Http upstream.
+INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, DownstreamProtocolIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP3},
-                             {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2})),
+                             {Http::CodecClient::Type::HTTP3}, {FakeHttpConnection::Type::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+// These will run with HTTP/3 downstream, and Http and HTTP/2 upstream.
 INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, ProtocolIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecClient::Type::HTTP3},

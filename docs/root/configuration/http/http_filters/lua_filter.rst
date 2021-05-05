@@ -87,7 +87,7 @@ The Lua HTTP filter also can be disabled or overridden on a per-route basis by p
 :ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration
 on the virtual host, route, or weighted cluster.
 
-LuaPerRoute provides two ways of overriding the `GLOBAL` Lua script:
+LuaPerRoute provides two ways of overriding the ``GLOBAL`` Lua script:
 
 * By providing a name reference to the defined :ref:`named Lua source codes map
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
@@ -145,7 +145,7 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
   ``GLOBAL`` as name for other Lua scripts.
 
-Or we can define a new Lua script in the LuaPerRoute configuration directly to override the `GLOBAL`
+Or we can define a new Lua script in the LuaPerRoute configuration directly to override the ``GLOBAL``
 Lua script as follows:
 
 .. code-block:: yaml
@@ -243,7 +243,7 @@ more details on the supported API.
 A common use-case is to rewrite upstream response body, for example: an upstream sends non-2xx
 response with JSON data, but the application requires HTML page to be sent to browsers.
 
-There are two ways of doing this, the first one is via the `body()` API.
+There are two ways of doing this, the first one is via the ``body()`` API.
 
 .. code-block:: lua
 
@@ -254,7 +254,7 @@ There are two ways of doing this, the first one is via the `body()` API.
     end
 
 
-Or, through `bodyChunks()` API, which let Envoy to skip buffering the upstream response data.
+Or, through ``bodyChunks()`` API, which let Envoy to skip buffering the upstream response data.
 
 .. code-block:: lua
 
@@ -334,8 +334,8 @@ the entire body has been received in a buffer. Note that all buffering must adhe
 flow-control policies in place. Envoy will not buffer more data than is allowed by the connection
 manager.
 
-An optional boolean argument `always_wrap_body` can be used to require Envoy always returns a
-`body` object even if the body is empty. Therefore we can modify the body regardless of whether the
+An optional boolean argument ``always_wrap_body`` can be used to require Envoy always returns a
+``body`` object even if the body is empty. Therefore we can modify the body regardless of whether the
 original body exists or not.
 
 Returns a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
@@ -561,7 +561,7 @@ that supplies the header value.
 
   In the current implementation, headers cannot be modified during iteration. Additionally, if
   it is necessary to modify headers after an iteration, the iteration must first be completed. This means that
-  `break` or any other way to exit the loop early must not be used. This may be more flexible in the future.
+  ``break`` or any other way to exit the loop early must not be used. This may be more flexible in the future.
 
 remove()
 ^^^^^^^^

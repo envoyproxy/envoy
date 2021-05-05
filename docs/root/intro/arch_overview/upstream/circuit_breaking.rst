@@ -19,8 +19,8 @@ configure and code each application independently. Envoy supports various types 
   allocated. This has the implication that the :ref:`upstream_cx_active
   <config_cluster_manager_cluster_stats>` count for a cluster may be higher than the cluster maximum
   connection circuit breaker, with an upper bound of
-  `cluster maximum connections + (number of endpoints in a cluster) * (connection pools for the
-  cluster)`. This bound applies to the sum of connections across all workers threads. See
+  ``cluster maximum connections + (number of endpoints in a cluster) * (connection pools for the
+  cluster)``. This bound applies to the sum of connections across all workers threads. See
   :ref:`connection pooling <arch_overview_conn_pool_how_many>` for details on how many connection
   pools a cluster may have.
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while

@@ -23,6 +23,7 @@ envoy_cc_extension(
     # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
+        ":dependency_manager",
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:codec_interface",

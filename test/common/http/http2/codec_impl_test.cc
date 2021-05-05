@@ -2176,15 +2176,14 @@ TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
 }
 
 TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
-  // Raising the limit past this triggers some unexpected nghttp2 error.
-  // Further debugging required to increase past ~96 KiB.
-  max_request_headers_kb_ = 96;
+  max_request_headers_kb_ = 8192;
+  max_request_headers_count_ = 150;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  std::string long_string = std::string(1024, 'q');
-  for (int i = 0; i < 95; i++) {
+  std::string long_string = std::string(63 * 1024, 'q');
+  for (int i = 0; i < 129; i++) {
     request_headers.addCopy(std::to_string(i), long_string);
   }
 

@@ -1,40 +1,21 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_connection.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include <memory>
 
-#include "common/common/logger.h"
 #include "envoy/network/connection.h"
+
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {
 
-// Derived for network filter chain, stats and QoS. This is used on both client
-// and server side.
-class EnvoyQuicConnection : public quic::QuicConnection,
-                            protected Logger::Loggable<Logger::Id::connection> {
+// A base class of both the client and server connections which keeps stats and
+// connection socket.
+class QuicNetworkConnection : protected Logger::Loggable<Logger::Id::connection> {
 public:
-  EnvoyQuicConnection(const quic::QuicConnectionId& server_connection_id,
-                      quic::QuicSocketAddress initial_self_address,
-                      quic::QuicSocketAddress initial_peer_address,
-                      quic::QuicConnectionHelperInterface& helper,
-                      quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
-                      bool owns_writer, quic::Perspective perspective,
-                      const quic::ParsedQuicVersionVector& supported_versions,
-                      Network::ConnectionSocketPtr&& connection_socket);
+  QuicNetworkConnection(Network::ConnectionSocketPtr&& connection_socket);
 
-  ~EnvoyQuicConnection() override;
+  virtual ~QuicNetworkConnection();
 
   // Called by EnvoyQuicSession::setConnectionStats().
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {

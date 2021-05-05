@@ -583,6 +583,7 @@ virtual_hosts:
     EXPECT_EQ("/rewrote?works=true", route->currentUrlPathAfterRewrite(headers));
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("bat3.com", headers.get_(Http::Headers::get().Host));
   }
   // Prefix rewrite for CONNECT without path (for non-crashing)
   {
@@ -591,6 +592,26 @@ virtual_hosts:
     ASSERT(redirect != nullptr);
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
+  }
+
+  stream_info.filterState()->setData(
+      Router::OriginalConnectPort::key(), std::make_unique<Router::OriginalConnectPort>(10),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+  // Port addition for CONNECT without port
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("bat3.com:10", headers.get_(Http::Headers::get().Host));
+  }
+  // No port addition for CONNECT with port
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("bat3.com:20", "/api/locations?works=true", "CONNECT");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("bat3.com:20", headers.get_(Http::Headers::get().Host));
   }
 
   // Header matching (for HTTP/1.1)

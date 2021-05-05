@@ -198,7 +198,8 @@ public:
    * @return TransportSocketFactoryPtr the client transport socket factory.
    */
   static Network::TransportSocketFactoryPtr
-  createQuicUpstreamTransportSocketFactory(Api::Api& api, const std::string& san_to_match);
+  createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
+                                           const std::string& san_to_match);
 };
 
 // A set of connection callbacks which tracks connection state.

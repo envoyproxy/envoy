@@ -28,7 +28,10 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // given connection pool.
   quic::QuicServerId server_id_;
   quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
+  // TODO(danzh) move this into client transport socket factory so that it can
+  // be updated with SDS.
   std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  quic::QuicConfig quic_config_;
 };
 
 std::unique_ptr<Network::ClientConnection>

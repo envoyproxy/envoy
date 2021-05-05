@@ -249,6 +249,12 @@ message Listener {
   // The listener's connection balancer configuration, currently only applicable to TCP listeners.
   // If no configuration is specified, Envoy will not attempt to balance active connections between
   // worker threads.
+  //
+  // In the scenario that the listener X redirects all the connections to the listeners Y1 and Y2
+  // by setting :ref:`use_original_dst <envoy_api_field_config.listener.v4alpha.Listener.use_original_dst>` in X
+  // and :ref:`bind_to_port <envoy_api_field_config.listener.v4alpha.Listener.bind_to_port>` to false in Y1 and Y2,
+  // it is recommended to disable the balance config in listener X to avoid the cost of balancing, and
+  // enable the balance config in Y1 and Y2 to balance the connections among the workers.
   ConnectionBalanceConfig connection_balance_config = 20;
 
   // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and

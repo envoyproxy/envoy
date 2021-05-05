@@ -5,6 +5,7 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -389,6 +390,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_test",
     srcs = ["version_test.cc"],
+    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     external_deps = [
         "abseil_strings",
     ],

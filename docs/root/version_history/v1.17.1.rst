@@ -18,11 +18,10 @@ Bug Fixes
 
 Removed Config or Runtime
 -------------------------
-*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+*Normally occurs at the end of the* :ref:`deprecation period <v1.17.1:deprecated>`
 
 New Features
 ------------
 
 Deprecated
 ----------
-

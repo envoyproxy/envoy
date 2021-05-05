@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-"^.github|.rst$|.md$"}
+EXCLUDED_SHELLFILES=${EXCLUDED_SHELLFILES:-".rst$|.md$"}
 SHEBANG_RE='^#!/bin/bash|^#!/bin/sh|^#!/usr/bin/env bash|^#!/usr/bin/env sh'
 
 

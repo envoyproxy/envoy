@@ -125,7 +125,7 @@ udp_listener_config:
   auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
-  EXPECT_TRUE(quic_socket_factory.serverContextConfig().isReady());
+  EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
 }
 #endif
 

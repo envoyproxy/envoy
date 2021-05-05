@@ -202,7 +202,7 @@ message FilterAction {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -229,11 +229,17 @@ message Route {
     DirectResponseAction direct_response = 7;
 
     // [#not-implemented-hide:]
-    // If true, a filter will define the action (e.g., it could dynamically generate the
-    // RouteAction).
+    // A filter-defined action (e.g., it could dynamically generate the RouteAction).
     // [#comment: TODO(samflattery): Remove cleanup in route_fuzz_test.cc when
     // implemented]
     FilterAction filter_action = 17;
+
+    // [#not-implemented-hide:]
+    // An action used when the route will generate a response directly,
+    // without forwarding to an upstream host. This will be used in non-proxy
+    // xDS clients like the gRPC server. It could also be used in the future
+    // in Envoy for a filter that directly generates responses for requests.
+    NonForwardingAction non_forwarding_action = 18;
   }
 
   // The Metadata field can be used to provide additional information
@@ -1467,6 +1473,10 @@ message DirectResponseAction {
   //   :ref:`envoy_api_msg_config.route.v3.Route`, :ref:`envoy_api_msg_config.route.v3.RouteConfiguration` or
   //   :ref:`envoy_api_msg_config.route.v3.VirtualHost`.
   core.v3.DataSource body = 2;
+}
+
+// [#not-implemented-hide:]
+message NonForwardingAction {
 }
 
 message Decorator {

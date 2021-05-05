@@ -13,13 +13,38 @@
 namespace Envoy {
 namespace Quic {
 
+#define QUIC_TRANSPORT_SOCKET_FACTORY_STATS(COUNTER)                                               \
+  COUNTER(context_config_update_by_sds)                                                            \
+  COUNTER(upstream_context_secrets_not_ready)                                                      \
+  COUNTER(downstream_context_secrets_not_ready)
+
+struct QuicTransportSocketFactoryStats {
+  QUIC_TRANSPORT_SOCKET_FACTORY_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+namespace {
+
+QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::string& perspective) {
+  return {QUIC_TRANSPORT_SOCKET_FACTORY_STATS(
+      POOL_COUNTER_PREFIX(store, fmt::format("quic_{}_transport_socket_factory.", perspective)))};
+}
+
+} // namespace
+
 // Base class for QUIC transport socket factory.
 // Because QUIC stack handles all L4 data, there is no need of a real transport
 // socket for QUIC in current implementation. This factory doesn't provides a
 // transport socket, instead, its derived class provides TLS context config for
 // server and client.
-class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory {
+class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
+                                       protected Logger::Loggable<Logger::Id::quic> {
 public:
+  QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
+      : stats_(generateStats(store, perspective)) {}
+
+  // To be called right after construction.
+  virtual void initialize() PURE;
+
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr /*options*/) const override {
@@ -28,19 +53,42 @@ public:
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
+
+protected:
+  virtual void onSecretUpdated() PURE;
+  QuicTransportSocketFactoryStats stats_;
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Ssl::ServerContextConfigPtr config)
-      : config_(std::move(config)) {}
+  QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)) {}
 
-  const Ssl::ServerContextConfig& serverContextConfig() const { return *config_; }
+  void initialize() override {
+    config_->setSecretUpdateCallback([this]() {
+      // The callback also updates config_ with the new secret.
+      onSecretUpdated();
+    });
+  }
+
+  // Return TLS certificates if the context config is ready.
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
+  getTlsCertificates() const {
+    if (!config_->isReady()) {
+      ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
+      stats_.downstream_context_secrets_not_ready_.inc();
+      return {};
+    }
+    return config_->tlsCertificates();
+  }
+
+protected:
+  void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
 
 private:
-  std::unique_ptr<const Ssl::ServerContextConfig> config_;
+  Ssl::ServerContextConfigPtr config_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
@@ -48,6 +96,10 @@ public:
   QuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  void initialize() override {
+    // TODO(14829) fallback_factory_ needs to call onSecretUpdated() upon SDS update.
+  }
 
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
   // code does not create transport sockets.
@@ -63,6 +115,12 @@ public:
   // TODO(14829) make sure that clientContextConfig() is safe when secrets are updated.
   const Ssl::ClientContextConfig& clientContextConfig() const {
     return fallback_factory_->config();
+  }
+
+protected:
+  void onSecretUpdated() override {
+    // fallback_factory_ will update the stats.
+    // TODO(14829) Client transport socket factory may also need to update quic crypto.
   }
 
 private:

@@ -805,12 +805,12 @@ private:
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
-  std::list<FakeHttpConnectionPtr> quic_connections_ ABSL_GUARDED_BY(lock_);
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
   std::list<SharedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
+  std::list<FakeHttpConnectionPtr> quic_connections_ ABSL_GUARDED_BY(lock_);
   const FakeUpstreamConfig config_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;

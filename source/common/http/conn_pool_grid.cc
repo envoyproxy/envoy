@@ -110,8 +110,11 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
             host->hostname());
   if (!grid_.isPoolHttp3(attempt->pool())) {
     tcp_attempt_succeeded_ = true;
+    maybeMarkHttp3Broken();
+  } else {
+    ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", grid_.host_->hostname());
+    grid_.markHttp3Confirmed();
   }
-  maybeMarkHttp3Broken();
 
   auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
@@ -133,7 +136,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
 void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
   if (http3_attempt_failed_ && tcp_attempt_succeeded_) {
     ENVOY_LOG(trace, "Marking HTTP/3 broken for host '{}'.", grid_.host_->hostname());
-    grid_.setIsHttp3Broken(true);
+    grid_.markHttp3Broken();
   }
 }
 
@@ -190,7 +193,8 @@ ConnectivityGrid::ConnectivityGrid(
     std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source) {
+      state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source),
+      http3_status_tracker_(dispatcher_) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   // TODO(#15649) support v6/v4, WiFi/cellular.
@@ -243,7 +247,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
-  if (is_http3_broken_) {
+  if (http3_status_tracker_.isHttp3Broken()) {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", describePool(**pool),
               host_->hostname());
     // Since HTTP/3 is broken, presumably both pools have already been created so this
@@ -305,6 +309,12 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::nextPool(PoolIt
 bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
+
+bool ConnectivityGrid::isHttp3Broken() const { return http3_status_tracker_.isHttp3Broken(); }
+
+void ConnectivityGrid::markHttp3Broken() { http3_status_tracker_.markHttp3Broken(); }
+
+void ConnectivityGrid::markHttp3Confirmed() { http3_status_tracker_.markHttp3Confirmed(); }
 
 void ConnectivityGrid::onDrainReceived() {
   // Don't do any work under the stack of ~ConnectivityGrid()

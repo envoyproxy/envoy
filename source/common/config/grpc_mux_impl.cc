@@ -69,7 +69,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     request.clear_node();
   }
   VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
-  ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
+  ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;
 

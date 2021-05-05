@@ -126,7 +126,7 @@ public:
   std::vector<LocalizedSamplingRule>& customRules() { return custom_rules_; }
 
   /**
-   * @return true if the this manifest has a set of custom rules; otherwise false.
+   * @return true if this manifest has a set of custom rules; otherwise false.
    */
   bool hasCustomRules() const { return !custom_rules_.empty(); }
 
@@ -154,6 +154,11 @@ public:
    * Determines whether default rules are in effect. Mainly for unit testing purposes.
    */
   bool usingDefaultManifest() const { return use_default_; }
+
+  /**
+   * @return the default manifest. Mainly for unit testing purposes.
+   */
+  const LocalizedSamplingManifest& defaultManifest() const { return default_manifest_; }
 
 private:
   bool shouldTrace(LocalizedSamplingRule& rule);

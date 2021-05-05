@@ -687,7 +687,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  max_request_headers_kb: 96
+  max_request_headers_kb: 8192
   route_config:
     name: local_route
   http_filters:
@@ -698,7 +698,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(96, config.maxRequestHeadersKb());
+  EXPECT_EQ(8192, config.maxRequestHeadersKb());
 }
 
 // Validated that an explicit zero stream idle timeout disables.

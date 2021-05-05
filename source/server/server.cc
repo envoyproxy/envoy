@@ -497,7 +497,6 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   if (initial_config.admin().address()) {
-    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
     admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
