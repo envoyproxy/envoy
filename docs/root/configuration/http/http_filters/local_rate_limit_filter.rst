@@ -24,7 +24,7 @@ configured to be added to forwarded requests to the upstream when the local rate
 
 Depending on the value of the config :ref:`local_rate_limit_per_downstream_connection <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_rate_limit_per_downstream_connection>`,
 the token bucket is either shared across all workers or on a per connection basis. This results in the local rate limits being applied either per Envoy process or per downstream connection.
-If unspecified, this config is set to false by default, which means the rate limits are applied per Envoy process.
+By default the rate limits are applied per Envoy process.
 
 Example configuration
 ---------------------
