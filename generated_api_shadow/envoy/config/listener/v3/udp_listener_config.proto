@@ -45,7 +45,7 @@ message UdpListenerConfig {
   //   `#13115 <https://github.com/envoyproxy/envoy/issues/13115>`_ has been addressed.
   //
   //   For general feature requests beyond production readiness, you can track
-  //   updates `here <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_.
+  //   the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
   QuicProtocolOptions quic_options = 7;
 
   oneof config_type {
