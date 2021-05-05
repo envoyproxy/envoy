@@ -11,9 +11,9 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
 * grpc_bridge_filter: the filter no longer collects grpc stats in favor of the existing grpc stats filter. 
   The behavior can be reverted by changing runtime key ``envoy.reloadable_features.grpc_bridge_stats_disabled``.
-* access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
 * http: replaced setting ``envoy.reloadable_features.strict_1xx_and_204_response_headers`` with settings
   ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers``
   (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
