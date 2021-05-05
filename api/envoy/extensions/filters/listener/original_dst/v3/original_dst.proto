@@ -17,4 +17,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message OriginalDst {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.original_dst.v2.OriginalDst";
+  enum Method {
+    // Use sockopt SO_ORIGINAL_DST or IP6T_SO_ORIGINAL_DST to recover the original local address. This is the default method.
+    Dnat = 0;
+
+    // Mark the local address as restored so that the :ref:`original_dst cluster<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.ORIGINAL_DST>`
+    // can be utilized. This recovery method is used when TPROXY rule is used without DNAT rule.
+    CurrentLocalAddress = 1;
+  }
+
+  // The method to recover the original local address. The default method is Dnat if the field is not set.
+  // [#not-implemented-hide:]
+  Method address_recovery_method = 0;
 }
