@@ -257,6 +257,7 @@ message RemoteJwks {
 // The fetched Jwks from the main thread can be used by all worker threads.
 message JwksAsyncFetch {
   // If false, the listener is activated after the initial fetch is completed.
+  // The initial fetch result can be either successful or failed.
   // If true, it is activated without waiting for the initial fetch to complete.
   // Default is false.
   bool fast_listener = 1;
