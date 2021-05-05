@@ -75,6 +75,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   // Call registered on-drain callbacks - immediately
   if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
     std::chrono::milliseconds no_delay{0};
+    cbs_.runCallbacksWith([&](auto cb) { cb(no_delay); });
     cbs_.runCallbacks(no_delay);
     return;
   }
@@ -91,11 +92,10 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   const auto time_step =
       std::chrono::duration_cast<std::chrono::milliseconds>(remaining_time) / cbs_.size() / 4;
   uint32_t step_count = 0;
-  cbs_.runCallbacksWith(
-      [&](Common::ThreadSafeCallbackManager<std::chrono::milliseconds>::Callback cb) {
-        cb(time_step * step_count);
-        step_count++;
-      });
+  cbs_.runCallbacksWith([&](auto cb) {
+    cb(time_step * step_count);
+    step_count++;
+  });
 }
 
 void DrainManagerImpl::startParentShutdownSequence() {
