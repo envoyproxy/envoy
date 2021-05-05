@@ -10,7 +10,7 @@ This could be undesirable for services that require warm up time to serve full p
 Slow start mode is a mechanism that affects load balancing weight of upstream endpoints and can be configured per upstream cluster.
 Currently, slow start is supported in Round Robin and Least Request load balancer types.
 
-Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.slow_start_window>` (in seconds), so that if endpoint “cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode.
+Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.slow_start_window>` (in seconds), so that if endpoint "cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode.
 During slow start window, load balancing weight of a particular endpoint will be scaled with :ref:`time bias parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.time_bias>`
 and :ref:`aggression parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.aggression>`, e.g.:
 
@@ -21,7 +21,7 @@ As time progresses, more and more traffic would be send to endpoint within slow 
 
 Aggression parameter non-linearly affects endpoint weight and represents the speed of ramp-up.
 By tuning aggression parameter, one could achieve polynomial or exponential speed for traffic increase.
-Below simulation demonstartes how various values for aggression affect traffic ramp-up:
+Below simulation demonstrates how various values for aggression affect traffic ramp-up:
 
 .. image:: /_static/slow_start_aggression.svg
    :width: 60%

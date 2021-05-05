@@ -486,22 +486,25 @@ private:
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
         aggression_ = aggression_runtime_ != nullptr ? aggression_runtime_->value() : 1.0;
 
-        if (time_bias_ < 0.0) {
-          time_bias_ = 1.0;
-        }
-        if (aggression_ < 0.0) {
-          aggression_ = 1.0;
-        }
-        if (time_bias_ > 0.0 && aggression_ > 0.0) {
-          // Slow start window cannot be set to 0 due to validation in api protos.
-          auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
-                                                          host_create_duration.count())) /
-                             slow_start_window_.count();
-          return host.weight() * time_bias_ * std::pow(time_factor, 1.0 / aggression_);
-        }
+        time_bias_ = std::max(0.0, time_bias_);
+        aggression_ = std::max(0.0, aggression_);
+
+        ASSERT(time_bias_ > 0.0);
+        ASSERT(aggression_ > 0.0);
+        auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
+                                                        host_create_duration.count())) /
+                           slow_start_window_.count();
+        return host.weight() * time_bias_ * aggressionFactor(time_factor);
       }
     }
     return host.weight();
+  }
+  double aggressionFactor(double time_factor) {
+    if (aggression_ == 1.0 || time_factor == 1.0) {
+      return time_factor;
+    } else {
+      return std::pow(time_factor, 1.0 / aggression_);
+    }
   }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {

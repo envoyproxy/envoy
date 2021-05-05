@@ -711,6 +711,11 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
               ? std::make_unique<Runtime::Double>(common_config.slow_start_config().time_bias(),
                                                   runtime)
               : nullptr),
+      aggression_runtime_(common_config.has_slow_start_config() &&
+                                  common_config.slow_start_config().has_aggression()
+                              ? std::make_unique<Runtime::Double>(
+                                    common_config.slow_start_config().aggression(), runtime)
+                              : nullptr),
       time_source_(time_source),
       hosts_in_slow_start_(
           std::make_shared<absl::btree_set<HostSharedPtr, OrderByCreateDateDesc>>()),
@@ -785,9 +790,9 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
+      scheduler.edf_->add(hostWeight(*host), host);
       std::cerr << "***Adding weight " << hostWeight(*host) << "for host "
                 << host->address()->asString() << std::endl;
-      scheduler.edf_->add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
