@@ -1,6 +1,6 @@
+#include "common/http/alternate_protocols_cache.h"
 #include "common/http/conn_pool_grid.h"
 
-#include "common/http/alternate_protocols_cache.h"
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -102,8 +102,8 @@ public:
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
-              state_, simTime(), maybeCreateAlternateProtocolsCache(use_alternate_protocols), std::chrono::milliseconds(300),
-              options_),
+              state_, simTime(), maybeCreateAlternateProtocolsCache(use_alternate_protocols),
+              std::chrono::milliseconds(300), options_),
         host_(grid_.host()) {
     grid_.info_ = &info_;
     grid_.encoder_ = &encoder_;
@@ -111,7 +111,7 @@ public:
 
   OptRef<AlternateProtocolsCache> maybeCreateAlternateProtocolsCache(bool use_alternate_protocols) {
     if (!use_alternate_protocols) {
-      return  makeOptRefFromPtr<AlternateProtocolsCache>(nullptr);
+      return makeOptRefFromPtr<AlternateProtocolsCache>(nullptr);
     }
     return alternate_protocols_;
   }
@@ -119,8 +119,7 @@ public:
   void addHttp3AlternateProtocol() {
     AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
     const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
-      {"h3-29", "", origin.port_}
-    };
+        {"h3-29", "", origin.port_}};
     alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
   }
 
@@ -158,7 +157,8 @@ public:
 TEST_F(ConnectivityGridTest, Success) {
   EXPECT_EQ(grid_.first(), nullptr);
 
-  EXPECT_LOG_CONTAINS("trace", "No alternate protocols cache. Attempting HTTP/3 to host 'hostname'.",
+  EXPECT_LOG_CONTAINS("trace",
+                      "No alternate protocols cache. Attempting HTTP/3 to host 'hostname'.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_EQ(grid_.second(), nullptr);
@@ -508,8 +508,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3) {
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithExpiredHttp3) {
   AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
-    {"h3-29", "", origin.port_}
-  };
+      {"h3-29", "", origin.port_}};
   alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
   simTime().setMonotonicTime(Seconds(10));
 
@@ -530,8 +529,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithExpiredHttp3)
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingHostname) {
   AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
-    {"h3-29", "otherhostname", origin.port_}
-  };
+      {"h3-29", "otherhostname", origin.port_}};
   alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
 
   EXPECT_EQ(grid_.first(), nullptr);
@@ -551,8 +549,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMat
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingPort) {
   AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
-    {"h3-29", "", origin.port_ + 1}
-  };
+      {"h3-29", "", origin.port_ + 1}};
   alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
 
   EXPECT_EQ(grid_.first(), nullptr);

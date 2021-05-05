@@ -2,6 +2,7 @@
 
 #include "common/http/http3/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
+
 #include "quiche/quic/core/quic_versions.h"
 
 namespace Envoy {
@@ -338,7 +339,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     return false;
   }
   if (!alternate_protocols_.has_value()) {
-  // TODO(RyanTheOptimist): Make the alternate protocols cache required.
+    // TODO(RyanTheOptimist): Make the alternate protocols cache required.
     ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}'.",
               host_->hostname());
     return true;
@@ -348,7 +349,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     return false;
   }
   uint32_t port = host_->address()->ip()->port();
-  // TODO(RyanTheOptimist): Figure out how scheme gets plummed in here.
+  // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
   AlternateProtocolsCache::Origin origin("https", host_->hostname(), port);
   OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
       alternate_protocols_->findAlternatives(origin);
@@ -376,7 +377,6 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
   ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", host_->hostname());
   return false;
 }
-
 
 } // namespace Http
 } // namespace Envoy
