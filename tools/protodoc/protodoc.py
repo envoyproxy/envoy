@@ -131,8 +131,6 @@ for _k, _v in EXTENSION_DB.items():
     for _cat in _v['categories']:
         EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
 
-REDIRECTS_FILE = os.environ.get("REDIRECTS_FILE", "/tmp/redirects.txt")
-
 V2_LINK_TEMPLATE = Template(
     """
 .. sidebar:: API v3
@@ -727,12 +725,6 @@ class RstFormatVisitor(visitor.Visitor):
             v2_text = v2_filepath.split('/', 1)[1]
             v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
             v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
-
-            # TODO(phlax): move this to a separate bazel task
-            with open(REDIRECTS_FILE, "a") as f:
-                redirect_from = f"api-v2/{self.v2_mapping[file_proto.name].split('/', 1)[1]}.rst"
-                redirect_to = f"api-v3/{file_proto.name.split('/', 1)[1]}.rst"
-                f.write(f"{redirect_from}\t{redirect_to}\n")
 
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs

@@ -163,7 +163,7 @@ rsync -av \
 
 # Merge generated redirects
 # TODO(phlax): Move updating redirects to separate bazel task
-cat /tmp/redirects.txt >> "${GENERATED_RST_DIR}"/redirects.txt
+jq -r 'with_entries(.key |= sub("^envoy/";"api-v2/")) | with_entries(.value |= sub("^envoy/";"api-v3/")) | to_entries[] | "\(.key)\t\t\(.value)"' docs/v2_mapping.json >> "${GENERATED_RST_DIR}"/redirects.txt
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
