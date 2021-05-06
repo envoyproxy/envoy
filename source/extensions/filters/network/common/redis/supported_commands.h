@@ -26,12 +26,12 @@ struct SupportedCommands {
         "hexists", "hget", "hgetall", "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset",
         "hscan", "hset", "hsetnx", "hstrlen", "hvals", "incr", "incrby", "incrbyfloat", "lindex",
         "linsert", "llen", "lpop", "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist",
-        "pexpire", "pexpireat", "pfadd", "pfcount", "psetex", "pttl", "restore", "rpop", "rpush",
-        "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember",
-        "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "zadd",
-        "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
-        "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
-        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
+        "pexpire", "pexpireat", "pfadd", "psetex", "pttl", "restore", "rpop", "rpush", "rpushx",
+        "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers",
+        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "zadd", "zcard", "zcount",
+        "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex", "zrangebyscore",
+        "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore", "zrevrange",
+        "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
   }
 
   /**
@@ -45,7 +45,8 @@ struct SupportedCommands {
    * @return commands which are sent to multiple servers and coalesced by summing the responses
    */
   static const absl::flat_hash_set<std::string>& hashMultipleSumResultCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "del", "exists", "touch", "unlink");
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "del", "exists", "touch", "unlink",
+                           "pfcount");
   }
 
   /**
