@@ -727,5 +727,17 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 
+TEST_P(EnvoyQuicServerStreamTest, MetadataNotSupported) {
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  quic_stream_->encodeMetadata(metadata_map_vector);
+  EXPECT_EQ(1,
+            TestUtility::findCounter(listener_config_.scope_, "http3.metadata_not_supported_error")
+                ->value());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
 } // namespace Quic
 } // namespace Envoy

@@ -193,12 +193,7 @@ public:
     // WatermarkBuffer implementations.
     ASSERT(false);
   }
-  void setWatermarks(uint32_t, uint32_t) override {
-    // Not implemented.
-    // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
-    // WatermarkBuffer implementations.
-    ASSERT(false);
-  }
+
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 

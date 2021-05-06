@@ -451,15 +451,6 @@ public:
   virtual void setWatermarks(uint32_t watermark) PURE;
 
   /**
-   * Set the buffer's low and high watermark.
-   * The low_watermark should be < high_watermark if these are set. Set both
-   * watermarks to 0 to disable watermark functionality.
-   * @param low_watermark supplies the buffer low watermark size threshold, in bytes.
-   * @param high_watermark supplies the buffer high watermark size threshold, in bytes.
-   */
-  virtual void setWatermarks(uint32_t low_watermark, uint32_t high_watermark) PURE;
-
-  /**
    * Returns the configured high watermark. A return value of 0 indicates that watermark
    * functionality is disabled.
    */
