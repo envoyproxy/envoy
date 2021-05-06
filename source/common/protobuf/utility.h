@@ -147,6 +147,8 @@ public:
 class TypeUtil {
 public:
   static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
+
+  static std::string descriptorFullNameToTypeUrl(absl::string_view type);
 };
 
 class RepeatedPtrUtil {
