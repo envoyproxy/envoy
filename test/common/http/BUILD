@@ -451,11 +451,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_test",
-    srcs = ["alternate_protocols_test.cc"],
+    name = "alternate_protocols_cache_test",
+    srcs = ["alternate_protocols_cache_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:alternate_protocols",
+        "//source/common/http:alternate_protocols_cache",
         "//test/mocks:common_lib",
         "//test/test_common:simulated_time_system_lib",
     ],

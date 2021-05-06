@@ -574,10 +574,6 @@ public:
                const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 
-  // Creates a fake upstream bound to the specified |address|.
-  FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-               const FakeUpstreamConfig& config);
-
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                const FakeUpstreamConfig& config);

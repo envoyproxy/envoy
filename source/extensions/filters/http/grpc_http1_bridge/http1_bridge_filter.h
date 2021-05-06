@@ -4,6 +4,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/grpc/context_impl.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +48,12 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  bool doStatTracking() const { return request_stat_names_.has_value(); }
+  bool doStatTracking() const {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_stats_disabled")) {
+      return false;
+    }
+    return request_stat_names_.has_value();
+  }
 
 private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
