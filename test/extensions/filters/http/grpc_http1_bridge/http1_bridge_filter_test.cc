@@ -8,8 +8,8 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -79,7 +79,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2HeaderOnlyResponse) {
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
   ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-    .WillByDefault(testing::ReturnRef(stats_store_));
+      .WillByDefault(testing::ReturnRef(stats_store_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
 
@@ -91,8 +91,10 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2HeaderOnlyResponse) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
-  EXPECT_FALSE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure"));
-  EXPECT_FALSE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
@@ -107,7 +109,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
       {{"envoy.reloadable_features.grpc_bridge_stats_disabled", "false"}});
 
   ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-    .WillByDefault(testing::ReturnRef(stats_store_));
+      .WillByDefault(testing::ReturnRef(stats_store_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
 
@@ -119,8 +121,10 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
-  EXPECT_TRUE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure"));
-  EXPECT_TRUE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
+  EXPECT_TRUE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure"));
+  EXPECT_TRUE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
                      .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure")
@@ -139,7 +143,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2NormalResponse) {
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
   ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-    .WillByDefault(testing::ReturnRef(stats_store_));
+      .WillByDefault(testing::ReturnRef(stats_store_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
@@ -149,8 +153,10 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2NormalResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_FALSE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.success"));
-  EXPECT_FALSE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.success"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, Http2ContentTypeGrpcPlusProto) {
@@ -161,7 +167,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2ContentTypeGrpcPlusProto) {
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
   ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-    .WillByDefault(testing::ReturnRef(stats_store_));
+      .WillByDefault(testing::ReturnRef(stats_store_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
@@ -169,8 +175,10 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2ContentTypeGrpcPlusProto) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_FALSE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.success"));
-  EXPECT_FALSE(stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.success"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, NotHandlingHttp2) {
