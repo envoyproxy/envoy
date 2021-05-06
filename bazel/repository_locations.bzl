@@ -807,10 +807,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Common Expression Language (CEL) C++ library",
         project_desc = "Common Expression Language (CEL) C++ library",
         project_url = "https://opensource.google/projects/cel",
-        version = "v0.5.0",
+        version = "0.5.0",
         sha256 = "293b4a0479a4390e08b24e7f14a307e4dd94495367b104c4a37926a760597aa7",
-        strip_prefix = "cel-cpp-0.5.0",
-        urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
+        strip_prefix = "cel-cpp-{version}",
+        urls = ["https://github.com/google/cel-cpp/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
