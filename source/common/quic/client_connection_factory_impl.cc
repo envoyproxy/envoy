@@ -14,16 +14,23 @@ getConfig(Network::TransportSocketFactory& transport_socket_factory) {
   return quic_socket_factory->clientContextConfig();
 }
 
+Envoy::Ssl::ClientContextSharedPtr
+getContext(Network::TransportSocketFactory& transport_socket_factory) {
+  auto* quic_socket_factory =
+      dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
+  ASSERT(quic_socket_factory != nullptr);
+  ASSERT(quic_socket_factory->sslCtx() != nullptr);
+  return quic_socket_factory->sslCtx();
+}
+
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
-    Stats::Scope& stats_scope, TimeSource& time_source,
-    Network::Address::InstanceConstSharedPtr server_addr)
+    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
       crypto_config_(std::make_unique<quic::QuicCryptoClientConfig>(
-          std::make_unique<EnvoyQuicProofVerifier>(stats_scope, getConfig(transport_socket_factory),
-                                                   time_source),
+          std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory)),
           std::make_unique<EnvoyQuicSessionCache>(time_source))) {
   quiche::FlagRegistry::getInstance();
 }
