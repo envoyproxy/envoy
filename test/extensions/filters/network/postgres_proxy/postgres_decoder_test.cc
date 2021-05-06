@@ -109,21 +109,13 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   data_.add(buf_, 1);
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(data_.length(), 0);
+  // Decoder should move to InSyncState
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   // Verify parsing attributes
   ASSERT_THAT(decoder_->getAttributes().at("user"), "postgres");
   ASSERT_THAT(decoder_->getAttributes().at("database"), "testdb");
   // This attribute should not be found
   ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
-
-#if 0
-  // Now feed normal message with 1bytes as command.
-  data_.add("P");
-  // Add length.
-  data_.writeBEInt<uint32_t>(6); // 4 bytes of length + 2 bytes of data.
-  data_.add("AB");
-  ASSERT_THAT(decoder_->onData(data_, true), DecoderImpl::State::InSyncState);
-  ASSERT_THAT(data_.length(), 0);
-#endif
 }
 
 // Test verifies that when Startup message does not carry
@@ -161,12 +153,39 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
   ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
 }
 
+TEST_F(PostgresProxyDecoderTest, InvalidStartupMessage) {
+  decoder_->state(DecoderImpl::State::InitState);
+
+  // Create a bogus message with incorrect syntax.
+  // Length is 10 bytes.
+  data_.writeBEInt<uint32_t>(10);
+  for (auto i = 0; i < 6; i++) {
+    data_.writeBEInt<uint8_t>(i);
+  }
+
+  // Decoder should move to OutOfSync state.
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::OutOfSyncState);
+  ASSERT_THAT(data_.length(), 0);
+
+  // All-zeros message.
+  data_.writeBEInt<uint32_t>(0);
+  for (auto i = 0; i < 6; i++) {
+    data_.writeBEInt<uint8_t>(0);
+  }
+
+  // Decoder should move to OutOfSync state.
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::OutOfSyncState);
+  ASSERT_THAT(data_.length(), 0);
+}
+
 // Test that decoder does not crash when it receives
 // random data in InitState.
-TEST_F(PostgresProxyDecoderTest, DISABLED_StartupMessageRandomData) {
-
+TEST_F(PostgresProxyDecoderTest, StartupMessageRandomData) {
   srand(time(NULL));
   for (auto i = 0; i < 10000; i++) {
+    decoder_->state(DecoderImpl::State::InSyncState);
     // Generate random length.
     uint32_t len = rand() % 2048;
     // Now fill the buffer with random data.
@@ -176,7 +195,7 @@ TEST_F(PostgresProxyDecoderTest, DISABLED_StartupMessageRandomData) {
       data_.writeBEInt<uint8_t>(data);
     }
     // Feed the buffer to the decoder. It should not crash.
-    // ASSERT_THAT(decoder_->onData(data_, true), DecoderImpl::State::InSyncState);
+    decoder_->onData(data_, true);
 
     // Reset the buffer for the nect iteration.
     data_.drain(data_.length());

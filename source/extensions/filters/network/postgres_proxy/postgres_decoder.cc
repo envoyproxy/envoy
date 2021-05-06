@@ -179,6 +179,7 @@ void DecoderImpl::initialize() {
   };
 }
 
+#if 0
 Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
   ENVOY_LOG(trace, "postgres_proxy: parsing message, len {}", data.length());
 
@@ -240,7 +241,11 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
   ENVOY_LOG(trace, "postgres_proxy: msg parsed");
   return Decoder::Result::ReadyForNext;
 }
+#endif
 
+/* Main handler for incoming messages. Messages are dispatched based on the
+current decoder's state.
+*/
 Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   switch (state_) {
   case State::InitState:
@@ -255,6 +260,14 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   }
 }
 
+/* Handler for messages when decoder is in Init State. There are very few message types which
+   are allowed in this state.
+   If the initial message has the correct syntax and  indicates that session should be in cleartext,
+   the decoder will move to InSyncState. If the initial message has the correct syntax and indicates
+   that session should be encrypted, the decoder stays in InitState, because the initial message
+   will be received again after transport socket negotiates SSL. If the message syntax is incorect,
+   the decoder will move to OutOfSyncState, in which messages are not parsed.
+*/
 Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool frontend) {
   ASSERT(state_ == State::InitState);
 
@@ -347,14 +360,12 @@ void DecoderImpl::processMessageBody(Buffer::Instance& data, const std::string& 
   }
 
   ENVOY_LOG(debug, "({}) command = {} ({})", direction, command_, std::get<0>(msg));
-  ENVOY_LOG(debug, "({}) length = {}", /*msg_processor.direction_*/ "to-do", message_len_);
-  ENVOY_LOG(debug, "({}) message = {}", /*msg_processor.direction_*/ "to-do",
-            genDebugMessage(parser, data, bytes_to_read));
+  ENVOY_LOG(debug, "({}) length = {}", direction, message_len_);
+  ENVOY_LOG(debug, "({}) message = {}", direction, genDebugMessage(parser, data, bytes_to_read));
 
-  data.drain(length);
   ENVOY_LOG(trace, "postgres_proxy: {} bytes remaining in buffer", data.length());
 
-  length = 0;
+  data.drain(length);
 }
 
 Decoder::Result DecoderImpl::onDataInSync(Buffer::Instance& data, bool frontend) {

@@ -145,7 +145,9 @@ protected:
 
   void processMessageBody(Buffer::Instance& data, const std::string& direction, uint32_t length,
                           MessageProcessor& msg, const std::unique_ptr<Message>& parser);
+#if 0
   Result parseHeader(Buffer::Instance& data);
+#endif
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
   void decodeBackendStatements();
