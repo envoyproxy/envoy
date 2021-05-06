@@ -24,9 +24,6 @@ public:
   // deleter deleteIoError() below to avoid deallocating memory for this error.
   static IoSocketError* getIoSocketEagainInstance();
 
-  // Similar case for `IoErrorCode::NoSupport`
-  static IoSocketError* getIoSocketInvalidAddressInstance();
-
   // This error is introduced when Envoy create socket for unsupported address. It is either a bug,
   // or this Envoy instance received config which is not yet supported. This should not be fatal
   // error.
@@ -35,12 +32,13 @@ public:
   // Deallocate memory only if the error is not Again.
   static void deleteIoError(Api::IoError* err);
 
-  // Map a system error code to an Envoy `IoErrorCode`
-  static Api::IoError::IoErrorCode errorCodeFromErrno(int sys_errno);
-
 private:
   explicit IoSocketError(int sys_errno, Api::IoError::IoErrorCode error_code)
       : errno_(sys_errno), error_code_(error_code) {}
+
+  static Api::IoError::IoErrorCode errorCodeFromErrno(int sys_errno);
+
+  static IoSocketError* getIoSocketInvalidAddressInstance();
 
   const int errno_;
   const Api::IoError::IoErrorCode error_code_;
