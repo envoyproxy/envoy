@@ -21,7 +21,6 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
