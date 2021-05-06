@@ -183,6 +183,8 @@ public:
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
+    client_tsi_socket_->setActualFrameSizeToUse(16384);
+    client_tsi_socket_->setFrameOverheadSize(4);
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                std::move(client_transport_socket), nullptr);
   }

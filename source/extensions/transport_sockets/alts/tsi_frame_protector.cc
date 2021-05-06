@@ -3,7 +3,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 
-#include "grpc/slice_buffer.h"
 #include "src/core/tsi/transport_security_grpc.h"
 #include "src/core/tsi/transport_security_interface.h"
 
@@ -15,16 +14,14 @@ namespace Alts {
 TsiFrameProtector::TsiFrameProtector(CFrameProtectorPtr&& frame_protector)
     : frame_protector_(std::move(frame_protector)) {}
 
-tsi_result TsiFrameProtector::protect(Buffer::Instance& input, Buffer::Instance& output) {
+tsi_result TsiFrameProtector::protect(const grpc_slice& input_slice, Buffer::Instance& output) {
   ASSERT(frame_protector_);
 
-  if (input.length() == 0) {
+  if (GRPC_SLICE_LENGTH(input_slice) == 0) {
     return TSI_OK;
   }
 
   grpc_core::ExecCtx exec_ctx;
-  grpc_slice input_slice = grpc_slice_from_copied_buffer(
-      reinterpret_cast<char*>(input.linearize(input.length())), input.length());
 
   grpc_slice_buffer message_buffer;
   grpc_slice_buffer_init(&message_buffer);
@@ -58,7 +55,6 @@ tsi_result TsiFrameProtector::protect(Buffer::Instance& input, Buffer::Instance&
       });
 
   output.addBufferFragment(*fragment);
-  input.drain(input.length());
 
   grpc_slice_buffer_destroy(&message_buffer);
   grpc_slice_buffer_destroy(&protected_buffer);

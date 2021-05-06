@@ -129,6 +129,8 @@ protected:
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
   // bytes of body downstream.
+  // Waits |time| ms for both the request to be proxied upstream and the
+  // response to be proxied downstream.
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
@@ -185,9 +187,10 @@ protected:
   void testRouterVirtualClusters();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
 
-  void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
-                                            bool big_header, bool set_content_length_header = false,
-                                            ConnectionCreationFunction* creator = nullptr);
+  void testRouterRequestAndResponseWithBody(
+      uint64_t request_size, uint64_t response_size, bool big_header,
+      bool set_content_length_header = false, ConnectionCreationFunction* creator = nullptr,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url",
@@ -210,7 +213,8 @@ protected:
                         uint32_t max_size);
   void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
-                               uint32_t max_count = 100);
+                               uint32_t max_count = 100,
+                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
   void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 

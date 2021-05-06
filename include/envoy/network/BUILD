@@ -193,15 +193,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "udp_packet_writer_config_interface",
-    hdrs = ["udp_packet_writer_config.h"],
-    deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/network:udp_packet_writer_handler_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "proxy_protocol_options_lib",
     hdrs = ["proxy_protocol.h"],
     deps = [

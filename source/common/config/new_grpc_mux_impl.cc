@@ -62,9 +62,12 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
-    ControlPlaneStats&) {
+    ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -83,6 +86,7 @@ void NewGrpcMuxImpl::onStreamEstablished() {
     UNREFERENCED_PARAMETER(type_url);
     subscription->sub_state_.markStreamFresh();
   }
+  pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
 }
 
@@ -124,7 +128,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, options.use_namespace_matching_);
+    addSubscription(type_url, options.use_namespace_matching_, resources.empty());
     return addWatch(type_url, resources, callbacks, resource_decoder, options);
   }
 
@@ -196,10 +200,11 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
-                                     const bool use_namespace_matching) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
-                                       type_url, local_info_, use_namespace_matching, dispatcher_));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching,
+                                     const bool wildcard) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_,
+                                                                       use_namespace_matching,
+                                                                       dispatcher_, wildcard));
   subscription_ordering_.emplace_back(type_url);
 }
 

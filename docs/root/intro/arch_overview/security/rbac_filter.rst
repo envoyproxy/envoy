@@ -43,7 +43,7 @@ In addition to the pre-defined permissions and principals, a policy may optional
 authorization condition written in the `Common Expression Language
 <https://github.com/google/cel-spec/blob/master/doc/intro.md>`_. The condition specifies an extra
 clause that must be satisfied for the policy to match. For example, the following condition checks
-whether the request path starts with `/v1/`:
+whether the request path starts with ``/v1/``:
 
 .. code-block:: yaml
 
@@ -61,5 +61,4 @@ whether the request path starts with `/v1/`:
 Envoy provides a number of :ref:`request attributes <arch_overview_request_attributes>`
 for expressive policies. Most attributes are optional and provide the default
 value based on the type of the attribute. CEL supports presence checks for
-attributes and maps using `has()` syntax, e.g. `has(request.referer)`.
-
+attributes and maps using ``has()`` syntax, e.g. ``has(request.referer)``.

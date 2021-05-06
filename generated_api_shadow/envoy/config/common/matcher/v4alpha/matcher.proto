@@ -66,6 +66,7 @@ message Matcher {
             "envoy.config.common.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate";
 
         // Protocol-specific specification of input field to match on.
+        // [#extension-category: envoy.matching.common_inputs]
         core.v4alpha.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
 
         oneof matcher {
@@ -99,6 +100,9 @@ message Matcher {
 
         // A list of predicates to be AND-ed together.
         PredicateList and_matcher = 3;
+
+        // The invert of a predicate
+        Predicate not_matcher = 4;
       }
     }
 

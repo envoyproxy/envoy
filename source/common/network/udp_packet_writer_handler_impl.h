@@ -41,5 +41,13 @@ private:
   Network::IoHandle& io_handle_;
 };
 
+class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
+public:
+  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
+                                                    Stats::Scope&) override {
+    return std::make_unique<UdpDefaultWriter>(io_handle);
+  }
+};
+
 } // namespace Network
 } // namespace Envoy

@@ -3,23 +3,25 @@
 #include "common/common/base64.h"
 #include "common/common/hex.h"
 
+#include "source/tracing_context_impl.h"
+
 #include "test/test_common/utility.h"
 
 #include "cpp2sky/config.pb.h"
 #include "cpp2sky/propagation.h"
-#include "cpp2sky/segment_context.h"
+#include "cpp2sky/tracing_context.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-using cpp2sky::createSegmentContextFactory;
 using cpp2sky::createSpanContext;
-using cpp2sky::CurrentSegmentSpanPtr;
-using cpp2sky::SegmentContextPtr;
 using cpp2sky::SpanContextPtr;
 using cpp2sky::TracerConfig;
+using cpp2sky::TracingContextFactory;
+using cpp2sky::TracingContextPtr;
+using cpp2sky::TracingSpanPtr;
 
 /*
  * A simple helper class for auxiliary testing. Contains some simple static functions, such as
@@ -39,10 +41,12 @@ public:
     TracerConfig config;
     config.set_service_name(seed + "#SERVICE");
     config.set_instance_name(seed + "#INSTANCE");
-    auto segment_context_factory = createSegmentContextFactory(config);
-    auto segment_context = segment_context_factory->create();
 
-    auto span = segment_context->createCurrentSegmentRootSpan();
+    auto tracing_context_factory = std::make_unique<TracingContextFactory>(config);
+    auto tracing_context = tracing_context_factory->create();
+
+    auto entry_span = tracing_context->createEntrySpan();
+    auto span = tracing_context->createExitSpan(entry_span);
     span->startSpan(seed + "#OPERATION");
     span->setPeer(seed + "#ADDRESS");
 
@@ -51,16 +55,17 @@ public:
     }
 
     span->endSpan();
+    entry_span->endSpan();
 
-    return segment_context->createSW8HeaderValue(seed + "#ENDPOINT");
+    return tracing_context->createSW8HeaderValue(seed + "#ENDPOINT").value();
   }
 
-  static SegmentContextPtr createSegmentContext(bool sampled, std::string seed,
+  static TracingContextPtr createSegmentContext(bool sampled, std::string seed,
                                                 std::string prev_seed) {
     TracerConfig config;
     config.set_service_name(seed + "#SERVICE");
     config.set_instance_name(seed + "#INSTANCE");
-    auto segment_context_factory = createSegmentContextFactory(config);
+    auto tracing_context_factory = std::make_unique<TracingContextFactory>(config);
 
     SpanContextPtr previous_span_context;
     if (!prev_seed.empty()) {
@@ -69,25 +74,24 @@ public:
       ASSERT(previous_span_context);
     }
 
-    SegmentContextPtr segment_context;
+    TracingContextPtr tracing_context;
     if (previous_span_context) {
-      segment_context = segment_context_factory->create(previous_span_context);
+      tracing_context = tracing_context_factory->create(previous_span_context);
     } else {
-      segment_context = segment_context_factory->create();
+      tracing_context = tracing_context_factory->create();
       if (!sampled) {
-        segment_context->setSkipAnalysis();
+        tracing_context->setSkipAnalysis();
       }
     }
 
-    return segment_context;
+    return tracing_context;
   }
 
-  static CurrentSegmentSpanPtr createSpanStore(SegmentContextPtr segment_context,
-                                               CurrentSegmentSpanPtr parent_span_store,
-                                               std::string seed, bool sample = true) {
-    auto span_store = parent_span_store
-                          ? segment_context->createCurrentSegmentSpan(parent_span_store)
-                          : segment_context->createCurrentSegmentRootSpan();
+  static TracingSpanPtr createSpanStore(TracingContextPtr tracing_context,
+                                        TracingSpanPtr parent_span_store, std::string seed,
+                                        bool sample = true) {
+    auto span_store = parent_span_store ? tracing_context->createExitSpan(parent_span_store)
+                                        : tracing_context->createEntrySpan();
 
     span_store->startSpan(seed + "#OPERATION");
     span_store->setPeer("0.0.0.0");

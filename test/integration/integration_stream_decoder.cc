@@ -15,6 +15,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AssertionFailure;
+using testing::AssertionResult;
+using testing::AssertionSuccess;
+
 namespace Envoy {
 
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
@@ -44,18 +48,40 @@ void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   }
 }
 
-void IntegrationStreamDecoder::waitForEndStream() {
+AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
+  bool timer_fired = false;
   if (!saw_end_stream_) {
+    Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
+      timer_fired = true;
+      dispatcher_.exit();
+    }));
+    timer->enableTimer(timeout);
     waiting_for_end_stream_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
+    if (!saw_end_stream_) {
+      // HTTP/1.1 may end stream by disconnecting.
+      ENVOY_LOG_MISC(warn, "No explicit end stream detected.");
+    }
+    if (timer_fired) {
+      return AssertionFailure() << "Timed out waiting for end stream\n";
+    }
   }
+  return AssertionSuccess();
 }
 
-void IntegrationStreamDecoder::waitForReset() {
+AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds timeout) {
   if (!saw_reset_) {
+    // Set a timer to stop the dispatcher if the timeout has been exceeded.
+    Event::TimerPtr timer(dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); }));
+    timer->enableTimer(timeout);
     waiting_for_reset_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
+    // If the timer has fired, this timed out before a reset was received.
+    if (!timer->enabled()) {
+      return AssertionFailure() << "Timed out waiting for reset.";
+    }
   }
+  return AssertionSuccess();
 }
 
 void IntegrationStreamDecoder::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
@@ -97,6 +123,7 @@ void IntegrationStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&& trai
 }
 
 void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+  metadata_maps_decoded_count_++;
   // Combines newly received metadata with the existing metadata.
   for (const auto& metadata : *metadata_map) {
     duplicated_metadata_key_count_[metadata.first]++;

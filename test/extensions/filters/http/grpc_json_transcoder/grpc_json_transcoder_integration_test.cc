@@ -135,7 +135,7 @@ protected:
       EXPECT_TRUE(upstream_request_->complete());
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->complete(), expect_response_complete);
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
@@ -163,8 +163,15 @@ protected:
           return Http::HeaderMap::Iterate::Continue;
         });
     if (!expected_response_body.empty()) {
-      if (full_response) {
-        EXPECT_EQ(expected_response_body, response->body());
+      const bool isJsonResponse = response->headers().getContentTypeValue() == "application/json";
+      if (full_response && isJsonResponse) {
+        const bool isStreamingResponse = response->body()[0] == '[';
+        EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_response_body,
+                                                 isStreamingResponse))
+            << "Response mismatch. \nGot : " << response->body()
+            << "\nWant: " << expected_response_body;
+      } else if (full_response) {
+        EXPECT_EQ(response->body(), expected_response_body);
       } else {
         EXPECT_TRUE(absl::StartsWith(response->body(), expected_response_body));
       }
@@ -196,6 +203,7 @@ protected:
     config_helper_.addConfigModifier(modifier);
   }
 };
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -420,7 +428,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData)
   EXPECT_TRUE(upstream_request_->complete());
 
   // Wait for complete / check body to have 3 frames joined
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response->body(), "HelloHelloHello");
 }
@@ -463,7 +471,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
   EXPECT_TRUE(upstream_request_->complete());
 
   // Wait for complete
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   // Ensure that body was actually replaced
   EXPECT_EQ(response->body(), http_body.data());
@@ -1190,7 +1198,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       Status(),
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       // Incomplete response, not valid JSON.
-      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", true, false, "", true,
+      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
       /*expect_response_complete=*/false);
 }
 
@@ -1238,7 +1246,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
       {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 };

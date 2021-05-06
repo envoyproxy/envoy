@@ -100,7 +100,7 @@ input
   random_value
     *(optional, integer)* An integer used to identify the target for weighted cluster selection
     and as a factor for the routing engine to decide whether a runtime based route takes effect.
-    The default value of random_value is 0. For routes with runtime fraction numerators of 0, 
+    The default value of random_value is 0. For routes with runtime fraction numerators of 0,
     the route checker tool changes the numerators to 1 so they can be tested with random_value
     set to 0 to simulate the route being enabled and random_value set to any int >= 1 to
     simulate the route being disabled.
@@ -168,7 +168,7 @@ validate
     and "date" fields, as well as custom headers set in the input or by the route. The header fields are checked
     after all other test cases. Thus, the header fields checked will be those of the redirected or rewritten
     routes when applicable.
-    - Matchers are specified as :ref:`HeaderMatchers <envoy_api_msg_route.HeaderMatcher>`, and behave the same way.
+    - Matchers are specified as :ref:`HeaderMatchers <envoy_v3_api_msg_config.route.v3.headermatcher>`, and behave the same way.
 
 Coverage
 --------
@@ -181,7 +181,7 @@ The router check tool will report route coverage at the end of a successful test
   Current route coverage: 0.0744863
 
 This reporting can be leveraged to enforce a minimum coverage percentage by using
-the `-f` or `--fail-under` flag. If coverage falls below this percentage the test
+the ``-f`` or ``--fail-under`` flag. If coverage falls below this percentage the test
 run will fail.
 
 .. code:: bash
@@ -194,7 +194,7 @@ run will fail.
 By default the coverage report measures test coverage by checking that at least one field is
 verified for every route. However, this can leave holes in the tests where fields
 aren't validated and later changed. For more comprehensive coverage you can add a flag,
-`--covall`, which will calculate coverage taking into account all of the possible
+``--covall``, which will calculate coverage taking into account all of the possible
 fields that could be tested.
 
 .. code:: bash
