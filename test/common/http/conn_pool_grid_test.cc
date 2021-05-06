@@ -424,7 +424,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 
 // Test that when HTTP/3 is broken then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
-  grid_.setIsHttp3Broken(true);
+  grid_.markHttp3Broken();
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'first', skipping.",
@@ -455,6 +455,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   auto factory = std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config));
+  factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
   EXPECT_CALL(matcher, resolve(_))

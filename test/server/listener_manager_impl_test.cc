@@ -630,7 +630,14 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+
   InSequence s;
+
+  auto* lds_api = new MockLdsApi();
+  EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
+  envoy::config::core::v3::ConfigSource lds_config;
+  manager_->createLdsApi(lds_config, nullptr);
 
   // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -639,40 +646,194 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
-filter_chains:
-- filters: []
-drain_type: default
-
+filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version1"));
+  checkConfigDump(R"EOF(
+version_info: version1
+static_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version1
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 1001001001
+        nanos: 1000000
+)EOF");
 
-  // Update foo listener, but with a different address. Should throw.
+  // Update foo listener, but with a different address.
   const std::string listener_foo_different_address_yaml = R"EOF(
 name: foo
 address:
   socket_address:
     address: 127.0.0.1
     port_value: 1235
-filter_chains:
-- filters: []
-drain_type: modify_only
+filter_chains: {}
   )EOF";
 
-  ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, true, envoy::config::listener::v3::Listener::MODIFY_ONLY);
-  EXPECT_CALL(*listener_foo_different_address, onDestroy());
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_different_address_yaml),
-                                    "", true),
-      EnvoyException,
-      "error updating listener: 'foo' has a different address "
-      "'127.0.0.1:1235' from existing listener address '127.0.0.1:1234'");
+  time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
 
+  ListenerHandle* listener_foo_different_address = expectListenerCreate(false, true);
+  // Another socket should be created.
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(manager_->addOrUpdateListener(
+      parseListenerFromV3Yaml(listener_foo_different_address_yaml), "version2", true));
+  checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
+  checkConfigDump(R"EOF(
+version_info: version2
+static_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version2
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1235
+        filter_chains: {}
+      last_updated:
+        seconds: 2002002002
+        nanos: 2000000
+)EOF");
+
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  worker_->callAddCompletion(true);
+
+  time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
+
+  // Add baz listener, this time requiring initializing.
+  const std::string listener_baz_yaml = R"EOF(
+name: baz
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1236
+filter_chains: {}
+  )EOF";
+
+  ListenerHandle* listener_baz = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_baz->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "version3", true));
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version3"));
+  checkConfigDump(R"EOF(
+version_info: version3
+static_listeners:
+dynamic_listeners:
+  - name: foo
+    active_state:
+      version_info: version2
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1235
+        filter_chains: {}
+      last_updated:
+        seconds: 2002002002
+        nanos: 2000000
+  - name: baz
+    warming_state:
+      version_info: version3
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: baz
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1236
+        filter_chains: {}
+      last_updated:
+        seconds: 3003003003
+        nanos: 3000000
+)EOF");
+
+  time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
+
+  const std::string listener_baz_different_address_yaml = R"EOF(
+name: baz
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1237
+filter_chains: {}
+  )EOF";
+
+  // Modify the address of a warming listener.
+  ListenerHandle* listener_baz_different_address = expectListenerCreate(true, true);
+  // Another socket should be created.
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
+    listener_baz->target_.ready();
+  }));
+  EXPECT_CALL(listener_baz_different_address->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(
+      parseListenerFromV3Yaml(listener_baz_different_address_yaml), "version4", true));
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version4"));
+  checkConfigDump(R"EOF(
+version_info: version4
+static_listeners:
+dynamic_listeners:
+  - name: foo
+    active_state:
+      version_info: version2
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1235
+        filter_chains: {}
+      last_updated:
+        seconds: 2002002002
+        nanos: 2000000
+  - name: baz
+    warming_state:
+      version_info: version4
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: baz
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1237
+        filter_chains: {}
+      last_updated:
+        seconds: 4004004004
+        nanos: 4000000
+)EOF");
+
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_baz_different_address->target_.ready();
+  worker_->callAddCompletion(true);
+
+  EXPECT_CALL(*listener_foo_different_address, onDestroy());
+  EXPECT_CALL(*listener_baz_different_address, onDestroy());
 }
 
 // Make sure that a listener creation does not fail on IPv4 only setups when FilterChainMatch is not
@@ -916,16 +1077,6 @@ static_listeners:
           seconds: 2002002002
           nanos: 2000000
   )EOF");
-
-    // While it is in warming state, try updating the address. It should fail.
-    ListenerHandle* listener_foo3 = expectListenerCreate(true, true);
-    EXPECT_CALL(*listener_foo3, onDestroy());
-    EXPECT_THROW_WITH_MESSAGE(
-        manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_address_update_yaml),
-                                      "version3", true),
-        EnvoyException,
-        "error updating listener: 'foo' has a different address "
-        "'127.0.0.1:1235' from existing listener address '127.0.0.1:1234'");
 
     // Delete foo-listener again.
     EXPECT_CALL(*listener_foo2, onDestroy());

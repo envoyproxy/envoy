@@ -163,4 +163,14 @@ static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
 }
 BENCHMARK(BM_TypedJsonAccessLogFormatter);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_FormatterCommandParsing(benchmark::State& state) {
+  const std::string token = "(Listener:namespace:key):100";
+  std::string listener, names, key;
+  absl::optional<size_t> len;
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    Formatter::SubstitutionFormatParser::parseCommand(token, 1, ':', len, listener, names, key);
+  }
+}
+BENCHMARK(BM_FormatterCommandParsing);
 } // namespace Envoy

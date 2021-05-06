@@ -63,12 +63,12 @@ public:
     // Endpoint connections
     if (tls_hosts_) {
       host_upstream_ =
-          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
+          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
       host2_upstream_ =
-          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
+          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
     } else {
-      host_upstream_ = createFakeUpstream(http_conn_type_);
-      host2_upstream_ = createFakeUpstream(http_conn_type_);
+      host_upstream_ = &addFakeUpstream(http_conn_type_);
+      host2_upstream_ = &addFakeUpstream(http_conn_type_);
     }
   }
 
@@ -362,8 +362,9 @@ transport_socket_matches:
   FakeStreamPtr hds_stream_;
   FakeUpstream* hds_upstream_{};
   uint32_t hds_requests_{};
-  FakeUpstreamPtr host_upstream_{};
-  FakeUpstreamPtr host2_upstream_{};
+  // These two are owned by fake_upstreams_
+  FakeUpstream* host_upstream_{};
+  FakeUpstream* host2_upstream_{};
   FakeStreamPtr host_stream_;
   FakeStreamPtr host2_stream_;
   FakeHttpConnectionPtr host_fake_connection_;

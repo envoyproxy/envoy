@@ -122,6 +122,7 @@ private:
   };
 
   FilterState filter_state_ = FilterState::Initial;
+  bool is_head_request_ = false;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
