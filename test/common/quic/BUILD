@@ -55,6 +55,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "envoy_quic_session_cache_test",
+    srcs = ["envoy_quic_session_cache_test.cc"],
+    external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:envoy_quic_session_cache_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = ["envoy_quic_proof_verifier_test.cc"],
     external_deps = ["quiche_quic_platform"],
@@ -79,6 +89,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
+        "//source/server:active_listener_base",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
@@ -168,6 +179,7 @@ envoy_cc_test(
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
+        "//source/common/http:utility_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:envoy_quic_utils_lib",
@@ -274,6 +286,8 @@ envoy_cc_test_library(
     external_deps = ["bazel_runfiles"],
     tags = ["nofips"],
     deps = [
+        "//source/common/quic:envoy_quic_client_connection_lib",
+        "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/test_common:environment_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",

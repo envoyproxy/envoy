@@ -77,17 +77,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
+        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/dev release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-90.0.4395.0(linux/dev)
-        version = "b049eae83d25977661556dcd913b35fbafb3a93a",
-        sha256 = "d78f7b11b8665feea1b6def8e6f235ad8671db8de950f5429f1bf2b3503b3894",
+        # chromium-92.0.4491.6 (linux/dev)
+        version = "c5ad6dcb65e532589e8acb9e9adbde62463af13d",
+        sha256 = "6b4674999af85c4a19f2b51132db3507520070923cd967bb1cd157d43b3f68d9",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-01-25",
+        release_date = "2021-04-22",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -322,26 +322,26 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Data Collect Protocols of Apache SkyWalking",
         project_url = "https://github.com/apache/skywalking-data-collect-protocol",
         name = "skywalking_data_collect_protocol",
-        sha256 = "fa9ac679624217f30b6e8d5c450365386c610e2d08188a20f0340c3b14401833",
-        urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v8.3.0.zip"],
-        strip_prefix = "skywalking-data-collect-protocol-8.3.0",
-        version = "8.3.0",
+        sha256 = "edfa970394511213eacc8055b4c13e4e9773e9196122a49e0db68f6162f67dff",
+        urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v{version}.tar.gz"],
+        strip_prefix = "skywalking-data-collect-protocol-{version}",
+        version = "8.4.0",
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2020-11-20",
+        release_date = "2021-01-20",
         cpe = "N/A",
     ),
     com_github_skyapm_cpp2sky = dict(
         project_name = "cpp2sky",
         project_desc = "C++ SDK for Apache SkyWalking",
         project_url = "https://github.com/SkyAPM/cpp2sky",
-        sha256 = "a8d870bb4b1c4a05eae319f689d1948927f3f0a5b5fe524db73a4c04121a339a",
-        version = "0.1.1",
+        sha256 = "76117a63cf29355c28a75bc83bd1d7e5bc004039445e7c854ee752dfe66094e6",
+        version = "0.2.1",
         strip_prefix = "cpp2sky-{version}",
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2021-01-15",
+        release_date = "2021-03-17",
         cpe = "N/A",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
@@ -768,14 +768,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "9.0.257.17",
+        version = "9.1.269.18",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "0eaf060eae4907f7d961fc31b0692175003f56cee320c7e4da4d19b47c2557f3",
+        sha256 = "3c4f0827f38b49c11a8a3a20cf897ce14dc8a7a7b999f8b0ee913211c6ab3d8b",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2021-04-12",
+        release_date = "2021-04-27",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
@@ -948,8 +948,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "aba2704bcd7d8adce2ccaf07c4ecbaf0cffeb7ef",
-        sha256 = "6263b45f87fc0c106eb88f31238553b1bde68f8a5ea25e20e95a5e6624a896d2",
+        version = "579189940ee48ebf1fb1d6539483506bee89f0b4",
+        sha256 = "eedcc5d0e73a715d9361eda39b21b178e077ab4d749d6bf2f030de81f668d6d3",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -964,7 +964,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-04-08",
+        release_date = "2021-04-28",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

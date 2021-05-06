@@ -58,6 +58,7 @@ public:
   bool enforced() const;
   LocalRateLimitStats& stats() const { return stats_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
+  const Router::HeaderParser& requestHeadersParser() const { return *request_headers_parser_; }
   Http::Code status() const { return status_; }
   uint64_t stage() const { return stage_; }
   bool hasDescriptors() const { return has_descriptors_; }
@@ -83,6 +84,7 @@ private:
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   Router::HeaderParserPtr response_headers_parser_;
+  Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
 };

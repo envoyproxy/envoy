@@ -146,6 +146,49 @@ std::string ConfigHelper::startTlsConfig() {
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
+envoy::config::cluster::v3::Cluster ConfigHelper::buildStartTlsCluster(const std::string& address,
+                                                                       int port) {
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
+  auto config_str = fmt::format(
+      R"EOF(
+      name: dummy_cluster
+      connect_timeout: 5s
+      type: STATIC
+      load_assignment:
+        cluster_name: dummy_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: {}
+      transport_socket:
+        name: "starttls"
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig
+          cleartext_socket_config:
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+                certificate_chain:
+                  filename: {}
+                private_key:
+                  filename: {}
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {{}}
+    )EOF",
+      address, port, TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+
+  TestUtility::loadFromYaml(config_str, cluster);
+  return cluster;
+}
+
 std::string ConfigHelper::tlsInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
@@ -624,6 +667,16 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
       }
     }
   }
+
+  // Ensure we have a basic admin-capable runtime layer.
+  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
+    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    static_layer->set_name("static_layer");
+    static_layer->mutable_static_layer();
+    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    admin_layer->set_name("admin");
+    admin_layer->mutable_admin_layer();
+  }
 }
 
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
@@ -741,14 +794,6 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
 }
 
 void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
-  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
-    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
-    static_layer->set_name("static_layer");
-    static_layer->mutable_static_layer();
-    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
-    admin_layer->set_name("admin");
-    admin_layer->mutable_admin_layer();
-  }
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
@@ -941,6 +986,20 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
+  const uint32_t stream_buffer_size = std::max(
+      downstream_buffer_limit, Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+  if (Network::Utility::protobufAddressSocketType(listener->address()) ==
+          Network::Socket::Type::Datagram &&
+      listener->udp_listener_config().has_quic_options()) {
+    // QUIC stream's flow control window is configured in listener config.
+    listener->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_initial_stream_window_size()
+        // The same as kStreamReceiveWindowLimit in QUICHE which only supports stream flow control
+        // window no larger than 16MB.
+        ->set_value(std::min(16u * 1024 * 1024, stream_buffer_size));
+  }
 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
@@ -955,10 +1014,8 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
                                        v3::HttpConnectionManager::HTTP2) {
-      const uint32_t size = std::max(downstream_buffer_limit,
-                                     Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       auto* options = hcm_config.mutable_http2_protocol_options();
-      options->mutable_initial_stream_window_size()->set_value(size);
+      options->mutable_initial_stream_window_size()->set_value(stream_buffer_size);
       storeHttpConnectionManager(hcm_config);
     }
   }
@@ -1356,6 +1413,17 @@ void ConfigHelper::setLocalReply(
   loadHttpConnectionManager(hcm_config);
   hcm_config.mutable_local_reply_config()->MergeFrom(config);
   storeHttpConnectionManager(hcm_config);
+}
+
+void ConfigHelper::adjustUpstreamTimeoutForTsan(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
+  auto* route =
+      hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+  uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
+  auto* timeout = route->mutable_timeout();
+  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
+  // upstream_response_timeout.
+  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}

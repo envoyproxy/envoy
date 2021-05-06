@@ -1,11 +1,10 @@
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
+#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
-
-#include "source/extensions/filters/http/cache/simple_http_cache/config.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -215,7 +214,7 @@ public:
   // From TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>();
+        envoy::extensions::cache::simple_http_cache::v3alpha::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
   HttpCache&
