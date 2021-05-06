@@ -40,13 +40,9 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  # TODO(phlax): remove jq install once upstream support is added:
-  #    https://github.com/envoyproxy/envoy-build-tools/pull/132
   START_COMMAND=("/bin/bash" "-lc" "groupadd --gid $(id -g) -f envoygroup \
     && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
-    && apt-get update \
-    && apt-get install -y -qq --no-install-recommends jq \
     && chown envoybuild:envoygroup /build \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
