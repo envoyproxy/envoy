@@ -18,7 +18,8 @@ namespace BandwidthLimitFilter {
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                            Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
-    : stats_(generateStats(config.stat_prefix(), scope)), runtime_(runtime), scope_(scope),
+    : stats_(generateStats(config.stat_prefix(), scope)),
+      enabled_(config.runtime_enabled(), runtime), runtime_(runtime), scope_(scope),
       time_source_(time_source),
       limit_kbps_(config.has_limit_kbps() ? config.limit_kbps().value() : 0),
       enable_mode_(config.enable_mode()),
@@ -49,7 +50,7 @@ BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
 Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   const auto* config = getConfig();
 
-  if (config->enable_mode() & BandwidthLimit::Decode) {
+  if (config->enabled() && (config->enable_mode() & BandwidthLimit::Decode)) {
     config->stats().decode_enabled_.inc();
     decode_limiter_ = std::make_unique<StreamRateLimiter>(
         config->limit(), decoder_callbacks_->decoderBufferLimit(),
@@ -107,7 +108,7 @@ Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailer
 Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
   auto* config = getConfig();
 
-  if (config->enable_mode() & BandwidthLimit::Encode) {
+  if (config->enabled() && (config->enable_mode() & BandwidthLimit::Encode)) {
     config->stats().encode_enabled_.inc();
 
     encode_limiter_ = std::make_unique<StreamRateLimiter>(

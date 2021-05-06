@@ -69,6 +69,7 @@ public:
   TimeSource& timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
   uint64_t limit() const { return limit_kbps_; }
+  bool enabled() const { return enabled_.enabled(); }
   EnableMode enable_mode() const { return enable_mode_; };
   std::shared_ptr<SharedTokenBucketImpl> tokenBucket() { return token_bucket_; }
   const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const { return token_bucket_; }
@@ -80,6 +81,7 @@ private:
   static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   mutable BandwidthLimitStats stats_;
+  Runtime::FeatureFlag enabled_;
   Runtime::Loader& runtime_;
   Stats::Scope& scope_;
   TimeSource& time_source_;
