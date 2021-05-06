@@ -139,6 +139,7 @@ TEST_F(AppleDnsImplTest, DestructPending) {
 TEST_F(AppleDnsImplTest, LocalLookup) {
   EXPECT_NE(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
