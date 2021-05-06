@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Filesystem {
 
 MemfileInstanceImpl::MemfileInstanceImpl()
-    : file_system_{std::move(Envoy::Filesystem::makeFilesystemInstance())}, use_memfiles_(false) {}
+    : file_system_{new InstanceImpl()}, use_memfiles_(false) {}
 
 MemfileInstanceImpl& fileSystemForTest() {
   static MemfileInstanceImpl* file_system = new MemfileInstanceImpl();

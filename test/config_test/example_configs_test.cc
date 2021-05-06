@@ -11,9 +11,9 @@ namespace Envoy {
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
-  auto file_system = Envoy::Filesystem::makeFilesystemInstance();
+  Filesystem::InstanceImpl file_system;
   const auto config_file_count = std::stoi(
-      file_system->fileReadToEnd(TestEnvironment::temporaryDirectory() + "/config-file-count.txt"));
+      file_system.fileReadToEnd(TestEnvironment::temporaryDirectory() + "/config-file-count.txt"));
 
   // Change working directory, otherwise we won't be able to read files using relative paths.
 #ifdef PATH_MAX
