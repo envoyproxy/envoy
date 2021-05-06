@@ -28,5 +28,5 @@ message OriginalDst {
 
   // The method to recover the original local address. The default method is Dnat if the field is not set.
   // [#not-implemented-hide:]
-  Method address_recovery_method = 0;
+  Method address_recovery_method = 1;
 }
