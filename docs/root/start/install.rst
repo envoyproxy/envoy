@@ -159,6 +159,13 @@ The following commands will pull and show the Envoy version of current images.
          $ docker pull envoyproxy/|envoy_docker_image|
          $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
+   .. tab:: Envoy (distroless)
+
+      .. substitution-code-block:: console
+
+         $ docker pull envoyproxy/|envoy_distroless_docker_image|
+         $ docker run --rm envoyproxy/|envoy_distroless_docker_image| --version
+
    .. tab:: Get Envoy
 
       .. code-block:: console
@@ -245,6 +252,18 @@ The following table shows the available Docker images
      -
    * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
      - Build image which includes tools for building multi-arch Envoy and containers.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
+   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
+     - Build image on top of distroless images.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
+   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
+     - Build image on top of distroless images.
      -
      -
      - See Docker Hub
