@@ -29,7 +29,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), mode_(wildcard ? WildcardMode::Implicit : WildcardMode::Disabled), watch_map_(watch_map),
+      type_url_(std::move(type_url)),
+      mode_(wildcard ? WildcardMode::Implicit : WildcardMode::Disabled), watch_map_(watch_map),
       local_info_(local_info), dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(

@@ -83,7 +83,8 @@ private:
 
   // Describes the wildcard mode the subscription is in.
   enum class WildcardMode {
-    // This mode is being expressed by sending a wildcard subscription request with an empty resource subscription list.
+    // This mode is being expressed by sending a wildcard subscription request with an empty
+    // resource subscription list.
     Implicit,
     // This mode is being expressed by sending a wildcard subscription request that contains "*"
     // special name in the resource subscription list.
