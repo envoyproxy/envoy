@@ -14,6 +14,8 @@ class HttpFilterNameValues {
 public:
   // Buffer filter
   const std::string Buffer = "envoy.filters.http.buffer";
+  // Bandwidthlimit filter
+  const std::string BandwidthLimit = "envoy.filters.http.bandwidth_limit";
   // Cache filter
   const std::string Cache = "envoy.filters.http.cache";
   // CDN Loop filter

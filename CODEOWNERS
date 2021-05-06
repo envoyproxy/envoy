@@ -183,3 +183,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/http/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/network/ext_authz @esmet @gsagula @dio
+/*/extensions/filters/http/bandwidth_limit @tonya11en @mattklein123 @nitgoy
