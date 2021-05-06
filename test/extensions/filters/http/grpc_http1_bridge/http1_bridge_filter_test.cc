@@ -30,7 +30,8 @@ public:
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
-    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope()).WillByDefault(testing::ReturnRef(stats_store_));
+    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
+        .WillByDefault(testing::ReturnRef(stats_store_));
   }
 
   ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
