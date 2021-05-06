@@ -4,6 +4,7 @@
 
 #endif
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -212,6 +213,15 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     char* pathenv = getenv("PATH");
     if (pathenv != nullptr) {
       FAIL_NOW("PATH environment variable should not be available");
+    }
+    // Call to clock_time_get on monotonic clock should be available.
+    std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+    for (auto i = 0; i < 10; i++) {
+      // Busy wait since "sleep" not available yet.
+    }
+    std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+    if ((t2-t1).count() < 0) {
+      FAIL_NOW("monotonic clock should be available");
     }
 #ifndef WIN32
     // Exercise the `WASI` `fd_fdstat_get` a little bit
