@@ -29,7 +29,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), wildcard_(wildcard), watch_map_(watch_map),
+      type_url_(std::move(type_url)), mode_(wildcard ? WildcardMode::Implicit : WildcardMode::Disabled), watch_map_(watch_map),
       local_info_(local_info), dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
@@ -52,6 +52,32 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     // add-remove (because "remove-add" has to be treated as equivalent to just "add").
     names_added_.erase(r);
     names_removed_.insert(r);
+  }
+  switch (mode_) {
+  case WildcardMode::Implicit:
+    if (names_removed_.find("*") != names_removed_.end()) {
+      // we explicitly cancel the wildcard subscription
+      mode_ = WildcardMode::Disabled;
+    } else if (!names_added_.empty()) {
+      // switch to explicit mode if we requested some extra names
+      mode_ = WildcardMode::Explicit;
+      names_added_.emplace("*");
+    }
+    break;
+
+  case WildcardMode::Explicit:
+    if (names_removed_.find("*") != names_removed_.end()) {
+      // we explicitly cancel the wildcard subscription
+      mode_ = WildcardMode::Disabled;
+    }
+    break;
+
+  case WildcardMode::Disabled:
+    if (names_added_.find("*") != names_added_.end()) {
+      // we switch into an explicit wildcard subscription
+      mode_ = WildcardMode::Explicit;
+    }
+    break;
   }
 }
 
@@ -177,16 +203,15 @@ DeltaSubscriptionState::getNextRequestAckless() {
       if (!resource_state.waitingForServer()) {
         (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
-      // As mentioned above, fill resource_names_subscribe with everything, including names we
-      // have yet to receive any resource for unless this is a wildcard subscription, for which
-      // the first request on a stream must be without any resource names.
-      if (!wildcard_) {
-        names_added_.insert(resource_name);
-      }
+      // Fill resource_names_subscribe with everything, including names we have yet to receive any
+      // resource.
+      names_added_.insert(resource_name);
     }
-    // Wildcard subscription initial requests must have no resource_names_subscribe.
-    if (wildcard_) {
-      names_added_.clear();
+    // Wildcard subscription initial requests need to switch immediately to explicit mode if some
+    // resource names were explicitly requested.
+    if (mode_ == WildcardMode::Implicit && !names_added_.empty()) {
+      mode_ = WildcardMode::Explicit;
+      names_added_.insert("*");
     }
     names_removed_.clear();
   }

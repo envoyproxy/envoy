@@ -81,6 +81,17 @@ private:
     absl::optional<std::string> version_;
   };
 
+  // Describes the wildcard mode the subscription is in.
+  enum class WildcardMode {
+    // This mode is being expressed by sending a wildcard subscription request with an empty resource subscription list.
+    Implicit,
+    // This mode is being expressed by sending a wildcard subscription request that contains "*"
+    // special name in the resource subscription list.
+    Explicit,
+    // This mode is means no wildcard subscription.
+    Disabled,
+  };
+
   // Use these helpers to ensure resource_state_ and resource_names_ get updated together.
   void addResourceState(const envoy::service::discovery::v3::Resource& resource);
   void setResourceWaitingForServer(const std::string& resource_name);
@@ -104,8 +115,7 @@ private:
   absl::flat_hash_set<std::string> resource_names_;
 
   const std::string type_url_;
-  // Is the subscription is for a wildcard request.
-  const bool wildcard_;
+  WildcardMode mode_;
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;

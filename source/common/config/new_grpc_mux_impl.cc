@@ -153,8 +153,10 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
     if (enable_type_url_downgrade_and_upgrade_) {
       registerVersionedTypeUrl(type_url);
     }
-    // No resources implies that this is a wildcard request subscription.
-    addSubscription(type_url, options.use_namespace_matching_, resources.empty());
+    // No resources or an existence of the special name implies that
+    // this is a wildcard request subscription.
+    const bool wildcard = resources.empty() || (resources.find("*") != resources.end());
+    addSubscription(type_url, options.use_namespace_matching_, wildcard);
     return addWatch(type_url, resources, callbacks, resource_decoder, options);
   }
 
