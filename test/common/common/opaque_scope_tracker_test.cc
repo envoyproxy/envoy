@@ -1,13 +1,14 @@
 #include <array>
+#include <functional>
+
+#include "envoy/common/scope_tracker.h"
 
 #include "common/common/opaque_scope_tracker.h"
 #include "common/common/utility.h"
 
-#include "envoy/common/scope_tracker.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include <functional>
 
 namespace Envoy {
 namespace {
