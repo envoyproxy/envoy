@@ -46,7 +46,7 @@ else
     && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && apt-get update \
-    && apt-get install --no-install-recommends jq \
+    && apt-get install -y -qq --no-install-recommends jq \
     && chown envoybuild:envoygroup /build \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
