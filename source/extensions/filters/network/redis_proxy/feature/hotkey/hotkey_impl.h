@@ -49,7 +49,8 @@ using HotKeyCounterSharedPtr = std::shared_ptr<HotKeyCounter>;
  * All redis proxy stats. @see stats_macros.h
  */
 #define ALL_REDIS_HOTKEY_COLLECTOR_STATS(GAUGE)                                                    \
-  GAUGE(counter, NeverImport)                                                                      \
+  GAUGE(active_counter, NeverImport)                                                               \
+  GAUGE(draining_counter, NeverImport)                                                             \
   GAUGE(hotkey, NeverImport)                                                                       \
   GAUGE(hotkey_freq_avg, NeverImport)                                                              \
   GAUGE(hotkey_heat_avg, NeverImport)
@@ -91,7 +92,8 @@ private:
   Event::TimerPtr attenuate_timer_;
   Cache::CacheSharedPtr hotkey_cache_;
   Thread::MutexBasicLockable hotkey_cache_mutex_;
-  absl::flat_hash_map<std::string, HotKeyCounterSharedPtr> counters_;
+  absl::flat_hash_map<std::string, HotKeyCounterSharedPtr> active_counters_;
+  absl::flat_hash_map<std::string, HotKeyCounterSharedPtr> draining_counters_;
   Thread::MutexBasicLockable counters_mutex_;
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey::CacheType
       hotkey_cache_type_;

@@ -54,7 +54,10 @@ HotKeyCollector::HotKeyCollector(
   hotkey_cache_ = Cache::CacheFactory::createCache(hotkey_cache_type_, hotkey_cache_capacity_);
 }
 
-HotKeyCollector::~HotKeyCollector() { hotkey_collector_stats_.counter_.set(0); }
+HotKeyCollector::~HotKeyCollector() {
+  hotkey_collector_stats_.active_counter_.set(0);
+  hotkey_collector_stats_.draining_counter_.set(0);
+}
 
 HotKeyCounterSharedPtr HotKeyCollector::createHotKeyCounter() {
   HotKeyCounterSharedPtr counter(
@@ -105,16 +108,18 @@ uint8_t HotKeyCollector::getHotKeyHeats(absl::flat_hash_map<std::string, uint32_
 inline void HotKeyCollector::registerHotKeyCounter(const HotKeyCounterSharedPtr& counter) {
   if (counter) {
     Thread::LockGuard lock_guard(counters_mutex_);
-    counters_.emplace(std::make_pair(counter->name(), counter));
-    hotkey_collector_stats_.counter_.inc();
+    active_counters_.emplace(std::make_pair(counter->name(), counter));
+    hotkey_collector_stats_.active_counter_.inc();
   }
 }
 
 inline void HotKeyCollector::unregisterHotKeyCounter(const HotKeyCounterSharedPtr& counter) {
   if (counter) {
     Thread::LockGuard lock_guard(counters_mutex_);
-    counters_.erase(counter->name());
-    hotkey_collector_stats_.counter_.dec();
+    draining_counters_.emplace(std::make_pair(counter->name(), counter));
+    hotkey_collector_stats_.draining_counter_.inc();
+    active_counters_.erase(counter->name());
+    hotkey_collector_stats_.active_counter_.dec();
   }
 }
 
@@ -124,7 +129,7 @@ void HotKeyCollector::collect() {
 
   {
     Thread::LockGuard lock_guard(counters_mutex_);
-    for (auto& it : counters_) {
+    for (auto& it : active_counters_) {
       if (it.second->getHotKeys(tmp_hotkeys) > 0) {
         for (auto& tmp_it : tmp_hotkeys) {
           auto tmp_tmp_it = hotkeys.find(tmp_it.first);
@@ -139,6 +144,22 @@ void HotKeyCollector::collect() {
       }
       it.second->reset();
     }
+    for (auto& it : draining_counters_) {
+      if (it.second->getHotKeys(tmp_hotkeys) > 0) {
+        for (auto& tmp_it : tmp_hotkeys) {
+          auto tmp_tmp_it = hotkeys.find(tmp_it.first);
+          if (tmp_tmp_it == hotkeys.end()) {
+            hotkeys[tmp_it.first] = tmp_it.second;
+          } else {
+            hotkeys[tmp_it.first] = ((UINT32_MAX - tmp_it.second) > tmp_tmp_it->second)
+                                        ? (tmp_it.second + tmp_tmp_it->second)
+                                        : UINT32_MAX;
+          }
+        }
+      }
+    }
+    draining_counters_.clear();
+    hotkey_collector_stats_.draining_counter_.set(0);
   }
 
   {

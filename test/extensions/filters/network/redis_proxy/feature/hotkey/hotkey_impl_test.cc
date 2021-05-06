@@ -160,8 +160,14 @@ TEST(HotKeyCollectorTest, DestroyHotKeyCounter) {
   EXPECT_EQ(1, cache.at(test_key_1));
   cache.clear();
 
+  test_hk_counter_1->incr(test_key_1);
   test_hk_collector->destroyHotKeyCounter(test_hk_counter_1);
   EXPECT_EQ(nullptr, test_hk_counter_1);
+  absl::SleepFor(absl::Milliseconds(550));
+  test_hk_collector->getHotKeys(cache);
+  EXPECT_EQ(1, cache.size());
+  EXPECT_EQ(1, cache.count(test_key_1));
+  EXPECT_EQ(2, cache.at(test_key_1));
   cache.clear();
 
   dispatcher->exit();
