@@ -125,10 +125,12 @@ private:
 
 Network::TransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
+                                                          Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store));
+  ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
@@ -204,12 +206,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   }
 
 #ifdef ENVOY_ENABLE_QUIC
+  Extensions::TransportSockets::Tls::ContextManagerImpl manager(time_system);
   Network::TransportSocketFactoryPtr transport_socket_factory =
-      createQuicUpstreamTransportSocketFactory(api, mock_stats_store,
+      createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
   persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
+      *dispatcher, *transport_socket_factory, time_system, addr);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
