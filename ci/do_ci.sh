@@ -442,6 +442,9 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   # Build docs.
+  # TODO(phlax): Move jq install to envoy-build-tools
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends jq
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
