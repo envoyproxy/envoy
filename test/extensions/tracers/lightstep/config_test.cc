@@ -20,7 +20,7 @@ namespace Tracers {
 namespace Lightstep {
 namespace {
 
-TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
+TEST(LightstepTracerConfigTest, DEPRECATED_FEATURE_TEST(LightstepHttpTracer)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   ON_CALL(*context.server_factory_context_.cluster_manager_.active_clusters_["fake_cluster"]->info_,
