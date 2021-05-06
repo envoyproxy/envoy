@@ -95,3 +95,6 @@ Runtime
 
 The HTTP bandwidth limit filter supports the following runtime settings:
 
+The bandwidth limit filter can be runtime feature flagged via the :ref:`enabled
+<envoy_v3_api_msg_extensions.filters.http.bandwidthlimit.v3alpha.BandwidthLimit.runtime_enabled>`
+configuration field.

@@ -20,16 +20,15 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/common:shared_token_bucket_impl_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:timespan_lib",
-        "//source/common/common:shared_token_bucket_impl_lib",
         "//source/extensions/filters/http/common:stream_rate_limiter_lib",
         "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
