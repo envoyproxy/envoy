@@ -258,6 +258,7 @@ protected:
     enabled:
       default_value: true
       runtime_key: quic.enabled
+    packets_received_to_connection_count_ratio: 50
 )EOF";
   }
 
@@ -310,13 +311,13 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
   quic_listener_.reset();
-  EXPECT_THROW_WITH_REGEX(
-      (void)std::make_unique<ActiveQuicListener>(
-          0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
-          options, false,
-          ActiveQuicListenerFactoryPeer::runtimeEnabled(
-              static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),
-      Network::CreateListenerException, "Failed to apply socket options.");
+  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
+                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
+                              listener_config_, quic_config_, options, false,
+                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
+                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
+                              32u),
+                          Network::CreateListenerException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
@@ -327,6 +328,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
   readFromClientSockets();
 }
 
@@ -334,7 +336,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
-  maybeConfigureMocks(count);
+  maybeConfigureMocks(count + 1);
+  // Create 1 session to increase number of packet to read in the next READ event.
+  sendCHLO(quic::test::TestConnectionId());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_NE(0u, quic_dispatcher_->NumSessions());
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= count; ++i) {
@@ -352,6 +358,8 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
+
   readFromClientSockets();
 }
 
