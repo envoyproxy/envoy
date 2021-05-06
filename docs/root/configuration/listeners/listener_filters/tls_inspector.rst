@@ -17,7 +17,7 @@ of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatc
 * :ref:`SNI <faq_how_to_setup_sni>`
 * :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.ListenerFilter.name>`
 * This filter may be configured with the name *envoy.filters.listener.tls_inspector* or
-  *type.googleapis.com/envoy.extensions.listeners.tls_inspector.v3.TlsInspector* as the
+  *type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector* as the
   `type_url <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Any.FIELDS.string.google.protobuf.Any.type_url>`_.
 
 Example
@@ -39,7 +39,7 @@ of the *typed_config*:
   listener_filters:
   - name: "tls_inspector"
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.listeners.tls_inspector.v3.TlsInspector
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
 
 Statistics
 ----------

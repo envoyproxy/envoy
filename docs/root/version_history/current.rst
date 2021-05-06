@@ -11,13 +11,16 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
 * http: replaced setting ``envoy.reloadable_features.strict_1xx_and_204_response_headers`` with settings
   ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers``
   (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
   ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
   (do not send 1xx or 204 responses with these headers). Both are true by default.
+* http: serve HEAD requests from cache.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+
 
 
 Bug Fixes
@@ -50,7 +53,9 @@ New Features
 * cluster: added :ref:`dns_resolver_options <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting one such option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
 * dns_filter: added :ref:`dns_resolver_options <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting the option *use_tcp_for_dns_lookups* to true we can make dns filter's external resolvers to answer queries using TCP only. And by setting the option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
 * dynamic_forward_proxy: added :ref:`dns_resolver_options <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting one such option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
+* listener: added ability to change an existing listener's address.
 * metric service: added support for sending metric tags as labels. This can be enabled by setting the :ref:`emit_tags_as_labels <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels>` field to true.
+* udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.
 
 Deprecated
 ----------

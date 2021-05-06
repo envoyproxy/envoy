@@ -150,8 +150,8 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
 
 .. attention::
 
-  The HTTP/2 `streams_active` gauge may be greater than the HTTP connection manager
-  `downstream_rq_active` gauge due to differences in stream accounting between the codec and the
+  The HTTP/2 ``streams_active`` gauge may be greater than the HTTP connection manager
+  ``downstream_rq_active`` gauge due to differences in stream accounting between the codec and the
   HTTP connection manager.
 
 Tracing statistics
