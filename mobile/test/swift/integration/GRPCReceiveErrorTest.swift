@@ -11,6 +11,7 @@ final class ReceiveErrorTests: XCTestCase {
     let pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
     // swiftlint:disable:next line_length
     let localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+    let filterName = "error_validation_filter"
     let config =
     """
     static_resources:
@@ -34,7 +35,7 @@ final class ReceiveErrorTests: XCTestCase {
             - name: envoy.filters.http.platform_bridge
               typed_config:
                 "@type": \(pbfType)
-                platform_filter_name: error_validation_filter
+                platform_filter_name: \(filterName)
             - name: envoy.filters.http.local_error
               typed_config:
                 "@type": \(localErrorFilterType)
@@ -75,7 +76,7 @@ final class ReceiveErrorTests: XCTestCase {
     let httpStreamClient = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .addPlatformFilter(
-        name: "error_validation_filter",
+        name: filterName,
         factory: { ErrorValidationFilter(expectation: filterExpectation) }
       )
       .build()
@@ -102,7 +103,7 @@ final class ReceiveErrorTests: XCTestCase {
          runExpectation.fulfill()
       }
       .start()
-      .sendHeaders(requestHeaders, endStream: true)
+      .sendHeaders(requestHeaders, endStream: false)
       .sendMessage(message)
 
     XCTAssertEqual(XCTWaiter.wait(for: [filterExpectation, runExpectation], timeout: 1), .completed)
