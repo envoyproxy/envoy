@@ -24,7 +24,7 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
           odcds_config.resource_api_version(), validation_visitor, "name"),
-      helper_(cm, "odcds"), cm_(cm), notifier_(notifier_), scope_(scope.createScope("odcds.")),
+      helper_(cm, "odcds"), cm_(cm), notifier_(notifier), scope_(scope.createScope("odcds.")),
       status_(StartStatus::NotStarted) {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
