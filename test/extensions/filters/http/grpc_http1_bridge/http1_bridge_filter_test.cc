@@ -30,6 +30,7 @@ public:
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
+    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope()).WillByDefault(testing::ReturnRef(stats_store_));
   }
 
   ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
@@ -78,9 +79,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2HeaderOnlyResponse) {
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
-  ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-      .WillByDefault(testing::ReturnRef(stats_store_));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
@@ -107,9 +105,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.grpc_bridge_stats_disabled", "false"}});
-
-  ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-      .WillByDefault(testing::ReturnRef(stats_store_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
 
@@ -142,9 +137,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2NormalResponse) {
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
-  ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-      .WillByDefault(testing::ReturnRef(stats_store_));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -165,9 +157,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2ContentTypeGrpcPlusProto) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc+proto"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
-
-  ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-      .WillByDefault(testing::ReturnRef(stats_store_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
