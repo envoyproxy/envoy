@@ -495,6 +495,8 @@ key:
     - string_key: foo
 )EOF";
   sendSrdsResponse({}, {scope_route2}, {}, "2");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                                 1);
   sendSrdsResponse({}, {}, {"foo_scope1", "foo_scope2"}, "3");
 }
 
