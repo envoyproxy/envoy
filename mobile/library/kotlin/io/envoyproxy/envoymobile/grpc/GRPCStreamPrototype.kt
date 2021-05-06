@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * A type representing a gRPC stream that has not yet been started.
@@ -19,7 +20,7 @@ class GRPCStreamPrototype(
    * @param executor Executor on which to receive callback events.
    * @return The new gRPC stream.
    */
-  fun start(executor: Executor): GRPCStream {
+  fun start(executor: Executor = Executors.newSingleThreadExecutor()): GRPCStream {
     val stream = underlyingStream.start(executor)
     return GRPCStream(stream)
   }
