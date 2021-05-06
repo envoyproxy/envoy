@@ -534,8 +534,14 @@ void InstanceImpl::initialize(const Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
-  const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
-  dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
+  auto dns_resolver_options =
+      envoy::config::core::v3::DnsResolverOptions(bootstrap_.dns_resolver_options());
+  // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
+  // utilize bootstrap_.use_tcp_for_dns_lookups() if `dns_resolver_options` is not set.
+  if (!bootstrap_.has_dns_resolver_options()) {
+    dns_resolver_options.set_use_tcp_for_dns_lookups(bootstrap_.use_tcp_for_dns_lookups());
+  }
+  dns_resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,

@@ -23,10 +23,10 @@ namespace Network {
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_tcp_for_dns_lookups)
+    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
-      use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups),
+      dns_resolver_options_(dns_resolver_options),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
@@ -66,9 +66,14 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
 DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   AresOptions options{};
 
-  if (use_tcp_for_dns_lookups_) {
+  if (dns_resolver_options_.use_tcp_for_dns_lookups()) {
     options.optmask_ |= ARES_OPT_FLAGS;
     options.options_.flags |= ARES_FLAG_USEVC;
+  }
+
+  if (dns_resolver_options_.no_default_search_domain()) {
+    options.optmask_ |= ARES_OPT_FLAGS;
+    options.options_.flags |= ARES_FLAG_NOSEARCH;
   }
 
   return options;

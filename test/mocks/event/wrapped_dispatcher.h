@@ -50,10 +50,10 @@ public:
                                         std::move(transport_socket), options);
   }
 
-  Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const bool use_tcp_for_dns_lookups) override {
-    return impl_.createDnsResolver(resolvers, use_tcp_for_dns_lookups);
+  Network::DnsResolverSharedPtr createDnsResolver(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override {
+    return impl_.createDnsResolver(resolvers, dns_resolver_options);
   }
 
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

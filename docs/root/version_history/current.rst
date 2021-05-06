@@ -46,7 +46,15 @@ Removed Config or Runtime
 New Features
 ------------
 
+* bootstrap: added :ref:`dns_resolver_options <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting one such option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
+* cluster: added :ref:`dns_resolver_options <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting one such option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
+* dns_filter: added :ref:`dns_resolver_options <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting the option *use_tcp_for_dns_lookups* to true we can make dns filter's external resolvers to answer queries using TCP only. And by setting the option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
+* dynamic_forward_proxy: added :ref:`dns_resolver_options <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting one such option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
 * metric service: added support for sending metric tags as labels. This can be enabled by setting the :ref:`emit_tags_as_labels <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels>` field to true.
 
 Deprecated
 ----------
+
+* bootstrap: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolver_options <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolver_options>` which aggregates all of the DNS resolver options in a single message.
+* cluster: the fields :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolver_options <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolver_options>` which aggregates all of the DNS resolver options in a single message.
+* dynamic_forward_proxy: the fields :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolver_options <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolver_options>` which aggregates all of the DNS resolver options in a single message.

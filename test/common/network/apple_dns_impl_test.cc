@@ -118,12 +118,14 @@ protected:
 };
 
 TEST_F(AppleDnsImplTest, InvalidConfigOptions) {
+  auto dns_resolver_options = envoy::config::core::v3::DnsResolverOptions();
   EXPECT_DEATH(
-      dispatcher_->createDnsResolver({}, true),
-      "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
-  EXPECT_DEATH(
-      dispatcher_->createDnsResolver({nullptr}, false),
+      dispatcher_->createDnsResolver({nullptr}, dns_resolver_options),
       "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
+  dns_resolver_options.set_use_tcp_for_dns_lookups(true);
+  EXPECT_DEATH(
+      dispatcher_->createDnsResolver({}, dns_resolver_options),
+      "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
 }
 
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,

@@ -812,8 +812,8 @@ message Cluster {
   // server startup. Apple's API only allows overriding DNS resolvers via system settings.
   repeated core.v4alpha.Address dns_resolvers = 18;
 
-  // Configuration of DNS Lookup option flags which control the behavior of the DNS resolver.
-  core.v4alpha.DnsLookupOptions dns_lookup_options = 53;
+  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  core.v4alpha.DnsResolverOptions dns_resolver_options = 53;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via

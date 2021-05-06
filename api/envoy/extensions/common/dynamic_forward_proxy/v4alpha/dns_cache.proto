@@ -103,6 +103,6 @@ message DnsCacheConfig {
   // Envoy will use dns cache circuit breakers with default settings even if this value is not set.
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 
-  // Configuration of DNS Lookup option flags which control the behavior of the DNS resolver.
-  config.core.v4alpha.DnsLookupOptions dns_lookup_options = 9;
+  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  config.core.v4alpha.DnsResolverOptions dns_resolver_options = 9;
 }

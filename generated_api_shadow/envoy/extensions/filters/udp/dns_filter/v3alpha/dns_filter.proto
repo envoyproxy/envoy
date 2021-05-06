@@ -60,6 +60,9 @@ message DnsFilterConfig {
     // The context structure allows the filter to respond to every query even if the external
     // resolution times out or is otherwise unsuccessful
     uint64 max_pending_lookups = 3 [(validate.rules).uint64 = {gte: 1}];
+
+    // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+    config.core.v3.DnsResolverOptions dns_resolver_options = 4;
   }
 
   // The stat prefix used when emitting DNS filter statistics

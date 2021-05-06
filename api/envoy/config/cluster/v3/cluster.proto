@@ -863,14 +863,13 @@ message Cluster {
   // Setting this value causes failure if the
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
   // server startup. Apple' API only uses UDP for DNS resolution.
-  // This field is deprecated. Instead use
-  // :ref:`dns_lookup_options <envoy_api_field_config.config.cluster.v3.Cluster.dns_lookup_options>`
-  // which aggregates all of the DNS lookup options in a single message.
+  // This field is deprecated in favor of *dns_resolver_options*
+  // which aggregates all of the DNS resolver options in a single message.
   bool use_tcp_for_dns_lookups = 45
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // Configuration of DNS Lookup option flags which control the behavior of the DNS resolver.
-  core.v3.DnsLookupOptions dns_lookup_options = 53;
+  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  core.v3.DnsResolverOptions dns_resolver_options = 53;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
