@@ -9,7 +9,26 @@ import sys
 import protodoc
 
 EMPTY_EXTENSION_DOCS_TEMPLATE = string.Template(
-    """$header
+    """
+{% macro format_extension(extension) -%}
+.. _extension_{{extension["name"]}}:
+
+This extension may be referenced by the qualified name ``{{extension["name"]}}``
+
+.. note::
+  {{extension["status"]}}
+
+  {{extension["security_posture"]}}
+
+.. tip::
+  This extension extends and can be used with the following extension {% if extension["categories"]|length > 1 %}categories{% else %}category{% endif %}:
+
+{% for cat in extension["categories"] %}
+  - :ref:`{{cat}} <extension_category_{{cat}}>`
+{% endfor %}
+{% endmacro -%}
+
+$header
 
 $description
 
@@ -19,7 +38,7 @@ This extension does not have a structured configuration, `google.protobuf.Empty
 <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#empty>`_ should be used
 instead.
 
-$extension
+format_extension($extension)
 """)
 
 
@@ -37,7 +56,7 @@ def generate_empty_extension_docs(extension, details, api_extensions_root):
         header=protodoc.format_header('=', details['title']),
         description=description,
         reflink=reflink,
-        extension=protodoc.format_extension(extension))
+        extension=protodoc.get_extension(extension))
     path.write_text(content)
 
 

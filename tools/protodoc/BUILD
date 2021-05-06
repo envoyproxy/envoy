@@ -6,6 +6,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files(["protodoc.template.rst"])
+
 py_binary(
     name = "generate_empty",
     srcs = ["generate_empty.py"],
@@ -22,6 +24,7 @@ py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
     data = [
+        ":protodoc.template.rst",
         "//docs:protodoc_manifest.yaml",
         "//docs:v2_mapping.json",
     ],

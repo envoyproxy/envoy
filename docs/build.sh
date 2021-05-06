@@ -5,6 +5,8 @@
 
 . tools/shell_utils.sh
 
+#MAKEFAIL
+
 set -e
 
 RELEASE_TAG_REGEX="^refs/tags/v.*"
@@ -58,7 +60,7 @@ mkdir -p "${GENERATED_RST_DIR}"
 export ENVOY_SRCDIR
 
 source_venv "$BUILD_DIR"
-pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
+# pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
@@ -83,7 +85,7 @@ BAZEL_BUILD_OPTIONS+=(
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:generate_external_dep_rst
+# bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:generate_external_dep_rst
 
 function generate_api_rst() {
   local proto_target

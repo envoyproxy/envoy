@@ -55,27 +55,6 @@ UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
     os.environ['ENVOY_BLOB_SHA'])
 
-# Template for formating extension descriptions.
-EXTENSION_TEMPLATE = Template(
-    """
-.. _extension_{{extension}}:
-
-This extension may be referenced by the qualified name ``{{extension}}``
-
-.. note::
-  {{status}}
-
-  {{security_posture}}
-
-.. tip::
-  This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
-
-{% for cat in categories %}
-  - :ref:`{{cat}} <extension_category_{{cat}}>`
-{% endfor %}
-
-""")
-
 # Template for formating an extension category.
 EXTENSION_CATEGORY_TEMPLATE = Template(
     """
@@ -127,18 +106,6 @@ for _k, _v in EXTENSION_DB.items():
     for _cat in _v['categories']:
         EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
 
-V2_LINK_TEMPLATE = Template(
-    """
-This documentation is for the Envoy v3 API.
-
-As of Envoy v1.18 the v2 API has been removed and is no longer supported.
-
-If you are upgrading from v2 API config you may wish to view the v2 API documentation:
-
-    :ref:`{{v2_text}} <{{v2_url}}>`
-
-""")
-
 
 class ProtodocError(Exception):
     """Base error class for the protodoc module."""
@@ -164,27 +131,11 @@ def github_url(type_context):
     return ''
 
 
-def format_comment_with_annotations(comment, type_name=''):
-    """Format a comment string with additional RST for annotations.
-
-    Args:
-        comment: comment string.
-        type_name: optional, 'message' or 'enum' may be specified for additional
-           message/enum specific annotations.
-
-    Returns:
-        A string with additional RST from annotations.
-    """
-    formatted_extension = ''
-    if annotations.EXTENSION_ANNOTATION in comment.annotations:
-        extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
-        formatted_extension = format_extension(extension)
-    formatted_extension_category = ''
-    if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
-        for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
-            formatted_extension_category += format_extension_category(category)
-    comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return comment + formatted_extension + formatted_extension_category
+def parse_comment(comment, type_name=''):
+    return dict(
+        comment=annotations.without_annotations(strip_leading_space(comment.raw)),
+        extension=get_extension(comment.annotations.get(annotations.EXTENSION_ANNOTATION)),
+        extension_categories=get_extension_categories(comment.annotations.get(annotations.EXTENSION_CATEGORY_ANNOTATION, "").split(",")))
 
 
 def map_lines(f, s):
@@ -231,7 +182,7 @@ def format_header(style, text):
     return '%s\n%s\n\n' % (text, style * len(text))
 
 
-def format_extension(extension):
+def get_extension(extension):
     """Format extension metadata as RST.
 
     Args:
@@ -240,6 +191,8 @@ def format_extension(extension):
     Returns:
         RST formatted extension description.
     """
+    if not extension:
+        return {}
     try:
         extension_metadata = EXTENSION_DB[extension]
         status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
@@ -251,11 +204,21 @@ def format_extension(extension):
         )
         exit(1)  # Raising the error buries the above message in tracebacks.
 
-    return EXTENSION_TEMPLATE.render(
-        extension=extension,
+    return dict(
+        name=extension,
         status=status,
         security_posture=security_posture,
         categories=categories)
+
+
+def get_extension_categories(categories):
+    try:
+        return [
+            (category, EXTENSION_CATEGORIES[category])
+            for category in categories
+            if category.strip()]
+    except KeyError as e:
+        raise ProtodocError(f"\n\nUnable to find extension category:  {e.args[0]}\n\n")
 
 
 def format_extension_category(extension_category):
@@ -275,33 +238,6 @@ def format_extension_category(extension_category):
         category=extension_category, extensions=sorted(extensions))
 
 
-def format_header_from_file(style, source_code_info, proto_name, v2_link):
-    """Format RST header based on special file level title
-
-    Args:
-        style: underline style, e.g. '=', '-'.
-        source_code_info: SourceCodeInfo object.
-        proto_name: If the file_level_comment does not contain a user specified
-           title, use this as page title.
-
-    Returns:
-        RST formatted header, and file level comment without page title strings.
-    """
-    anchor = format_anchor(file_cross_ref_label(proto_name))
-    stripped_comment = annotations.without_annotations(
-        strip_leading_space('\n'.join(c + '\n' for c in source_code_info.file_level_comments)))
-    formatted_extension = ''
-    if annotations.EXTENSION_ANNOTATION in source_code_info.file_level_annotations:
-        extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
-        formatted_extension = format_extension(extension)
-    if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
-        return anchor + format_header(
-            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
-        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
-    return anchor + format_header(
-        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
-
-
 def format_field_type_as_json(type_context, field):
     """Format FieldDescriptorProto.Type as a pseudo-JSON string.
 
@@ -311,33 +247,12 @@ def format_field_type_as_json(type_context, field):
     Return: RST formatted pseudo-JSON string representation of field type.
     """
     if type_name_from_fqn(field.type_name) in type_context.map_typenames:
-        return '"{...}"'
+        return "{...}"
     if field.label == field.LABEL_REPEATED:
-        return '[]'
+        return []
     if field.type == field.TYPE_MESSAGE:
-        return '"{...}"'
-    return '"..."'
-
-
-def format_message_as_json(type_context, msg):
-    """Format a message definition DescriptorProto as a pseudo-JSON block.
-
-    Args:
-        type_context: contextual information for message/enum/field.
-        msg: message definition DescriptorProto.
-    Return: RST formatted pseudo-JSON string representation of message definition.
-    """
-    lines = []
-    for index, field in enumerate(msg.field):
-        field_type_context = type_context.extend_field(index, field.name)
-        leading_comment = field_type_context.leading_comment
-        if hide_not_implemented(leading_comment):
-            continue
-        lines.append('"%s": %s' % (field.name, format_field_type_as_json(type_context, field)))
-
-    if lines:
-        return '.. code-block:: json\n\n  {\n' + ',\n'.join(indent_lines(4, lines)) + '\n  }\n\n'
-    return ""
+        return "{...}"
+    return "..."
 
 
 def normalize_field_type_name(field_fqn):
@@ -380,85 +295,9 @@ def type_name_from_fqn(fqn):
     return fqn[1:]
 
 
-def format_field_type(type_context, field):
-    """Format a FieldDescriptorProto type description.
-
-    Adds cross-refs for message types.
-    TODO(htuch): Add cross-refs for enums as well.
-
-    Args:
-        type_context: contextual information for message/enum/field.
-        field: FieldDescriptor proto.
-    Return: RST formatted field type.
-    """
-    if field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(
-            ENVOY_PREFIX):
-        type_name = normalize_field_type_name(field.type_name)
-        if field.type == field.TYPE_MESSAGE:
-            if type_context.map_typenames and type_name_from_fqn(
-                    field.type_name) in type_context.map_typenames:
-                return 'map<%s, %s>' % tuple(
-                    map(
-                        functools.partial(format_field_type, type_context),
-                        type_context.map_typenames[type_name_from_fqn(field.type_name)]))
-            return format_internal_link(type_name, message_cross_ref_label(type_name))
-        if field.type == field.TYPE_ENUM:
-            return format_internal_link(type_name, enum_cross_ref_label(type_name))
-    elif field.type_name.startswith(WKT_NAMESPACE_PREFIX):
-        wkt = field.type_name[len(WKT_NAMESPACE_PREFIX):]
-        return format_external_link(
-            wkt, 'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s'
-            % wkt.lower())
-    elif field.type_name.startswith(RPC_NAMESPACE_PREFIX):
-        rpc = field.type_name[len(RPC_NAMESPACE_PREFIX):]
-        return format_external_link(
-            rpc, 'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s'
-            % rpc.lower())
-    elif field.type_name:
-        return field.type_name
-
-    pretty_type_names = {
-        field.TYPE_DOUBLE: 'double',
-        field.TYPE_FLOAT: 'float',
-        field.TYPE_INT32: 'int32',
-        field.TYPE_SFIXED32: 'int32',
-        field.TYPE_SINT32: 'int32',
-        field.TYPE_FIXED32: 'uint32',
-        field.TYPE_UINT32: 'uint32',
-        field.TYPE_INT64: 'int64',
-        field.TYPE_SFIXED64: 'int64',
-        field.TYPE_SINT64: 'int64',
-        field.TYPE_FIXED64: 'uint64',
-        field.TYPE_UINT64: 'uint64',
-        field.TYPE_BOOL: 'bool',
-        field.TYPE_STRING: 'string',
-        field.TYPE_BYTES: 'bytes',
-    }
-    if field.type in pretty_type_names:
-        return format_external_link(
-            pretty_type_names[field.type],
-            'https://developers.google.com/protocol-buffers/docs/proto#scalar')
-    raise ProtodocError('Unknown field type ' + str(field.type))
-
-
 def strip_leading_space(s):
     """Remove leading space in flat comment strings."""
     return map_lines(lambda s: s[1:], s)
-
-
-def file_cross_ref_label(msg_name):
-    """File cross reference label."""
-    return 'envoy_api_file_%s' % msg_name
-
-
-def message_cross_ref_label(msg_name):
-    """Message cross reference label."""
-    return 'envoy_api_msg_%s' % msg_name
-
-
-def enum_cross_ref_label(enum_name):
-    """Enum cross reference label."""
-    return 'envoy_api_enum_%s' % enum_name
 
 
 def field_cross_ref_label(field_name):
@@ -466,194 +305,9 @@ def field_cross_ref_label(field_name):
     return 'envoy_api_field_%s' % field_name
 
 
-def enum_value_cross_ref_label(enum_value_name):
-    """Enum value cross reference label."""
-    return 'envoy_api_enum_value_%s' % enum_value_name
-
-
 def format_anchor(label):
     """Format a label as an Envoy API RST anchor."""
     return '.. _%s:\n\n' % label
-
-
-def format_security_options(security_option, field, type_context, edge_config):
-    sections = []
-
-    if security_option.configure_for_untrusted_downstream:
-        sections.append(
-            indent(
-                4, 'This field should be configured in the presence of untrusted *downstreams*.'))
-    if security_option.configure_for_untrusted_upstream:
-        sections.append(
-            indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
-    if edge_config.note:
-        sections.append(indent(4, edge_config.note))
-
-    example_dict = json_format.MessageToDict(edge_config.example)
-    validate_fragment.validate_fragment(field.type_name[1:], example_dict)
-    field_name = type_context.name.split('.')[-1]
-    example = {field_name: example_dict}
-    sections.append(
-        indent(4, 'Example configuration for untrusted environments:\n\n')
-        + indent(4, '.. code-block:: yaml\n\n')
-        + '\n'.join(indent_lines(6,
-                                 yaml.dump(example).split('\n'))))
-
-    return '.. attention::\n' + '\n\n'.join(sections)
-
-
-def format_field_as_definition_list_item(
-        outer_type_context, type_context, field, protodoc_manifest):
-    """Format a FieldDescriptorProto as RST definition list item.
-
-    Args:
-        outer_type_context: contextual information for enclosing message.
-        type_context: contextual information for message/enum/field.
-        field: FieldDescriptorProto.
-        protodoc_manifest: tools.protodoc.Manifest for proto.
-
-    Returns:
-        RST formatted definition list item.
-    """
-    field_annotations = []
-
-    anchor = format_anchor(field_cross_ref_label(normalize_type_context_name(type_context.name)))
-    if field.options.HasExtension(validate_pb2.rules):
-        rule = field.options.Extensions[validate_pb2.rules]
-        if ((rule.HasField('message') and rule.message.required)
-                or (rule.HasField('duration') and rule.duration.required)
-                or (rule.HasField('string') and rule.string.min_len > 0)
-                or (rule.HasField('string') and rule.string.min_bytes > 0)
-                or (rule.HasField('repeated') and rule.repeated.min_items > 0)):
-            field_annotations = ['*REQUIRED*']
-    leading_comment = type_context.leading_comment
-    formatted_leading_comment = format_comment_with_annotations(leading_comment)
-    if hide_not_implemented(leading_comment):
-        return ''
-
-    if field.HasField('oneof_index'):
-        oneof_context = outer_type_context.extend_oneof(
-            field.oneof_index, type_context.oneof_names[field.oneof_index])
-        oneof_comment = oneof_context.leading_comment
-        formatted_oneof_comment = format_comment_with_annotations(oneof_comment)
-        if hide_not_implemented(oneof_comment):
-            return ''
-
-        # If the oneof only has one field and marked required, mark the field as required.
-        if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[
-                field.oneof_index]:
-            field_annotations = ['*REQUIRED*']
-
-        if len(type_context.oneof_fields[field.oneof_index]) > 1:
-            # Fields in oneof shouldn't be marked as required when we have oneof comment below it.
-            field_annotations = []
-            oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
-                field.oneof_index] else '\nOnly one of %s may be set.\n'
-            formatted_oneof_comment += oneof_template % ', '.join(
-                format_internal_link(
-                    f,
-                    field_cross_ref_label(
-                        normalize_type_context_name(outer_type_context.extend_field(i, f).name)))
-                for i, f in type_context.oneof_fields[field.oneof_index])
-    else:
-        formatted_oneof_comment = ''
-
-    # If there is a udpa.annotations.security option, include it after the comment.
-    if field.options.HasExtension(security_pb2.security):
-        manifest_description = protodoc_manifest.fields.get(type_context.name)
-        if not manifest_description:
-            raise ProtodocError('Missing protodoc manifest YAML for %s' % type_context.name)
-        formatted_security_options = format_security_options(
-            field.options.Extensions[security_pb2.security], field, type_context,
-            manifest_description.edge_config)
-    else:
-        formatted_security_options = ''
-    pretty_label_names = {
-        field.LABEL_OPTIONAL: '',
-        field.LABEL_REPEATED: '**repeated** ',
-    }
-    comment = '(%s) ' % ', '.join(
-        [pretty_label_names[field.label] + format_field_type(type_context, field)]
-        + field_annotations) + formatted_leading_comment
-    return anchor + field.name + '\n' + map_lines(
-        functools.partial(indent, 2),
-        comment + formatted_oneof_comment) + formatted_security_options
-
-
-def format_message_as_definition_list(type_context, msg, protodoc_manifest):
-    """Format a DescriptorProto as RST definition list.
-
-    Args:
-        type_context: contextual information for message/enum/field.
-        msg: DescriptorProto.
-        protodoc_manifest: tools.protodoc.Manifest for proto.
-
-    Returns:
-        RST formatted definition list item.
-    """
-    type_context.oneof_fields = defaultdict(list)
-    type_context.oneof_required = defaultdict(bool)
-    type_context.oneof_names = defaultdict(list)
-    for index, field in enumerate(msg.field):
-        if field.HasField('oneof_index'):
-            leading_comment = type_context.extend_field(index, field.name).leading_comment
-            if hide_not_implemented(leading_comment):
-                continue
-            type_context.oneof_fields[field.oneof_index].append((index, field.name))
-    for index, oneof_decl in enumerate(msg.oneof_decl):
-        if oneof_decl.options.HasExtension(validate_pb2.required):
-            type_context.oneof_required[index] = oneof_decl.options.Extensions[
-                validate_pb2.required]
-        type_context.oneof_names[index] = oneof_decl.name
-    return '\n'.join(
-        format_field_as_definition_list_item(
-            type_context, type_context.extend_field(index, field.name), field, protodoc_manifest)
-        for index, field in enumerate(msg.field)) + '\n'
-
-
-def format_enum_value_as_definition_list_item(type_context, enum_value):
-    """Format a EnumValueDescriptorProto as RST definition list item.
-
-    Args:
-        type_context: contextual information for message/enum/field.
-        enum_value: EnumValueDescriptorProto.
-
-    Returns:
-        RST formatted definition list item.
-    """
-    anchor = format_anchor(
-        enum_value_cross_ref_label(normalize_type_context_name(type_context.name)))
-    default_comment = '*(DEFAULT)* ' if enum_value.number == 0 else ''
-    leading_comment = type_context.leading_comment
-    formatted_leading_comment = format_comment_with_annotations(leading_comment)
-    if hide_not_implemented(leading_comment):
-        return ''
-    comment = default_comment + UNICODE_INVISIBLE_SEPARATOR + formatted_leading_comment
-    return anchor + enum_value.name + '\n' + map_lines(functools.partial(indent, 2), comment)
-
-
-def format_enum_as_definition_list(type_context, enum):
-    """Format a EnumDescriptorProto as RST definition list.
-
-    Args:
-        type_context: contextual information for message/enum/field.
-        enum: DescriptorProto.
-
-    Returns:
-        RST formatted definition list item.
-    """
-    return '\n'.join(
-        format_enum_value_as_definition_list_item(
-            type_context.extend_enum_value(index, enum_value.name), enum_value)
-        for index, enum_value in enumerate(enum.value)) + '\n'
-
-
-def format_proto_as_block_comment(proto):
-    """Format a proto as a RST block comment.
-
-    Useful in debugging, not usually referenced.
-    """
-    return '\n\nproto::\n\n' + map_lines(functools.partial(indent, 2), str(proto)) + '\n'
 
 
 class RstFormatVisitor(visitor.Visitor):
@@ -668,6 +322,9 @@ class RstFormatVisitor(visitor.Visitor):
         with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
             self.v2_mapping = json.load(f)
 
+        with open(r.Rlocation('envoy/tools/protodoc/protodoc.template.rst'), 'r') as f:
+            self.template = Template(f.read())
+
         with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
             # Load as YAML, emit as JSON and then parse as proto to provide type
             # checking.
@@ -675,78 +332,250 @@ class RstFormatVisitor(visitor.Visitor):
             self.protodoc_manifest = manifest_pb2.Manifest()
             json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 
+    def get_v2_link(self, proto_name):
+        if proto_name not in self.v2_mapping:
+            return {}
+        # TODO(phlax): remove _v2_ from filepath once sed mangling is removed
+        v2_filepath = f"envoy_v2_api_file_{self.v2_mapping[proto_name]}"
+        return dict(
+            text=v2_filepath.split('/', 1)[1],
+            url=f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}")
+
+    def get_comment(self, comment):
+        stripped = annotations.without_annotations('\n'.join(comment))
+        return "\n".join(
+            c[1:]
+            for c in stripped.split("\n"))[1:]
+
+    def get_field(self, outer_type_context, type_context, field):
+        if hide_not_implemented(type_context.leading_comment):
+            return {}
+
+        required = False
+
+        if field.options.HasExtension(validate_pb2.rules):
+            rule = field.options.Extensions[validate_pb2.rules]
+            if ((rule.HasField('message') and rule.message.required)
+                or (rule.HasField('duration') and rule.duration.required)
+                or (rule.HasField('string') and rule.string.min_len > 0)
+                or (rule.HasField('string') and rule.string.min_bytes > 0)
+                or (rule.HasField('repeated') and rule.repeated.min_items > 0)):
+                required = True
+
+        oneof = {}
+        if field.HasField('oneof_index'):
+            oneof_context = outer_type_context.extend_oneof(
+                field.oneof_index, type_context.oneof_names[field.oneof_index])
+            if hide_not_implemented(oneof_context.leading_comment):
+                return {}
+
+            # If the oneof only has one field and marked required, mark the field as required.
+            if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[field.oneof_index]:
+                required = True
+
+            if len(type_context.oneof_fields[field.oneof_index]) > 1:
+                # Fields in oneof shouldn't be marked as required when we have oneof comment below it.
+                required = False
+                oneof = parse_comment(oneof_context.leading_comment)
+                oneof["required"] = type_context.oneof_required[field.oneof_index]
+                oneof["links"] = [
+                    format_internal_link(
+                        f,
+                        field_cross_ref_label(
+                            normalize_type_context_name(outer_type_context.extend_field(i, f).name)))
+                    for i, f in type_context.oneof_fields[field.oneof_index]]
+
+        return dict(
+            proto=normalize_type_context_name(type_context.name),
+            name=field.name.strip(),
+            type=self.get_field_type(type_context, field),
+            label=dict(
+                repeated=field.label == field.LABEL_REPEATED,
+                required=required),
+            info=parse_comment(type_context.leading_comment),
+            oneof=oneof,
+            security_options=self.get_security_options(field, type_context))
+
+    def get_primitive_field_type(self, type_context, field):
+        primitive_types = {
+            field.TYPE_DOUBLE: 'double',
+            field.TYPE_FLOAT: 'float',
+            field.TYPE_INT32: 'int32',
+            field.TYPE_SFIXED32: 'int32',
+            field.TYPE_SINT32: 'int32',
+            field.TYPE_FIXED32: 'uint32',
+            field.TYPE_UINT32: 'uint32',
+            field.TYPE_INT64: 'int64',
+            field.TYPE_SFIXED64: 'int64',
+            field.TYPE_SINT64: 'int64',
+            field.TYPE_FIXED64: 'uint64',
+            field.TYPE_UINT64: 'uint64',
+            field.TYPE_BOOL: 'bool',
+            field.TYPE_STRING: 'string',
+            field.TYPE_BYTES: 'bytes',
+        }
+        if field.type in primitive_types:
+            return dict(
+                text=primitive_types[field.type],
+                type="external",
+                url='https://developers.google.com/protocol-buffers/docs/proto#scalar')
+
+    def get_field_type(self, type_context, field):
+        field_type = (
+            self.get_typed_field_type(type_context, field)
+            if field.type_name
+            else self.get_primitive_field_type(type_context, field))
+        if not field_type:
+            raise ProtodocError('Unknown field type ' + str(field.type))
+        return field_type
+
+    def get_security_options(self, field, type_context):
+        # If there is a udpa.annotations.security option, include it after the comment.
+        if not field.options.HasExtension(security_pb2.security):
+            return {}
+        manifest_description = self.protodoc_manifest.fields.get(type_context.name)
+        if not manifest_description:
+            raise ProtodocError('Missing protodoc manifest YAML for %s' % type_context.name)
+
+        security_options = {}
+        security_options["options"] = field.options.Extensions[security_pb2.security]
+        edge_config = manifest_description.edge_config
+        security_options["edge_config"] = edge_config.note
+        example_dict = json_format.MessageToDict(edge_config.example)
+        # validate_fragment.validate_fragment(field.type_name[1:], example_dict)
+        security_options["example"] = {type_context.name.split('.')[-1]: example_dict}
+        return security_options
+
+    def get_typed_field_type(self, type_context, field):
+        """Format a FieldDescriptorProto type description.
+
+        Adds cross-refs for message types.
+        TODO(htuch): Add cross-refs for enums as well.
+        """
+        type_name = field.type_name
+        if type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or type_name.startswith(ENVOY_PREFIX):
+            type_name = normalize_field_type_name(type_name)
+            if field.type == field.TYPE_MESSAGE:
+                if type_context.map_typenames and type_name_from_fqn(
+                        type_name) in type_context.map_typenames:
+                    return dict(text='map<%s, %s>' % tuple(
+                        map(
+                            functools.partial(self.get_field_type, type_context),
+                            type_context.map_typenames[type_name_from_fqn(type_name)])))
+                return dict(text=type_name, type="api_msg")
+            if field.type == field.TYPE_ENUM:
+                return dict(text=type_name, type="api_enum")
+        elif type_name.startswith(WKT_NAMESPACE_PREFIX):
+            wkt = type_name[len(WKT_NAMESPACE_PREFIX):]
+            return dict(
+                type="external",
+                text=wkt,
+                url=f"https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#{wkt.lower()}")
+        elif type_name.startswith(RPC_NAMESPACE_PREFIX):
+            rpc = type_name[len(RPC_NAMESPACE_PREFIX):]
+            return dict(
+                type="external",
+                text=rpc,
+                url=f"https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#{rpc.lower()}")
+        elif type_name:
+            return dict(text=type_name)
+
+    def get_file(self, source_code_info, file_proto):
+        return dict(
+            proto=file_proto.name,
+            title=source_code_info.file_level_annotations.get(annotations.DOC_TITLE_ANNOTATION),
+            extension=get_extension(
+                source_code_info.file_level_annotations.get(annotations.EXTENSION_ANNOTATION)),
+            comment=self.get_comment(source_code_info.file_level_comments),
+            work_in_progress=getattr(
+                file_proto.options.Extensions.__getitem__(status_pb2.file_status) or object,
+                "work_in_progress", False),
+            v2_link=self.get_v2_link(file_proto.name))
+
+    def get_fields(self, type_context, msg):
+        type_context.oneof_fields = defaultdict(list)
+        type_context.oneof_required = defaultdict(bool)
+        type_context.oneof_names = defaultdict(list)
+        for index, field in enumerate(msg.field):
+            if field.HasField('oneof_index'):
+                leading_comment = type_context.extend_field(index, field.name).leading_comment
+                if hide_not_implemented(leading_comment):
+                    continue
+                type_context.oneof_fields[field.oneof_index].append((index, field.name))
+        for index, oneof_decl in enumerate(msg.oneof_decl):
+            if oneof_decl.options.HasExtension(validate_pb2.required):
+                type_context.oneof_required[index] = oneof_decl.options.Extensions[
+                    validate_pb2.required]
+            type_context.oneof_names[index] = oneof_decl.name
+        return [
+            self.get_field(type_context, type_context.extend_field(index, field.name), field)
+            for index, field in enumerate(msg.field)]
+
+    def get_message_config(self, type_context, msg):
+        data = {}
+        for index, field in enumerate(msg.field):
+            field_type_context = type_context.extend_field(index, field.name)
+            leading_comment = field_type_context.leading_comment
+            if hide_not_implemented(leading_comment):
+                continue
+            data[field.name] = format_field_type_as_json(type_context, field)
+        return data
+
     def visit_enum(self, enum_proto, type_context):
-        normal_enum_type = normalize_type_context_name(type_context.name)
-        anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
-        header = format_header('-', 'Enum %s' % normal_enum_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_enum_type, _github_url) + '\n\n'
-        leading_comment = type_context.leading_comment
-        formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
-        if hide_not_implemented(leading_comment):
+        if hide_not_implemented(type_context.leading_comment):
             return ''
-        return anchor + header + proto_link + formatted_leading_comment + format_enum_as_definition_list(
-            type_context, enum_proto)
+        normal_enum_type = normalize_type_context_name(type_context.name)
+        return dict(
+            proto=normal_enum_type,
+            proto_link=dict(text=normal_enum_type, url=github_url(type_context)),
+            comment=parse_comment(type_context.leading_comment, 'enum'),
+            values=self.get_enum_values(type_context, enum_proto))
+
+    def get_enum_values(self, type_context, enum):
+        values = {}
+        for (index, enum_value) in enumerate(enum.value):
+            ctx = type_context.extend_enum_value(index, enum_value.name)
+            if hide_not_implemented(ctx.leading_comment):
+                continue
+            default_comment = '*(DEFAULT)* ' if enum_value.number == 0 else ''
+            comment = default_comment + UNICODE_INVISIBLE_SEPARATOR + str(parse_comment(ctx.leading_comment))
+            values[enum_value.name] = dict(
+                anchor=normalize_type_context_name(type_context.name),
+                name=enum_value.name,
+                comment=comment)
+        return values
 
     def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
         # Skip messages synthesized to represent map types.
-        if msg_proto.options.map_entry:
-            return ''
+        if msg_proto.options.map_entry or hide_not_implemented(type_context.leading_comment):
+            return {}
         normal_msg_type = normalize_type_context_name(type_context.name)
-        anchor = format_anchor(message_cross_ref_label(normal_msg_type))
-        header = format_header('-', normal_msg_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_msg_type, _github_url) + '\n\n'
-        leading_comment = type_context.leading_comment
-        formatted_leading_comment = format_comment_with_annotations(leading_comment, 'message')
-        if hide_not_implemented(leading_comment):
-            return ''
-
-        return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
-            type_context, msg_proto) + format_message_as_definition_list(
-                type_context, msg_proto,
-                self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
+        data = parse_comment(type_context.leading_comment, 'message')
+        data.update(
+            dict(proto=normal_msg_type,
+                 proto_link=dict(text=f"[{normal_msg_type} proto]", url=github_url(type_context)),
+                 config=self.get_message_config(type_context, msg_proto),
+                 fields=self.get_fields(type_context, msg_proto),
+                 messages=nested_msgs,
+                 enums=nested_enums))
+        return data
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
-        has_messages = True
-        if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
-            has_messages = False
-
-        v2_link = ""
-        if file_proto.name in self.v2_mapping:
-            # TODO(phlax): remove _v2_ from filepath once sed mangling is removed
-            v2_filepath = f"envoy_v2_api_file_{self.v2_mapping[file_proto.name]}"
-            v2_text = v2_filepath.split('/', 1)[1]
-            v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
-            v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
-
-        # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
-        # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
-        # in the common case.
-        if (has_messages and not annotations.DOC_TITLE_ANNOTATION
-                in type_context.source_code_info.file_level_annotations
-                and file_proto.name.startswith('envoy')):
+        data = dict(
+            json=json,
+            yaml=yaml,
+            file=self.get_file(type_context.source_code_info, file_proto),
+            has_messages=bool(sum(len(item) for item in msgs + enums) > 0),
+            msgs=msgs,
+            enums=enums)
+        missing_title = (
+            data["has_messages"]
+            and not data["file"]["title"]
+            and file_proto.name.startswith('envoy'))
+        if missing_title:
             raise ProtodocError(
-                'Envoy API proto file missing [#protodoc-title:] annotation: {}'.format(
-                    file_proto.name))
-
-        # Find the earliest detached comment, attribute it to file level.
-        # Also extract file level titles if any.
-        header, comment = format_header_from_file(
-            '=', type_context.source_code_info, file_proto.name, v2_link)
-        # If there are no messages, we don't include in the doc tree (no support for
-        # service rendering yet). We allow these files to be missing from the
-        # toctrees.
-        if not has_messages:
-            header = ':orphan:\n\n' + header
-        warnings = ''
-        if file_proto.options.HasExtension(status_pb2.file_status):
-            if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
-                warnings += (
-                    '.. warning::\n   This API is work-in-progress and is '
-                    'subject to breaking changes.\n\n')
-        # debug_proto = format_proto_as_block_comment(file_proto)
-        return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
+                f"Envoy API proto file missing [#protodoc-title:] annotation: {file_proto.name}")
+        return self.template.render(data, trim_blocks=True, lstrip_blocks=True)
 
 
 def main():
