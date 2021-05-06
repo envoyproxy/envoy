@@ -14,7 +14,7 @@ namespace Config {
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
-                                               Event::Dispatcher& dispatcher)
+                                               Event::Dispatcher& dispatcher, const bool wildcard)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
     // empty resources as updates.
     : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
@@ -29,8 +29,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
-      dispatcher_(dispatcher) {}
+      type_url_(std::move(type_url)), wildcard_(wildcard), watch_map_(watch_map),
+      local_info_(local_info), dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
@@ -178,8 +178,15 @@ DeltaSubscriptionState::getNextRequestAckless() {
         (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
       // As mentioned above, fill resource_names_subscribe with everything, including names we
-      // have yet to receive any resource for.
-      names_added_.insert(resource_name);
+      // have yet to receive any resource for unless this is a wildcard subscription, for which
+      // the first request on a stream must be without any resource names.
+      if (!wildcard_) {
+        names_added_.insert(resource_name);
+      }
+    }
+    // Wildcard subscription initial requests must have no resource_names_subscribe.
+    if (wildcard_) {
+      names_added_.clear();
     }
     names_removed_.clear();
   }

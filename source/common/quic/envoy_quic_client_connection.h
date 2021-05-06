@@ -3,13 +3,28 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/network/utility.h"
-#include "common/quic/envoy_quic_connection.h"
+#include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_network_connection.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/core/quic_connection.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Quic {
 
 // A client QuicConnection instance managing its own file events.
-class EnvoyQuicClientConnection : public EnvoyQuicConnection, public Network::UdpPacketProcessor {
+class EnvoyQuicClientConnection : public quic::QuicConnection,
+                                  public QuicNetworkConnection,
+                                  public Network::UdpPacketProcessor {
 public:
   // A connection socket will be created with given |local_addr|. If binding
   // port not provided in |local_addr|, pick up a random port.
