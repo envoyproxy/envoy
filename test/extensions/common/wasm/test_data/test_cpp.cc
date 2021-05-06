@@ -193,10 +193,10 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     std::string message = "configuration";
     proxy_log(LogLevel::error, message.c_str(), message.size());
   } else if (configuration == "WASI") {
-    // Call to clock_time_get on monotonic clock should be available.
-    std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
     // These checks depend on Emscripten's support for `WASI` and will only
     // work if invoked on a "real" Wasm VM.
+    // Call to clock_time_get on monotonic clock should be available.
+    std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
     int err = fprintf(stdout, "WASI write to stdout\n");
     if (err < 0) {
       FAIL_NOW("stdout write should succeed");
