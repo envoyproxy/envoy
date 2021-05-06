@@ -69,9 +69,7 @@ def deps_format(pkgs):
 
 
 def is_v3_package(pkg):
-    return (
-        V3_REGEX.match(pkg) is not None
-        or pkg in ACCIDENTAL_V3_PKGS)
+    return (V3_REGEX.match(pkg) is not None or pkg in ACCIDENTAL_V3_PKGS)
 
 
 if __name__ == '__main__':

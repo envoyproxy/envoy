@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.external.v3;
 
-import "envoy/api/v2/core/base.proto";
-
 import "google/protobuf/any.proto";
 
 import "tools/testdata/protoxform/external/package_type.proto";
