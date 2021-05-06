@@ -69,6 +69,11 @@ struct SupportedCommands {
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
 
   /**
+   * @return hotkey command
+   */
+  static const std::string& hotkey() { CONSTRUCT_ON_FIRST_USE(std::string, "hotkey"); }
+
+  /**
    * @return commands which alters the state of redis
    */
   static const absl::flat_hash_set<std::string>& writeCommands() {

@@ -15,6 +15,7 @@
 
 #include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
+#include "extensions/filters/network/redis_proxy/feature/feature.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,7 +51,7 @@ class ProxyFilterConfig {
 public:
   ProxyFilterConfig(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
                     Stats::Scope& scope, const Network::DrainDecision& drain_decision,
-                    Runtime::Loader& runtime, Api::Api& api);
+                    Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
@@ -59,6 +60,7 @@ public:
   ProxyStats stats_;
   const std::string downstream_auth_username_;
   const std::string downstream_auth_password_;
+  const Feature::FeatureConfigSharedPtr feature_config_;
 
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -102,10 +104,12 @@ private:
 
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }
+    void incrHotKey(const std::string& key) override { parent_.incrHotKey(key); }
     void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
     void onAuth(const std::string& username, const std::string& password) override {
       parent_.onAuth(*this, username, password);
     }
+    void onHotKey() override { parent_.onHotKey(*this); }
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onResponse(*this, std::move(value));
     }
@@ -115,13 +119,22 @@ private:
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
+  void incrHotKey(const std::string& key) {
+    if (hk_counter_) {
+      hk_counter_->incr((key.size() > 100) ? key.substr(0, 100) : key);
+    }
+  }
+
   void onAuth(PendingRequest& request, const std::string& password);
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
+  void onHotKey(PendingRequest& request);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
   CommandSplitter::Instance& splitter_;
+  Feature::HotKey::HotKeyCollectorSharedPtr hk_collector_;
+  Feature::HotKey::HotKeyCounterSharedPtr hk_counter_;
   ProxyFilterConfigSharedPtr config_;
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};

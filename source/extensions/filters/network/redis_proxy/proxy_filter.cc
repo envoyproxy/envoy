@@ -19,14 +19,18 @@ namespace RedisProxy {
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-    Api::Api& api)
+    Api::Api& api, Event::Dispatcher& dispatcher)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
       downstream_auth_username_(
           Config::DataSource::read(config.downstream_auth_username(), true, api)),
       downstream_auth_password_(
-          Config::DataSource::read(config.downstream_auth_password(), true, api)) {}
+          Config::DataSource::read(config.downstream_auth_password(), true, api)),
+      feature_config_((config.has_feature_config())
+                          ? std::make_shared<Feature::FeatureConfig>(
+                                config.feature_config(), dispatcher, stat_prefix_, scope)
+                          : nullptr) {}
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
@@ -42,9 +46,19 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =
       config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty();
+
+  if (config->feature_config_) {
+    hk_collector_ = config->feature_config_->hotkeyCollector();
+    if (hk_collector_) {
+      hk_counter_ = hk_collector_->createHotKeyCounter();
+    }
+  }
 }
 
 ProxyFilter::~ProxyFilter() {
+  if (hk_collector_) {
+    hk_collector_->destroyHotKeyCounter(hk_counter_);
+  }
   ASSERT(pending_requests_.empty());
   config_->stats_.downstream_cx_active_.dec();
 }
@@ -121,6 +135,24 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
     response->type(Common::Redis::RespType::Error);
     response->asString() = "WRONGPASS invalid username-password pair";
     connection_allowed_ = false;
+  }
+  request.onResponse(std::move(response));
+}
+
+void ProxyFilter::onHotKey(PendingRequest& request) {
+  Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+  if (hk_collector_) {
+    absl::flat_hash_map<std::string, uint32_t> hotkeys;
+    std::string resp_string = "Collect " + std::to_string(hk_collector_->getHotKeyHeats(hotkeys)) +
+                              " keys in the period !";
+    for (auto& it : hotkeys) {
+      resp_string += "\nkey:" + it.first + " hit:" + std::to_string(it.second);
+    }
+    response->type(Common::Redis::RespType::SimpleString);
+    response->asString().swap(resp_string);
+  } else {
+    response->type(Common::Redis::RespType::Error);
+    response->asString() = "ERR Client sent HOTKEY, but this feature is not enabled";
   }
   request.onResponse(std::move(response));
 }

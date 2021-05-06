@@ -145,6 +145,9 @@ SplitRequestPtr SimpleRequest::create(Router& router,
                                       TimeSource& time_source, bool delay_command_latency) {
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
+  callbacks.incrHotKey(incoming_request->asArray()[1].asString());
+
   const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
@@ -177,6 +180,16 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
 
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
+  try {
+    // maybe throw std::invalid_argument or std::out_of_range
+    uint64_t key_max_offset(3 + std::stoull(incoming_request->asArray()[2].asString()));
+    for (uint64_t i = 3; (i < key_max_offset) && (i < incoming_request->asArray().size()); ++i) {
+      callbacks.incrHotKey(incoming_request->asArray()[i].asString());
+    }
+  } catch (const std::exception& e) {
+    ENVOY_LOG(debug, "redis: error: '{}', request: '{}'", e.what(), incoming_request->toString());
+  }
 
   const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (route) {
@@ -234,6 +247,8 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
   for (uint32_t i = 1; i < base_request->asArray().size(); i++) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+    callbacks.incrHotKey(base_request->asArray()[i].asString());
 
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
@@ -313,6 +328,8 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
+    callbacks.incrHotKey(base_request->asArray()[i].asString());
+
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
       // Create composite array for a single set command.
@@ -386,6 +403,9 @@ SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& 
     const Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
     ENVOY_LOG(debug, "parallel {}: '{}'", base_request->asArray()[0].asString(),
               single_fragment.toString());
+
+    callbacks.incrHotKey(base_request->asArray()[i].asString());
+
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
       pending_request.handle_ = makeFragmentedRequest(route, base_request->asArray()[0].asString(),
@@ -503,6 +523,11 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     pong->type(Common::Redis::RespType::SimpleString);
     pong->asString() = "PONG";
     callbacks.onResponse(std::move(pong));
+    return nullptr;
+  }
+
+  if (to_lower_string == Common::Redis::SupportedCommands::hotkey()) {
+    callbacks.onHotKey();
     return nullptr;
   }
 

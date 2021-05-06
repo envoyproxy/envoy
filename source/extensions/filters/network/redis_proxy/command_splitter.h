@@ -42,6 +42,11 @@ public:
   virtual bool connectionAllowed() PURE;
 
   /**
+   * Called to increase that key.
+   */
+  virtual void incrHotKey(const std::string& key) PURE;
+
+  /**
    * Called when an authentication command has been received with a password.
    * @param password supplies the AUTH password provided by the downstream client.
    */
@@ -53,6 +58,11 @@ public:
    * @param password supplies the AUTH password provided by the downstream client.
    */
   virtual void onAuth(const std::string& username, const std::string& password) PURE;
+
+  /**
+   * Called when an hotkey command has been received.
+   */
+  virtual void onHotKey() PURE;
 
   /**
    * Called when the response is ready.

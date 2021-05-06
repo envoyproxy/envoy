@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -207,6 +207,34 @@ message RedisProxy {
     repeated string commands = 4;
   }
 
+  message FeatureConfig {
+    // [#next-free-field: 6]
+    message HotKey {
+      enum CacheType { LFU = 0; }
+
+      CacheType cache_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+      google.protobuf.UInt32Value cache_capacity = 2 [(validate.rules).uint32 = {lte: 255 gte: 1}];
+
+      google.protobuf.Duration collect_dispatch_interval = 3 [(validate.rules).duration = {
+        lte {seconds: 3600}
+        gte {nanos: 500000000}
+      }];
+
+      google.protobuf.Duration attenuate_dispatch_interval = 4 [(validate.rules).duration = {
+        lte {seconds: 3600}
+        gte {nanos: 500000000}
+      }];
+
+      google.protobuf.Duration attenuate_cache_interval = 5 [(validate.rules).duration = {
+        lte {seconds: 3600}
+        gte {}
+      }];
+    }
+
+    HotKey hotkey = 1;
+  }
+
   reserved 2;
 
   reserved "cluster";
@@ -300,6 +328,8 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no ACL is set" error will be returned.
   config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
+
+  FeatureConfig feature_config = 9;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in

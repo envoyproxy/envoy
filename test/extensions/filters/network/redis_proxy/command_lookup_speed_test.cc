@@ -31,8 +31,10 @@ public:
   ~NoOpSplitCallbacks() override = default;
 
   bool connectionAllowed() override { return true; }
+  void incrHotKey(const std::string&) override {}
   void onAuth(const std::string&) override {}
   void onAuth(const std::string&, const std::string&) override {}
+  void onHotKey() override {}
   void onResponse(Common::Redis::RespValuePtr&&) override {}
 };
 
