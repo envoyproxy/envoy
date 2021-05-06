@@ -32,6 +32,5 @@ ApiTypeOracle::getEarlierVersionMessageTypeName(const std::string& message_type)
   return absl::nullopt;
 }
 
-
 } // namespace Config
 } // namespace Envoy

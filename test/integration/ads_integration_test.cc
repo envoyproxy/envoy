@@ -333,7 +333,6 @@ TEST_P(AdsIntegrationTest, ResendNodeOnStreamReset) {
                                       {"cluster_0"}, {}, true));
 }
 
-
 // Validate that the request with duplicate listeners is rejected.
 TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
   initialize();

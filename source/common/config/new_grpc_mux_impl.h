@@ -160,7 +160,6 @@ private:
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
-
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;
