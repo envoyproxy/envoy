@@ -29,10 +29,11 @@ listener is advertising http/3 support via an ``alt-svc header``. Advertising HT
 in-house deployments where HTTP/3 is explicitly configured, but is needed for internet facing deployments
 where TCP is the default, and clients such as Chrome will only attempt HTTP/3 if it is explicitly advertised.
 
-By default the example configuration uses kernel UDP support, but for production performance on Linux, use of
+By default the example configuration uses kernel UDP support, but for production performance use of
 BPF is strongly advised if Envoy is running with multiple worker threads. Envoy will attepmt to
-use BPF by default if multiple worker threads are configured, but may require root, or at least sudo-with-permissions
-(e.g. sudo setcap cap_bpf+ep). Envoy will log a warning on start-up if BPF is attempted and fails.
+use BPF on Linux by default if multiple worker threads are configured, but may require root, or at least
+sudo-with-permissions (e.g. sudo setcap cap_bpf+ep). If multiple worker threads are configured, Envoy will
+log a warning on start-up if BPF is unsupported on the platform, or is attempted and fails.
 
 HTTP3 upstream
 --------------
