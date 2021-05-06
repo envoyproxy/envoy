@@ -149,6 +149,9 @@ public:
 
   /**
    * Instructs a transport socket to start using secure transport.
+   * It is up to the caller of this method to manage the coordination between the client
+   * and server with regard to when to start secure transport. This is typically done via
+   * some signal message. See STARTTLS for an example of such negotiation.
    * Note: Not all transport sockets support such operation.
    * @return boolean indicating if the transport socket was able to start secure transport.
    */

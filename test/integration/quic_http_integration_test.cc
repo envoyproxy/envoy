@@ -21,6 +21,7 @@
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -256,6 +257,36 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
+}
+
+TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
+  // Make sure both connections use the same PersistentQuicInfoImpl.
+  concurrency_ = 1;
+  initialize();
+  // Start the first connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Send a complete request on the first connection.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  // Close the first connection.
+  codec_client_->close();
+  // Start a second connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Send a complete request on the second connection.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  // Ensure 0-RTT was used by second connection.
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_TRUE(static_cast<quic::QuicCryptoClientStream*>(
+                  quic::test::QuicSessionPeer::GetMutableCryptoStream(quic_session))
+                  ->EarlyDataAccepted());
+  // Close the second connection.
+  codec_client_->close();
 }
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndResponseWithBody) {
