@@ -32,8 +32,6 @@ namespace BandwidthLimitFilter {
 #define ALL_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE, HISTOGRAM)                   \
   COUNTER(decode_enabled)                                                      \
   COUNTER(encode_enabled)                                                      \
-  COUNTER(decode_enforced)                                                     \
-  COUNTER(encode_enforced)                                                     \
   GAUGE(decode_pending, Accumulate)                                            \
   GAUGE(encode_pending, Accumulate)                                            \
   GAUGE(decode_incoming_size, Accumulate)                                      \

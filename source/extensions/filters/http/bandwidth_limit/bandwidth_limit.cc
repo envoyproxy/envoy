@@ -55,8 +55,6 @@ BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap &, bool) {
 
   if (config->enable_mode() & BandwidthLimit::Decode) {
     config->stats().decode_enabled_.inc();
-    // TBD: move this counter when soft-limiting is implemented.
-    config->stats().decode_enforced_.inc();
     decode_limiter_ = std::make_unique<StreamRateLimiter>(
         config->limit(), decoder_callbacks_->decoderBufferLimit(),
         [this] {
@@ -126,8 +124,6 @@ BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap &, bool) {
 
   if (config->enable_mode() & BandwidthLimit::Encode) {
     config->stats().encode_enabled_.inc();
-    // TBD: move this counter when soft-limiting is implemented.
-    config->stats().encode_enforced_.inc();
 
     encode_limiter_ = std::make_unique<StreamRateLimiter>(
         config->limit(), encoder_callbacks_->encoderBufferLimit(),

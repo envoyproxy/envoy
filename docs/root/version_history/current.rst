@@ -31,6 +31,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
 
 Deprecated
 ----------

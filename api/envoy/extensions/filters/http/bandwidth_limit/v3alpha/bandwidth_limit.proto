@@ -53,8 +53,6 @@ message BandwidthLimit {
   //
   google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
-  // Optional fill_interval in milliseconds for the token buckets (per second). Defaults to 50ms.
-  // .. note::
-  //   In the current implementation, the fill_interval must be >= 20ms to avoid too aggressive refills.
-  google.protobuf.UInt32Value fill_interval = 4 [(validate.rules).uint32 = {gte: 1}];
+  // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
+  google.protobuf.UInt32Value fill_interval = 4 [(validate.rules).uint32 = {gte: 20}];
 }
