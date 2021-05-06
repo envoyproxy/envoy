@@ -910,6 +910,14 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
+double EdfLoadBalancerBase::aggressionFactor(double time_factor) {
+  if (aggression_ == 1.0 || time_factor == 1.0) {
+    return time_factor;
+  } else {
+    return std::pow(time_factor, 1.0 / aggression_);
+  }
+}
+
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector&,
                                                                 const HostsSource&) {
   // LeastRequestLoadBalancer can not do deterministic preconnecting, because

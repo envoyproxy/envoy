@@ -412,6 +412,8 @@ protected:
   // overload.
   const uint64_t seed_;
 
+  double aggressionFactor(double time_factor);
+
 private:
   friend class EdfLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
@@ -499,13 +501,7 @@ private:
     }
     return host.weight();
   }
-  double aggressionFactor(double time_factor) {
-    if (aggression_ == 1.0 || time_factor == 1.0) {
-      return time_factor;
-    } else {
-      return std::pow(time_factor, 1.0 / aggression_);
-    }
-  }
+
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {
     auto i = rr_indexes_.find(source);
@@ -606,16 +602,37 @@ private:
     //
     // It might be possible to do better by picking two hosts off of the schedule, and selecting the
     // one with fewer active requests at the time of selection.
-    if (active_request_bias_ == 0.0) {
-      return host.weight();
-    }
+
+    double host_weight = static_cast<double>(host.weight());
 
     if (active_request_bias_ == 1.0) {
-      return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+      host_weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    } else if (active_request_bias_ != 0.0 && active_request_bias_ != 1.0) {
+      host_weight = static_cast<double>(host.weight()) /
+                    std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
     }
 
-    return static_cast<double>(host.weight()) /
-           std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
+    if (slow_start_enabled_) {
+      auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+          time_source_.monotonicTime() - host.creationTime());
+      if (host_create_duration < slow_start_window_ &&
+          host.health() == Upstream::Host::Health::Healthy) {
+
+        time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
+        aggression_ = aggression_runtime_ != nullptr ? aggression_runtime_->value() : 1.0;
+
+        time_bias_ = std::max(0.0, time_bias_);
+        aggression_ = std::max(0.0, aggression_);
+
+        ASSERT(time_bias_ > 0.0);
+        ASSERT(aggression_ > 0.0);
+        auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
+                                                        host_create_duration.count())) /
+                           slow_start_window_.count();
+        host_weight = host_weight * time_bias_ * aggressionFactor(time_factor);
+      }
+    }
+     return host_weight;
   }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
