@@ -307,52 +307,20 @@ public:
                                                  *dispatcher_, std::move(transport_socket));
   }
 
-  // Helper to create FakeUpstream.
-  // Creates a fake upstream bound to the specified unix domain socket path.
-  std::unique_ptr<FakeUpstream> createFakeUpstream(const std::string& uds_path,
-                                                   FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(uds_path, config);
-  }
-  // Creates a fake upstream bound to the specified |address|.
-  std::unique_ptr<FakeUpstream>
-  createFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                     FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(address, config);
-  }
-  // Creates a fake upstream bound to INADDR_ANY and there is no specified port.
-  std::unique_ptr<FakeUpstream> createFakeUpstream(FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(0, version_, config);
-  }
-  std::unique_ptr<FakeUpstream>
-  createFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                     FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config);
-  }
-  // Helper to add FakeUpstream.
-  // Add a fake upstream bound to the specified unix domain socket path.
-  void addFakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(uds_path, type));
-  }
-  // Add a fake upstream bound to the specified |address|.
-  void addFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                       FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(address, type));
-  }
   // Add a fake upstream bound to INADDR_ANY and there is no specified port.
-  void addFakeUpstream(FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(type));
+  FakeUpstream& addFakeUpstream(FakeHttpConnection::Type type) {
+    FakeUpstreamConfig config = upstream_config_;
+    config.upstream_protocol_ = type;
+    fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(0, version_, config));
+    return *fake_upstreams_.back();
   }
-  void addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                       FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(std::move(transport_socket_factory), type));
+  FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                                FakeHttpConnection::Type type) {
+    FakeUpstreamConfig config = upstream_config_;
+    config.upstream_protocol_ = type;
+    fake_upstreams_.emplace_back(
+        std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    return *fake_upstreams_.back();
   }
 
 protected:

@@ -74,6 +74,7 @@ EXTENSION_CATEGORIES = [
     "envoy.compression.compressor",
     "envoy.compression.decompressor",
     "envoy.filters.http",
+    "envoy.filters.http.cache",
     "envoy.filters.listener",
     "envoy.filters.network",
     "envoy.filters.udp_listener",

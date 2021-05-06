@@ -214,8 +214,7 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-
-    "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+    "envoy.cache.simple_http_cache":                    "//source/extensions/filters/http/cache/simple_http_cache:config",
 
     #
     # Internal redirect predicates

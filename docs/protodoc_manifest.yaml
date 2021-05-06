@@ -52,3 +52,8 @@ fields:
       example: 300s # 5 mins
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address:
     edge_config: { example: true }
+  envoy.config.listener.v3.QuicProtocolOptions.quic_protocol_options:
+    edge_config:
+      example:
+        initial_stream_window_size: 65536 # 64 KiB
+        initial_connection_window_size: 65536 # 64 KiB

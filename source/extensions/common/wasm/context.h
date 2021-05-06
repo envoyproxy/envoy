@@ -209,6 +209,7 @@ public:
   // Continue
   WasmResult continueStream(WasmStreamType stream_type) override;
   WasmResult closeStream(WasmStreamType stream_type) override;
+  void failStream(WasmStreamType stream_type) override;
   WasmResult sendLocalResponse(uint32_t response_code, absl::string_view body_text,
                                Pairs additional_headers, uint32_t grpc_status,
                                absl::string_view details) override;
@@ -414,7 +415,6 @@ protected:
   ::Envoy::Buffer::Instance* network_upstream_data_buffer_{};
 
   // HTTP filter state.
-  bool http_request_started_ = false; // When decodeHeaders() is called the request is "started".
   Http::RequestHeaderMap* request_headers_{};
   Http::ResponseHeaderMap* response_headers_{};
   ::Envoy::Buffer::Instance* request_body_buffer_{};

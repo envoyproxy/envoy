@@ -213,7 +213,8 @@ protected:
                         uint32_t max_size);
   void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
-                               uint32_t max_count = 100);
+                               uint32_t max_count = 100,
+                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
   void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
