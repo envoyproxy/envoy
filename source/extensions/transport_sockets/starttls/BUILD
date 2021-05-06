@@ -27,7 +27,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
 )
@@ -50,7 +49,6 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_annotations",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
 )

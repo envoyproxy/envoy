@@ -2,8 +2,6 @@
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -16,7 +14,7 @@ namespace ProxyProtocol {
 class UpstreamProxyProtocolSocketConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
-  std::string name() const override { return TransportSocketNames::get().UpstreamProxyProtocol; }
+  std::string name() const override { return "envoy.transport_sockets.upstream_proxy_protocol"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,

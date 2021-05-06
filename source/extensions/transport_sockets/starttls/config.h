@@ -6,8 +6,6 @@
 
 #include "common/config/utility.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -16,7 +14,7 @@ namespace StartTls {
 template <typename ConfigFactory, typename ConfigMessage>
 class BaseStartTlsSocketFactory : public ConfigFactory {
 public:
-  std::string name() const override { return TransportSocketNames::get().StartTls; }
+  std::string name() const override { return "envoy.transport_sockets.starttls"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ConfigMessage>();
@@ -25,12 +23,11 @@ public:
 protected:
   ConfigFactory& rawSocketConfigFactory() {
     return Config::Utility::getAndCheckFactoryByName<ConfigFactory>(
-        TransportSocketNames::get().RawBuffer);
+        "envoy.transport_sockets.raw_buffer");
   }
 
   ConfigFactory& tlsSocketConfigFactory() {
-    return Config::Utility::getAndCheckFactoryByName<ConfigFactory>(
-        TransportSocketNames::get().Tls);
+    return Config::Utility::getAndCheckFactoryByName<ConfigFactory>("envoy.transport_sockets.tls");
   }
 };
 

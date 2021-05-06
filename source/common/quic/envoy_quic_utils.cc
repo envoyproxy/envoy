@@ -9,8 +9,6 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Quic {
 
@@ -237,8 +235,7 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
       std::make_unique<QuicIoHandleWrapper>(io_handle),
       quicAddressToEnvoyAddressInstance(self_address),
       quicAddressToEnvoyAddressInstance(peer_address));
-  connection_socket->setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
+  connection_socket->setDetectedTransportProtocol("quic");
   connection_socket->setRequestedServerName(hostname);
   connection_socket->setRequestedApplicationProtocols({alpn});
   return connection_socket;

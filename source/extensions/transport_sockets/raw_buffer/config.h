@@ -3,8 +3,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -16,7 +14,7 @@ namespace RawBuffer {
  */
 class RawBufferSocketFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  std::string name() const override { return TransportSocketNames::get().RawBuffer; }
+  std::string name() const override { return "envoy.transport_sockets.raw_buffer"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 

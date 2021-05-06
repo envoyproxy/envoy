@@ -134,7 +134,6 @@ envoy_cc_library(
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:active_listener_base",
     ],
 )
@@ -153,7 +152,6 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/server:listener_manager_interface",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:connection_handler_impl",
     ],
 )
@@ -412,7 +410,6 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/upstreams/http/generic:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

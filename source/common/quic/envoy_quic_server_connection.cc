@@ -4,8 +4,6 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_io_handle_wrapper.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Quic {
 
