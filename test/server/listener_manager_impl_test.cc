@@ -91,7 +91,8 @@ public:
   }
 };
 
-class ListenerManagerImplForInPlaceFilterChainUpdateTest : public ListenerManagerImplTest {
+class ListenerManagerImplForInPlaceFilterChainUpdateTest : public Event::SimulatedTimeSystem,
+                                                           public ListenerManagerImplTest {
 public:
   envoy::config::listener::v3::Listener createDefaultListener() {
     envoy::config::listener::v3::Listener listener_proto;

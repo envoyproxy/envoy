@@ -159,8 +159,8 @@ public:
 
     BaseIntegrationTest::initialize();
 
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        BaseIntegrationTest::timeSystem());
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
@@ -581,9 +581,16 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
   EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'grewgragra'");
 }
 
+// This test case uses `SimulatedTimeSystem` to stack two listener update in the same time point.
+class LdsStsIntegrationTest : public Event::SimulatedTimeSystem,
+                              public LdsInplaceUpdateTcpProxyIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, LdsStsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 // Verify that the listener in place update will accomplish anyway if the listener is removed.
-TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest,
-       TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
+TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
   // The in place listener update takes 2 seconds. We will remove the listener.
   drain_time_ = std::chrono::seconds(2);
   // 1. Start the first in place listener update.
@@ -604,8 +611,8 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest,
       });
   new_config_helper.setLds("1");
 
-  // 2. Remove the tcp listener immediately. We are emulating the case that listener removal is
-  // stacked with the previous update in the same timer expiration cycle.
+  // 2. Remove the tcp listener immediately. This listener update should stack in the same poller
+  // cycle so that this listener update has the same time stamp as the first update.
   ConfigHelper new_config_helper1(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper1.addConfigModifier(
@@ -632,7 +639,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest,
   // value 1. Increase the drain_time_ at the beginning of the test if the test is flaky.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
   // Wait for the filter chain removal at worker thread. When the value drops from 1, all pending
-  // removal at the worker is completed.
+  // removal at the worker is completed. This is the end of the in place update.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
 }
 } // namespace
