@@ -14,15 +14,14 @@ static_resources:
           address: 0.0.0.0
           port_value: 10000
       filter_chains:
-        transport_socket:
+      - transport_socket:
           name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
             downstream_tls_context:
               common_tls_context:
-                alpn_protocols: h3
                 tls_certificates:
-                  certificate_chain:
+                - certificate_chain:
                     filename: certs/servercert.pem
                   private_key:
                     filename: certs/serverkey.pem
@@ -64,15 +63,14 @@ static_resources:
         downstream_socket_config:
           prefer_gro: true
       filter_chains:
-        transport_socket:
+      - transport_socket:
           name: envoy.transport_sockets.quic
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
             downstream_tls_context:
               common_tls_context:
-                alpn_protocols: h3
                 tls_certificates:
-                  certificate_chain:
+                - certificate_chain:
                     filename: certs/servercert.pem
                   private_key:
                     filename: certs/serverkey.pem
