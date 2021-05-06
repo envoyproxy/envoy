@@ -385,6 +385,8 @@ private:
 
   ServerFactoryContextImpl server_contexts_;
 
+  bool stats_flush_in_progress_ : 1;
+
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
   public:
