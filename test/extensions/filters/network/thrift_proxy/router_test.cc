@@ -953,10 +953,12 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
 
   dispatcher_.time_system_.advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_CALL(cluster_scope,
-              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
+              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds))
+      .Times(0);
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500));
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500))
+      .Times(0);
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);

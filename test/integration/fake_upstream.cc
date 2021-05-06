@@ -346,7 +346,8 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
-        fake_upstream.http3Options(), max_request_headers_kb, headers_with_underscores_action);
+        fake_upstream.http3Options(), max_request_headers_kb, max_request_headers_count,
+        headers_with_underscores_action);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -478,16 +479,6 @@ makeListenSocket(const FakeUpstreamConfig& config,
                                                 : makeTcpListenSocket(address));
 }
 
-FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                           const FakeUpstreamConfig& config)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(), makeListenSocket(config, address),
-                   config) {
-  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
-            address->ip()->addressAsString(), address->ip()->port(),
-            Network::Test::addressVersionAsString(address->ip()->version()),
-            config.udp_fake_upstream_.has_value());
-}
-
 FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
@@ -589,6 +580,7 @@ void FakeUpstream::threadRoutine() {
   {
     absl::MutexLock lock(&lock_);
     new_connections_.clear();
+    quic_connections_.clear();
     consumed_connections_.clear();
   }
 }

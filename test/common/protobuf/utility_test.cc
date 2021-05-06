@@ -304,36 +304,22 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST_F(ProtobufV2ApiUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryV2ProtoFromFile)) {
-  // Allow the use of v2.Bootstrap.runtime.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.config.bootstrap.v2.Bootstrap.runtime", "True "}});
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  bootstrap.mutable_runtime()->set_symlink_root("/");
-
-  const std::string filename =
-      TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
-
-  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
-  TestUtility::loadFromFile(filename, proto_from_file, *api_);
-  EXPECT_EQ("/", proto_from_file.hidden_envoy_deprecated_runtime().symlink_root());
-  EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
-}
-
 // Verify that a config with a deprecated field can be loaded with runtime global override.
-TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryV2GlobalOverrideProtoFromFile)) {
-  // Allow the use of v2.Bootstrap.runtime.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.features.enable_all_deprecated_features", "true"}});
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  bootstrap.mutable_runtime()->set_symlink_root("/");
-
+TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryGlobalOverrideProtoFromFile)) {
+  const std::string bootstrap_yaml = R"EOF(
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      envoy.features.enable_all_deprecated_features: true
+watchdog: { miss_timeout: 1s })EOF";
   const std::string filename =
-      TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
+      TestEnvironment::writeStringToFileForTest("proto.yaml", bootstrap_yaml);
 
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
-  EXPECT_EQ("/", proto_from_file.hidden_envoy_deprecated_runtime().symlink_root());
+  TestUtility::validate(proto_from_file);
+  EXPECT_TRUE(proto_from_file.has_watchdog());
   EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
 }
 

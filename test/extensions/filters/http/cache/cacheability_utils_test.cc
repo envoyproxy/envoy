@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-class IsCacheableRequestTest : public testing::Test {
+class CanServeRequestFromCacheTest : public testing::Test {
 protected:
   Http::TestRequestHeaderMapImpl request_headers_ = {{":path", "/"},
                                                      {":method", "GET"},
@@ -49,46 +49,48 @@ protected:
   VaryHeader vary_allow_list_;
 };
 
-TEST_F(IsCacheableRequestTest, CacheableRequest) {
-  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
+TEST_F(CanServeRequestFromCacheTest, CacheableRequest) {
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
-TEST_F(IsCacheableRequestTest, PathHeader) {
-  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
+TEST_F(CanServeRequestFromCacheTest, PathHeader) {
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.removePath();
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
-TEST_F(IsCacheableRequestTest, HostHeader) {
-  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
+TEST_F(CanServeRequestFromCacheTest, HostHeader) {
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.removeHost();
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
-TEST_F(IsCacheableRequestTest, MethodHeader) {
+TEST_F(CanServeRequestFromCacheTest, MethodHeader) {
   const Http::HeaderValues& header_values = Http::Headers::get();
-  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setMethod(header_values.MethodValues.Post);
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setMethod(header_values.MethodValues.Put);
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  request_headers_.setMethod(header_values.MethodValues.Head);
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.removeMethod();
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
-TEST_F(IsCacheableRequestTest, ForwardedProtoHeader) {
-  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
+TEST_F(CanServeRequestFromCacheTest, ForwardedProtoHeader) {
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setForwardedProto("ftp");
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.removeForwardedProto();
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
-TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
-  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
+TEST_F(CanServeRequestFromCacheTest, AuthorizationHeader) {
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Authorization,
                                    "basic YWxhZGRpbjpvcGVuc2VzYW1l");
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
 INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
@@ -102,9 +104,9 @@ INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
                          });
 
 TEST_P(RequestConditionalHeadersTest, ConditionalHeaders) {
-  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setCopy(Http::LowerCaseString{conditionalHeader()}, "test-value");
-  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
+  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
 TEST_F(IsCacheableResponseTest, CacheableResponse) {
