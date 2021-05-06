@@ -589,6 +589,7 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
+  ENVOY_LOG(debug, "lambdai: tcp proxy filter on downstream event {}, upstream_ = {}", static_cast<int>(event), static_cast<void*>(upstream_.get()));
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&
@@ -751,6 +752,9 @@ Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedP
       timer_(std::move(idle_timer)), upstream_host_(upstream_host), config_(config) {
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
+  ENVOY_CONN_LOG(debug, "set drainer and bump upstream_flush_total_ to {}, active to {} ",
+                 upstream_conn_data_->connection(), config_->stats().upstream_flush_total_.value(),
+                 config_->stats().upstream_flush_active_.value());
 }
 
 void Drainer::onEvent(Network::ConnectionEvent event) {
@@ -760,6 +764,10 @@ void Drainer::onEvent(Network::ConnectionEvent event) {
       timer_->disableTimer();
     }
     config_->stats().upstream_flush_active_.dec();
+    ENVOY_CONN_LOG(
+        debug, "drainer on close event and set upstream_flush_total_ to {}, active to {}",
+        upstream_conn_data_->connection(), config_->stats().upstream_flush_total_.value(),
+        config_->stats().upstream_flush_active_.value());
     parent_.remove(*this, upstream_conn_data_->connection().dispatcher());
   }
 }
