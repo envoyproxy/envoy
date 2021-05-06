@@ -135,6 +135,9 @@ generate_api_rst v3
 # Fixup anchors and references in v3 so they form a distinct namespace.
 # TODO(htuch): Do this in protodoc generation in the future.
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
+
+find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0
+
 # TODO(phlax): Remove this once above is removed
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_v2_api_#envoy_api_#g"
 
@@ -162,7 +165,6 @@ rsync -av \
       "${GENERATED_RST_DIR}"
 
 # Merge generated redirects
-# TODO(phlax): Move updating redirects to separate bazel task
 jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/")) | with_entries(.value |= sub("^envoy/";"api-v2/")) | to_entries[] | "\(.value)\t\t\(.key)"' docs/v2_mapping.json >> "${GENERATED_RST_DIR}"/redirects.txt
 
 # To speed up validate_fragment invocations in validating_code_block
