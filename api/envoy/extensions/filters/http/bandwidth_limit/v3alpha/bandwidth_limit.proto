@@ -57,8 +57,7 @@ message BandwidthLimit {
   google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
   // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
-  // .. note::
-  //   It must be at least 20ms to avoid too aggressive refills.
+  // It must be at least 20ms to avoid too aggressive refills.
   google.protobuf.UInt32Value fill_interval = 4 [(validate.rules).uint32 = {gte: 20}];
 
   // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
