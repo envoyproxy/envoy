@@ -206,7 +206,7 @@ Network::FilterStatus MySQLTerminalFilter::onData(Buffer::Instance& buffer, bool
 
   read_buffer_.move(buffer);
   decoder_->onData(read_buffer_);
-  return Network::FilterStatus::Continue;
+  return Network::FilterStatus::StopIteration;
 }
 
 void MySQLTerminalFilter::sendLocal(MySQLCodec& message) {
