@@ -23,9 +23,9 @@ static_resources:
                 alpn_protocols: h3
                 tls_certificates:
                   certificate_chain:
-                    filename: test/config/integration/certs/servercert.pem
+                    filename: certs/servercert.pem
                   private_key:
-                    filename: test/config/integration/certs/serverkey.pem
+                    filename: certs/serverkey.pem
         filters:
         - name: envoy.filters.network.http_connection_manager
           typed_config:
@@ -73,9 +73,9 @@ static_resources:
                 alpn_protocols: h3
                 tls_certificates:
                   certificate_chain:
-                    filename: test/config/integration/certs/servercert.pem
+                    filename: certs/servercert.pem
                   private_key:
-                    filename: test/config/integration/certs/serverkey.pem
+                    filename: certs/serverkey.pem
         filters:
         - name: envoy.filters.network.http_connection_manager
           typed_config:

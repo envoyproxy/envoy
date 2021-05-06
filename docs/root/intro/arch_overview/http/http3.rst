@@ -3,18 +3,26 @@
 HTTP3 overview
 ==============
 
+.. warning::
+
+  HTTP/3 support is still in Alpha, and should be used with caution.
+  Outstanding issues required for HTTP/3 to go GA can be found
+  `here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
+  For example QUIC does not currently support in-place filter chain updates, so users
+  requiring dynamic config reload for QUIC should wait until
+  `#13115 <https://github.com/envoyproxy/envoy/issues/13115>`_ has been addressed.
+
+  For general feature requests beyond production readiness, you can track
+  the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
+
 HTTP3 downstream
 ----------------
 
-HTTP/3 downstream support is still in Alpha, and should be used with caution.
-Outstanding issues required for HTTP/3 to go GA can be found
-`here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
-
-Envoy HTTP/3 support can be turned up via adding
+Downstream Envoy HTTP/3 support can be turned up via adding
 :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` and
 ensuring the downstream transport socket is a QuicDownstreamTransport.
 
-See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.template.yaml1>` for example configuration.
+See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.yaml1>` for example configuration.
 
 Note that the example configuration includes both a TCP and a UDP listener, and the TCP
 listener is advertising http/3 support via an ``alt-svc header``. Advertising HTTP/3 is not necessary for
