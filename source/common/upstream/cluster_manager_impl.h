@@ -650,6 +650,7 @@ private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
+  // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;
   Random::RandomGenerator& random_;
 
