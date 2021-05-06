@@ -193,6 +193,8 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     std::string message = "configuration";
     proxy_log(LogLevel::error, message.c_str(), message.size());
   } else if (configuration == "WASI") {
+    // Call to clock_time_get on monotonic clock should be available.
+    std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
     // These checks depend on Emscripten's support for `WASI` and will only
     // work if invoked on a "real" Wasm VM.
     int err = fprintf(stdout, "WASI write to stdout\n");
@@ -214,11 +216,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     if (pathenv != nullptr) {
       FAIL_NOW("PATH environment variable should not be available");
     }
-    // Call to clock_time_get on monotonic clock should be available.
-    std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-    for (auto i = 0; i < 10; i++) {
-      // Busy wait since "sleep" not available yet.
-    }
+    // Check if the monotonic clock actually increases monotonically.
     std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
     if ((t2-t1).count() < 0) {
       FAIL_NOW("monotonic clock should be available");
