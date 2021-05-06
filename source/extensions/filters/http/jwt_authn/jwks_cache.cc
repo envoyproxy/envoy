@@ -82,14 +82,13 @@ public:
 
 private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCache(bool enable_jwt_cache, int jwt_cache_size, TimeSource& time_source) {
-      jwt_cache_ = JwtCache::create(enable_jwt_cache, jwt_cache_size, time_source);
-    }
+    ThreadLocalCache(bool enable_jwt_cache, int jwt_cache_size, TimeSource& time_source)
+        : jwt_cache_(JwtCache::create(enable_jwt_cache, jwt_cache_size, time_source)) {}
 
     // The jwks object.
     JwksSharedPtr jwks_;
     // The JwtCache object
-    JwtCachePtr jwt_cache_;
+    const JwtCachePtr jwt_cache_;
     // The pubkey expiration time.
     MonotonicTime expire_;
   };
