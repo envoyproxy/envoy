@@ -3,6 +3,8 @@
 #include "common/http/http3/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
 
+#include "quiche/quic/core/quic_versions.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -190,11 +192,12 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+    OptRef<AlternateProtocolsCache> alternate_protocols,
     std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source),
-      http3_status_tracker_(dispatcher_) {
+      http3_status_tracker_(dispatcher_), alternate_protocols_(alternate_protocols) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   // TODO(#15649) support v6/v4, WiFi/cellular.
@@ -247,11 +250,8 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
-  if (http3_status_tracker_.isHttp3Broken()) {
-    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", describePool(**pool),
-              host_->hostname());
-    // Since HTTP/3 is broken, presumably both pools have already been created so this
-    // is just to be safe.
+  if (!shouldAttemptHttp3()) {
+    // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;
   }
@@ -332,6 +332,59 @@ void ConnectivityGrid::onDrainReceived() {
   for (auto& callback : drained_callbacks_) {
     callback();
   }
+}
+
+bool ConnectivityGrid::shouldAttemptHttp3() {
+  if (http3_status_tracker_.isHttp3Broken()) {
+    ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
+    return false;
+  }
+  if (!alternate_protocols_.has_value()) {
+    ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}'.",
+              host_->hostname());
+    return true;
+  }
+  if (host_->address()->type() != Network::Address::Type::Ip) {
+    ENVOY_LOG(error, "Address is not an IP address");
+    ASSERT(false);
+    return false;
+  }
+  uint32_t port = host_->address()->ip()->port();
+  // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
+  AlternateProtocolsCache::Origin origin("https", host_->hostname(), port);
+  OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
+      alternate_protocols_->findAlternatives(origin);
+  if (!protocols.has_value()) {
+    ENVOY_LOG(trace, "No alternate protocols available for host '{}', skipping HTTP/3.",
+              host_->hostname());
+    return false;
+  }
+
+  for (const AlternateProtocolsCache::AlternateProtocol& protocol : protocols.ref()) {
+    // TODO(RyanTheOptimist): Handle alternate protocols which change hostname or port.
+    if (!protocol.hostname_.empty() || protocol.port_ != port) {
+      ENVOY_LOG(trace,
+                "Alternate protocol for host '{}' attempts to change host or port, skipping.",
+                host_->hostname());
+      continue;
+    }
+
+    // TODO(RyanTheOptimist): Cache this mapping, but handle the supported versions list
+    // changing dynamically.
+    for (const quic::ParsedQuicVersion& version : quic::CurrentSupportedVersions()) {
+      if (quic::AlpnForVersion(version) == protocol.alpn_) {
+        // TODO(RyanTheOptimist): Pass this version down to the HTTP/3 pool.
+        ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", host_->hostname());
+        return true;
+      }
+    }
+
+    ENVOY_LOG(trace, "Alternate protocol for host '{}' has unsupported ALPN '{}', skipping.",
+              host_->hostname(), protocol.alpn_);
+  }
+
+  ENVOY_LOG(trace, "HTTP/3 is not available to host '{}', skipping.", host_->hostname());
+  return false;
 }
 
 } // namespace Http
