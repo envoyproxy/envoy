@@ -340,7 +340,6 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     return false;
   }
   if (!alternate_protocols_.has_value()) {
-    // TODO(RyanTheOptimist): Make the alternate protocols cache required.
     ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}'.",
               host_->hostname());
     return true;
@@ -374,6 +373,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     // changing dynamically.
     for (const quic::ParsedQuicVersion& version : quic::CurrentSupportedVersions()) {
       if (quic::AlpnForVersion(version) == protocol.alpn_) {
+        // TODO(RyanTheOptimist): Pass this version down to the HTTP/3 pool.
         ENVOY_LOG(trace, "HTTP/3 advertised for host '{}'", host_->hostname());
         return true;
       }

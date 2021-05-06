@@ -191,6 +191,7 @@ private:
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
+  // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
   OptRef<AlternateProtocolsCache> alternate_protocols_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
