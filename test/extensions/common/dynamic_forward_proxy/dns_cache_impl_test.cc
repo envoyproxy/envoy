@@ -16,7 +16,6 @@
 
 using testing::DoAll;
 using testing::InSequence;
-using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 

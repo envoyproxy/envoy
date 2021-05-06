@@ -96,12 +96,20 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
     for (const auto& resolver_addr : resolver_addrs) {
       resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
     }
-    auto dns_resolver_options =
-        envoy::config::core::v3::DnsResolverOptions(cluster.dns_resolver_options());
-    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
-    // utilize cluster.use_tcp_for_dns_lookups() if `dns_resolver_options` is not set.
-    if (!cluster.has_dns_resolver_options()) {
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+    if (cluster.has_dns_resolver_options()) {
+      const auto& cluster_dns_options = cluster.dns_resolver_options();
+      dns_resolver_options.set_use_tcp_for_dns_lookups(
+          cluster_dns_options.use_tcp_for_dns_lookups());
+      dns_resolver_options.set_no_default_search_domain(
+          cluster_dns_options.no_default_search_domain());
+    } else {
+      // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
+      // compatible utilize cluster.use_tcp_for_dns_lookups() if `cluster.dns_resolver_options` is
+      // not set.
       dns_resolver_options.set_use_tcp_for_dns_lookups(cluster.use_tcp_for_dns_lookups());
+      // Preserve the existing behavior.
+      dns_resolver_options.set_no_default_search_domain(false);
     }
     return context.dispatcher().createDnsResolver(resolvers, dns_resolver_options);
   }

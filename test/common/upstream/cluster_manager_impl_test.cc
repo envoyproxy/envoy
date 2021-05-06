@@ -31,7 +31,6 @@ using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
 using ::testing::Mock;
 using ::testing::NiceMock;
-using ::testing::Ref;
 using ::testing::Return;
 using ::testing::ReturnNew;
 using ::testing::ReturnRef;

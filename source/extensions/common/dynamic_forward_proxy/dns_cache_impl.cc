@@ -30,12 +30,18 @@ DnsCacheImpl::DnsCacheImpl(
               config, refresh_interval_.count(), random)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
-  auto dns_resolver_options =
-      envoy::config::core::v3::DnsResolverOptions(config.dns_resolver_options());
-  // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
-  // utilize config.use_tcp_for_dns_lookups() if `dns_resolver_options` is not set.
-  if (!config.has_dns_resolver_options()) {
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+  if (config.has_dns_resolver_options()) {
+    const auto& config_dns_options = config.dns_resolver_options();
+    dns_resolver_options.set_use_tcp_for_dns_lookups(config_dns_options.use_tcp_for_dns_lookups());
+    dns_resolver_options.set_no_default_search_domain(
+        config_dns_options.no_default_search_domain());
+  } else {
+    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
+    // utilize config.use_tcp_for_dns_lookups() if `config.dns_resolver_options` is not set.
     dns_resolver_options.set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
+    // Preserve the existing behavior.
+    dns_resolver_options.set_no_default_search_domain(false);
   }
   resolver_ = main_thread_dispatcher.createDnsResolver({}, dns_resolver_options);
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
