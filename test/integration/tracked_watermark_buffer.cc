@@ -1,5 +1,7 @@
 #include "test/integration/tracked_watermark_buffer.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -41,10 +43,9 @@ TrackedWatermarkBufferFactory::create(std::function<void()> below_low_watermark,
         auto account = buffer->getAccountForTest();
         if (account) {
           auto& set = account_infos_[account];
-          // Erase buffer, one entry should be removed.
-          ASSERT(set.erase(buffer) == 1);
-          ASSERT(actively_bound_buffers_.erase(buffer) == 1);
-
+          RELEASE_ASSERT(set.erase(buffer) == 1, "Expected to remove buffer from account_infos.");
+          RELEASE_ASSERT(actively_bound_buffers_.erase(buffer) == 1,
+                         "Did not find buffer in actively_bound_buffers_.");
           // Erase account entry if there are no active bound buffers, and
           // there's no other pointers to the account besides the local account
           // pointer and within the map.
@@ -53,7 +54,8 @@ TrackedWatermarkBufferFactory::create(std::function<void()> below_low_watermark,
           // the case that the H2 stream completes, but the data hasn't flushed
           // at TCP.
           if (set.empty() && account.use_count() == 2) {
-            ASSERT(account_infos_.erase(account) == 1);
+            RELEASE_ASSERT(account_infos_.erase(account) == 1,
+                           "Expected to remove account from account_infos.");
           }
         }
       },
