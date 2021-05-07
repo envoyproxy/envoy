@@ -36,6 +36,9 @@ from validate import validate_pb2
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
 
+# Last documented v2 api version
+ENVOY_LAST_V2_VERSION = "1.17.2"
+
 # Namespace prefix for Envoy top-level APIs.
 ENVOY_PREFIX = '.envoy.'
 
@@ -57,7 +60,7 @@ EXTENSION_TEMPLATE = Template(
     """
 .. _extension_{{extension}}:
 
-This extension may be referenced by the qualified name *{{extension}}*
+This extension may be referenced by the qualified name ``{{extension}}``
 
 .. note::
   {{status}}
@@ -123,6 +126,18 @@ EXTENSION_CATEGORIES = {}
 for _k, _v in EXTENSION_DB.items():
     for _cat in _v['categories']:
         EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
+
+V2_LINK_TEMPLATE = Template(
+    """
+This documentation is for the Envoy v3 API.
+
+As of Envoy v1.18 the v2 API has been removed and is no longer supported.
+
+If you are upgrading from v2 API config you may wish to view the v2 API documentation:
+
+    :ref:`{{v2_text}} <{{v2_url}}>`
+
+""")
 
 
 class ProtodocError(Exception):
@@ -260,7 +275,7 @@ def format_extension_category(extension_category):
         category=extension_category, extensions=sorted(extensions))
 
 
-def format_header_from_file(style, source_code_info, proto_name):
+def format_header_from_file(style, source_code_info, proto_name, v2_link):
     """Format RST header based on special file level title
 
     Args:
@@ -281,9 +296,10 @@ def format_header_from_file(style, source_code_info, proto_name):
         formatted_extension = format_extension(extension)
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
-            style, source_code_info.file_level_annotations[
-                annotations.DOC_TITLE_ANNOTATION]) + formatted_extension, stripped_comment
-    return anchor + format_header(style, proto_name) + formatted_extension, stripped_comment
+            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
+        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
+    return anchor + format_header(
+        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
@@ -648,6 +664,10 @@ class RstFormatVisitor(visitor.Visitor):
 
     def __init__(self):
         r = runfiles.Create()
+
+        with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
+            self.v2_mapping = json.load(f)
+
         with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
             # Load as YAML, emit as JSON and then parse as proto to provide type
             # checking.
@@ -681,6 +701,7 @@ class RstFormatVisitor(visitor.Visitor):
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'message')
         if hide_not_implemented(leading_comment):
             return ''
+
         return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
             type_context, msg_proto) + format_message_as_definition_list(
                 type_context, msg_proto,
@@ -690,6 +711,14 @@ class RstFormatVisitor(visitor.Visitor):
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
+
+        v2_link = ""
+        if file_proto.name in self.v2_mapping:
+            # TODO(phlax): remove _v2_ from filepath once sed mangling is removed
+            v2_filepath = f"envoy_v2_api_file_{self.v2_mapping[file_proto.name]}"
+            v2_text = v2_filepath.split('/', 1)[1]
+            v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
+            v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
 
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
@@ -704,7 +733,7 @@ class RstFormatVisitor(visitor.Visitor):
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
-            '=', type_context.source_code_info, file_proto.name)
+            '=', type_context.source_code_info, file_proto.name, v2_link)
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
         # toctrees.
@@ -716,7 +745,7 @@ class RstFormatVisitor(visitor.Visitor):
                 warnings += (
                     '.. warning::\n   This API is work-in-progress and is '
                     'subject to breaking changes.\n\n')
-        debug_proto = format_proto_as_block_comment(file_proto)
+        # debug_proto = format_proto_as_block_comment(file_proto)
         return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 

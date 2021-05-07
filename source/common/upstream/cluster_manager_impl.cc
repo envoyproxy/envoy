@@ -1522,10 +1522,12 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
 #ifdef ENVOY_ENABLE_QUIC
+    // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
+    auto alternate_protocols = makeOptRefFromPtr<Http::AlternateProtocolsCache>(nullptr);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state, source, std::chrono::milliseconds(300), coptions);
+        state, source, alternate_protocols, std::chrono::milliseconds(300), coptions);
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;

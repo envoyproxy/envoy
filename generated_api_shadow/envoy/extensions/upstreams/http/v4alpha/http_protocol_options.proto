@@ -63,7 +63,7 @@ message HttpProtocolOptions {
       "envoy.extensions.upstreams.http.v3.HttpProtocolOptions";
 
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
-  // Note that HTTP/2 should generally be used for upstream clusters doing gRPC.
+  // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
   message ExplicitHttpConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.extensions.upstreams.http.v3.HttpProtocolOptions.ExplicitHttpConfig";
@@ -75,7 +75,9 @@ message HttpProtocolOptions {
 
       config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 
-      // [#not-implemented-hide:]
+      // .. warning::
+      //   QUIC support is currently alpha and should be used with caution. Please
+      //   see :ref:`here <arch_overview_http3>` for details.
       config.core.v4alpha.Http3ProtocolOptions http3_protocol_options = 3;
     }
   }
@@ -90,7 +92,9 @@ message HttpProtocolOptions {
 
     config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 
-    // [#not-implemented-hide:]
+    // .. warning::
+    //   QUIC support is currently alpha and should be used with caution. Please
+    //   see :ref:`here <arch_overview_http3>` for details.
     config.core.v4alpha.Http3ProtocolOptions http3_protocol_options = 3;
   }
 
@@ -111,11 +115,17 @@ message HttpProtocolOptions {
 
     config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
 
-    // [#not-implemented-hide:]
     // Unlike HTTP/1 and HTTP/2, HTTP/3 will not be configured unless it is
-    // present. If HTTP/3 is present, attempts to connect will first be made
-    // via HTTP/3, and if the HTTP/3 connection fails, TCP (HTTP/1 or HTTP/2
-    // based on ALPN) will be used instead.
+    // present, and (soon) only if there is an indication of server side
+    // support.
+    // See :ref:`here <arch_overview_http3_upstream>` for more information on
+    // when HTTP/3 will be used, and when Envoy will fail over to TCP.
+    //
+    // .. warning::
+    //   QUIC support is currently alpha and should be used with caution. Please
+    //   see :ref:`here <arch_overview_http3>` for details.
+    //   AutoHttpConfig config is undergoing especially rapid change and as it
+    //   is alpha is not guaranteed to be API-stable.
     config.core.v4alpha.Http3ProtocolOptions http3_protocol_options = 3;
   }
 

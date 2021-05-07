@@ -659,7 +659,7 @@ protocol()
   streamInfo:protocol()
 
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
-used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
+used by the current request. The possible values are: ``HTTP/1.0``, ``HTTP/1.1``, ``HTTP/2`` and ``HTTP/3*``.
 
 downstreamLocalAddress()
 ^^^^^^^^^^^^^^^^^^^^^^^^

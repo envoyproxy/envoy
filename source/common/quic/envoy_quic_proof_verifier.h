@@ -11,9 +11,8 @@ namespace Quic {
 // client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
-  EnvoyQuicProofVerifier(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-                         TimeSource& time_source)
-      : context_impl_(scope, config, time_source) {}
+  EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context)
+      : context_(std::move(context)) {}
 
   // EnvoyQuicProofVerifierBase
   quic::QuicAsyncStatus
@@ -25,7 +24,7 @@ public:
                   std::unique_ptr<quic::ProofVerifierCallback> callback) override;
 
 private:
-  Extensions::TransportSockets::Tls::ClientContextImpl context_impl_;
+  Envoy::Ssl::ClientContextSharedPtr context_;
 };
 
 } // namespace Quic
