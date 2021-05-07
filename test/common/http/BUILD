@@ -463,6 +463,19 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "alternate_protocols_cache_manager_test",
+    srcs = ["alternate_protocols_cache_manager_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols_cache",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "path_utility_fuzz_proto",
     srcs = ["path_utility_fuzz.proto"],
