@@ -52,7 +52,7 @@ public:
   const_iterator end() const;
 
   const std::vector<std::string>& operator[](const std::string& key) const;
-  const RawHeaderMap& all_headers() const;
+  const RawHeaderMap& allHeaders() const;
   bool contains(const std::string& key) const;
 
 protected:

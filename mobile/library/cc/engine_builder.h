@@ -14,17 +14,17 @@ public:
   EngineBuilder(std::string config_template);
   EngineBuilder();
 
-  EngineBuilder& add_log_level(LogLevel log_level);
-  EngineBuilder& set_on_engine_running(std::function<void()> closure);
+  EngineBuilder& addLogLevel(LogLevel log_level);
+  EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
-  EngineBuilder& add_stats_domain(const std::string& stats_domain);
-  EngineBuilder& add_connect_timeout_seconds(int connect_timeout_seconds);
-  EngineBuilder& add_dns_refresh_seconds(int dns_refresh_seconds);
-  EngineBuilder& add_dns_failure_refresh_seconds(int base, int max);
-  EngineBuilder& add_stats_flush_seconds(int stats_flush_seconds);
-  EngineBuilder& set_app_version(const std::string& app_version);
-  EngineBuilder& set_app_id(const std::string& app_id);
-  EngineBuilder& add_virtual_clusters(const std::string& virtual_clusters);
+  EngineBuilder& addStatsDomain(const std::string& stats_domain);
+  EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
+  EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
+  EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
+  EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
+  EngineBuilder& setAppVersion(const std::string& app_version);
+  EngineBuilder& setAppId(const std::string& app_id);
+  EngineBuilder& addVirtualClusters(const std::string& virtual_clusters);
 
   EngineSharedPtr build();
 

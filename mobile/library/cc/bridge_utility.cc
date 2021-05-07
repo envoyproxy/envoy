@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Platform {
 
-envoy_headers raw_header_map_as_envoy_headers(const RawHeaderMap& headers) {
+envoy_headers rawHeaderMapAsEnvoyHeaders(const RawHeaderMap& headers) {
   size_t header_count = 0;
   for (const auto& pair : headers) {
     header_count += pair.second.size();
@@ -33,7 +33,7 @@ envoy_headers raw_header_map_as_envoy_headers(const RawHeaderMap& headers) {
   return raw_headers;
 }
 
-RawHeaderMap envoy_headers_as_raw_header_map(envoy_headers raw_headers) {
+RawHeaderMap envoyHeadersAsRawHeaderMap(envoy_headers raw_headers) {
   RawHeaderMap headers;
   for (auto i = 0; i < raw_headers.length; i++) {
     auto key = Data::Utility::copyToString(raw_headers.entries[i].key);

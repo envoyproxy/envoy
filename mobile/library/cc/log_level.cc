@@ -11,7 +11,7 @@ static const std::pair<LogLevel, std::string> LOG_LEVEL_LOOKUP[]{
     {LogLevel::off, "off"},
 };
 
-std::string log_level_to_string(LogLevel method) {
+std::string logLevelToString(LogLevel method) {
   for (const auto& pair : LOG_LEVEL_LOOKUP) {
     if (pair.first == method) {
       return pair.second;
@@ -21,7 +21,7 @@ std::string log_level_to_string(LogLevel method) {
   throw std::out_of_range("unknown log level type");
 }
 
-LogLevel log_level_from_string(const std::string& str) {
+LogLevel logLevelFromString(const std::string& str) {
   for (const auto& pair : LOG_LEVEL_LOOKUP) {
     if (pair.second == str) {
       return pair.first;

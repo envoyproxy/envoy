@@ -11,37 +11,37 @@ StreamPrototype::StreamPrototype(envoy_engine_t engine) : engine_(engine) {
 
 StreamSharedPtr StreamPrototype::start() {
   auto stream = init_stream(this->engine_);
-  start_stream(stream, this->callbacks_->as_envoy_http_callbacks());
+  start_stream(stream, this->callbacks_->asEnvoyHttpCallbacks());
 
   return std::make_shared<Stream>(stream, this->callbacks_);
 }
 
-StreamPrototype& StreamPrototype::set_on_headers(OnHeadersCallback closure) {
+StreamPrototype& StreamPrototype::setOnHeaders(OnHeadersCallback closure) {
   this->callbacks_->on_headers = closure;
   return *this;
 }
 
-StreamPrototype& StreamPrototype::set_on_data(OnDataCallback closure) {
+StreamPrototype& StreamPrototype::setOnData(OnDataCallback closure) {
   this->callbacks_->on_data = closure;
   return *this;
 }
 
-StreamPrototype& StreamPrototype::set_on_trailers(OnTrailersCallback closure) {
+StreamPrototype& StreamPrototype::setOnTrailers(OnTrailersCallback closure) {
   this->callbacks_->on_trailers = closure;
   return *this;
 }
 
-StreamPrototype& StreamPrototype::set_on_error(OnErrorCallback closure) {
+StreamPrototype& StreamPrototype::setOnError(OnErrorCallback closure) {
   this->callbacks_->on_error = closure;
   return *this;
 }
 
-StreamPrototype& StreamPrototype::set_on_complete(OnCompleteCallback closure) {
+StreamPrototype& StreamPrototype::setOnComplete(OnCompleteCallback closure) {
   this->callbacks_->on_complete = closure;
   return *this;
 }
 
-StreamPrototype& StreamPrototype::set_on_cancel(OnCancelCallback closure) {
+StreamPrototype& StreamPrototype::setOnCancel(OnCancelCallback closure) {
   this->callbacks_->on_cancel = closure;
   return *this;
 }

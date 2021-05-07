@@ -18,12 +18,12 @@ public:
 
   StreamSharedPtr start();
 
-  StreamPrototype& set_on_headers(OnHeadersCallback closure);
-  StreamPrototype& set_on_data(OnDataCallback closure);
-  StreamPrototype& set_on_trailers(OnTrailersCallback closure);
-  StreamPrototype& set_on_error(OnErrorCallback closure);
-  StreamPrototype& set_on_complete(OnCompleteCallback closure);
-  StreamPrototype& set_on_cancel(OnCancelCallback closure);
+  StreamPrototype& setOnHeaders(OnHeadersCallback closure);
+  StreamPrototype& setOnData(OnDataCallback closure);
+  StreamPrototype& setOnTrailers(OnTrailersCallback closure);
+  StreamPrototype& setOnError(OnErrorCallback closure);
+  StreamPrototype& setOnComplete(OnCompleteCallback closure);
+  StreamPrototype& setOnCancel(OnCancelCallback closure);
 
 private:
   envoy_engine_t engine_;

@@ -10,7 +10,7 @@ class RequestTrailersBuilder;
 
 class RequestTrailers : public Trailers {
 public:
-  RequestTrailersBuilder to_request_trailers_builder() const;
+  RequestTrailersBuilder toRequestTrailersBuilder() const;
 
 private:
   RequestTrailers(RawHeaderMap headers) : Trailers(std::move(headers)) {}

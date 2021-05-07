@@ -13,7 +13,7 @@ class ResponseHeadersBuilder : public HeadersBuilder {
 public:
   ResponseHeadersBuilder() {}
 
-  ResponseHeadersBuilder& add_http_status(int status);
+  ResponseHeadersBuilder& addHttpStatus(int status);
   ResponseHeadersSharedPtr build() const;
 };
 

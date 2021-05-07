@@ -9,8 +9,8 @@ namespace Envoy {
 namespace Python {
 namespace EngineBuilder {
 
-Platform::EngineBuilder& set_on_engine_running_shim(Platform::EngineBuilder& self,
-                                                    std::function<void()> closure);
+Platform::EngineBuilder& setOnEngineRunningShim(Platform::EngineBuilder& self,
+                                                std::function<void()> closure);
 
 } // namespace EngineBuilder
 } // namespace Python

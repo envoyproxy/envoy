@@ -10,7 +10,7 @@ class ResponseTrailersBuilder;
 
 class ResponseTrailers : public Trailers {
 public:
-  ResponseTrailersBuilder to_response_trailers_builder();
+  ResponseTrailersBuilder toResponseTrailersBuilder();
 
 private:
   ResponseTrailers(RawHeaderMap trailers) : Trailers(std::move(trailers)) {}

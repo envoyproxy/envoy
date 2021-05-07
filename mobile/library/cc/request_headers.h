@@ -16,14 +16,14 @@ class RequestHeadersBuilder;
 
 class RequestHeaders : public Headers {
 public:
-  RequestMethod request_method() const;
+  RequestMethod requestMethod() const;
   const std::string& scheme() const;
   const std::string& authority() const;
   const std::string& path() const;
-  absl::optional<RetryPolicy> retry_policy() const;
-  absl::optional<UpstreamHttpProtocol> upstream_http_protocol() const;
+  absl::optional<RetryPolicy> retryPolicy() const;
+  absl::optional<UpstreamHttpProtocol> upstreamHttpProtocol() const;
 
-  RequestHeadersBuilder to_request_headers_builder() const;
+  RequestHeadersBuilder toRequestHeadersBuilder() const;
 
 private:
   RequestHeaders(RawHeaderMap headers) : Headers(std::move(headers)) {}

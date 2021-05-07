@@ -10,9 +10,9 @@ class ResponseHeadersBuilder;
 
 class ResponseHeaders : public Headers {
 public:
-  int http_status() const;
+  int httpStatus() const;
 
-  ResponseHeadersBuilder to_response_headers_builder();
+  ResponseHeadersBuilder toResponseHeadersBuilder();
 
 private:
   ResponseHeaders(RawHeaderMap headers) : Headers(std::move(headers)) {}
