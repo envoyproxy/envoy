@@ -209,13 +209,7 @@ The following table shows the available Docker images
      -
      -
    * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
-     - Release binary with symbols stripped on top of a distroless Debain base.
-     -
-     -
-     - See Docker Hub
-     - See Docker Hub
-   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
-     - Release binary with symbols stripped on top of a distroless Debain base.
+     - Release binary with symbols stripped on top of a distroless base.
      -
      -
      - See Docker Hub
@@ -244,6 +238,12 @@ The following table shows the available Docker images
      -
      - latest
      - latest
+   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
    * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
      - Release binary with symbols stripped on top of a **glibc** alpine base.
      -
