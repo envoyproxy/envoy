@@ -254,11 +254,24 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
         envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
-  } else if (http2_options.value().has_override_stream_error_on_invalid_http_message()) {
-    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
-        http2_options.value().override_stream_error_on_invalid_http_message().value());
-  } else if (http2_options.value().stream_error_on_invalid_http_messaging()) {
-    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  } else {
+#ifdef ENVOY_ENABLE_QUIC
+    if (http2_options->has_initial_stream_window_size() &&
+        http2_options->initial_stream_window_size().value() < quic::kStreamReceiveWindowLimit) {
+      // Set http3 stream flow control window only if the configured http2 stream flow control
+      // window is smaller than the upper limit of flow control window supported by QUICHE which is
+      // also the default for http3 stream.
+      http3_options.mutable_quic_protocol_options()
+          ->mutable_initial_stream_window_size()
+          ->set_value(http2_options->initial_stream_window_size().value());
+    }
+    if (http2_options.value().has_override_stream_error_on_invalid_http_message()) {
+      http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
+          http2_options.value().override_stream_error_on_invalid_http_message().value());
+    } else if (http2_options.value().stream_error_on_invalid_http_messaging()) {
+      http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+    }
+#endif
   }
   cluster->http2_options_ = http2_options.value();
   cluster->http3_options_ = http3_options;
