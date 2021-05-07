@@ -102,6 +102,7 @@ stages:
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
             displayName: "Generate docs"
+            continueOnError: true
 
           - script: |
               ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
