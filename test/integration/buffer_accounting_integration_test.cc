@@ -138,8 +138,7 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   upstream_request1 = std::move(upstream_request_);
 
   // Check the expected number of buffers per account
-  EXPECT_EQ(buffer_factory_->numBuffersActivelyBound(), 4);
-  EXPECT_EQ(buffer_factory_->numAccountsActive(), 1);
+  EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
 
   // Send the second request.
   auto response2 = codec_client_->makeRequestWithBody(default_request_headers_, 1000);
@@ -147,8 +146,7 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   upstream_request2 = std::move(upstream_request_);
 
   // Check the expected number of buffers per account
-  EXPECT_EQ(buffer_factory_->numBuffersActivelyBound(), 8);
-  EXPECT_EQ(buffer_factory_->numAccountsActive(), 2);
+  EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(2, 8));
 
   // Respond to the first request and wait for complete
   upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -157,8 +155,7 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   ASSERT_TRUE(upstream_request1->complete());
 
   // Check the expected number of buffers per account
-  EXPECT_EQ(buffer_factory_->numBuffersActivelyBound(), 4);
-  EXPECT_EQ(buffer_factory_->numAccountsActive(), 1);
+  EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
 
   // Respond to the second request and wait for complete
   upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -167,8 +164,7 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   ASSERT_TRUE(upstream_request2->complete());
 
   // Check the expected number of buffers per account
-  EXPECT_EQ(buffer_factory_->numBuffersActivelyBound(), 0);
-  EXPECT_EQ(buffer_factory_->numAccountsActive(), 0);
+  EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 }
 
 TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
@@ -196,12 +192,10 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   // Wait for all requests to have accounted for the requests we've sent.
-  ASSERT_TRUE(
+  EXPECT_TRUE(
       buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
       << "buffer total: " << buffer_factory_->totalBufferSize()
-      << " buffer max: " << buffer_factory_->maxBufferSize()
-      << " active accounts: " << buffer_factory_->numAccountsActive()
-      << " active bound buffers: " << buffer_factory_->numBuffersActivelyBound() << printAccounts();
+      << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
 
   writev_matcher_->setResumeWrites();
 
@@ -236,12 +230,10 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   // Wait for all requests to buffered the response from upstream.
-  ASSERT_TRUE(
+  EXPECT_TRUE(
       buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
       << "buffer total: " << buffer_factory_->totalBufferSize()
-      << " buffer max: " << buffer_factory_->maxBufferSize()
-      << " active accounts: " << buffer_factory_->numAccountsActive()
-      << " active bound buffers: " << buffer_factory_->numBuffersActivelyBound() << printAccounts();
+      << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
 
   writev_matcher_->setResumeWrites();
 

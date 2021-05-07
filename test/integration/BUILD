@@ -1324,6 +1324,7 @@ envoy_cc_test_library(
     ],
     deps = [
         "//source/common/buffer:watermark_buffer_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

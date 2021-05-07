@@ -5,6 +5,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 
+#include "test/test_common/utility.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
@@ -86,7 +88,9 @@ public:
   }
 
   // Wait until total bytes buffered exceeds the a given size.
-  bool waitUntilTotalBufferedExceeds(uint64_t byte_size, std::chrono::milliseconds timeout);
+  bool
+  waitUntilTotalBufferedExceeds(uint64_t byte_size,
+                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Set the expected account balance, prior to sending requests.
   // The test thread can then wait for this condition to be true.
@@ -96,12 +100,17 @@ public:
   // The Envoy worker thread will notify the test thread once the condition is
   // met.
   void setExpectedAccountBalance(uint64_t byte_size, uint32_t num_accounts);
-  bool waitForExpectedAccountBalanceWithTimeout(std::chrono::milliseconds timeout);
+  bool waitForExpectedAccountBalanceWithTimeout(
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  // Number of accounts bound to a buffer that's still in use.
-  uint64_t numAccountsActive();
-  // Number of active buffers that had a call to bind.
-  uint64_t numBuffersActivelyBound() const;
+  // Wait for the expected number of accounts and number of bound buffers.
+  //
+  // Due to deferred deletion, it possible that the Envoy hasn't cleaned up on
+  // its end, but the stream has been completed. This avoids that by awaiting
+  // for the side effect of the deletion to have occurred.
+  bool waitUntilExpectedNumberOfAccountsAndBoundBuffers(
+      uint32_t num_accounts, uint32_t num_bound_buffers,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   using AccountToBoundBuffersMap =
       absl::flat_hash_map<BufferMemoryAccountSharedPtr,

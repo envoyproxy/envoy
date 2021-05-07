@@ -131,7 +131,8 @@ public:
 
   /**
    * Binds the account to be charged for resources used by the buffer. This
-   * should only be called once.
+   * should only be called when the buffer is empty as existing slices
+   * within the buffer won't retroactively get tagged.
    *
    * @param account a shared_ptr to the account to charge.
    */

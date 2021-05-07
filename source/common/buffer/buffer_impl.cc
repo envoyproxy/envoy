@@ -43,8 +43,6 @@ void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
 
 void OwnedImpl::bindAccount(BufferMemoryAccountSharedPtr account) {
   ASSERT(slices_.empty());
-  // We don't yet have an account bound.
-  ASSERT(!account_);
   account_ = std::move(account);
 }
 

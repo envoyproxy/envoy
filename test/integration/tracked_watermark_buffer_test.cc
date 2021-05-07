@@ -131,24 +131,24 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfBuffersActivelyBound) {
   auto buffer2 = factory_.create([]() {}, []() {}, []() {});
   auto buffer3 = factory_.create([]() {}, []() {}, []() {});
   BufferMemoryAccountSharedPtr account = std::make_shared<BufferMemoryAccountImpl>();
-  ASSERT_EQ(factory_.numBuffersActivelyBound(), 0);
+  ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
   buffer1->bindAccount(account);
-  EXPECT_EQ(factory_.numBuffersActivelyBound(), 1);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 1));
   buffer2->bindAccount(account);
-  EXPECT_EQ(factory_.numBuffersActivelyBound(), 2);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 2));
   buffer3->bindAccount(account);
-  EXPECT_EQ(factory_.numBuffersActivelyBound(), 3);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 3));
 
   // Release test access to the account.
   account.reset();
 
   buffer3.reset();
-  EXPECT_EQ(factory_.numBuffersActivelyBound(), 2);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 2));
   buffer2.reset();
-  EXPECT_EQ(factory_.numBuffersActivelyBound(), 1);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 1));
   buffer1.reset();
-  EXPECT_EQ(factory_.numBuffersActivelyBound(), 0);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 }
 
 TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
@@ -156,26 +156,26 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
   auto buffer2 = factory_.create([]() {}, []() {}, []() {});
   auto buffer3 = factory_.create([]() {}, []() {}, []() {});
   BufferMemoryAccountSharedPtr account1 = std::make_shared<BufferMemoryAccountImpl>();
-  ASSERT_EQ(factory_.numAccountsActive(), 0);
+  ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
   buffer1->bindAccount(account1);
-  EXPECT_EQ(factory_.numAccountsActive(), 1);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 1));
   buffer2->bindAccount(account1);
-  EXPECT_EQ(factory_.numAccountsActive(), 1);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 2));
 
   // Release test access to the account.
   account1.reset();
 
   buffer3->bindAccount(std::make_shared<BufferMemoryAccountImpl>());
-  EXPECT_EQ(factory_.numAccountsActive(), 2);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(2, 3));
 
   buffer2.reset();
-  EXPECT_EQ(factory_.numAccountsActive(), 2);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(2, 2));
   buffer1.reset();
-  EXPECT_EQ(factory_.numAccountsActive(), 1);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 1));
 
   buffer3.reset();
-  EXPECT_EQ(factory_.numAccountsActive(), 0);
+  EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 }
 
 TEST_F(TrackedWatermarkBufferTest, WaitForExpectedAccountBalanceShouldReturnTrueWhenConditionsMet) {
