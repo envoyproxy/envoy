@@ -1,5 +1,4 @@
 #include "common/http/alternate_protocols_cache_manager_impl.h"
-
 #include "common/singleton/manager_impl.h"
 
 #include "test/mocks/thread_local/mocks.h"
@@ -11,10 +10,11 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-class AlternateProtocolsCacheManagerTest : public testing::Test, public Event::TestUsingSimulatedTime {
+class AlternateProtocolsCacheManagerTest : public testing::Test,
+                                           public Event::TestUsingSimulatedTime {
 public:
-  AlternateProtocolsCacheManagerTest() : factory_(singleton_manager_, simTime(), tls_),
-                                         manager_(factory_.get()) {
+  AlternateProtocolsCacheManagerTest()
+      : factory_(singleton_manager_, simTime(), tls_), manager_(factory_.get()) {
     config1_.set_name(name1_);
     config1_.mutable_max_hosts()->set_value(max_hosts1_);
 
@@ -40,13 +40,13 @@ TEST_F(AlternateProtocolsCacheManagerTest, FactoryGet) {
   EXPECT_EQ(manager_, factory_.get());
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, getCache) {
+TEST_F(AlternateProtocolsCacheManagerTest, GetCache) {
   AlternateProtocolsCacheSharedPtr cache = manager_->getCache(config1_);
   EXPECT_NE(nullptr, cache);
   EXPECT_EQ(cache, manager_->getCache(config1_));
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, getCacheForDifferentConfig) {
+TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForDifferentConfig) {
   AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(config1_);
   AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(config2_);
   EXPECT_NE(nullptr, cache2);
