@@ -714,8 +714,7 @@ class RstFormatVisitor(visitor.Visitor):
 
         v2_link = ""
         if file_proto.name in self.v2_mapping:
-            # TODO(phlax): remove _v2_ from filepath once sed mangling is removed
-            v2_filepath = f"envoy_v2_api_file_{self.v2_mapping[file_proto.name]}"
+            v2_filepath = f"envoy_api_file_{self.v2_mapping[file_proto.name]}"
             v2_text = v2_filepath.split('/', 1)[1]
             v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
             v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
