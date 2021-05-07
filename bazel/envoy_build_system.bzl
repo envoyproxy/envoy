@@ -209,10 +209,10 @@ envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
+envoy_select_wasm_v8 = _envoy_select_wasm_v8
+envoy_select_wasm_wamr = _envoy_select_wasm_wamr
 envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
-envoy_select_wasm_wamr = _envoy_select_wasm_wamr
-envoy_select_wasm_v8 = _envoy_select_wasm_v8
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary

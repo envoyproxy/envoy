@@ -13,7 +13,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     category = "envoy.wasm.runtime",
-    security_posture = "unknown",
+    security_posture = "unknown", # "This may never change from unknown until the threat model at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
     status = "alpha",
     deps = [
         "//include/envoy/registry",

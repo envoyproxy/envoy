@@ -319,6 +319,26 @@ envoy_cmake_external(
 )
 
 envoy_cmake_external(
+    name = "wamr",
+    cache_entries = {
+        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
+        "WAMR_BUILD_INTERP": "1",
+        "WAMR_BUILD_JIT": "0",
+        "WAMR_BUILD_AOT": "0",
+        "WAMR_BUILD_SIMD": "0",
+        "WAMR_BUILD_MULTI_MODULE": "1",
+        "WAMR_BUILD_LIBC_WASI": "0",
+        "WAMR_BUILD_TAIL_CALL": "1",
+    },
+    defines = ["ENVOY_WASM_WAMR"],
+    lib_source = "@com_github_wamr//:all",
+    static_libraries = ["libvmlib.a"],
+    tags = ["skip_on_windows"],
+    deps = [":llvm"],
+    alwayslink = True,
+)
+
+envoy_cmake_external(
     name = "wavm",
     binaries = ["wavm"],
     cache_entries = {
@@ -347,26 +367,6 @@ envoy_cmake_external(
     }),
     tags = ["skip_on_windows"],
     deps = [":llvm"],
-)
-
-envoy_cmake_external(
-    name = "wamr",
-    cache_entries = {
-        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
-        "WAMR_BUILD_INTERP": "1",
-        "WAMR_BUILD_JIT": "0",
-        "WAMR_BUILD_AOT": "0",
-        "WAMR_BUILD_SIMD": "0",
-        "WAMR_BUILD_MULTI_MODULE": "1",
-        "WAMR_BUILD_LIBC_WASI": "0",
-        "WAMR_BUILD_TAIL_CALL": "1",
-    },
-    defines = ["ENVOY_WASM_WAMR"],
-    lib_source = "@com_github_wamr//:all",
-    static_libraries = ["libvmlib.a"],
-    tags = ["skip_on_windows"],
-    deps = [":llvm"],
-    alwayslink = True,
 )
 
 envoy_cmake_external(
