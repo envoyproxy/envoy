@@ -152,7 +152,7 @@ std::string parseSetCookieValue(const Http::HeaderMap& headers, const std::strin
       // Split the cookie header into individual cookies.
       for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
         // Find the key part of the cookie (i.e. the name of the cookie).
-        size_t first_non_space = s.find_first_not_of(" ");
+        size_t first_non_space = s.find_first_not_of(' ');
         size_t equals_index = s.find('=');
         if (equals_index == absl::string_view::npos) {
           // The cookie is malformed if it does not have an `=`. Continue
@@ -194,11 +194,23 @@ TEST_F(OauthIntegrationTest, AuthenticationFlow) {
       {"authority", "Bearer token"}};
   absl::string_view host_ = headers.Host()->value().getStringView();
 
+  Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
+  Filesystem::Watcher::OnChangedCb on_changed_cb_;
+  watcher->addWatch(TestEnvironment::temporaryPath("token_secret.yaml"),
+                    Filesystem::Watcher::Events::MovedTo,
+                    [&](uint32_t) -> void { dispatcher_->exit(); });
+
+  watcher->addWatch(TestEnvironment::temporaryPath("hmac_secret.yaml"),
+                    Filesystem::Watcher::Events::MovedTo,
+                    [&](uint32_t) -> void { dispatcher_->exit(); });
+
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
                               TestEnvironment::temporaryPath("token_secret.yaml"));
-
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
                               TestEnvironment::temporaryPath("hmac_secret.yaml"));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   auto encoder_decoder = codec_client_->startRequest(headers);
   request_encoder_ = &encoder_decoder.first;
