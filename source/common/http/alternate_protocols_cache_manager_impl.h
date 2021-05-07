@@ -26,7 +26,7 @@ private:
   // Contains a cache and the options associated with it.
   struct CacheWithOptions {
     CacheWithOptions(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
-                AlternateProtocolsCacheSharedPtr cache)
+                     AlternateProtocolsCacheSharedPtr cache)
         : options_(options), cache_(cache) {}
 
     const envoy::config::core::v3::AlternateProtocolsCacheOptions& options_;
