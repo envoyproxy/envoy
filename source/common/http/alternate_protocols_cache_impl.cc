@@ -14,6 +14,7 @@ AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() {}
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   const std::vector<AlternateProtocol>& protocols,
                                                   const MonotonicTime& expiration) {
+  // TODO(RyanTheOptimist): Propogate state changes across threads.
   State& state = *(slot_.get());
   Entry& entry = state.protocols_[origin];
   if (entry.protocols_ != protocols) {
