@@ -5,7 +5,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-exports_files(["protodoc_manifest.yaml"])
+exports_files([
+    "protodoc_manifest.yaml",
+    "v2_mapping.json",
+])
 
 envoy_package()
 
