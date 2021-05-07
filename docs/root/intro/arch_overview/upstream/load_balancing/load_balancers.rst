@@ -45,7 +45,7 @@ same or different weights.
 
   In this case the weights are calculated at the time a host is picked using the following formula:
 
-  `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`.
+  ``weight = load_balancing_weight / (active_requests + 1)^active_request_bias``.
 
   :ref:`active_request_bias<envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.active_request_bias>`
   can be configured via runtime and defaults to 1.0. It must be greater than or equal to 0.0.
@@ -53,7 +53,7 @@ same or different weights.
   The larger the active request bias is, the more aggressively active requests will lower the
   effective weight.
 
-  If `active_request_bias` is set to 0.0, the least request load balancer behaves like the round
+  If ``active_request_bias`` is set to 0.0, the least request load balancer behaves like the round
   robin load balancer and ignores the active request count at the time of picking.
 
   For example, if active_request_bias is 1.0, a host with weight 2 and an active request count of 4

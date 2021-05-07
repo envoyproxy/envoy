@@ -220,15 +220,6 @@ public:
 using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
 
 /**
- * Get the singleton cache manager for the entire server.
- */
-DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
-                                         Event::Dispatcher& main_thread_dispatcher,
-                                         ThreadLocal::SlotAllocator& tls,
-                                         Random::RandomGenerator& random, Runtime::Loader& loader,
-                                         Stats::Scope& root_scope);
-
-/**
  * Factory for getting a DNS cache manager.
  */
 class DnsCacheManagerFactory {

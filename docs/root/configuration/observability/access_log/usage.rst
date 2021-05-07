@@ -181,7 +181,7 @@ The following command operators are supported:
 
 %PROTOCOL%
   HTTP
-    Protocol. Currently either *HTTP/1.1* or *HTTP/2*.
+    Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
 
   TCP
     Not implemented ("-").
@@ -331,7 +331,7 @@ The following command operators are supported:
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. If runtime feature
-  `envoy.reloadable_features.use_observable_cluster_name` is enabled, then :ref:`alt_stat_name
+  ``envoy.reloadable_features.use_observable_cluster_name`` is enabled, then :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
 
 %UPSTREAM_LOCAL_ADDRESS%

@@ -317,6 +317,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_system_version_info("1");
+  response->mutable_control_plane()->set_identifier("HAL 9000");
 
   envoy::config::route::v3::VirtualHost vhost;
   vhost.set_name("vhost_1");
@@ -335,6 +336,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
 
   EXPECT_TRUE(sub != subscriptions.end());
   watch->update({});
+  EXPECT_EQ("HAL 9000", stats_.textReadout("control_plane.identifier").value());
 }
 
 // DeltaDiscoveryResponse that comes in response to an on-demand request that couldn't be resolved
