@@ -46,6 +46,7 @@ public:
   Network::MockDrainDecision drain_decision_;
   Runtime::MockLoader runtime_;
   NiceMock<Api::MockApi> api_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 TEST_F(RedisProxyFilterConfigTest, Normal) {
@@ -60,8 +61,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher("test_thread"));
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *dispatcher);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, dispatcher_);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_TRUE(config.downstream_auth_username_.empty());
   EXPECT_TRUE(config.downstream_auth_password_.empty());
@@ -90,8 +90,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher("test_thread"));
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *dispatcher);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, dispatcher_);
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
 }
 
@@ -111,8 +110,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher("test_thread"));
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *dispatcher);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, dispatcher_);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
 }
@@ -130,8 +128,7 @@ TEST_F(RedisProxyFilterConfigTest, FeatureConfigDefaultSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher("test_thread"));
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *dispatcher);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, dispatcher_);
   EXPECT_TRUE(bool(config.feature_config_));
 }
 

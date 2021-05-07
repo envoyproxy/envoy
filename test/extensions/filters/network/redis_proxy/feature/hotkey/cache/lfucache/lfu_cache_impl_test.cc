@@ -122,6 +122,11 @@ TEST(LFUCacheTest, IncrKey) {
   std::string test_key_1("test_key_1");
   absl::flat_hash_map<std::string, uint32_t> cache;
 
+  lfu->setKey(test_key_1, 0);
+  lfu->getCache(cache);
+  EXPECT_EQ(0, cache.size());
+  cache.clear();
+
   lfu->setKey(test_key_1, 5);
   lfu->getCache(cache);
   EXPECT_EQ(1, cache.size());
@@ -148,6 +153,11 @@ TEST(LFUCacheTest, SetKey) {
   std::unique_ptr<LFUCache> lfu = std::make_unique<LFUCache>(1, 1);
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
+
+  lfu->setKey(test_key_1, 0);
+  lfu->getCache(cache);
+  EXPECT_EQ(0, cache.size());
+  cache.clear();
 
   lfu->setKey(test_key_1, 5);
   lfu->getCache(cache);

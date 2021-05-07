@@ -6,11 +6,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 
-using testing::Eq;
-using testing::Matcher;
-using testing::NiceMock;
-using testing::Return;
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -96,6 +91,14 @@ TEST(HotKeyCollectorTest, CreateHotKeyCounter) {
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey
       hotkey_config;
+
+  HotKeyCollectorSharedPtr test_default_hk_collector =
+      std::make_shared<HotKeyCollector>(hotkey_config, *dispatcher, "", store);
+  HotKeyCounterSharedPtr test_default_hk_counter_1 =
+      test_default_hk_collector->createHotKeyCounter();
+  EXPECT_EQ(true, bool(test_default_hk_collector));
+  EXPECT_EQ(true, bool(test_default_hk_counter_1));
+
   hotkey_config.set_cache_type(envoy::extensions::filters::network::redis_proxy::v3::
                                    RedisProxy_FeatureConfig_HotKey_CacheType_LFU);
   hotkey_config.mutable_cache_capacity()->set_value(1);
@@ -103,6 +106,9 @@ TEST(HotKeyCollectorTest, CreateHotKeyCounter) {
   HotKeyCollectorSharedPtr test_hk_collector =
       std::make_shared<HotKeyCollector>(hotkey_config, *dispatcher, "", store);
   HotKeyCounterSharedPtr test_hk_counter_1 = test_hk_collector->createHotKeyCounter();
+  EXPECT_EQ(true, bool(test_hk_collector));
+  EXPECT_EQ(true, bool(test_hk_counter_1));
+
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
 
@@ -169,6 +175,8 @@ TEST(HotKeyCollectorTest, DestroyHotKeyCounter) {
   EXPECT_EQ(1, cache.count(test_key_1));
   EXPECT_EQ(2, cache.at(test_key_1));
   cache.clear();
+
+  test_hk_collector->destroyHotKeyCounter(test_hk_counter_1);
 
   dispatcher->exit();
   thread->join();
