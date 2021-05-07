@@ -1542,9 +1542,9 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
     const ProtobufWkt::Struct& config, const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
+  bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
   auto factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-      Server::Configuration::NamedHttpFilterConfigFactory>(name, optional_http_filters.find(name) !=
-                                                                     optional_http_filters.end());
+      Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
   if (factory == nullptr) {
     ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
     return nullptr;
@@ -1555,7 +1555,7 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+            "envoy.reloadable_features.check_unsupported_typed_per_filter_config") && !is_optional) {
       throw EnvoyException(
           fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
     } else {
