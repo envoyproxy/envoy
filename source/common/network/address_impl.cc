@@ -109,7 +109,6 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  // ASSERT(Thread::MainThread::isMainThread());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_ = *address;
   ip_.friendly_address_ = sockaddrToString(*address);
@@ -131,7 +130,6 @@ Ipv4Instance::Ipv4Instance(const std::string& address, const SocketInterface* so
 Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  // ASSERT(Thread::MainThread::isMainThread());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
