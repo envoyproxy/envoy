@@ -39,6 +39,7 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":lightstep_tracer_lib",
+        "//source/common/config:datasource_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],

@@ -470,6 +470,36 @@ key:
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(ScopedRdsIntegrationTest, RejectKeyConflictInDeltaUpdate) {
+  if (!isDelta()) {
+    return;
+  }
+  const std::string scope_route1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  // Delta SRDS update with key conflict, should be rejected.
+  const std::string scope_route2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  sendSrdsResponse({}, {scope_route2}, {}, "2");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                                 1);
+  sendSrdsResponse({}, {}, {"foo_scope1", "foo_scope2"}, "3");
+}
+
 // Verify SRDS works when reference via a xdstp:// collection locator.
 TEST_P(ScopedRdsIntegrationTest, XdsTpCollection) {
   if (!isDelta()) {

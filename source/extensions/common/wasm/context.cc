@@ -88,8 +88,6 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
 
-constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
-
 } // namespace
 
 // Test support.
@@ -1584,12 +1582,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
   return WasmResult::Ok;
 }
 
+constexpr absl::string_view CloseStreamResponseDetails = "wasm_close_stream";
+
 WasmResult Context::closeStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
     if (decoder_callbacks_) {
       if (!decoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
-        decoder_callbacks_->streamInfo().setResponseCodeDetails(FailStreamResponseDetails);
+        decoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       decoder_callbacks_->resetStream();
     }
@@ -1597,7 +1597,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
   case WasmStreamType::Response:
     if (encoder_callbacks_) {
       if (!encoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
-        encoder_callbacks_->streamInfo().setResponseCodeDetails(FailStreamResponseDetails);
+        encoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       encoder_callbacks_->resetStream();
     }
@@ -1616,6 +1616,39 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;
+}
+
+constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
+
+void Context::failStream(WasmStreamType stream_type) {
+  switch (stream_type) {
+  case WasmStreamType::Request:
+    if (decoder_callbacks_) {
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                         FailStreamResponseDetails);
+    }
+    break;
+  case WasmStreamType::Response:
+    if (encoder_callbacks_) {
+      encoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                         FailStreamResponseDetails);
+    }
+    break;
+  case WasmStreamType::Downstream:
+    if (network_read_filter_callbacks_) {
+      network_read_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
+    break;
+  case WasmStreamType::Upstream:
+    if (network_write_filter_callbacks_) {
+      network_write_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
+    break;
+  }
 }
 
 WasmResult Context::sendLocalResponse(uint32_t response_code, absl::string_view body_text,
