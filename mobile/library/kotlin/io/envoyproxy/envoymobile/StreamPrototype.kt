@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * A type representing a stream that has not yet been started.
@@ -21,7 +22,7 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
    * @param executor Executor on which to receive callback events.
    * @return The new stream.
    */
-  open fun start(executor: Executor): Stream {
+  open fun start(executor: Executor = Executors.newSingleThreadExecutor()): Stream {
     val engineStream = engine.startStream(createCallbacks(executor))
     return Stream(engineStream)
   }

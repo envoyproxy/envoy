@@ -9,6 +9,7 @@ final class ReceiveDataTests: XCTestCase {
     let apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
     let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+    let assertionResponseBody = "response_body"
     let config =
     """
     static_resources:
@@ -35,7 +36,7 @@ final class ReceiveDataTests: XCTestCase {
                       direct_response:
                         status: 200
                         body:
-                          inline_string: response_body
+                          inline_string: \(assertionResponseBody)
             http_filters:
               - name: envoy.filters.http.assertion
                 typed_config:
@@ -71,7 +72,7 @@ final class ReceiveDataTests: XCTestCase {
       }
       .setOnResponseData { data, _ in
         let responseBody = String(data: data, encoding: .utf8)
-        XCTAssertEqual("response_body", responseBody)
+        XCTAssertEqual(assertionResponseBody, responseBody)
         dataExpectation.fulfill()
       }
       .setOnError { _ in
