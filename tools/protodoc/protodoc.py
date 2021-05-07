@@ -297,9 +297,9 @@ def format_header_from_file(style, source_code_info, proto_name, v2_link):
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
             style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
-        ) + "\n" + v2_link + "\n\n" + formatted_extension, stripped_comment
-    return v2_link + anchor + format_header(
-        style, proto_name) + formatted_extension, stripped_comment
+        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
+    return anchor + format_header(
+        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
