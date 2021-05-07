@@ -36,11 +36,3 @@ table.docutils div.line-block {
     padding: 2px 2px;
     border: solid #eee 1px;
 }
-
-.inline-tip,
-.inline-note,
-.inline-warning {
-    clear: none !important;
-    display: inline-block !important;
-    max-width: 50%;
-}
