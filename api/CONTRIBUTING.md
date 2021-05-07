@@ -72,7 +72,6 @@ The following are some general guidelines around documentation.
   // [#comment:TODO(mattklein123): Do something cooler]
   string foo_field = 3;
   ```
-
-* Prefer *italics* for emphasis as `backtick` emphasis is somewhat jarring in our Sphinx theme.
+* Please use *italics* (enclosed in asterisks `*emphasized word*`) for emphasis and `inline literals` for code quotation (enclosed in *double* backticks ` ``code`` `).
 * All documentation is expected to use proper English grammar with proper punctuation. If you are
   not a fluent English speaker please let us know and we will help out.

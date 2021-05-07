@@ -15,6 +15,7 @@ statistics:
    downstream_cx_http1_total, Counter, Total HTTP/1.1 connections
    downstream_cx_upgrades_total, Counter, Total successfully upgraded connections. These are also counted as total http1/http2 connections.
    downstream_cx_http2_total, Counter, Total HTTP/2 connections
+   downstream_cx_http3_total, Counter, Total HTTP/3 connections
    downstream_cx_destroy, Counter, Total connections destroyed
    downstream_cx_destroy_remote, Counter, Total connections destroyed due to remote close
    downstream_cx_destroy_local, Counter, Total connections destroyed due to local close
@@ -26,6 +27,7 @@ statistics:
    downstream_cx_http1_active, Gauge, Total active HTTP/1.1 connections
    downstream_cx_upgrades_active, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
+   downstream_cx_http3_active, Gauge, Total active HTTP/3 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_rx_bytes_total, Counter, Total bytes received
@@ -41,6 +43,7 @@ statistics:
    downstream_rq_total, Counter, Total requests
    downstream_rq_http1_total, Counter, Total HTTP/1.1 requests
    downstream_rq_http2_total, Counter, Total HTTP/2 requests
+   downstream_rq_http3_total, Counter, Total HTTP/3 requests
    downstream_rq_active, Gauge, Total active requests
    downstream_rq_response_before_rq_complete, Counter, Total responses sent before the request was complete
    downstream_rq_rx_reset, Counter, Total request resets received
@@ -142,7 +145,7 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
    rx_messaging_error, Counter, Total number of invalid received frames that violated `section 8 <https://tools.ietf.org/html/rfc7540#section-8>`_ of the HTTP/2 spec. This will result in a *tx_reset*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
    trailers, Counter, Total number of trailers seen on requests coming from downstream
-   tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
+   tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
    keepalive_timeout, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
    streams_active, Gauge, Active streams as observed by the codec
