@@ -208,6 +208,18 @@ The following table shows the available Docker images
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
+   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
+     - Release binary with symbols stripped on top of a distroless Debain base.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
+   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
+     - Release binary with symbols stripped on top of a distroless Debain base.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
    * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
      - Release binary with symbols stripped on top of a **glibc** alpine base.
      - |DOCKER_IMAGE_TAG_NAME|
@@ -252,18 +264,6 @@ The following table shows the available Docker images
      -
    * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
      - Build image which includes tools for building multi-arch Envoy and containers.
-     -
-     -
-     - See Docker Hub
-     - See Docker Hub
-   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
-     - Build image on top of distroless images.
-     -
-     -
-     - See Docker Hub
-     - See Docker Hub
-   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
-     - Build image on top of distroless images.
      -
      -
      - See Docker Hub
