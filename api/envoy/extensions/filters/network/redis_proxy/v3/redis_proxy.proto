@@ -258,8 +258,6 @@ message RedisProxy {
     // Enable hotkey feature.
     //
     // Example:
-    // .. code-block:: yaml(default)
-    //    hotkey: {}
     //
     // .. code-block:: yaml
     //    hotkey:
