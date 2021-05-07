@@ -12,8 +12,14 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
 
-Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Network::Socket& sock) {
-  return Network::Utility::getOriginalDst(sock);
+Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Network::Socket& socket) {
+  if (config_.method_ != 0) {
+    ASSERT(socket.addressProvider().localAddress() != nullptr &&
+           socket.addressProvider().localAddress()->type() == Network::Address::Type::Ip);
+    return socket.addressProvider().localAddress();
+  } else {
+    return Network::Utility::getOriginalDst(socket);
+  }
 }
 
 Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
