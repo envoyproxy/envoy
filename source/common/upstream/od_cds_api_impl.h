@@ -39,6 +39,10 @@ public:
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
 
+/**
+ * An interface used by OdCdsApiImpl for sending notifications about the missing cluster that was
+ * requested.
+ */
 class MissingClusterNotifier {
 public:
   virtual ~MissingClusterNotifier() = default;

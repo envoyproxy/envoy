@@ -86,6 +86,7 @@ envoy_cc_mock(
         ":host_set_mocks",
         ":load_balancer_context_mock",
         ":load_balancer_mocks",
+        ":missing_cluster_notifier_mocks",
         ":od_cds_api_handle_mocks",
         ":od_cds_api_mocks",
         ":priority_set_mocks",
@@ -280,6 +281,15 @@ envoy_cc_mock(
     hdrs = ["cds_api.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "missing_cluster_notifier_mocks",
+    srcs = ["missing_cluster_notifier.cc"],
+    hdrs = ["missing_cluster_notifier.h"],
+    deps = [
+        "//source/common/upstream:od_cds_api_lib",
     ],
 )
 

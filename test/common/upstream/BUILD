@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/common/upstream:od_cds_api_lib",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:missing_cluster_notifier_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

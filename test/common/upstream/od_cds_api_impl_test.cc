@@ -5,6 +5,7 @@
 #include "common/upstream/od_cds_api_impl.h"
 
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/upstream/missing_cluster_notifier.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
@@ -23,12 +24,13 @@ public:
   void SetUp() override {
     envoy::config::core::v3::ConfigSource odcds_config;
     OptRef<xds::core::v3::ResourceLocator> null_locator;
-    odcds_ = OdCdsApiImpl::create(odcds_config, null_locator, cm_, store_, validation_visitor_);
+    odcds_ = OdCdsApiImpl::create(odcds_config, null_locator, cm_, notifier_, store_, validation_visitor_);
     odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 
   NiceMock<MockClusterManager> cm_;
   Stats::IsolatedStoreImpl store_;
+  MockMissingClusterNotifier notifier_;
   OdCdsApiSharedPtr odcds_;
   Config::SubscriptionCallbacks* odcds_callbacks_ = nullptr;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
@@ -143,6 +145,30 @@ TEST_F(OdCdsApiImplTest, ValidateDuplicateClusters) {
                             EnvoyException,
                             "Error adding/updating cluster(s) duplicate_cluster: duplicate cluster "
                             "duplicate_cluster found");
+}
+
+// Check that notifier gets a message about potentially missing cluster.
+TEST_F(OdCdsApiImplTest, NotifierGetsUsed) {
+  InSequence s;
+
+  odcds_->updateOnDemand("cluster");
+  EXPECT_CALL(notifier_, notifyMissingCluster("missing_cluster"));
+  std::vector<std::string> v {"missing_cluster"};
+  Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
+  odcds_callbacks_->onConfigUpdate({}, removed, "");
+}
+
+// Check that notifier won't be used for a requested cluster that did
+// not appear in the response.
+TEST_F(OdCdsApiImplTest, NotifierNotUsed) {
+  InSequence s;
+
+  odcds_->updateOnDemand("cluster");
+  EXPECT_CALL(notifier_, notifyMissingCluster("cluster")).Times(0);
+  odcds_callbacks_->onConfigUpdate({}, {}, "");
+  odcds_callbacks_->onConfigUpdate({}, {}, "");
+  odcds_callbacks_->onConfigUpdate({}, {}, "");
+  odcds_callbacks_->onConfigUpdate({}, {}, "");
 }
 
 } // namespace
