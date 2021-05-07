@@ -62,14 +62,10 @@ EXTENSION_TEMPLATE = Template(
 
 This extension may be referenced by the qualified name ``{{extension}}``
 
-.. rst-class::  inline-note
-
 .. note::
   {{status}}
 
   {{security_posture}}
-
-.. rst-class::  inline-tip
 
 .. tip::
   This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
@@ -133,15 +129,13 @@ for _k, _v in EXTENSION_DB.items():
 
 V2_LINK_TEMPLATE = Template(
     """
-.. sidebar:: API v3
+This documentation is for the Envoy v3 API.
 
-    This documentation is for the Envoy v3 API.
+As of Envoy v1.18 the v2 API has been removed and is no longer supported.
 
-    As of Envoy v1.18 the v2 API has been removed and is no longer supported.
+If you are upgrading from v2 API config you may wish to view the v2 API documentation:
 
-    If you are upgrading from v2 API config you may wish to view the v2 API documentation:
-
-        :ref:`{{v2_text}} <{{v2_url}}>`
+    :ref:`{{v2_text}} <{{v2_url}}>`
 
 """)
 
