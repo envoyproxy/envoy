@@ -262,7 +262,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
       StatusOr<Address::InstanceConstSharedPtr> error_or_instance = Address::addressFromSockAddr(
           *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-      ASSERT(error_or_instance.ok());
+      RELEASE_ASSERT(error_or_instance.ok(), error_or_instance.status().ToString());
       ret = *error_or_instance;
       if (!isLoopbackAddress(*ret)) {
         break;
@@ -382,26 +382,15 @@ const std::string& Utility::getIpv6CidrCatchAllAddress() {
   CONSTRUCT_ON_FIRST_USE(std::string, "::/0");
 }
 
-StatusOr<Address::InstanceConstSharedPtr>
-Utility::getAddressWithPort(const Address::Instance& address, uint32_t port) {
+Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
+                                                            uint32_t port) {
   switch (address.ip()->version()) {
   case Address::IpVersion::v4:
-    return Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
-        address.ip()->addressAsString(), port);
+    return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
   case Address::IpVersion::v6:
-    return Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
-        address.ip()->addressAsString(), port);
+    return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-Address::InstanceConstSharedPtr Utility::getAddressWithPortOrThrow(const Address::Instance& address,
-                                                                   uint32_t port) {
-  StatusOr<Address::InstanceConstSharedPtr> error_or_address = getAddressWithPort(address, port);
-  if (!error_or_address.ok()) {
-    throw EnvoyException(error_or_address.status().ToString());
-  }
-  return *error_or_address;
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {

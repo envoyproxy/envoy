@@ -120,16 +120,9 @@ void LogicalDnsCluster::startResolve() {
         // not stabilize back to 0 hosts.
         if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
           info_->stats().update_success_.inc();
-          // TODO(mattklein123): Move port handling into the DNS interface.
-          ASSERT(response.front().address_ != nullptr);
-          StatusOr<Network::Address::InstanceConstSharedPtr> error_or_address =
+          Network::Address::InstanceConstSharedPtr new_address =
               Network::Utility::getAddressWithPort(*(response.front().address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
-          if (!error_or_address.ok()) {
-            ENVOY_LOG(debug, "Fail to create new address.");
-            return;
-          }
-          Network::Address::InstanceConstSharedPtr new_address = *error_or_address;
           if (!logical_host_) {
             logical_host_ =
                 std::make_shared<LogicalHost>(info_, hostname_, new_address, localityLbEndpoint(),

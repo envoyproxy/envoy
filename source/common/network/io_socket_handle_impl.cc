@@ -1,6 +1,7 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
@@ -605,7 +606,9 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   }
   StatusOr<Address::InstanceConstSharedPtr> error_or_address =
       Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
-  ASSERT(error_or_address.ok());
+  if (!error_or_address.ok()) {
+    throw EnvoyException(error_or_address.status().ToString());
+  }
   return *error_or_address;
 }
 
@@ -633,7 +636,9 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   }
   StatusOr<Address::InstanceConstSharedPtr> error_or_address =
       Address::addressFromSockAddr(ss, ss_len);
-  ASSERT(error_or_address.ok());
+  if (!error_or_address.ok()) {
+    throw EnvoyException(error_or_address.status().ToString());
+  }
   return *error_or_address;
 }
 

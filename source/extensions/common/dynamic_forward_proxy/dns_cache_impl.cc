@@ -242,10 +242,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   // If the DNS resolver successfully resolved with an empty response list, the dns cache does not
   // update. This ensures that a potentially previously resolved address does not stabilize back to
   // 0 hosts.
-  const auto new_address =
-      !response.empty() ? Network::Utility::getAddressWithPortOrThrow(*(response.front().address_),
+  const auto new_address = !response.empty()
+                               ? Network::Utility::getAddressWithPort(*(response.front().address_),
                                                                       primary_host_info->port_)
-                        : nullptr;
+                               : nullptr;
 
   if (status == Network::DnsResolver::ResolutionStatus::Failure) {
     stats_.dns_query_failure_.inc();

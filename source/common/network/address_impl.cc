@@ -149,7 +149,6 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
 
 Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  // ASSERT(Thread::MainThread::isMainThread());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -174,36 +173,6 @@ Ipv4Instance::Ipv4Instance(absl::Status&, const sockaddr_in* address,
   friendly_name_.append(ip_.friendly_address_);
   friendly_name_.push_back(':');
   friendly_name_.append(port.data(), port.size());
-}
-
-Ipv4Instance::Ipv4Instance(absl::Status& error, const std::string& address,
-                           const SocketInterface* sock_interface)
-    : Ipv4Instance(error, address, 0, sockInterfaceOrDefault(sock_interface)) {}
-
-Ipv4Instance::Ipv4Instance(absl::Status& error, const std::string& address, uint32_t port,
-                           const SocketInterface* sock_interface)
-    : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
-  ip_.ipv4_.address_.sin_family = AF_INET;
-  ip_.ipv4_.address_.sin_port = htons(port);
-  int rc = inet_pton(AF_INET, address.c_str(), &ip_.ipv4_.address_.sin_addr);
-  if (1 != rc) {
-    // Invalid ipv4 address, return.
-    error = absl::InvalidArgumentError(fmt::format("invalid ipv4 address '{}'", address));
-    return;
-  }
-  friendly_name_ = absl::StrCat(address, ":", port);
-  ip_.friendly_address_ = address;
-}
-
-Ipv4Instance::Ipv4Instance(absl::Status&, uint32_t port, const SocketInterface* sock_interface)
-    : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
-  ip_.ipv4_.address_.sin_family = AF_INET;
-  ip_.ipv4_.address_.sin_port = htons(port);
-  ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
-  friendly_name_ = absl::StrCat("0.0.0.0:", port);
-  ip_.friendly_address_ = "0.0.0.0";
 }
 
 bool Ipv4Instance::operator==(const Instance& rhs) const {
@@ -267,7 +236,6 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  // ASSERT(Thread::MainThread::isMainThread());
   ip_.ipv6_.address_ = address;
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   ip_.ipv6_.v6only_ = v6only;
@@ -283,7 +251,6 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  // ASSERT(Thread::MainThread::isMainThread());
   ip_.ipv6_.address_.sin6_family = AF_INET6;
   ip_.ipv6_.address_.sin6_port = htons(port);
   if (!address.empty()) {
@@ -353,33 +320,6 @@ Ipv6Instance::Ipv6Instance(absl::Status&, const sockaddr_in6& address, bool v6on
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
 }
 
-Ipv6Instance::Ipv6Instance(absl::Status& error, const std::string& address,
-                           const SocketInterface* sock_interface)
-    : Ipv6Instance(error, address, 0, sockInterfaceOrDefault(sock_interface)) {}
-
-Ipv6Instance::Ipv6Instance(absl::Status& error, const std::string& address, uint32_t port,
-                           const SocketInterface* sock_interface)
-    : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  ip_.ipv6_.address_.sin6_family = AF_INET6;
-  ip_.ipv6_.address_.sin6_port = htons(port);
-  if (!address.empty()) {
-    if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
-      // Invalid ipv6 address return.
-      error = absl::InvalidArgumentError(fmt::format("invalid ipv6 address '{}'", address));
-      return;
-    }
-  } else {
-    ip_.ipv6_.address_.sin6_addr = in6addr_any;
-  }
-  // Just in case address is in a non-canonical format, format from network address.
-  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
-  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
-}
-
-Ipv6Instance::Ipv6Instance(absl::Status& error, uint32_t port,
-                           const SocketInterface* sock_interface)
-    : Ipv6Instance(error, "", port, sockInterfaceOrDefault(sock_interface)) {}
-
 PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
@@ -447,54 +387,6 @@ PipeInstance::PipeInstance(absl::Status& error, const sockaddr_un* address, sock
         absl::string_view(pipe_.address_.sun_path, pipe_.address_length_));
   } else {
     friendly_name_ = address->sun_path;
-  }
-  pipe_.mode_ = mode;
-}
-
-PipeInstance::PipeInstance(absl::Status& error, const std::string& pipe_path, mode_t mode,
-                           const SocketInterface* sock_interface)
-    : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
-  if (pipe_path.size() >= sizeof(pipe_.address_.sun_path)) {
-    error = absl::InvalidArgumentError(
-        fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
-                    sizeof(pipe_.address_.sun_path)));
-    return;
-  }
-  memset(&pipe_.address_, 0, sizeof(pipe_.address_));
-  pipe_.address_.sun_family = AF_UNIX;
-  if (pipe_path[0] == '@') {
-    // This indicates an abstract namespace.
-    // In this case, null bytes in the name have no special significance, and so we copy all
-    // characters of pipe_path to sun_path, including null bytes in the name. The pathname must also
-    // be null terminated. The friendly name is the address path with embedded nulls replaced with
-    // '@' for consistency with the first character.
-#if !defined(__linux__)
-    error = absl::FailedPreconditionError("Abstract AF_UNIX sockets are only supported on linux.");
-    return;
-#endif
-    if (mode != 0) {
-      error = absl::InvalidArgumentError("Cannot set mode for Abstract AF_UNIX sockets");
-      return;
-    }
-    pipe_.abstract_namespace_ = true;
-    pipe_.address_length_ = pipe_path.size();
-    // The following statement is safe since pipe_path size was checked at the beginning of this
-    // function
-    memcpy(&pipe_.address_.sun_path[0], pipe_path.data(), pipe_path.size()); // NOLINT(safe-memcpy)
-    pipe_.address_.sun_path[0] = '\0';
-    pipe_.address_.sun_path[pipe_path.size()] = '\0';
-    friendly_name_ = friendlyNameFromAbstractPath(
-        absl::string_view(pipe_.address_.sun_path, pipe_.address_length_));
-  } else {
-    // Reports an error if the pipe path has an embedded null character.
-    if (pipe_path.size() != strlen(pipe_path.c_str())) {
-      error = absl::InvalidArgumentError(
-          "UNIX domain socket pathname contains embedded null characters");
-      return;
-    }
-    StringUtil::strlcpy(&pipe_.address_.sun_path[0], pipe_path.c_str(),
-                        sizeof(pipe_.address_.sun_path));
-    friendly_name_ = pipe_.address_.sun_path;
   }
   pipe_.mode_ = mode;
 }

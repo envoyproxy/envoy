@@ -531,6 +531,18 @@ public:
                               });
   }
 
+  template <typename T>
+  ActiveDnsQuery* resolveWithException(const std::string& address,
+                                       const DnsLookupFamily lookup_family, T exception_object) {
+    return resolver_->resolve(address, lookup_family,
+                              [exception_object](DnsResolver::ResolutionStatus status,
+                                                 std::list<DnsResponse>&& results) -> void {
+                                UNREFERENCED_PARAMETER(status);
+                                UNREFERENCED_PARAMETER(results);
+                                throw exception_object;
+                              });
+  }
+
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zeroTimeout() const { return false; }
@@ -646,6 +658,24 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
                                              DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Validate exception behavior during c-ares callbacks.
+TEST_P(DnsImplTest, CallbackException) {
+  // Force immediate resolution, which will trigger a c-ares exception unsafe
+  // state providing regression coverage for #4307.
+  EXPECT_EQ(nullptr, resolveWithException<EnvoyException>("1.2.3.4", DnsLookupFamily::V4Only,
+                                                          EnvoyException("Envoy exception")));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "Envoy exception");
+  EXPECT_EQ(nullptr, resolveWithException<std::runtime_error>("1.2.3.4", DnsLookupFamily::V4Only,
+                                                              std::runtime_error("runtime error")));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "runtime error");
+  EXPECT_EQ(nullptr,
+            resolveWithException<std::string>("1.2.3.4", DnsLookupFamily::V4Only, std::string()));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "unknown");
 }
 
 // Validate that the c-ares channel is destroyed and re-initialized when c-ares returns

@@ -27,7 +27,7 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
                                                 ? sizeof(sockaddr_in)
                                                 : sizeof(sockaddr_in6),
                                             false);
-  ASSERT(error_or_instance.ok());
+  RELEASE_ASSERT(error_or_instance.ok(), error_or_instance.status().ToString());
   return *error_or_instance;
 }
 

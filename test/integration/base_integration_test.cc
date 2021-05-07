@@ -556,7 +556,7 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
     try {
-      Network::TcpListenSocket(Network::Utility::getAddressWithPortOrThrow(
+      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
                                    *Network::Test::getCanonicalLoopbackAddress(version_), port),
                                nullptr, true);
       return AssertionSuccess();

@@ -144,25 +144,6 @@ private:
   explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr);
 
-  /**
-   * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
-   */
-  explicit Ipv4Instance(absl::Status& error, const std::string& address,
-                        const SocketInterface* sock_interface = nullptr);
-
-  /**
-   * Construct from a string IPv4 address such as "1.2.3.4" as well as a port.
-   */
-  Ipv4Instance(absl::Status& error, const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
-
-  /**
-   * Construct from a port. The IPv4 address will be set to "any" and is suitable for binding
-   * a port to any available address.
-   */
-  explicit Ipv4Instance(absl::Status& error, uint32_t port,
-                        const SocketInterface* sock_interface = nullptr);
-
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
 
@@ -238,25 +219,6 @@ private:
    */
   Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
                const SocketInterface* sock_interface = nullptr);
-
-  /**
-   * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
-   */
-  explicit Ipv6Instance(absl::Status& error, const std::string& address,
-                        const SocketInterface* sock_interface = nullptr);
-
-  /**
-   * Construct from a string IPv6 address such as "12:34::5" as well as a port.
-   */
-  Ipv6Instance(absl::Status& error, const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
-
-  /**
-   * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
-   * a port to any available address.
-   */
-  explicit Ipv6Instance(absl::Status& error, uint32_t port,
-                        const SocketInterface* sock_interface = nullptr);
 
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
@@ -336,11 +298,6 @@ private:
   explicit PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len,
                         mode_t mode = 0, const SocketInterface* sock_interface = nullptr);
 
-  /**
-   * Construct from a string pipe path.
-   */
-  explicit PipeInstance(absl::Status& error, const std::string& pipe_path, mode_t mode = 0,
-                        const SocketInterface* sock_interface = nullptr);
   struct PipeHelper : public Pipe {
 
     bool abstractNamespace() const override { return abstract_namespace_; }

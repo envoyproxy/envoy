@@ -131,13 +131,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             // for SRV.
 
             ASSERT(resp.address_ != nullptr);
-            StatusOr<Network::Address::InstanceConstSharedPtr> error_or_address =
+            Network::Address::InstanceConstSharedPtr new_address =
                 Network::Utility::getAddressWithPort(*(resp.address_), port_);
-            if (!error_or_address.ok()) {
-              ENVOY_LOG(debug, "Fail to create new address.");
-              return;
-            }
-            Network::Address::InstanceConstSharedPtr new_address = *error_or_address;
             new_hosts.emplace_back(new HostImpl(
                 parent_.info_, hostname_, new_address,
                 // TODO(zyfjeff): Created through metadata shared pool

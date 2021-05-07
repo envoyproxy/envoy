@@ -88,7 +88,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     } else {
       StatusOr<Address::InstanceConstSharedPtr> error_or_address = Address::addressFromSockAddr(
           remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
-      ASSERT(error_or_address.ok());
+      RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
       remote_address = *error_or_address;
     }
 
