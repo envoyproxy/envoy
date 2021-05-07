@@ -22,7 +22,7 @@ Downstream Envoy HTTP/3 support can be turned up via adding
 :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` and
 ensuring the downstream transport socket is a QuicDownstreamTransport.
 
-See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.yaml1>` for example configuration.
+See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.yaml>` for example configuration.
 
 Note that the example configuration includes both a TCP and a UDP listener, and the TCP
 listener is advertising http/3 support via an ``alt-svc header``. Advertising HTTP/3 is not necessary for
@@ -30,7 +30,7 @@ in-house deployments where HTTP/3 is explicitly configured, but is needed for in
 where TCP is the default, and clients such as Chrome will only attempt HTTP/3 if it is explicitly advertised.
 
 By default the example configuration uses kernel UDP support, but for production performance use of
-BPF is strongly advised if Envoy is running with multiple worker threads. Envoy will attepmt to
+BPF is strongly advised if Envoy is running with multiple worker threads. Envoy will attempt to
 use BPF on Linux by default if multiple worker threads are configured, but may require root, or at least
 sudo-with-permissions (e.g. sudo setcap cap_bpf+ep). If multiple worker threads are configured, Envoy will
 log a warning on start-up if BPF is unsupported on the platform, or is attempted and fails.
