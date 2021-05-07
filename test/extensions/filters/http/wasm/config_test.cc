@@ -842,7 +842,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
   EXPECT_CALL(decoder_callbacks,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")));
+                             testing::Eq("wasm_fail_stream"),
+                             _));
   EXPECT_EQ(context->onRequestHeaders(10, false),
             proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark);
 }
