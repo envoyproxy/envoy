@@ -260,12 +260,14 @@ message RedisProxy {
     // Example:
     //
     // .. code-block:: yaml
+    //
     //    hotkey:
     //      cache_type: LFU
     //      cache_capacity: 32
     //      collect_dispatch_interval: 5s
     //      attenuate_dispatch_interval: 30s
     //      attenuate_cache_interval: 60s
+    //
     HotKey hotkey = 1;
   }
 
@@ -366,9 +368,12 @@ message RedisProxy {
   // Enable some extra features.
   //
   // Example:
+  //
   // .. code-block:: yaml
+  //
   //    feature_config:
   //      hotkey: {}
+  //
   FeatureConfig feature_config = 9;
 }
 

@@ -17,11 +17,14 @@ TEST(FeatureConfigTest, Constructor) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig feature_config;
-  feature_config.mutable_hotkey();
-  FeatureConfigSharedPtr feature =
+  FeatureConfigSharedPtr feature_no_hotkey =
       std::make_shared<FeatureConfig>(feature_config, *dispatcher, "", store);
+  EXPECT_EQ(false, bool(feature_no_hotkey->hotkeyCollector()));
 
-  EXPECT_EQ(true, bool(feature->hotkeyCollector()));
+  feature_config.mutable_hotkey();
+  FeatureConfigSharedPtr feature_with_hotkey =
+      std::make_shared<FeatureConfig>(feature_config, *dispatcher, "", store);
+  EXPECT_EQ(true, bool(feature_with_hotkey->hotkeyCollector()));
 }
 
 } // namespace Feature
