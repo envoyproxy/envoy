@@ -168,6 +168,9 @@ public:
   ~RedisProxyFilterTest() override {
     filter_.reset();
     for (const Stats::GaugeSharedPtr& gauge : store_.gauges()) {
+      if (gauge->name().compare("redis.foo.feature.hotkey.collector.draining_counter") == 0) {
+        continue;
+      }
       EXPECT_EQ(0U, gauge->value());
     }
   }
