@@ -27,7 +27,7 @@ if is_windows; then
   BUILD_DIR_MOUNT_DEST=C:/build
   SOURCE_DIR=$(echo "${PWD}" | sed -E "s#^/([a-zA-Z])/#\1:/#")
   SOURCE_DIR_MOUNT_DEST=C:/source
-  START_COMMAND=("bash" "-c" "cd source && $*")
+  START_COMMAND=("bash" "-c" "cd /c/source && export HOME=/c/build && $*")
 else
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-ubuntu"
   # We run as root and later drop permissions. This is required to setup the USER

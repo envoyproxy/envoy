@@ -362,10 +362,16 @@ public:
    *
    * @param lhs JSON string on LHS.
    * @param rhs JSON string on RHS.
+   * @param support_root_array Whether to support parsing JSON arrays.
    * @return bool indicating whether the JSON strings are equal.
    */
-  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs) {
-    return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
+                              bool support_root_array = false) {
+    if (!support_root_array) {
+      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+    }
+
+    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
   }
 
   /**
@@ -637,6 +643,15 @@ public:
   static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
     ProtobufWkt::Struct message;
     MessageUtil::loadFromJson(json, message);
+    return message;
+  }
+
+  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
+    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
+    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
+
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(root_message, message);
     return message;
   }
 

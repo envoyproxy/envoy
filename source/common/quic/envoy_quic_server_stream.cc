@@ -45,7 +45,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {
-  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+  ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
+         "Send buffer limit should be larger than 8KB.");
 }
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(
@@ -113,7 +114,8 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
-  // TODO(danzh): add stats for metadata not supported error.
+  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
+  stats_.metadata_not_supported_error_.inc();
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
@@ -128,13 +130,16 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
   }
 }
 
-void EnvoyQuicServerStream::switchStreamBlockState(bool should_block) {
-  ASSERT(FinishedReadingHeaders(),
-         "Upperstream buffer limit is reached before request body is delivered.");
-  if (should_block) {
+void EnvoyQuicServerStream::switchStreamBlockState() {
+  // From when the callback got scheduled till now, readDisable() might have blocked and unblocked
+  // the stream multiple times, but those actions haven't taken any effect yet, and only the last
+  // state of read_disable_counter_ determines whether to unblock or block the quic stream.
+  // Unlike Envoy readDisable() the quic stream gets blocked/unblocked based on the most recent
+  // call. So a stream will be blocked upon SetBlockedUntilFlush() no matter how many times
+  // SetUnblocked() was called before, and vice versa.
+  if (read_disable_counter_ > 0) {
     sequencer()->SetBlockedUntilFlush();
   } else {
-    ASSERT(read_disable_counter_ == 0, "readDisable called in between.");
     sequencer()->SetUnblocked();
   }
 }
@@ -157,7 +162,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
-      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list, *this);
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_);
     return;
@@ -174,12 +180,9 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
-  ASSERT(read_disable_counter_ == 0);
-  ASSERT(!in_decode_data_callstack_);
   if (read_side_closed()) {
     return;
   }
-  in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
@@ -209,12 +212,6 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
-    in_decode_data_callstack_ = false;
-    if (read_disable_counter_ > 0) {
-      // If readDisable() was ever called during decodeData() and it meant to disable
-      // reading from downstream, the call must have been deferred. Call it now.
-      switchStreamBlockState(true);
-    }
     return;
   }
 
@@ -223,7 +220,6 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   maybeDecodeTrailers();
 
   OnFinRead();
-  in_decode_data_callstack_ = false;
 }
 
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
@@ -249,6 +245,11 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
+      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+      onStreamError(close_connection_upon_invalid_header_);
+      return;
+    }
     request_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();

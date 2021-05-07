@@ -118,11 +118,19 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 } // namespace Http2
 namespace Http3 {
 namespace Utility {
+
+// Limits and defaults for `envoy::config::core::v3::Http3ProtocolOptions` protos.
+struct OptionsLimits {
+  // The same as kStreamReceiveWindowLimit in QUICHE which is the maximum supported by QUICHE.
+  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 16 * 1024 * 1024;
+  // The same as kSessionReceiveWindowLimit in QUICHE which is the maximum supported by QUICHE.
+  static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 24 * 1024 * 1024;
+};
+
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error);
-
 } // namespace Utility
 } // namespace Http3
 namespace Http {

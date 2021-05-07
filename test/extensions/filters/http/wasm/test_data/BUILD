@@ -49,6 +49,15 @@ wasm_rust_binary(
 )
 
 wasm_rust_binary(
+    name = "panic_rust.wasm",
+    srcs = ["panic_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+    ],
+)
+
+wasm_rust_binary(
     name = "resume_call_rust.wasm",
     srcs = ["resume_call_rust.rs"],
     deps = [
@@ -80,6 +89,7 @@ envoy_cc_library(
     srcs = [
         "test_async_call_cpp.cc",
         "test_body_cpp.cc",
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_cpp_null_plugin.cc",
         "test_grpc_call_cpp.cc",
@@ -107,9 +117,11 @@ envoy_wasm_cc_binary(
     srcs = [
         "test_async_call_cpp.cc",
         "test_body_cpp.cc",
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_grpc_call_cpp.cc",
         "test_grpc_stream_cpp.cc",
+        "test_panic_cpp.cc",
         "test_resume_call_cpp.cc",
         "test_shared_data_cpp.cc",
         "test_shared_queue_cpp.cc",

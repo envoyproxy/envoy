@@ -40,7 +40,8 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options) {
-  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+  ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
+         "Send buffer limit should be larger than 8KB.");
 }
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(
@@ -105,19 +106,25 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
 }
 
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-  // Metadata Frame is not supported in QUIC.
-  // TODO(danzh): add stats for metadata not supported error.
+  // Metadata Frame is not supported in QUICHE.
+  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
+  stats_.metadata_not_supported_error_.inc();
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
   Reset(envoyResetReasonToQuicRstError(reason));
 }
 
-void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
-  if (should_block) {
+void EnvoyQuicClientStream::switchStreamBlockState() {
+  // From when the callback got scheduled till now, readDisable() might have blocked and unblocked
+  // the stream multiple times, but those actions haven't taken any effect yet, and only the last
+  // state of read_disable_counter_ determines whether to unblock or block the quic stream. Unlike
+  // Envoy readDisable() the quic stream gets blocked/unblocked based on the most recent call. So a
+  // stream will be blocked upon SetBlockedUntilFlush() no matter how many times SetUnblocked() was
+  // called before, and vice versa.
+  if (read_disable_counter_ > 0) {
     sequencer()->SetBlockedUntilFlush();
   } else {
-    ASSERT(read_disable_counter_ == 0, "readDisable called in between.");
     sequencer()->SetUnblocked();
   }
 }
@@ -129,7 +136,8 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   if (!headers_decompressed() || header_list.empty()) {
-    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
+                  quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
 
@@ -138,16 +146,18 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
-      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list, *this);
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
   if (headers == nullptr) {
-    onStreamError(close_connection_upon_invalid_header_);
+    onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
     return;
   }
   const absl::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusNoThrow(*headers);
   if (!optional_status.has_value()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
-    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value());
+    onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
+                  quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
   const uint64_t status = optional_status.value();
@@ -176,12 +186,9 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 
 void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
-  ASSERT(read_disable_counter_ == 0);
-  ASSERT(!in_decode_data_callstack_);
   if (read_side_closed()) {
     return;
   }
-  in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
@@ -210,12 +217,6 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
-    in_decode_data_callstack_ = false;
-    if (read_disable_counter_ > 0) {
-      // If readDisable() was ever called during decodeData() and it meant to disable
-      // reading from downstream, the call must have been deferred. Call it now.
-      switchStreamBlockState(true);
-    }
     return;
   }
 
@@ -224,7 +225,6 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   maybeDecodeTrailers();
 
   OnFinRead();
-  in_decode_data_callstack_ = false;
 }
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
@@ -244,6 +244,11 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
+      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+      onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+      return;
+    }
     response_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
@@ -304,7 +309,8 @@ QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection(
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
 }
 
-void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection) {
+void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,
+                                          quic::QuicRstStreamErrorCode rst_code) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
@@ -318,7 +324,7 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
   if (close_connection_upon_invalid_header) {
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
   } else {
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    Reset(rst_code);
   }
 }
 
