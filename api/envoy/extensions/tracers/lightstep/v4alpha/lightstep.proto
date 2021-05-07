@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.tracers.lightstep.v4alpha;
 
+import "envoy/config/core/v4alpha/base.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -34,12 +36,15 @@ message LightstepConfig {
     TRACE_CONTEXT = 3;
   }
 
+  reserved 2;
+
+  reserved "access_token_file";
+
   // The cluster manager cluster that hosts the LightStep collectors.
   string collector_cluster = 1 [(validate.rules).string = {min_len: 1}];
 
-  // File containing the access token to the `LightStep
-  // <https://lightstep.com/>`_ API.
-  string access_token_file = 2 [(validate.rules).string = {min_len: 1}];
+  // Access token to the `LightStep <https://lightstep.com/>`_ API.
+  config.core.v4alpha.DataSource access_token = 4;
 
   // Propagation modes to use by LightStep's tracer.
   repeated PropagationMode propagation_modes = 3
