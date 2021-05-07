@@ -139,6 +139,7 @@ TEST_F(AppleDnsImplTest, DestructPending) {
 TEST_F(AppleDnsImplTest, LocalLookup) {
   EXPECT_NE(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
@@ -398,37 +399,6 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
                                  dns_callback_executed.Notify();
                                }));
   dns_callback_executed.WaitForNotification();
-}
-
-TEST_F(AppleDnsImplFakeApiTest, IncorrectInterfaceIndexReturned) {
-  createResolver();
-
-  const std::string hostname = "foo.com";
-  sockaddr_in addr4;
-  addr4.sin_family = AF_INET;
-  EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
-  addr4.sin_port = htons(6502);
-
-  Network::Address::Ipv4Instance address(&addr4);
-
-  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
-  EXPECT_CALL(dns_service_,
-              dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
-                                    kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
-                                    StrEq(hostname.c_str()), _, _))
-      .WillOnce(DoAll(
-          // Have the API call synchronously call the provided callback. Notice the incorrect
-          // interface_index "2". This will cause an assertion failure.
-          WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
-            EXPECT_DEATH(callback(nullptr, kDNSServiceFlagsAdd, 2, kDNSServiceErr_NoError,
-                                  hostname.c_str(), address.sockAddr(), 30, context),
-                         "unexpected interface_index=2");
-          })),
-          Return(kDNSServiceErr_NoError)));
-
-  resolver_->resolve(
-      hostname, Network::DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void { FAIL(); });
 }
 
 TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithError) {
