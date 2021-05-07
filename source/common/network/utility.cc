@@ -136,7 +136,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::
     sa4.sin_port = htons(port);
     StatusOr<Address::InstanceConstSharedPtr> error_or_address =
         Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4);
-    ASSERT(error_or_address.ok());
+    RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
     return *error_or_address;
   }
   sockaddr_in6 sa6;
@@ -146,7 +146,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::
     sa6.sin6_port = htons(port);
     StatusOr<Address::InstanceConstSharedPtr> error_or_address =
         Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only);
-    ASSERT(error_or_address.ok());
+    RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
     return *error_or_address;
   }
   return nullptr;
@@ -188,7 +188,7 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     sa6.sin6_port = htons(port64);
     StatusOr<Address::InstanceConstSharedPtr> error_or_address =
         Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only);
-    ASSERT(error_or_address.ok());
+    RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
     return *error_or_address;
   }
   // Treat it as an IPv4 address followed by a port.
@@ -211,7 +211,7 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   sa4.sin_port = htons(port64);
   StatusOr<Address::InstanceConstSharedPtr> error_or_address =
       Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4);
-  ASSERT(error_or_address.ok());
+  RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
   return *error_or_address;
 }
 
