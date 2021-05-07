@@ -748,11 +748,9 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
 
   EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
 
-  // Trigger another flush after the first one finished. This should go through an no drops should be
-  // recorded.
-  server_->dispatcher().post([&] {
-    server_->flushStats();
-  });
+  // Trigger another flush after the first one finished. This should go through an no drops should
+  // be recorded.
+  server_->dispatcher().post([&] { server_->flushStats(); });
 
   server_->dispatcher().post([&] { stats_store_.merge_cb_(); });
 
