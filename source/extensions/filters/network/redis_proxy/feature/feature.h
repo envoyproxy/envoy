@@ -16,6 +16,7 @@ public:
   FeatureConfig(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig& config,
       Event::Dispatcher& dispatcher, const std::string& prefix, Stats::Scope& scope);
+  ~FeatureConfig() = default;
 
   HotKey::HotKeyCollectorSharedPtr hotkeyCollector() const { return hk_collector_; }
 

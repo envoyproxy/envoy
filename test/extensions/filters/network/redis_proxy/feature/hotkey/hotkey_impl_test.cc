@@ -13,7 +13,17 @@ namespace RedisProxy {
 namespace Feature {
 namespace HotKey {
 
-TEST(HotKeyCounterTest, Name) {
+class HotKeyCounterTest : public testing::Test {
+public:
+  void test_incr_try_lock_failed(const HotKeyCounterSharedPtr& hk_counter, const std::string& key) {
+    {
+      Thread::LockGuard lock_guard(hk_counter->hotkey_cache_mutex_);
+      hk_counter->incr(key);
+    }
+  }
+};
+
+TEST_F(HotKeyCounterTest, Name) {
   HotKeyCounterSharedPtr hk_counter =
       std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
                                           RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
@@ -22,7 +32,7 @@ TEST(HotKeyCounterTest, Name) {
             fmt::format("{}_HotKeyCounter", static_cast<void*>(hk_counter.get())));
 }
 
-TEST(HotKeyCounterTest, GetHotKeys) {
+TEST_F(HotKeyCounterTest, GetHotKeys) {
   HotKeyCounterSharedPtr hk_counter =
       std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
                                           RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
@@ -38,7 +48,7 @@ TEST(HotKeyCounterTest, GetHotKeys) {
   cache.clear();
 }
 
-TEST(HotKeyCounterTest, Reset) {
+TEST_F(HotKeyCounterTest, Reset) {
   HotKeyCounterSharedPtr hk_counter =
       std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
                                           RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
@@ -59,13 +69,18 @@ TEST(HotKeyCounterTest, Reset) {
   cache.clear();
 }
 
-TEST(HotKeyCounterTest, Incr) {
+TEST_F(HotKeyCounterTest, Incr) {
   HotKeyCounterSharedPtr hk_counter =
       std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
                                           RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
                                       2);
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
+
+  test_incr_try_lock_failed(hk_counter, test_key_1);
+  hk_counter->getHotKeys(cache);
+  EXPECT_EQ(0, cache.size());
+  cache.clear();
 
   hk_counter->incr(test_key_1);
   hk_counter->getHotKeys(cache);

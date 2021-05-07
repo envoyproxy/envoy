@@ -19,12 +19,15 @@ TEST(FeatureConfigTest, Constructor) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig feature_config;
   FeatureConfigSharedPtr feature_no_hotkey =
       std::make_shared<FeatureConfig>(feature_config, *dispatcher, "", store);
-  EXPECT_EQ(false, bool(feature_no_hotkey->hotkeyCollector()));
+  HotKey::HotKeyCollectorSharedPtr hk_collector_no_hotkey = feature_no_hotkey->hotkeyCollector();
+  EXPECT_EQ(false, bool(hk_collector_no_hotkey));
 
   feature_config.mutable_hotkey();
   FeatureConfigSharedPtr feature_with_hotkey =
       std::make_shared<FeatureConfig>(feature_config, *dispatcher, "", store);
-  EXPECT_EQ(true, bool(feature_with_hotkey->hotkeyCollector()));
+  HotKey::HotKeyCollectorSharedPtr hk_collector_with_hotkey =
+      feature_with_hotkey->hotkeyCollector();
+  EXPECT_EQ(true, bool(hk_collector_with_hotkey));
 }
 
 } // namespace Feature

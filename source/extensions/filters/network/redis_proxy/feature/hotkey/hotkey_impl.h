@@ -21,6 +21,8 @@ namespace Feature {
 namespace HotKey {
 
 class HotKeyCounter {
+  friend class HotKeyCounterTest;
+
 public:
   HotKeyCounter(const envoy::extensions::filters::network::redis_proxy::v3::
                     RedisProxy_FeatureConfig_HotKey::CacheType& hotkey_cache_type,

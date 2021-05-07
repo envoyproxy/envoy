@@ -16,7 +16,7 @@ class LFUCache;
 } // namespace LFUCache
 
 class Cache {
-  friend LFUCache::LFUCache;
+  friend class LFUCache::LFUCache;
 
 public:
   Cache(const uint8_t& capacity, const uint8_t& warming_capacity = 5)
