@@ -58,9 +58,9 @@ The route specific configuration:
         typed_per_filter_config:
           envoy.filters.http.bandwidth_limit:
             "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
-			enable_mode: DecodeAndEncode
-			limit_kbps: 500
-			fill_interval: 100
+            enable_mode: DecodeAndEncode
+            limit_kbps: 500
+            fill_interval: 100
       - match: { prefix: "/" }
         route: { cluster: default_service }
 
