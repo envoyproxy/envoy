@@ -9,20 +9,11 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "hotkey_interface",
-    hdrs = ["hotkey_impl.h"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_factory_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "hotkey_lib",
     srcs = ["hotkey_impl.cc"],
     hdrs = ["hotkey_impl.h"],
     deps = [
-        ":hotkey_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//source/common/common:thread_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_factory_lib",
