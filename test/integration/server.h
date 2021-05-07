@@ -373,7 +373,9 @@ public:
   void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
-  void mergeHistograms(PostMergeCb) override {}
+  void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }
+
+  PostMergeCb merge_cb_;
 
 private:
   mutable Thread::MutexBasicLockable lock_;

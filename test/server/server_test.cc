@@ -727,21 +727,39 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
     });
     initialize("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", false, hooks);
     server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
   });
 
   workers_started_fired.WaitForNotification();
   EXPECT_TRUE(workers_started);
 
+  // Flush three times in a row. Two of these should get dropped.
   server_->dispatcher().post([&] {
     server_->flushStats();
     server_->flushStats();
     server_->flushStats();
   });
 
-  // The test store doesn't actually ever trigger the actual flush after the init stage, but this
-  // verifies that we're hitting the right code path at the very least.
-  ASSERT_TRUE(TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2,
-                                            time_system_, std::chrono::seconds(2)));
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+
+  server_->dispatcher().post([&] { stats_store_.merge_cb_(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+
+  // Trigger another flush after the first one finished. This should go through an no drops should be
+  // recorded.
+  server_->dispatcher().post([&] {
+    server_->flushStats();
+  });
+
+  server_->dispatcher().post([&] { stats_store_.merge_cb_(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
+
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
