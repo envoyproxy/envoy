@@ -499,6 +499,7 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   AllocatorImpl heap_allocator_;
+  OptRef<ThreadLocal::Instance> tls_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;

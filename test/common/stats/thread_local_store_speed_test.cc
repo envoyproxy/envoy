@@ -37,9 +37,11 @@ public:
     for (auto& stat_name_storage : stat_names_) {
       stat_name_storage->free(symbol_table_);
     }
-    store_.shutdownThreading();
     if (tls_) {
       tls_->shutdownGlobalThreading();
+    }
+    store_.shutdownThreading();
+    if (tls_) {
       tls_->shutdownThread();
     }
     if (dispatcher_) {
