@@ -536,6 +536,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*decoder_filter, onLocalReply(_));
     EXPECT_CALL(*stream_filter, onLocalReply(_));
     EXPECT_CALL(*encoder_filter, onLocalReply(_));
+    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty());
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                                absl::nullopt, "details");

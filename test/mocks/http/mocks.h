@@ -309,6 +309,8 @@ public:
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, setEncoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
+  MOCK_METHOD(void, restoreContextOnContinue,
+              (std::vector<std::reference_wrapper<const ScopeTrackedObject>>&));
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
