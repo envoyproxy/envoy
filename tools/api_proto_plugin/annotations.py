@@ -16,8 +16,8 @@ EXTENSION_CATEGORY_ANNOTATION = 'extension-category'
 # envoy.filters.network.http_connection_manager.
 EXTENSION_ANNOTATION = 'extension'
 
-# Used to mark something as experimental, excluding it from the security posture.
-EXPERIMENTAL_ANNOTATION = 'experimental'
+# Used to mark something as alpha, excluding it from the threat model.
+ALPHA_ANNOTATION = 'alpha'
 
 # Not implemented yet annotation on leading comments, leading to hiding of
 # field.
@@ -36,7 +36,7 @@ COMMENT_ANNOTATION = 'comment'
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
     EXTENSION_ANNOTATION,
-    EXPERIMENTAL_ANNOTATION,
+    ALPHA_ANNOTATION,
     EXTENSION_CATEGORY_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
     NEXT_FREE_FIELD_ANNOTATION,
