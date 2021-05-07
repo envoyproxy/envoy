@@ -20,23 +20,24 @@ public:
 
   // AlternateProtocolsCacheManager
   AlternateProtocolsCacheSharedPtr
-  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) override;
+  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options) override;
 
 private:
-  struct ActiveCache {
-    ActiveCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
+  // Contains a cache and the options associated with it.
+  struct CacheWithOptions {
+    CacheWithOptions(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
                 AlternateProtocolsCacheSharedPtr cache)
-        : config_(config), cache_(cache) {}
+        : options_(options), cache_(cache) {}
 
-    const envoy::config::core::v3::AlternateProtocolsCacheOptions& config_;
+    const envoy::config::core::v3::AlternateProtocolsCacheOptions& options_;
     AlternateProtocolsCacheSharedPtr cache_;
   };
 
   TimeSource& time_source_;
   ThreadLocal::Instance& tls_;
 
-  // Map from config name to active cache for that config.
-  absl::flat_hash_map<std::string, ActiveCache> caches_;
+  // Map from config name to cache for that config.
+  absl::flat_hash_map<std::string, CacheWithOptions> caches_;
 };
 
 class AlternateProtocolsCacheManagerFactoryImpl : public AlternateProtocolsCacheManagerFactory {

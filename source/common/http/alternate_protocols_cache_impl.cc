@@ -35,6 +35,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
 
   const Entry& entry = entry_it->second;
   if (time_source_.monotonicTime() > entry.expiration_) {
+    // TODO(RyanTheOptimist): expire entries based on a timer.
     // Expire the entry.
     state.protocols_.erase(entry_it);
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);

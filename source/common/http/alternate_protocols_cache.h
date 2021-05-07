@@ -105,7 +105,7 @@ public:
   virtual ~AlternateProtocolsCacheManager() = default;
 
   /**
-   * Get a alternate protocols cache.
+   * Get an alternate protocols cache.
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
@@ -123,7 +123,7 @@ public:
   virtual ~AlternateProtocolsCacheManagerFactory() = default;
 
   /**
-   * Get a DNS cache manager.
+   * Get the alternate protocols cache manager.
    */
   virtual AlternateProtocolsCacheManagerSharedPtr get() PURE;
 };

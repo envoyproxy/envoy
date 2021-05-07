@@ -171,8 +171,6 @@ envoy_cc_library(
         "alternate_protocols_cache_manager_impl.h",
     ],
     deps = [
-        "//include/envoy/common:backoff_strategy_interface",
-        "//include/envoy/common:random_generator_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",

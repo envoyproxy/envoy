@@ -11,13 +11,13 @@ namespace Http {
 SINGLETON_MANAGER_REGISTRATION(alternate_protocols_cache_manager);
 
 AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
-    const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) {
-  const auto& existing_cache = caches_.find(config.name());
+    const envoy::config::core::v3::AlternateProtocolsCacheOptions& options) {
+  const auto& existing_cache = caches_.find(options.name());
   if (existing_cache != caches_.end()) {
-    if (!Protobuf::util::MessageDifferencer::Equivalent(config, existing_cache->second.config_)) {
+    if (!Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
       throw EnvoyException(
-          fmt::format("config specified alternate protocols cache '{}' with different settings",
-                      config.name()));
+          fmt::format("options specified alternate protocols cache '{}' with different settings",
+                      options.name()));
     }
 
     return existing_cache->second.cache_;
@@ -25,7 +25,7 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
 
   AlternateProtocolsCacheSharedPtr new_cache =
       std::make_shared<AlternateProtocolsCacheImpl>(tls_, time_source_);
-  caches_.emplace(config.name(), ActiveCache{config, new_cache});
+  caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }
 

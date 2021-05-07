@@ -74,9 +74,9 @@ message UpstreamHttpProtocolOptions {
 message AlternateProtocolsCacheOptions {
   // The name of the cache. Multiple named caches allow independent alternate protocols cache
   // configurations to operate within a single Envoy process using different configurations. All
-  // configurations with the same name *must* otherwise have the same settings when referenced
-  // from different configuration components. Configuration will fail to load if this is not
-  // the case.
+  // alternate protocols cache options with the same name *must* be equal in all fields when
+  // referenced from different configuration components. Configuration will fail to load if this is
+  // not the case.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The maximum number of entries that the cache will hold. If not specified defaults to 1024.
