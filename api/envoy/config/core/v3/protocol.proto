@@ -438,8 +438,6 @@ message GrpcProtocolOptions {
   Http2ProtocolOptions http2_protocol_options = 1;
 }
 
-// [#not-implemented-hide:]
-//
 // A message which allows using HTTP/3.
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
