@@ -109,8 +109,8 @@ public:
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
-  virtual AlternateProtocolsCacheSharedPtr getCache(
-      const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) PURE;
+  virtual AlternateProtocolsCacheSharedPtr
+  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) PURE;
 };
 
 using AlternateProtocolsCacheManagerSharedPtr = std::shared_ptr<AlternateProtocolsCacheManager>;

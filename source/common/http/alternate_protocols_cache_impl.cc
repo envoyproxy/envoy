@@ -6,9 +6,7 @@ namespace Http {
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(ThreadLocal::Instance& tls,
                                                          TimeSource& time_source)
     : time_source_(time_source), slot_(tls) {
-  slot_.set([](Event::Dispatcher& /*dispatcher*/) {
-    return std::make_shared<State>();
-  });
+  slot_.set([](Event::Dispatcher& /*dispatcher*/) { return std::make_shared<State>(); });
 }
 
 AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() {}

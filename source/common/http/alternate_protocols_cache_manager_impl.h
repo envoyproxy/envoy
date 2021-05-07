@@ -19,14 +19,13 @@ public:
       : time_source_(time_source), tls_(tls) {}
 
   // AlternateProtocolsCacheManager
-  AlternateProtocolsCacheSharedPtr getCache(
-      const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) override;
+  AlternateProtocolsCacheSharedPtr
+  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) override;
 
 private:
   struct ActiveCache {
-    ActiveCache(
-        const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
-        AlternateProtocolsCacheSharedPtr cache)
+    ActiveCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
+                AlternateProtocolsCacheSharedPtr cache)
         : config_(config), cache_(cache) {}
 
     const envoy::config::core::v3::AlternateProtocolsCacheOptions& config_;
@@ -43,10 +42,8 @@ private:
 class AlternateProtocolsCacheManagerFactoryImpl : public AlternateProtocolsCacheManagerFactory {
 public:
   AlternateProtocolsCacheManagerFactoryImpl(Singleton::Manager& singleton_manager,
-                                            TimeSource& time_source,
-                                            ThreadLocal::Instance& tls)
+                                            TimeSource& time_source, ThreadLocal::Instance& tls)
       : singleton_manager_(singleton_manager), time_source_(time_source), tls_(tls) {}
-
 
   AlternateProtocolsCacheManagerSharedPtr get() override;
 

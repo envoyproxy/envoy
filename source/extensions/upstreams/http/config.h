@@ -53,7 +53,8 @@ public:
   bool use_http2_{};
   bool use_http3_{};
   bool use_alpn_{};
-  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions> alternate_protocol_cache_options_;
+  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      alternate_protocol_cache_options_;
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {

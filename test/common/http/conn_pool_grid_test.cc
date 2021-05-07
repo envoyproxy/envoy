@@ -110,7 +110,8 @@ public:
     grid_.encoder_ = &encoder_;
   }
 
-  AlternateProtocolsCacheSharedPtr maybeCreateAlternateProtocolsCache(bool use_alternate_protocols) {
+  AlternateProtocolsCacheSharedPtr
+  maybeCreateAlternateProtocolsCache(bool use_alternate_protocols) {
     AlternateProtocolsCacheSharedPtr cache;
     if (!use_alternate_protocols) {
       return nullptr;
@@ -122,7 +123,8 @@ public:
     AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
     const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
         {"h3-29", "", origin.port_}};
-    alternate_protocols_->setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+    alternate_protocols_->setAlternatives(origin, protocols,
+                                          simTime().monotonicTime() + Seconds(5));
   }
 
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;

@@ -1,7 +1,7 @@
 #include "common/http/alternate_protocols_cache_impl.h"
 
-#include "test/test_common/simulated_time_system.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 

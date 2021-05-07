@@ -985,6 +985,9 @@ public:
   virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const PURE;
 
+  /**
+   * @return alternate protocols cache options for upstream connections.
+   */
   virtual const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const PURE;
 

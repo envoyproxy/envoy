@@ -31,9 +31,8 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
 
 AlternateProtocolsCacheManagerSharedPtr AlternateProtocolsCacheManagerFactoryImpl::get() {
   return singleton_manager_.getTyped<AlternateProtocolsCacheManager>(
-      SINGLETON_MANAGER_REGISTERED_NAME(alternate_protocols_cache_manager), [this] {
-        return std::make_shared<AlternateProtocolsCacheManagerImpl>(time_source_, tls_);
-      });
+      SINGLETON_MANAGER_REGISTERED_NAME(alternate_protocols_cache_manager),
+      [this] { return std::make_shared<AlternateProtocolsCacheManagerImpl>(time_source_, tls_); });
 }
 
 } // namespace Http

@@ -178,7 +178,7 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:resource_manager_interface",
-        "@envoy_api//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
