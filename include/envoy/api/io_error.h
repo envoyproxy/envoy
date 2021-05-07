@@ -33,6 +33,8 @@ public:
     AddressNotAvailable,
     // Bad file descriptor.
     BadFd,
+    // An existing connection was forcibly closed by the remote host.
+    ConnectionReset,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
