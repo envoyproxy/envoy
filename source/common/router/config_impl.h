@@ -59,7 +59,7 @@ public:
   virtual bool supportsPathlessHeaders() const { return false; }
 };
 
-using OptionalHttpFilters = std::set<std::string>;
+using OptionalHttpFilters = absl::flat_hash_set<std::string>;
 
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:

@@ -25,7 +25,7 @@ namespace Router {
 class RouteConfigProviderManager {
 public:
   virtual ~RouteConfigProviderManager() = default;
-  using OptionalHttpFilters = std::set<std::string>;
+  using OptionalHttpFilters = absl::flat_hash_set<std::string>;
 
   /**
    * Get a RouteConfigProviderPtr for a route from RDS. Ownership of the RouteConfigProvider is the
