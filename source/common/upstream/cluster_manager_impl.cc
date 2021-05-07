@@ -1510,10 +1510,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return ClusterManagerPtr{
-      new ClusterManagerImpl(bootstrap, *this, stats_, tls_, runtime_, local_info_, log_manager_,
-                             main_thread_dispatcher_, admin_, validation_context_, api_,
-                             http_context_, grpc_context_, router_context_)};
+  return ClusterManagerPtr{new ClusterManagerImpl(
+      bootstrap, *this, stats_, tls_, runtime_, local_info_, log_manager_, main_thread_dispatcher_,
+      admin_, validation_context_, api_, http_context_, grpc_context_, router_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1531,7 +1530,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache;
     if (alternate_protocol_options.has_value()) {
-      alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
+      alternate_protocols_cache =
+          alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
     }
 
     return std::make_unique<Http::ConnectivityGrid>(

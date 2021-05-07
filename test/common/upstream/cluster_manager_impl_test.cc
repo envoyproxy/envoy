@@ -4274,7 +4274,8 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
   std::vector<Http::ConnectionPool::MockInstance*> conn_pool_vector;
   for (size_t i = 0; i < 3; ++i) {
     conn_pool_vector.push_back(new Http::ConnectionPool::MockInstance());
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(conn_pool_vector.back()));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
+        .WillOnce(Return(conn_pool_vector.back()));
     EXPECT_CALL(downstream_connection, hashKey)
         .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
     EXPECT_EQ(conn_pool_vector.back(),

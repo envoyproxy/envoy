@@ -85,8 +85,8 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    TimeSource&, ClusterConnectivityState& state) override {
-    return Http::ConnectionPool::InstancePtr{
-        allocateConnPool_(host, alternate_protocol_options, options, transport_socket_options, state)};
+    return Http::ConnectionPool::InstancePtr{allocateConnPool_(
+        host, alternate_protocol_options, options, transport_socket_options, state)};
   }
 
   Tcp::ConnectionPool::InstancePtr
