@@ -128,18 +128,6 @@ You can install Envoy on Mac OSX using the official brew repositories, or from
          `Get Envoy <https://www.getenvoy.io/>`__ by adding the ``--HEAD`` flag to
          the install command.
 
-.. _start_install_windows:
-
-Install Envoy on Windows
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can run Envoy using the official Windows Docker image.
-
-.. substitution-code-block:: console
-
-   $ docker pull envoyproxy/|envoy_windows_docker_image|
-   $ docker run --rm envoyproxy/|envoy_windows_docker_image| --version
-
 .. _start_install_docker:
 
 Install Envoy using Docker
@@ -154,10 +142,19 @@ The following commands will pull and show the Envoy version of current images.
 
    .. tab:: Envoy
 
+      The stable version of Envoy can be run with:
+
       .. substitution-code-block:: console
 
-         $ docker pull envoyproxy/|envoy_docker_image|
-         $ docker run --rm envoyproxy/|envoy_docker_image| --version
+         $ docker pull envoyproxy/envoy:|docker_image_tag_name|
+         $ docker run --rm envoyproxy/envoy:|docker_image_tag_name| --version
+
+      The latest version built from the current ``main`` branch can be run with:
+
+      .. code-block:: console
+
+         $ docker pull envoyproxy/envoy-dev:latest
+         $ docker run --rm envoyproxy/envoy-dev:latest --version
 
    .. tab:: Get Envoy
 
@@ -170,6 +167,29 @@ The following commands will pull and show the Envoy version of current images.
 
          To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
          replace the word ``stable`` with ``nightly`` in the above commands.
+
+   .. tab:: Windows (image)
+
+      You can run Envoy on a Windows host using the official Windows Docker image.
+
+      .. warning::
+
+         This image is currently experimental and includes binaries that are not open source
+
+      The stable version of Envoy can be run with:
+
+      .. substitution-code-block:: console
+
+         $ docker pull envoyproxy/envoy-windows:|docker_image_tag_name|
+         $ docker run --rm envoyproxy/envoy-windows:|docker_image_tag_name| --version
+
+      The latest version built from the current ``main`` branch can be run with:
+
+      .. code-block:: console
+
+         $ docker pull envoyproxy/envoy-windows-dev:latest
+         $ docker run --rm envoyproxy/envoy-windows-dev:latest --version
+
 
 .. _install_binaries:
 

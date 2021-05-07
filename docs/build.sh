@@ -15,18 +15,33 @@ fi
 
 # We need to set ENVOY_DOCS_VERSION_STRING and ENVOY_DOCS_RELEASE_LEVEL for Sphinx.
 # We also validate that the tag and version match at this point if needed.
-VERSION_NUMBER=$(cat VERSION)
+VERSION=$(cat VERSION)
+DEV_VERSION=$(echo "${VERSION}" | cut -d- -f1)
+MAJOR_VERSION=$(echo "${VERSION/-dev/}" | cut -d. -f1)
+MINOR_VERSION=$(echo "${VERSION/-dev/}" | cut -d. -f2)
+if [[ -n "$DEV_VERSION" ]]; then
+    # if this is a dev version then we need to figure out
+    # the last *published* version
+    POINT_VERSION=$(echo "${VERSION/-dev/}" | cut -d. -f3)
+    if [[ "$POINT_VERSION" == 0 ]]; then
+        # TODO(phlax): if we increase the major version then we may
+        #              need to fix this to also decrement the major version
+        MINOR_VERSION=$((MINOR_VERSION-1))
+    fi
+fi
+
+DOCKER_IMAGE_TAG_NAME="v${MAJOR_VERSION}.${MINOR_VERSION}-latest"
 export DOCKER_IMAGE_TAG_NAME
-DOCKER_IMAGE_TAG_NAME=$(echo "$VERSION_NUMBER" | sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+.*/v\1-latest/')
+
 if [[ -n "${DOCS_TAG}" ]]; then
   # Check the git tag matches the version number in the VERSION file.
-  if [[ "v${VERSION_NUMBER}" != "${DOCS_TAG}" ]]; then
+  if [[ "v${VERSION}" != "${DOCS_TAG}" ]]; then
     echo "Given git tag does not match the VERSION file content:"
     echo "${DOCS_TAG} vs $(cat VERSION)"
     exit 1
   fi
   # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/version_history/current.rst \
+  grep --fixed-strings "$VERSION" docs/root/version_history/current.rst \
     || (echo "Git tag not found in version_history/current.rst" && exit 1)
 
   # Now that we know there is a match, we can use the tag.
@@ -35,7 +50,7 @@ if [[ -n "${DOCS_TAG}" ]]; then
   export ENVOY_BLOB_SHA="${DOCS_TAG}"
 else
   BUILD_SHA=$(git rev-parse HEAD)
-  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUMBER}"-"${BUILD_SHA:0:6}"
+  export ENVOY_DOCS_VERSION_STRING="${VERSION}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
   export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
