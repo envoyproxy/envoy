@@ -712,6 +712,41 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  options_.bootstrap_version_ = 3;
+
+  bool workers_started = false;
+  absl::Notification workers_started_fired;
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+    });
+    initialize("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", false, hooks);
+    server_->run();
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+
+  server_->dispatcher().post([&] {
+    server_->flushStats();
+    server_->flushStats();
+    server_->flushStats();
+  });
+
+  // The test store doesn't actually ever trigger the actual flush after the init stage, but this
+  // verifies that we're hitting the right code path at the very least.
+  ASSERT_TRUE(TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2,
+                                            time_system_, std::chrono::seconds(2)));
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";

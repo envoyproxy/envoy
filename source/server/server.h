@@ -71,6 +71,7 @@ struct ServerCompilationSettingsStats {
   COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(dropped_stat_flushes)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(seconds_until_first_ocsp_response_expiring, Accumulate)                                    \

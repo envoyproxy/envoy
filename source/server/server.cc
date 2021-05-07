@@ -208,6 +208,7 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, S
 void InstanceImpl::flushStats() {
   if (stats_flush_in_progress_) {
     ENVOY_LOG(debug, "skipping stats flush as flush is already in progress");
+    server_stats_->dropped_stat_flushes_.inc();
     return;
   }
 
