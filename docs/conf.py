@@ -18,7 +18,6 @@ from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 import sys
 
-
 if not os.environ.get('ENVOY_DOCS_RELEASE_LEVEL'):
     raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
 
