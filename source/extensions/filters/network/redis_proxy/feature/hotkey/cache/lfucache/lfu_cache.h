@@ -4,7 +4,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "extensions/filters/network/redis_proxy/feature/hotkey/cache/cache.h"
 
@@ -22,9 +21,9 @@ namespace LFUCache {
 class LFUCache : public Cache {
 public:
   LFUCache(const uint8_t& capacity, const uint8_t& warming_capacity = 5);
-  ~LFUCache();
+  ~LFUCache() override;
 
-  void reset() override;
+  void reset() override { resetEx(); }
   void touchKey(const std::string& key) override;
   void incrKey(const std::string& key, const uint32_t& count) override;
   void setKey(const std::string& key, const uint32_t& count) override;
@@ -42,7 +41,7 @@ private:
 
     void addItem(LFUCache::ItemNodeSharedPtr new_item);
     bool popFront();
-    void free(const bool& is_reuse = true);
+    void freeSelf(const bool& is_reuse = true);
 
     uint32_t count_;
     std::weak_ptr<LFUCache::FreqNode> prev_, next_;
@@ -56,7 +55,7 @@ private:
     ItemNode(LFUCache* lfu);
     ~ItemNode();
 
-    void free(const bool& is_reuse = true);
+    void freeSelf(const bool& is_reuse = true);
 
     std::string key_;
     std::chrono::time_point<std::chrono::high_resolution_clock> last_time_;
@@ -78,6 +77,7 @@ private:
   static void updateItemFreq(LFUCache::ItemNodeSharedPtr new_item,
                              LFUCache::FreqNodeSharedPtr new_freq,
                              const bool& update_time_enable = true);
+  void resetEx();
 
   absl::flat_hash_map<std::string, LFUCache::ItemNodeSharedPtr> items_;
   std::list<LFUCache::ItemNodeSharedPtr> free_items_;

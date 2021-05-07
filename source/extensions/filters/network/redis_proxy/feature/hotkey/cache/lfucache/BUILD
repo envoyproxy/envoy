@@ -11,6 +11,9 @@ envoy_extension_package()
 envoy_cc_library(
     name = "lfu_cache_interface",
     hdrs = ["lfu_cache.h"],
+    deps = [
+        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -20,6 +23,5 @@ envoy_cc_library(
     deps = [
         ":lfu_cache_interface",
         "//source/common/common:assert_lib",
-        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_interface",
     ],
 )

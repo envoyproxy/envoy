@@ -27,8 +27,6 @@ HotKeyCounter::HotKeyCounter(const envoy::extensions::filters::network::redis_pr
     : hotkey_cache_(Cache::CacheFactory::createCache(hotkey_cache_type, hotkey_cache_capacity)),
       name_(fmt::format("{}_HotKeyCounter", static_cast<void*>(this))) {}
 
-HotKeyCounter::~HotKeyCounter() {}
-
 void HotKeyCounter::incr(const std::string& key) {
   Thread::TryLockGuard try_lock_guard(hotkey_cache_mutex_);
   if (try_lock_guard.tryLock()) {

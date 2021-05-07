@@ -11,7 +11,10 @@ envoy_extension_package()
 envoy_cc_library(
     name = "hotkey_interface",
     hdrs = ["hotkey_impl.h"],
-    deps = ["//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_interface"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_factory_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -20,10 +23,9 @@ envoy_cc_library(
     hdrs = ["hotkey_impl.h"],
     deps = [
         ":hotkey_interface",
-        "//include/envoy/event:dispatcher_interface",
         "//source/common/common:thread_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_lib",
+        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_factory_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

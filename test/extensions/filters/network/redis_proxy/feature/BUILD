@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/redis_proxy/feature:feature_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )

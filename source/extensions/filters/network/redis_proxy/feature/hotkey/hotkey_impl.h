@@ -25,7 +25,7 @@ public:
   HotKeyCounter(const envoy::extensions::filters::network::redis_proxy::v3::
                     RedisProxy_FeatureConfig_HotKey::CacheType& hotkey_cache_type,
                 const uint8_t& cache_capacity);
-  ~HotKeyCounter();
+  ~HotKeyCounter() = default;
 
   const std::string name() { return name_; }
   inline uint8_t getHotKeys(absl::flat_hash_map<std::string, uint32_t>& hotkeys) {

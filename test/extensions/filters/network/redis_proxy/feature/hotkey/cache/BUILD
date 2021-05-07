@@ -16,6 +16,6 @@ envoy_extension_cc_test(
     srcs = ["cache_factory_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
-        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_lib",
+        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_factory_lib",
     ],
 )

@@ -11,17 +11,11 @@ envoy_extension_package()
 envoy_cc_library(
     name = "cache_interface",
     hdrs = ["cache.h"],
-    deps = [
-        ":cache_factory_interface",
-    ],
 )
 
 envoy_cc_library(
     name = "cache_lib",
     hdrs = ["cache.h"],
-    deps = [
-        ":cache_factory_lib",
-    ],
 )
 
 envoy_cc_library(

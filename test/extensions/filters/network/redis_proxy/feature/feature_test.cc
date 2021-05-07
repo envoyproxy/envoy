@@ -4,13 +4,7 @@
 #include "extensions/filters/network/redis_proxy/feature/feature.h"
 
 #include "test/mocks/runtime/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
-
-using testing::Eq;
-using testing::Matcher;
-using testing::NiceMock;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {

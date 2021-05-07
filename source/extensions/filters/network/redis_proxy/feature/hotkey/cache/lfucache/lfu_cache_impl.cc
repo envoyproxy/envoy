@@ -20,13 +20,7 @@ LFUCache::LFUCache(const uint8_t& capacity, const uint8_t& warming_capacity)
   freq_tail_->count_ = UINT32_MAX;
 }
 
-LFUCache::~LFUCache() { reset(); }
-
-void LFUCache::reset() {
-  while (!items_.empty()) {
-    eliminate();
-  }
-}
+LFUCache::~LFUCache() { resetEx(); }
 
 void LFUCache::touchKey(const std::string& key) {
   if (items_.count(key) > 0) {
@@ -119,19 +113,15 @@ LFUCache::FreqNode::FreqNode(LFUCache* lfu)
   item_tail_->prev_ = item_head_;
   item_head_->key_ = fmt::format("{}_item_head", static_cast<void*>(this));
   item_tail_->key_ = fmt::format("{}_item_tail", static_cast<void*>(this));
-  // std::cout << "Create FreqNode : " << fmt::format("{}", static_cast<void*>(this)) << " : "
-  //          << count_ << std::endl;
 }
 
 LFUCache::FreqNode::~FreqNode() {
-  free(false);
+  freeSelf(false);
   item_head_ = nullptr;
   item_tail_ = nullptr;
-  // std::cout << "Destroy FreqNode : " << fmt::format("{}", static_cast<void*>(this)) << " : "
-  //          << count_ << std::endl;
 }
 
-void LFUCache::FreqNode::free(const bool& is_reuse) {
+void LFUCache::FreqNode::freeSelf(const bool& is_reuse) {
   LFUCache::FreqNodeSharedPtr prev = prev_.lock();
   LFUCache::FreqNodeSharedPtr next = next_.lock();
   if (prev) {
@@ -163,25 +153,18 @@ bool LFUCache::FreqNode::popFront() {
   LFUCache::ItemNodeSharedPtr item = item_head_->next_.lock();
   ASSERT(item);
   if (item != item_tail_) {
-    item->free();
+    item->freeSelf();
     ret = true;
   }
   return ret;
 }
 
 LFUCache::ItemNode::ItemNode(LFUCache* lfu)
-    : last_time_(std::chrono::high_resolution_clock::now()), lfu_(lfu) {
-  // std::cout << "Create ItemNode : " << fmt::format("{}", static_cast<void*>(this)) << " : " <<
-  // key_ << std::endl;
-}
+    : last_time_(std::chrono::high_resolution_clock::now()), lfu_(lfu) {}
 
-LFUCache::ItemNode::~ItemNode() {
-  free(false);
-  // std::cout << "Destroy ItemNode : " << fmt::format("{}", static_cast<void*>(this)) << " : " <<
-  // key_ << std::endl;
-}
+LFUCache::ItemNode::~ItemNode() { freeSelf(false); }
 
-void LFUCache::ItemNode::free(const bool& is_reuse) {
+void LFUCache::ItemNode::freeSelf(const bool& is_reuse) {
   LFUCache::ItemNodeSharedPtr prev = prev_.lock();
   LFUCache::ItemNodeSharedPtr next = next_.lock();
   if (prev) {
@@ -194,7 +177,7 @@ void LFUCache::ItemNode::free(const bool& is_reuse) {
     LFUCache::ItemNodeSharedPtr next = freq_->item_head_->next_.lock();
     ASSERT(next);
     if (next == freq_->item_tail_) {
-      freq_->free();
+      freq_->freeSelf();
     }
     freq_ = nullptr;
   }
@@ -361,7 +344,7 @@ void LFUCache::updateItemFreq(LFUCache::ItemNodeSharedPtr new_item,
   if (new_freq) {
     if ((new_item->prev_.lock() != new_freq->item_head_) ||
         (new_item->next_.lock() != new_freq->item_tail_)) {
-      new_item->free(false);
+      new_item->freeSelf(false);
       new_item->freq_ = new_freq;
       new_item->freq_->addItem(new_item);
     }
@@ -370,7 +353,13 @@ void LFUCache::updateItemFreq(LFUCache::ItemNodeSharedPtr new_item,
       new_item->last_time_ = std::chrono::high_resolution_clock::now();
     }
   } else {
-    new_item->free(true);
+    new_item->freeSelf(true);
+  }
+}
+
+void LFUCache::resetEx() {
+  while (!items_.empty()) {
+    eliminate();
   }
 }
 
