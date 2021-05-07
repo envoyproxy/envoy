@@ -11,7 +11,7 @@ class StreamClient {
 public:
   StreamClient(envoy_engine_t engine);
 
-  StreamPrototypeSharedPtr new_stream_prototype();
+  StreamPrototypeSharedPtr newStreamPrototype();
 
 private:
   envoy_engine_t engine_;

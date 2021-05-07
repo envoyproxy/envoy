@@ -22,8 +22,8 @@ enum RetryRule {
   Reset,
 };
 
-std::string retry_rule_to_string(RetryRule retry_rule);
-RetryRule retry_rule_from_string(const std::string& str);
+std::string retryRuleToString(RetryRule retry_rule);
+RetryRule retryRuleFromString(const std::string& str);
 
 struct RetryPolicy {
   int max_retry_count;
@@ -32,8 +32,8 @@ struct RetryPolicy {
   absl::optional<int> per_try_timeout_ms;
   absl::optional<int> total_upstream_timeout_ms;
 
-  RawHeaderMap as_raw_header_map() const;
-  static RetryPolicy from_raw_header_map(const RawHeaderMap& headers);
+  RawHeaderMap asRawHeaderMap() const;
+  static RetryPolicy fromRawHeaderMap(const RawHeaderMap& headers);
 };
 
 using RetryPolicySharedPtr = std::shared_ptr<RetryPolicy>;

@@ -12,11 +12,11 @@ namespace {
 void* c_on_headers(envoy_headers headers, bool end_stream, void* context) {
   auto stream_callbacks = static_cast<StreamCallbacks*>(context);
   if (stream_callbacks->on_headers.has_value()) {
-    auto raw_headers = envoy_headers_as_raw_header_map(headers);
+    auto raw_headers = envoyHeadersAsRawHeaderMap(headers);
     ResponseHeadersBuilder builder;
     for (const auto& pair : raw_headers) {
       if (pair.first == ":status") {
-        builder.add_http_status(std::stoi(pair.second[0]));
+        builder.addHttpStatus(std::stoi(pair.second[0]));
       }
       builder.set(pair.first, pair.second);
     }
@@ -38,7 +38,7 @@ void* c_on_data(envoy_data data, bool end_stream, void* context) {
 void* c_on_trailers(envoy_headers metadata, void* context) {
   auto stream_callbacks = static_cast<StreamCallbacks*>(context);
   if (stream_callbacks->on_trailers.has_value()) {
-    auto raw_headers = envoy_headers_as_raw_header_map(metadata);
+    auto raw_headers = envoyHeadersAsRawHeaderMap(metadata);
     ResponseTrailersBuilder builder;
     for (const auto& pair : raw_headers) {
       builder.set(pair.first, pair.second);
@@ -84,7 +84,7 @@ void* c_on_cancel(void* context) {
 
 } // namespace
 
-envoy_http_callbacks StreamCallbacks::as_envoy_http_callbacks() {
+envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
   return envoy_http_callbacks{
       .on_headers = &c_on_headers,
       .on_data = &c_on_data,

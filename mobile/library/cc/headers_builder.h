@@ -15,11 +15,11 @@ public:
 
 protected:
   HeadersBuilder();
-  HeadersBuilder& internal_set(const std::string& name, const std::vector<std::string>& values);
-  const RawHeaderMap& all_headers() const;
+  HeadersBuilder& internalSet(const std::string& name, const std::vector<std::string>& values);
+  const RawHeaderMap& allHeaders() const;
 
 private:
-  bool is_restricted_header_(const std::string& name) const;
+  bool isRestrictedHeader(const std::string& name) const;
 
   RawHeaderMap headers_;
 };

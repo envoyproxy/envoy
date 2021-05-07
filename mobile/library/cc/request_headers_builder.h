@@ -19,8 +19,8 @@ public:
   RequestHeadersBuilder(RequestMethod request_method, const std::string& scheme,
                         const std::string& authority, const std::string& path);
 
-  RequestHeadersBuilder& add_retry_policy(const RetryPolicy& retry_policy);
-  RequestHeadersBuilder& add_upstream_http_protocol(UpstreamHttpProtocol upstream_http_protocol);
+  RequestHeadersBuilder& addRetryPolicy(const RetryPolicy& retry_policy);
+  RequestHeadersBuilder& addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol);
 
   RequestHeaders build() const;
 };

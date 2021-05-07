@@ -16,8 +16,8 @@ enum RequestMethod {
   TRACE,
 };
 
-std::string request_method_to_string(RequestMethod method);
-RequestMethod request_method_from_string(const std::string& str);
+std::string requestMethodToString(RequestMethod method);
+RequestMethod requestMethodFromString(const std::string& str);
 
 } // namespace Platform
 } // namespace Envoy

@@ -9,8 +9,8 @@ namespace Envoy {
 namespace Python {
 namespace Stream {
 
-Platform::Stream& send_data_shim(Platform::Stream& self, py::bytes data);
-void close_shim(Platform::Stream& self, py::bytes data);
+Platform::Stream& sendDataShim(Platform::Stream& self, py::bytes data);
+void closeShim(Platform::Stream& self, py::bytes data);
 
 } // namespace Stream
 } // namespace Python

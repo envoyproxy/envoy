@@ -13,7 +13,7 @@ static const std::pair<RequestMethod, std::string> REQUEST_METHOD_LOOKUP[]{
     {RequestMethod::PUT, "PUT"},       {RequestMethod::TRACE, "TRACE"},
 };
 
-std::string request_method_to_string(RequestMethod method) {
+std::string requestMethodToString(RequestMethod method) {
   for (const auto& pair : REQUEST_METHOD_LOOKUP) {
     if (pair.first == method) {
       return pair.second;
@@ -23,7 +23,7 @@ std::string request_method_to_string(RequestMethod method) {
   throw std::out_of_range("unknown request method type");
 }
 
-RequestMethod request_method_from_string(const std::string& str) {
+RequestMethod requestMethodFromString(const std::string& str) {
   for (const auto& pair : REQUEST_METHOD_LOOKUP) {
     if (pair.second == str) {
       return pair.first;

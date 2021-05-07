@@ -3,9 +3,9 @@
 namespace Envoy {
 namespace Platform {
 
-RequestTrailersBuilder RequestTrailers::to_request_trailers_builder() const {
+RequestTrailersBuilder RequestTrailers::toRequestTrailersBuilder() const {
   RequestTrailersBuilder builder;
-  for (const auto& pair : this->all_headers()) {
+  for (const auto& pair : this->allHeaders()) {
     builder.set(pair.first, pair.second);
   }
   return builder;

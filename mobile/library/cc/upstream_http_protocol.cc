@@ -10,7 +10,7 @@ static const std::pair<UpstreamHttpProtocol, std::string> UPSTREAM_HTTP_PROTOCOL
     {UpstreamHttpProtocol::HTTP2, "http2"},
 };
 
-std::string upstream_http_protocol_to_string(UpstreamHttpProtocol protocol) {
+std::string upstreamHttpProtocolToString(UpstreamHttpProtocol protocol) {
   for (const auto& pair : UPSTREAM_HTTP_PROTOCOL_LOOKUP) {
     if (pair.first == protocol) {
       return pair.second;
@@ -19,7 +19,7 @@ std::string upstream_http_protocol_to_string(UpstreamHttpProtocol protocol) {
   throw std::invalid_argument("invalid upstream http protocol");
 }
 
-UpstreamHttpProtocol upstream_http_protocol_from_string(const std::string& str) {
+UpstreamHttpProtocol upstreamHttpProtocolFromString(const std::string& str) {
   for (const auto& pair : UPSTREAM_HTTP_PROTOCOL_LOOKUP) {
     if (pair.second == str) {
       return pair.first;

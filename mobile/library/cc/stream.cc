@@ -12,20 +12,19 @@ namespace Platform {
 Stream::Stream(envoy_stream_t handle, StreamCallbacksSharedPtr callbacks)
     : handle_(handle), callbacks_(callbacks) {}
 
-Stream& Stream::send_headers(RequestHeadersSharedPtr headers, bool end_stream) {
-  envoy_headers raw_headers = raw_header_map_as_envoy_headers(headers->all_headers());
+Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
+  envoy_headers raw_headers = rawHeaderMapAsEnvoyHeaders(headers->allHeaders());
   ::send_headers(this->handle_, raw_headers, end_stream);
   return *this;
 }
 
-Stream& Stream::send_data(envoy_data data) {
+Stream& Stream::sendData(envoy_data data) {
   ::send_data(this->handle_, data, false);
   return *this;
 }
 
 void Stream::close(RequestTrailersSharedPtr trailers) {
-  envoy_status_t send_trailers(envoy_stream_t stream, envoy_headers trailers);
-  envoy_headers raw_headers = raw_header_map_as_envoy_headers(trailers->all_headers());
+  envoy_headers raw_headers = rawHeaderMapAsEnvoyHeaders(trailers->allHeaders());
   ::send_trailers(this->handle_, raw_headers);
 }
 

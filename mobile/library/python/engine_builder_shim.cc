@@ -6,9 +6,9 @@ namespace Envoy {
 namespace Python {
 namespace EngineBuilder {
 
-Platform::EngineBuilder& set_on_engine_running_shim(Platform::EngineBuilder& self,
-                                                    std::function<void()> closure) {
-  return self.set_on_engine_running([closure]() {
+Platform::EngineBuilder& setOnEngineRunningShim(Platform::EngineBuilder& self,
+                                                std::function<void()> closure) {
+  return self.setOnEngineRunning([closure]() {
     py::gil_scoped_acquire acquire;
     closure();
   });

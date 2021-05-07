@@ -5,7 +5,7 @@ namespace Platform {
 
 StreamClient::StreamClient(envoy_engine_t engine) : engine_(engine) {}
 
-StreamPrototypeSharedPtr StreamClient::new_stream_prototype() {
+StreamPrototypeSharedPtr StreamClient::newStreamPrototype() {
   return std::make_shared<StreamPrototype>(this->engine_);
 }
 

@@ -58,27 +58,26 @@ TEST(TestSendHeaders, CanSendHeaders) {
   Platform::EngineSharedPtr engine;
   absl::Notification engine_running;
   auto engine_builder = Platform::EngineBuilder(CONFIG_TEMPLATE);
-  engine = engine_builder.add_log_level(Platform::LogLevel::debug)
-               .set_on_engine_running([&]() { engine_running.Notify(); })
+  engine = engine_builder.addLogLevel(Platform::LogLevel::debug)
+               .setOnEngineRunning([&]() { engine_running.Notify(); })
                .build();
   engine_running.WaitForNotification();
 
   Status status;
   absl::Notification stream_complete;
   Platform::StreamSharedPtr stream;
-  auto stream_prototype = engine->stream_client()->new_stream_prototype();
+  auto stream_prototype = engine->streamClient()->newStreamPrototype();
 
-  stream_prototype->set_on_headers(
-      [&](Platform::ResponseHeadersSharedPtr headers, bool end_stream) {
-        status.status_code = headers->http_status();
-        status.end_stream = end_stream;
-      });
-  stream_prototype->set_on_complete([&]() { stream_complete.Notify(); });
-  stream_prototype->set_on_error([&](Platform::EnvoyErrorSharedPtr envoy_error) {
+  stream_prototype->setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream) {
+    status.status_code = headers->httpStatus();
+    status.end_stream = end_stream;
+  });
+  stream_prototype->setOnComplete([&]() { stream_complete.Notify(); });
+  stream_prototype->setOnError([&](Platform::EnvoyErrorSharedPtr envoy_error) {
     (void)envoy_error;
     stream_complete.Notify();
   });
-  stream_prototype->set_on_cancel([&]() { stream_complete.Notify(); });
+  stream_prototype->setOnCancel([&]() { stream_complete.Notify(); });
 
   stream = stream_prototype->start();
 
@@ -87,7 +86,7 @@ TEST(TestSendHeaders, CanSendHeaders) {
   auto request_headers = request_headers_builder.build();
   auto request_headers_ptr =
       Platform::RequestHeadersSharedPtr(new Platform::RequestHeaders(request_headers));
-  stream->send_headers(request_headers_ptr, true);
+  stream->sendHeaders(request_headers_ptr, true);
   stream_complete.WaitForNotification();
 
   EXPECT_EQ(status.status_code, 200);

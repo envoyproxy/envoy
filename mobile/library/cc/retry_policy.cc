@@ -13,7 +13,7 @@ static const std::pair<RetryRule, std::string> RETRY_RULE_LOOKUP[]{
     {RetryRule::Reset, "reset"},
 };
 
-std::string retry_rule_to_string(RetryRule retry_rule) {
+std::string retryRuleToString(RetryRule retry_rule) {
   for (const auto& pair : RETRY_RULE_LOOKUP) {
     if (pair.first == retry_rule) {
       return pair.second;
@@ -22,7 +22,7 @@ std::string retry_rule_to_string(RetryRule retry_rule) {
   throw std::invalid_argument("invalid retry rule");
 }
 
-RetryRule retry_rule_from_string(const std::string& str) {
+RetryRule retryRuleFromString(const std::string& str) {
   for (const auto& pair : RETRY_RULE_LOOKUP) {
     if (pair.second == str) {
       return pair.first;
@@ -31,7 +31,7 @@ RetryRule retry_rule_from_string(const std::string& str) {
   throw std::invalid_argument("invalid retry rule");
 }
 
-RawHeaderMap RetryPolicy::as_raw_header_map() const {
+RawHeaderMap RetryPolicy::asRawHeaderMap() const {
   RawHeaderMap outbound_headers{
       {"x-envoy-max-retries", {std::to_string(this->max_retry_count)}},
       {"x-envoy-upstream-rq-timeout-ms",
@@ -45,7 +45,7 @@ RawHeaderMap RetryPolicy::as_raw_header_map() const {
 
   std::vector<std::string> retry_on;
   for (const auto& retry_rule : this->retry_on) {
-    retry_on.push_back(retry_rule_to_string(retry_rule));
+    retry_on.push_back(retryRuleToString(retry_rule));
   }
 
   if (this->retry_status_codes.size() > 0) {
@@ -64,7 +64,7 @@ RawHeaderMap RetryPolicy::as_raw_header_map() const {
   return outbound_headers;
 }
 
-RetryPolicy RetryPolicy::from_raw_header_map(const RawHeaderMap& headers) {
+RetryPolicy RetryPolicy::fromRawHeaderMap(const RawHeaderMap& headers) {
   RetryPolicy retry_policy;
 
   if (headers.contains("x-envoy-max-retries")) {
@@ -88,7 +88,7 @@ RetryPolicy RetryPolicy::from_raw_header_map(const RawHeaderMap& headers) {
         has_retriable_status_codes = true;
         continue;
       }
-      retry_policy.retry_on.push_back(retry_rule_from_string(retry_rule_str));
+      retry_policy.retry_on.push_back(retryRuleFromString(retry_rule_str));
     }
   }
 

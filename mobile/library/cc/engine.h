@@ -10,11 +10,6 @@
 namespace Envoy {
 namespace Platform {
 
-// TODO(crockeo): refactor engine callbacks
-//   - make EngineCallbacks struct with on_engine_running and (eventually) on_exit
-//   - change context from Engine ptr to EngineCallbacks ptr
-//   - move c_on_(...) from private static fn to static fn in anonymous namespace
-
 struct EngineCallbacks {
   std::function<void()> on_engine_running;
   // unused:
@@ -27,8 +22,8 @@ class Engine {
 public:
   ~Engine();
 
-  StreamClientSharedPtr stream_client();
-  PulseClientSharedPtr pulse_client();
+  StreamClientSharedPtr streamClient();
+  PulseClientSharedPtr pulseClient();
 
   void terminate();
 
