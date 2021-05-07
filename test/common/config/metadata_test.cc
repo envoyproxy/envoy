@@ -95,6 +95,7 @@ public:
   class BazFactory : public FoobarFactory {
   public:
     std::string name() const override { return "baz"; }
+    using FoobarFactory::parse;
     // Override Any parse() to just return nullptr.
     std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Any&) const override {
       return nullptr;
