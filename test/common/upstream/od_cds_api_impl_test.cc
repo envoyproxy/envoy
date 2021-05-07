@@ -5,8 +5,8 @@
 #include "common/upstream/od_cds_api_impl.h"
 
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/upstream/missing_cluster_notifier.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/missing_cluster_notifier.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,7 +24,8 @@ public:
   void SetUp() override {
     envoy::config::core::v3::ConfigSource odcds_config;
     OptRef<xds::core::v3::ResourceLocator> null_locator;
-    odcds_ = OdCdsApiImpl::create(odcds_config, null_locator, cm_, notifier_, store_, validation_visitor_);
+    odcds_ = OdCdsApiImpl::create(odcds_config, null_locator, cm_, notifier_, store_,
+                                  validation_visitor_);
     odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 
@@ -153,7 +154,7 @@ TEST_F(OdCdsApiImplTest, NotifierGetsUsed) {
 
   odcds_->updateOnDemand("cluster");
   EXPECT_CALL(notifier_, notifyMissingCluster("missing_cluster"));
-  std::vector<std::string> v {"missing_cluster"};
+  std::vector<std::string> v{"missing_cluster"};
   Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
   odcds_callbacks_->onConfigUpdate({}, removed, "");
 }
