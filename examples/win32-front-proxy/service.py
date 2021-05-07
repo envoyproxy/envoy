@@ -1,11 +1,11 @@
 from flask import Flask
-from flask import request
 import os
 import requests
 import socket
 import sys
 
 app = Flask(__name__)
+
 
 @app.route('/service/<service_number>')
 def hello(service_number):
