@@ -1569,7 +1569,8 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.check_unsupported_typed_per_filter_config") && !is_optional) {
+            "envoy.reloadable_features.check_unsupported_typed_per_filter_config") &&
+        !is_optional) {
       throw EnvoyException(
           fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
     } else {
