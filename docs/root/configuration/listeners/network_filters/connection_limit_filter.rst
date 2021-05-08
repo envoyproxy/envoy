@@ -6,7 +6,9 @@ Connection Limit Filter
 Background
 ----------
 
-Network connections are a limited resource that we need some functionality to protect. Envoy has the capability to limit the rate of new connections via the L4 `local rate limit filter <https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/local_rate_limit_filter>`_. It would be useful to be able to limit the number of connections on a filter chain basis or based on some descriptors from the request.
+Network connections are a limited resource that we need some functionality to protect.
+Envoy has the capability to limit the rate of new connections via the L4 `local rate limit filter <https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/local_rate_limit_filter>`_.
+It would be useful to be able to limit the number of connections on a filter chain basis or based on some descriptors from the request.
 
 Goals
 -----
@@ -14,15 +16,23 @@ Goals
 1. Protection for resources such as connections, CPU, memory, etc. by making sure every filter chain gets fair share of connection resources.
 2. Preventing any single entity based on filter chain match or descriptors from consuming a large number of connections to ensure fair share of the connections.
 
-Filter Overview
----------------
+Overview
+--------
 
-We are planning to add a new Connection Limit Filter in Envoy since there’s no existing connection limit functionality per filter chain in Envoy. It will be a L4 filter that is designed to be configurable and extensible. This way we can prevent any one entity from taking up too much network connections resource.
+The connection limit filter applies a connection limit to incoming connections that are processed by the filter's filter chain.
+Each connection processed by the filter marked as an active connection, and if the number of active connections reaches the max connections limit,
+the connection will be closed without further filter iteration.
 
--  The connection limit filter will be similar to the L4 local rate limit filter, but instead of enforcing the limit on connections rate, the new filter will limit the number of active connections.
--  The filter maintains an atomic counter of active connection count. It has a max connections limit value based on the configured total number of connections. When a new connection request comes, the filter tries to increment the connection counter. The connection is allowed if the counter is less than the max connections limit, otherwise the connection gets rejected. When an active connection is closed, the filter decrements the active connection counter.
--  The filter may not stop connection creation but will immediately close the connections that were accepted but were deemed as overlimit.
--  **Slow rejection:** The filter can stop reading from the connection and close it after a delay instead of rejecting it right away or letting requests go through before the rejection. This way we can prevent a malicious entity from opening new connections while draining their resources.
+-  The connection limit filter is similar to the L4 local rate limit filter, but instead of enforcing the limit on connections rate, the filter limits the number of active connections.
+-  The filter maintains an atomic counter of active connection count. It has a max connections limit value based on the configured total number of connections.
+   When a new connection request comes, the filter tries to increment the connection counter. The connection is allowed if the counter is less than the max connections limit, otherwise the connection gets rejected.
+   When an active connection is closed, the filter decrements the active connection counter.
+-  The filter does not stop connection creation but will close the connections that were accepted but were deemed as overlimit.
+-  **Slow rejection:** The filter can stop reading from the connection and close it after a delay instead of rejecting it right away or letting requests go through before the rejection.
+   This way we can prevent a malicious entity from opening new connections while draining their resources.
+
+.. note::
+  In the current implementation each filter chain has an independent connection limit.
 
 Algorithm
 ---------
