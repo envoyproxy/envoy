@@ -18,14 +18,13 @@ namespace BandwidthLimitFilter {
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                            Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
-    : stats_(generateStats(config.stat_prefix(), scope)),
-      enabled_(config.runtime_enabled(), runtime), runtime_(runtime), scope_(scope),
-      time_source_(time_source),
-      limit_kbps_(config.has_limit_kbps() ? config.limit_kbps().value() : 0),
+    : runtime_(runtime), scope_(scope), time_source_(time_source),
       enable_mode_(config.enable_mode()),
-      fill_interval_(config.has_fill_interval()
-                         ? std::chrono::milliseconds(config.fill_interval().value())
-                         : StreamRateLimiter::DefaultFillInterval) {
+      limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, limit_kbps, 0)),
+      fill_interval_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))),
+      enabled_(config.runtime_enabled(), runtime),
+      stats_(generateStats(config.stat_prefix(), scope)) {
   if (per_route && !config.has_limit_kbps()) {
     throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
   }

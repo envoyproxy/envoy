@@ -80,14 +80,14 @@ private:
 
   static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  mutable BandwidthLimitStats stats_;
-  Runtime::FeatureFlag enabled_;
   Runtime::Loader& runtime_;
   Stats::Scope& scope_;
   TimeSource& time_source_;
-  const uint64_t limit_kbps_;
   const EnableMode enable_mode_;
+  const uint64_t limit_kbps_;
   const std::chrono::milliseconds fill_interval_;
+  const Runtime::FeatureFlag enabled_;
+  mutable BandwidthLimitStats stats_;
   // Filter chain's shared token bucket
   std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
 };

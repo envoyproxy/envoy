@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.bandwidth_limit.v3alpha;
 
 import "envoy/config/core/v3/base.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -58,7 +59,10 @@ message BandwidthLimit {
 
   // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
   // It must be at least 20ms to avoid too aggressive refills.
-  google.protobuf.UInt32Value fill_interval = 4 [(validate.rules).uint32 = {gte: 20}];
+  google.protobuf.Duration fill_interval = 4 [(validate.rules).duration = {
+    lte {seconds: 1}
+    gte {nanos: 20000000}
+  }];
 
   // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
   // to enabled.

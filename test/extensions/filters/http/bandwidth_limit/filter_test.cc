@@ -64,7 +64,7 @@ TEST_F(FilterTest, Disabled) {
     runtime_key: foo_key
   enable_mode: Disabled
   limit_kbps: 10
-  fill_interval: 32
+  fill_interval: 1s
   )";
   setup(fmt::format(config_yaml, "1"));
 

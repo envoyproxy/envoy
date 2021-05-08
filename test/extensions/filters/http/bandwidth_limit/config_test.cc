@@ -37,7 +37,7 @@ TEST(Factory, RouteSpecificFilterConfig) {
   stat_prefix: test
   enable_mode: DecodeAndEncode
   limit_kbps: 10
-  fill_interval: 100
+  fill_interval: 0.1s
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -60,7 +60,7 @@ TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
   const std::string config_yaml = R"(
   stat_prefix: test
   limit_kbps: 10
-  fill_interval: 100
+  fill_interval: 0.1s
   )";
 
   BandwidthLimitFilterConfig factory;
