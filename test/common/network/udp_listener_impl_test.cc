@@ -56,6 +56,8 @@ public:
     // Return the real version by default.
     ON_CALL(override_syscall_, supportsMmsg())
         .WillByDefault(Return(os_calls.latched().supportsMmsg()));
+    ON_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
+        .WillByDefault(Return(std::numeric_limits<size_t>::max()));
 
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
@@ -266,7 +268,7 @@ TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsg) {
   const std::string second("second");
   client_.write(second, *send_to_addr_);
 
-  EXPECT_CALL(listener_callbacks_, onReadReady()).Times(2);
+  EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
     validateRecvCallbackParams(data, 1);
