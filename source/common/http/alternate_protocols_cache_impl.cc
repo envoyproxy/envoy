@@ -9,7 +9,7 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(ThreadLocal::Instance& 
   slot_.set([](Event::Dispatcher& /*dispatcher*/) { return std::make_shared<State>(); });
 }
 
-AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() {}
+AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   const std::vector<AlternateProtocol>& protocols,
