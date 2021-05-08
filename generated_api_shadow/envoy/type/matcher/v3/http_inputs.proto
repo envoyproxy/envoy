@@ -58,8 +58,13 @@ message HttpResponseTrailerMatchInput {
 
 // Match input indicates that matching should be done on a specific cookie key.
 // The resulting input string will be all values for the given key joined by a
-// comma, e.g. if the request contains two 'foo' cookie keys with value 'bar'
-// and 'baz', the input string will be 'bar,baz'.
+// comma, in order of appearance in the HTTP request. For instance, if the
+// request contains, in this order, these headers:
+//
+// * ``Cookie: mykey=a; mykey=b; other=foo;``
+// * ``Cookie: mykey=c;``
+//
+// Then, this input matcher would return, for the cookie name ``mykey``: ``a,b,c``.
 message HttpRequestCookieMatchInput {
   // The cookie to match on.
   string cookie_name = 1;

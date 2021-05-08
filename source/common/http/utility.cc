@@ -381,16 +381,23 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   return path_str;
 }
 
-absl::InlinedVector<absl::string_view, 2>
-Utility::parseCookieValues(const HeaderMap& headers, const absl::string_view key, size_t max_vals) {
+absl::InlinedVector<absl::string_view, 2> Utility::parseCookieValues(const HeaderMap& headers,
+                                                                     const absl::string_view key,
+                                                                     size_t max_vals,
+                                                                     bool reversed_order) {
   absl::InlinedVector<absl::string_view, 2> ret;
 
-  headers.iterateReverse([&key, &ret, max_vals](const HeaderEntry& header) -> HeaderMap::Iterate {
+  const auto iterfunc = [&key, &ret, max_vals,
+                         reversed_order](const HeaderEntry& header) -> HeaderMap::Iterate {
     // Find the cookie headers in the request (typically, there's only one).
     if (header.key() == Http::Headers::get().Cookie.get()) {
 
       // Split the cookie header into individual cookies.
-      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+      auto keyvalues = StringUtil::splitToken(header.value().getStringView(), ";");
+      if (reversed_order) {
+        std::reverse(keyvalues.begin(), keyvalues.end());
+      }
+      for (const auto& s : keyvalues) {
         // Find the key part of the cookie (i.e. the name of the cookie).
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
@@ -417,13 +424,19 @@ Utility::parseCookieValues(const HeaderMap& headers, const absl::string_view key
       }
     }
     return HeaderMap::Iterate::Continue;
-  });
+  };
+
+  if (reversed_order) {
+    headers.iterateReverse(iterfunc);
+  } else {
+    headers.iterate(iterfunc);
+  }
 
   return ret;
 }
 
 absl::string_view Utility::parseCookieValue(const HeaderMap& headers, const absl::string_view key) {
-  const auto ret = parseCookieValues(headers, key, 1);
+  const auto ret = parseCookieValues(headers, key, 1, true /* reversed_order */);
   if (ret.size() == 1) {
     return ret[0];
   }

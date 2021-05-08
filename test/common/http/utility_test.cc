@@ -580,15 +580,23 @@ TEST(HttpUtility, TestParseCookieMultipleValues) {
 
   absl::string_view key{"somekey"};
 
-  auto values = Utility::parseCookieValues(headers, key, 0);
-  // Headers are parsed in reversed order
-  EXPECT_THAT(values, testing::ElementsAre("bar", "toto", "foo"));
+  auto values = Utility::parseCookieValues(headers, key, 0, false /* reversed_order */);
+  EXPECT_THAT(values, testing::ElementsAre("foo", "bar", "toto"));
 
-  values = Utility::parseCookieValues(headers, key, 1);
-  EXPECT_THAT(values, testing::ElementsAre("bar"));
+  values = Utility::parseCookieValues(headers, key, 1, false /* reversed_order */);
+  EXPECT_THAT(values, testing::ElementsAre("foo"));
 
-  values = Utility::parseCookieValues(headers, key, 2);
-  EXPECT_THAT(values, testing::ElementsAre("bar", "toto"));
+  values = Utility::parseCookieValues(headers, key, 2, false /* reversed_order */);
+  EXPECT_THAT(values, testing::ElementsAre("foo", "bar"));
+
+  values = Utility::parseCookieValues(headers, key, 0, true /* reversed_order */);
+  EXPECT_THAT(values, testing::ElementsAre("toto", "bar", "foo"));
+
+  values = Utility::parseCookieValues(headers, key, 1, true /* reversed_order */);
+  EXPECT_THAT(values, testing::ElementsAre("toto"));
+
+  values = Utility::parseCookieValues(headers, key, 2, true /* reversed_order */);
+  EXPECT_THAT(values, testing::ElementsAre("toto", "bar"));
 }
 
 TEST(HttpUtility, TestMakeSetCookieValue) {
