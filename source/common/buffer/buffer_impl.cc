@@ -1,12 +1,15 @@
 #include "common/buffer/buffer_impl.h"
 
+#include <bits/stdint-uintn.h>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 
 #include "common/common/assert.h"
 
 #include "absl/container/fixed_array.h"
+#include "envoy/buffer/buffer.h"
 #include "event2/buffer.h"
 
 namespace Envoy {
@@ -609,6 +612,160 @@ OwnedImpl::OwnendImplIterator::Location OwnedImpl::find(const void* data, uint64
   }
 
   return OwnedImpl::OwnendImplIterator::Location{slices_.size(), 0, -1};
+}
+
+IteratorPtr OwnedImpl::replace(IteratorPtr index, uint64_t count, const void* data, uint64_t size) {
+  if (index == nullptr ){
+    return nullptr;
+  }
+
+  auto& itr = dynamic_cast<OwnedImpl::OwnendImplIterator&>(*index);
+
+  if ( &itr.owned_impl_ != this || itr.slice_index_ < 0 ||
+      itr.slice_index_ >= slices_.size() || itr.slice_offset_ < 0 ||
+      itr.slice_offset_ >= slices_[itr.slice_index_].dataSize()) {
+    return nullptr;
+  }
+
+  // Validate count doesn't exceed sum of data size from index
+  auto end_slice_index = itr.slice_index_;
+  auto end_slice_offset = itr.slice_offset_;
+  auto data_size = slices_[itr.slice_index_].dataSize() - itr.slice_offset_;
+
+  if (data_size > count) {
+    end_slice_offset = itr.slice_index_ + count;
+  } else {
+    for (auto i=itr.slice_index_ + 1; i < slices_.size(); i++) {
+      end_slice_index = i;
+      data_size += slices_[i].dataSize();
+      if (data_size > count) {
+        end_slice_offset = slices_[i].dataSize() - (data_size - count);
+        break;
+      }
+    }
+    count = std::min(count, data_size);
+  }
+
+  if (count == 0 && size == 0) {
+    return nullptr;
+  }
+
+  size_t copied_size = 0;
+  auto last_slice_index = itr.slice_index_;
+  auto last_slice_offset = itr.slice_offset_;
+  const uint8_t* replacer = static_cast<const uint8_t*>(data);
+
+  // First copy min(count, size) lengh bytes of data into buffer
+  for (size_t i=itr.slice_index_; i <= end_slice_index && size > 0; i++){
+    uint64_t copy_size = 0;
+    auto& slice = slices_[i];
+
+    last_slice_index = i;
+    if (i == itr.slice_index_) {
+      auto drain_size =  std::min(count, slice.dataSize() - itr.slice_offset_);
+      if (itr.slice_offset_ == 0) {
+        // Replace everthing/prefix
+        slice.drain(drain_size);
+        last_slice_offset = copy_size = slice.prepend(replacer + copied_size, size);
+      } else if (itr.slice_offset_ + drain_size ==  slice.dataSize()) {
+        // Replace suffix
+        slice.drainAtEnd(drain_size);
+        copy_size = slice.append(replacer + copied_size, size);
+        last_slice_offset = itr.slice_offset_ + copy_size;
+      } else {
+        // Replace middle
+        memcpy(slice.data() + itr.slice_offset_, replacer + copied_size, drain_size);
+        last_slice_offset =  itr.slice_offset_ + copy_size;
+        copy_size = drain_size;
+      }
+    } else if (i == end_slice_index) {
+      slice.drain(end_slice_offset);
+      last_slice_offset = copy_size = slice.prepend(replacer + copied_size, size);
+    } else {
+      slice.drain(slice.dataSize());
+      last_slice_offset = copy_size = slice.append(replacer + copied_size, size);
+    }
+
+    size -= copy_size;
+    count -= copy_size;
+    copied_size += copy_size;
+  }
+
+  // handle remaining bytes in replacer
+  if (size > 0) {
+    Slice* new_slice = nullptr;
+    auto& slice = slices_[last_slice_index];
+    auto move_size = last_slice_offset < slice.dataSize() ? slice.dataSize() - last_slice_offset : 0;
+
+    // try reserving size bytes
+    auto reservation =  slice.reserve(size);
+    if (reservation.mem_) {
+      slice.commit(reservation);
+    }
+
+    auto avail_size = slice.dataSize() - last_slice_offset;
+    auto alloc_size = (avail_size - move_size) < size ? size - (avail_size - move_size) : 0;
+
+    if (alloc_size > 0) {
+        Slice nslice{alloc_size, nullptr}; //TODO: Accounting
+        slices_.emplace_insert(last_slice_index + 1, std::move(nslice)); // check handles empty or append
+        new_slice = &slices_[last_slice_index + 1];
+    }
+
+    // copy part of the replacer that cannot fit, into new slice 
+    if (size > avail_size) {
+        assert(new_slice);
+        new_slice->append(replacer + copied_size + avail_size, size-avail_size);
+    }
+
+    if (move_size > 0) {
+      // move the part of slice that cannot fit
+      if (new_slice) {
+        auto move_offset = avail_size < size ? last_slice_offset : last_slice_offset + size;
+        new_slice->append(slice.data() + move_offset,  avail_size < size ? move_size : move_size - size);      
+      } 
+
+      // move the part of slice that can fit
+      if (avail_size > size) {
+        memmove(slice.data() + last_slice_offset + size, slice.data() + last_slice_offset, move_size - size);
+      }
+    }
+
+    if (avail_size > 0) {
+      // copy remaining replacer into slice
+      memcpy(slice.data() + last_slice_offset, replacer + copied_size, avail_size < size ? avail_size : size);
+    }
+
+    if (avail_size < size){
+      return std::unique_ptr<OwnedImpl::OwnendImplIterator>{new OwnedImpl::OwnendImplIterator{*this, last_slice_index + 1, size - avail_size}};
+    }
+
+    return std::unique_ptr<OwnedImpl::OwnendImplIterator>{new OwnedImpl::OwnendImplIterator{*this, last_slice_index, last_slice_offset + size}};
+  }
+
+  // Handle case where replacement is shorter or slices had reservable space
+  for (auto i = last_slice_index; i <= end_slice_index && count > 0; i++) {
+    auto& slice = slices_[i];
+    if (i == last_slice_index) {
+      auto drain_size = std::min(count, slice.dataSize() - last_slice_offset);
+      if (drain_size < slice.dataSize() - last_slice_offset) {
+        // move 
+        auto move_offset =  last_slice_offset + drain_size;
+        memmove(slice.data() + last_slice_offset, slice.data() + move_offset, slice.dataSize() -  move_offset);
+        last_slice_offset = slice.dataSize();
+      }
+      slice.drainAtEnd(drain_size);
+      count-=drain_size;
+    } else if (i == end_slice_index) {
+      slice.drain(end_slice_offset);
+      count -= end_slice_offset;
+    } else {
+      count -= slice.dataSize();
+      slice.drain(slice.dataSize());
+    }
+  }
+
+  return std::unique_ptr<OwnedImpl::OwnendImplIterator>{new OwnedImpl::OwnendImplIterator{*this, last_slice_index, last_slice_offset}};
 }
 
 bool OwnedImpl::startsWith(absl::string_view data) const {

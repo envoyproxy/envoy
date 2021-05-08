@@ -333,6 +333,17 @@ public:
                              bool partial_match_at_end, Equals equals) PURE;
 
   /**
+   * Replace the count length bytes, starting at loc with size length data
+   * @param index supplies the location inside the buffer
+   * @param count supplies number of bytes to be replaced starting at the loc, 0 implies insert at the index 
+   * @param data supplies replacement bytes
+   * @param size supplies length of the replacement bytes
+   * @return IteratorPtr to the location right after the successful replacement, or nullptr when
+   * replacement is unsuccessful
+   */
+  virtual IteratorPtr replace(IteratorPtr index, uint64_t count, const void* data, uint64_t size);
+
+  /**
    * Search for an occurrence of data at the start of a buffer.
    * @param data supplies the data to search for.
    * @return true if this buffer starts with data, false otherwise.

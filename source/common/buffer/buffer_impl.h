@@ -285,6 +285,9 @@ public:
     return copy_size;
   }
 
+  uint8_t capacity(){
+    return capacity_;
+  }
   /**
    * Describe the in-memory representation of the slice. For use
    * in tests that want to make assertions about the specific arrangement of
@@ -756,6 +759,7 @@ public:
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   IteratorPtr search(const void* data, uint64_t size, size_t start, size_t length,
                      bool partial_match_at_end, Equals equals) override;
+  IteratorPtr replace(IteratorPtr index, uint64_t count, const void* data, uint64_t size) override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;
 
