@@ -35,9 +35,9 @@ do
     # Provide a white-list to ignore the DCO verify on specific commits
     DCO_WHITE_LIST_PATH="$(dirname "$(realpath "$0")")/../../dco_verify_white_list.txt"
     DCO_WHITE_LIST=""
-    if [ -f $DCO_WHITE_LIST_PATH ]
+    if [ -f "$DCO_WHITE_LIST_PATH" ]
     then
-      WHITE_LIST="$(cat $DCO_WHITE_LIST_PATH)"
+      WHITE_LIST="$(cat "$DCO_WHITE_LIST_PATH")"
     fi
 
     # Verify DCO signoff. We do this before the format checker, since it has
