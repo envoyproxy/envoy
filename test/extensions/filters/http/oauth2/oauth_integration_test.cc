@@ -185,17 +185,6 @@ std::string parseSetCookieValue(const Http::HeaderMap& headers, const std::strin
 TEST_F(OauthIntegrationTest, AuthenticationFlow) {
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},
-      {":path", "/callback?code=foo&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
-      {":scheme", "http"},
-      {"x-forwarded-proto", "http"},
-      {":authority", "authority"},
-      {"authority", "Bearer token"}};
-  absl::string_view host_ = headers.Host()->value().getStringView();
-
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
   Filesystem::Watcher::OnChangedCb on_changed_cb_;
   watcher->addWatch(TestEnvironment::temporaryPath("token_secret.yaml"),
@@ -213,6 +202,17 @@ TEST_F(OauthIntegrationTest, AuthenticationFlow) {
                               TestEnvironment::temporaryPath("hmac_secret.yaml"));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/callback?code=foo&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"authority", "Bearer token"}};
+  absl::string_view host_ = headers.Host()->value().getStringView();
 
   auto encoder_decoder = codec_client_->startRequest(headers);
   request_encoder_ = &encoder_decoder.first;
