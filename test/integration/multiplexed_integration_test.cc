@@ -143,7 +143,7 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(70000, true);
-  // test_server_->waitForCounterEq("http2.tx_flush_timeout", 1);
+  test_server_->waitForCounterEq("http2.tx_flush_timeout", 1);
   ASSERT_TRUE(response->waitForReset());
 }
 
