@@ -48,7 +48,7 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
   }
 };
 
-TEST(MatchWrapper, DisbaledByDefault) {
+TEST(MatchWrapper, DisabledByDefault) {
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
 
   const auto config =
