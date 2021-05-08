@@ -388,8 +388,6 @@ TEST_F(FileEventImplTest, RegisterIfEmulatedEdge) {
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
       fds_[0],
       [&](uint32_t events) -> void {
-        // Only process events once to avoid infinite delivery of LEVEL events.
-        dispatcher_->exit();
         if (events & FileReadyType::Read) {
           read_event.ready();
         }
