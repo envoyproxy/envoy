@@ -85,9 +85,6 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
 
 void FileEventImpl::updateEvents(uint32_t events) {
   ASSERT(dispatcher_.isThreadSafe());
-  if (events == enabled_events_) {
-    return;
-  }
   auto* base = event_get_base(&raw_event_);
   event_del(&raw_event_);
   assignEvents(events, base);
@@ -114,7 +111,9 @@ void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
     ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
     if (trigger_ == FileTriggerType::EmulatedEdge) {
       auto new_event_mask = enabled_events_ & ~event;
-      updateEvents(new_event_mask);
+      if (new_event_mask != enabled_events_) {
+        updateEvents(new_event_mask);
+      }
     }
   }
 }
@@ -130,7 +129,9 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
         // We never ask for both early close and read at the same time.
         new_event_mask = new_event_mask & ~FileReadyType::Read;
       }
-      updateEvents(new_event_mask);
+      if (new_event_mask != enabled_events_) {
+        updateEvents(new_event_mask);
+      }
     }
   }
 }

@@ -35,6 +35,17 @@ public:
     ASSERT_EQ(sizeof(data), static_cast<size_t>(result.rc_));
   }
 
+  void clearReadable() {
+    // Read the data from the socket so it is no longer readable.
+    char buffer[10];
+    struct iovec vec {
+      buffer, sizeof(buffer)
+    };
+    const Api::SysCallSizeResult result = os_sys_calls_.readv(fds_[0], &vec, 1);
+    EXPECT_LT(0, static_cast<size_t>(result.rc_));
+    EXPECT_GT(sizeof(buffer), static_cast<size_t>(result.rc_));
+  }
+
   void TearDown() override {
     os_sys_calls_.close(fds_[0]);
     os_sys_calls_.close(fds_[1]);
@@ -280,10 +291,9 @@ TEST_F(FileEventImplTest, LevelTrigger) {
 }
 
 TEST_F(FileEventImplTest, SetEnabled) {
+  testing::InSequence s;
   ReadyWatcher read_event;
-  EXPECT_CALL(read_event, ready()).Times(2);
   ReadyWatcher write_event;
-  EXPECT_CALL(write_event, ready()).Times(2);
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
@@ -300,16 +310,127 @@ TEST_F(FileEventImplTest, SetEnabled) {
       },
       trigger, FileReadyType::Read | FileReadyType::Write);
 
+  EXPECT_CALL(read_event, ready());
   file_event->setEnabled(FileReadyType::Read);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
+  EXPECT_CALL(write_event, ready());
   file_event->setEnabled(FileReadyType::Write);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   file_event->setEnabled(0);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Run a manual event to ensure that previous expectations are satisfied before moving on.
+  ReadyWatcher manual_event;
+  EXPECT_CALL(manual_event, ready());
+  manual_event.ready();
+
+  clearReadable();
+
+  file_event->setEnabled(FileReadyType::Read);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(write_event, ready());
+  file_event->setEnabled(FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(write_event, ready());
+  file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Repeat the previous registration, verify that write event is delivered again.
+  EXPECT_CALL(write_event, ready());
+  file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Synthetic read events are delivered even if the active registration doesn't contain them.
+  EXPECT_CALL(read_event, ready());
+  file_event->activate(FileReadyType::Read);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Run a manual event to ensure that previous expectations are satisfied before moving on.
+  EXPECT_CALL(manual_event, ready());
+  manual_event.ready();
+
+  // Do a read activation followed setEnabled to verify that the activation is
+  // cleared.
+  EXPECT_CALL(write_event, ready());
+  file_event->activate(FileReadyType::Read);
+  file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Repeat the previous steps but with the same input to setEnabled to verify that the activation
+  // is cleared even in cases where the setEnable mask hasn't changed.
+  EXPECT_CALL(write_event, ready());
+  file_event->activate(FileReadyType::Read);
+  file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(FileEventImplTest, RegisterIfEmulatedEdge) {
+  // Test only applies if using EmulatedEdge trigger mode
+  if constexpr (PlatformDefaultTriggerType != FileTriggerType::EmulatedEdge) {
+    return;
+  }
+
+  testing::InSequence s;
+  ReadyWatcher read_event;
+  ReadyWatcher write_event;
+
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
+  Event::FileEventPtr file_event = dispatcher_->createFileEvent(
+      fds_[0],
+      [&](uint32_t events) -> void {
+        // Only process events once to avoid infinite delivery of LEVEL events.
+        dispatcher_->exit();
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+        }
+
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+        }
+      },
+      trigger, FileReadyType::Read | FileReadyType::Write);
+
+  EXPECT_CALL(read_event, ready()).Times(0);
+  EXPECT_CALL(write_event, ready()).Times(0);
+  file_event->unregisterEventIfEmulatedEdge(FileReadyType::Read | FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(read_event, ready());
+  file_event->registerEventIfEmulatedEdge(FileReadyType::Read);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(write_event, ready());
+  file_event->registerEventIfEmulatedEdge(FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(read_event, ready());
+  file_event->registerEventIfEmulatedEdge(FileReadyType::Read | FileReadyType::Write);
+  file_event->unregisterEventIfEmulatedEdge(FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(read_event, ready()).Times(0);
+  EXPECT_CALL(write_event, ready()).Times(0);
+  file_event->unregisterEventIfEmulatedEdge(FileReadyType::Read);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
+  file_event->registerEventIfEmulatedEdge(FileReadyType::Read | FileReadyType::Write);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Events are delivered once due to auto unregistration after they are delivered.
+  EXPECT_CALL(read_event, ready()).Times(0);
+  EXPECT_CALL(write_event, ready()).Times(0);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
