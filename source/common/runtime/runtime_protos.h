@@ -11,6 +11,25 @@
 namespace Envoy {
 namespace Runtime {
 
+// Helper class for runtime-derived uint32.
+class UInt32 {
+public:
+  UInt32(const envoy::config::core::v3::RuntimeUInt32& uint32_proto, Runtime::Loader& runtime)
+      : runtime_key_(uint32_proto.runtime_key()), default_value_(uint32_proto.default_value()),
+        runtime_(runtime) {}
+
+  const std::string& runtimeKey() const { return runtime_key_; }
+
+  uint32_t value() const {
+    return static_cast<uint32_t>(runtime_.snapshot().getInteger(runtime_key_, default_value_));
+  }
+
+protected:
+  const std::string runtime_key_;
+  const uint32_t default_value_;
+  Runtime::Loader& runtime_;
+};
+
 // Helper class for runtime-derived boolean feature flags.
 class FeatureFlag {
 public:
