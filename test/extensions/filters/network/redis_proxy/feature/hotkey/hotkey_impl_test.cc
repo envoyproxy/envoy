@@ -15,7 +15,7 @@ namespace HotKey {
 
 class HotKeyCounterTest : public testing::Test {
 public:
-  void test_incr_try_lock_failed(const HotKeyCounterSharedPtr& hk_counter, const std::string& key) {
+  void testIncrTryLockFailed(const HotKeyCounterSharedPtr& hk_counter, const std::string& key) {
     {
       Thread::LockGuard lock_guard(hk_counter->hotkey_cache_mutex_);
       hk_counter->incr(key);
@@ -77,7 +77,7 @@ TEST_F(HotKeyCounterTest, Incr) {
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
 
-  test_incr_try_lock_failed(hk_counter, test_key_1);
+  testIncrTryLockFailed(hk_counter, test_key_1);
   hk_counter->getHotKeys(cache);
   EXPECT_EQ(0, cache.size());
   cache.clear();

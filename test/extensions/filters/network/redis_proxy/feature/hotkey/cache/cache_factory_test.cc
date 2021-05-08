@@ -15,7 +15,7 @@ class CacheImplTest : public Cache {
 public:
   CacheImplTest(const uint8_t& capacity, const uint8_t& warming_capacity)
       : Cache(capacity, warming_capacity) {}
-  ~CacheImplTest() = default;
+  ~CacheImplTest() override = default;
 
   void reset() override {}
   void touchKey(const std::string&) override {}
