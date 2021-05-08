@@ -30,6 +30,8 @@ def kotlin_dependencies():
             "junit:junit:4.12",
             "org.mockito:mockito-inline:2.28.2",
             "org.mockito:mockito-core:2.28.2",
+            "com.squareup.okhttp3:okhttp:4.9.1",
+            "com.squareup.okhttp3:mockwebserver:4.9.1",
             # Android test artifacts
             "androidx.test:core:1.3.0",
             "androidx.test:rules:1.3.0",
