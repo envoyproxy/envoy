@@ -62,7 +62,9 @@ public:
   AppleDnsImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
-  void SetUp() override { resolver_ = dispatcher_->createDnsResolver({}, false); }
+  void SetUp() override {
+    resolver_ = dispatcher_->createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
+  }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
