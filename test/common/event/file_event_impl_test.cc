@@ -358,8 +358,7 @@ TEST_F(FileEventImplTest, SetEnabled) {
   EXPECT_CALL(manual_event, ready());
   manual_event.ready();
 
-  // Do a read activation followed setEnabled to verify that the activation is
-  // cleared.
+  // Do a read activation followed setEnabled to verify that the activation is cleared.
   EXPECT_CALL(write_event, ready());
   file_event->activate(FileReadyType::Read);
   file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
