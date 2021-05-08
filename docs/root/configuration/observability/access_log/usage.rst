@@ -181,7 +181,7 @@ The following command operators are supported:
 
 %PROTOCOL%
   HTTP
-    Protocol. Currently either *HTTP/1.1* or *HTTP/2*.
+    Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
 
   TCP
     Not implemented ("-").

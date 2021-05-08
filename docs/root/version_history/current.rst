@@ -5,6 +5,8 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+* grpc_bridge_filter: the filter no longer collects grpc stats in favor of the existing grpc stats filter.
+  The behavior can be reverted by changing runtime key ``envoy.reloadable_features.grpc_bridge_stats_disabled``.
 * tracing: update Apache SkyWalking tracer version to be compatible with 8.4.0 data collect protocol. This change will introduce incompatibility with SkyWalking 8.3.0.
 
 Minor Behavior Changes
@@ -29,6 +31,7 @@ Bug Fixes
 
 * http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
 * http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
+* listener: fix the crash which could happen when the ongoing filter chain only listener update is followed by the listener removal or full listener update.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
 * xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.
 * zipkin: fix timestamp serializaiton in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
@@ -53,6 +56,7 @@ New Features
 * cluster: added :ref:`dns_resolver_options <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting one such option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
 * dns_filter: added :ref:`dns_resolver_options <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting the option *use_tcp_for_dns_lookups* to true we can make dns filter's external resolvers to answer queries using TCP only. And by setting the option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
 * dynamic_forward_proxy: added :ref:`dns_resolver_options <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolver_options>` to aggregate all of the DNS resolver options in a single message. By setting one such option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
+* http: added upstream and downstream alpha HTTP/3 support! See :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` for downstream and the new http3_protocol_options in :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` for upstream HTTP/3.
 * listener: added ability to change an existing listener's address.
 * metric service: added support for sending metric tags as labels. This can be enabled by setting the :ref:`emit_tags_as_labels <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels>` field to true.
 * udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.

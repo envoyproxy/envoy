@@ -4,6 +4,8 @@
 #include "common/common/json_escape_string.h"
 #include "common/common/logger.h"
 
+#include "test/test_common/environment.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -110,11 +112,8 @@ public:
 
     testing::internal::CaptureStderr();
     logger_->log(spdlog::details::log_msg("test", spdlog::level::info, message));
-#ifdef WIN32
-    EXPECT_EQ(expected + "\r\n", testing::internal::GetCapturedStderr());
-#else
-    EXPECT_EQ(expected + "\n", testing::internal::GetCapturedStderr());
-#endif
+    EXPECT_EQ(absl::StrCat(expected, TestEnvironment::newLine),
+              testing::internal::GetCapturedStderr());
   }
 
 protected:

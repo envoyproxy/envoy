@@ -137,6 +137,9 @@ generate_api_rst v3
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
 
+# TODO(phlax): Remove this once above is removed
+find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_v2_api_#envoy_api_#g"
+
 # xDS protocol spec.
 mkdir -p "${GENERATED_RST_DIR}/api-docs"
 cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
@@ -159,6 +162,9 @@ rsync -av \
       "${SCRIPT_DIR}"/redirects.txt \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
+
+# Merge generated redirects
+jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/")) | with_entries(.value |= sub("^envoy/";"api-v2/")) | to_entries[] | "\(.value)\t\t\(.key)"' docs/v2_mapping.json >> "${GENERATED_RST_DIR}"/redirects.txt
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment

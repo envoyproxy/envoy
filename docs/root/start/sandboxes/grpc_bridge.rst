@@ -13,7 +13,8 @@ The gRPC bridge sandbox is an example usage of Envoy's
 This is an example of a key-value store where an ``http``-based client CLI, written in ``Python``,
 updates a remote store, written in ``Go``, using the stubs generated for both languages.
 
-The client send messages through a proxy that upgrades the HTTP requests from ``http/1.1`` to ``http/2``.
+The client send messages through a proxy that upgrades the HTTP requests from ``http/1.1`` to ``http/2`` or
+``http/3``
 
 ``[client](http/1.1) -> [client-egress-proxy](http/2) -> [server-ingress-proxy](http/2) -> [server]``
 

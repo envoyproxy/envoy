@@ -21,7 +21,10 @@ envoy_proto_library(
 py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
-    data = ["//docs:protodoc_manifest.yaml"],
+    data = [
+        "//docs:protodoc_manifest.yaml",
+        "//docs:v2_mapping.json",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":manifest_proto_py_proto",
