@@ -35,7 +35,7 @@ message StatsSink {
   string name = 1;
 
   // Stats sink specific configuration which depends on the sink being instantiated. See
-  // :ref:`StatsdSink <envoy_api_msg_config.metrics.v4alpha.StatsdSink>` for an example.
+  // :ref:`StatsdSink <envoy_v3_api_msg_config.metrics.v3.StatsdSink>` for an example.
   // [#extension-category: envoy.stats_sinks]
   oneof config_type {
     google.protobuf.Any typed_config = 3;
@@ -49,13 +49,13 @@ message StatsConfig {
 
   // Each stat name is iteratively processed through these tag specifiers.
   // When a tag is matched, the first capture group is removed from the name so
-  // later :ref:`TagSpecifiers <envoy_api_msg_config.metrics.v4alpha.TagSpecifier>` cannot match that
+  // later :ref:`TagSpecifiers <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>` cannot match that
   // same portion of the match.
   repeated TagSpecifier stats_tags = 1;
 
   // Use all default tag regexes specified in Envoy. These can be combined with
   // custom tags specified in :ref:`stats_tags
-  // <envoy_api_field_config.metrics.v4alpha.StatsConfig.stats_tags>`. They will be processed before
+  // <envoy_v3_api_field_config.metrics.v3.StatsConfig.stats_tags>`. They will be processed before
   // the custom tags.
   //
   // .. note::
@@ -117,7 +117,7 @@ message StatsMatcher {
   // However, StatsMatcher can be used to limit the creation of families of stats in order to
   // conserve memory. Stats can either be disabled entirely, or they can be
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
-  // <envoy_api_msg_type.matcher.v4alpha.StringMatcher>` protos:
+  // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` protos:
   //
   // * If `reject_all` is set to `true`, no stats will be instantiated. If `reject_all` is set to
   //   `false`, all stats will be instantiated.
@@ -211,9 +211,9 @@ message TagSpecifier {
   // sink. Envoy has a set of default names and regexes to extract dynamic
   // portions of existing stats, which can be found in :repo:`well_known_names.h
   // <source/common/config/well_known_names.h>` in the Envoy repository. If a :ref:`tag_name
-  // <envoy_api_field_config.metrics.v4alpha.TagSpecifier.tag_name>` is provided in the config and
-  // neither :ref:`regex <envoy_api_field_config.metrics.v4alpha.TagSpecifier.regex>` or
-  // :ref:`fixed_value <envoy_api_field_config.metrics.v4alpha.TagSpecifier.fixed_value>` were specified,
+  // <envoy_v3_api_field_config.metrics.v3.TagSpecifier.tag_name>` is provided in the config and
+  // neither :ref:`regex <envoy_v3_api_field_config.metrics.v3.TagSpecifier.regex>` or
+  // :ref:`fixed_value <envoy_v3_api_field_config.metrics.v3.TagSpecifier.fixed_value>` were specified,
   // Envoy will attempt to find that name in its set of defaults and use the accompanying regex.
   //
   // .. note::
@@ -353,7 +353,7 @@ message StatsdSink {
 // Stats configuration proto schema for built-in *envoy.stat_sinks.dog_statsd* sink.
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
-// <envoy_api_msg_config.metrics.v4alpha.StatsConfig>`.
+// <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
 // [#extension: envoy.stat_sinks.dog_statsd]
 message DogStatsdSink {
   option (udpa.annotations.versioning).previous_message_type =
@@ -370,7 +370,7 @@ message DogStatsdSink {
   }
 
   // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
-  // <envoy_api_field_config.metrics.v4alpha.StatsdSink.prefix>` for more details.
+  // <envoy_v3_api_field_config.metrics.v3.StatsdSink.prefix>` for more details.
   string prefix = 3;
 
   // Optional max datagram size to use when sending UDP messages. By default Envoy
