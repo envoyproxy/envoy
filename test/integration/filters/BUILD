@@ -70,9 +70,9 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "continue_after_local_reply_filter_with_metadata_lib",
+    name = "local_reply_with_metadata_filter_lib",
     srcs = [
-        "continue_after_local_reply_with_metadata_filter.cc",
+        "local_reply_with_metadata_filter.cc",
     ],
     deps = [
         ":common_lib",
