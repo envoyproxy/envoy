@@ -87,6 +87,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
   * Replace all internal links in current.rst with the versioned link pointing to the current version.
     E.g., replace `` :ref:`deprecation period <deprecated>` `` with `` :ref:`deprecation period <v1.6.0:deprecated>` ``.
+  * Update the [docs/versions.json](docs/versions.json) with the current release.
   * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
