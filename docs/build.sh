@@ -152,6 +152,7 @@ rsync -av \
       "${SCRIPT_DIR}"/root/ \
       "${SCRIPT_DIR}"/conf.py \
       "${SCRIPT_DIR}"/redirects.txt \
+      "${SCRIPT_DIR}"/versions.json \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
 
