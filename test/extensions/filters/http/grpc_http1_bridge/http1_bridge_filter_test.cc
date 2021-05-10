@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -29,6 +30,8 @@ public:
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
+    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
+        .WillByDefault(testing::ReturnRef(stats_store_));
   }
 
   ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
@@ -38,6 +41,7 @@ public:
   Http1BridgeFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
 };
 
@@ -69,7 +73,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, NoCluster) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
 }
 
-TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
+TEST_F(GrpcHttp1BridgeFilterTest, Http2HeaderOnlyResponse) {
   protocol_ = Http::Protocol::Http2;
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -86,6 +90,37 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
+}
+
+TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
+  protocol_ = Http::Protocol::Http2;
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.grpc_bridge_stats_disabled", "false"}});
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"grpc-status", "1"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_TRUE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure"));
+  EXPECT_TRUE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
                      .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure")
@@ -96,7 +131,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
                      .value());
 }
 
-TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
+TEST_F(GrpcHttp1BridgeFilterTest, Http2NormalResponse) {
   protocol_ = Http::Protocol::Http2;
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -111,17 +146,13 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
-                     .value());
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.success"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
 }
 
-TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2ContentTypeGrpcPlusProto) {
+TEST_F(GrpcHttp1BridgeFilterTest, Http2ContentTypeGrpcPlusProto) {
   protocol_ = Http::Protocol::Http2;
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -134,14 +165,10 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2ContentTypeGrpcPlusProto) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
-                     .value());
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.success"));
+  EXPECT_FALSE(
+      stats_store_.findCounterByString("grpc.lyft.users.BadCompanions.GetBadCompanions.total"));
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, NotHandlingHttp2) {

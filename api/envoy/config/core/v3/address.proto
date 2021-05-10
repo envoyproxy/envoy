@@ -37,7 +37,7 @@ message EnvoyInternalAddress {
   oneof address_name_specifier {
     option (validate.required) = true;
 
-    // [#not-implemented-hide:] The :ref:`listener name <envoy_api_field_config.listener.v3.Listener.name>` of the destination internal listener.
+    // [#not-implemented-hide:] The :ref:`listener name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the destination internal listener.
     string server_listener_name = 1;
   }
 }
@@ -57,13 +57,13 @@ message SocketAddress {
   // to the address. An empty address is not allowed. Specify ``0.0.0.0`` or ``::``
   // to bind to any address. [#comment:TODO(zuercher) reinstate when implemented:
   // It is possible to distinguish a Listener address via the prefix/suffix matching
-  // in :ref:`FilterChainMatch <envoy_api_msg_config.listener.v3.FilterChainMatch>`.] When used
-  // within an upstream :ref:`BindConfig <envoy_api_msg_config.core.v3.BindConfig>`, the address
+  // in :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`.] When used
+  // within an upstream :ref:`BindConfig <envoy_v3_api_msg_config.core.v3.BindConfig>`, the address
   // controls the source address of outbound connections. For :ref:`clusters
-  // <envoy_api_msg_config.cluster.v3.Cluster>`, the cluster type determines whether the
+  // <envoy_v3_api_msg_config.cluster.v3.Cluster>`, the cluster type determines whether the
   // address must be an IP (*STATIC* or *EDS* clusters) or a hostname resolved by DNS
   // (*STRICT_DNS* or *LOGICAL_DNS* clusters). Address resolution can be customized
-  // via :ref:`resolver_name <envoy_api_field_config.core.v3.SocketAddress.resolver_name>`.
+  // via :ref:`resolver_name <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>`.
   string address = 2 [(validate.rules).string = {min_len: 1}];
 
   oneof port_specifier {
@@ -72,7 +72,7 @@ message SocketAddress {
     uint32 port_value = 3 [(validate.rules).uint32 = {lte: 65535}];
 
     // This is only valid if :ref:`resolver_name
-    // <envoy_api_field_config.core.v3.SocketAddress.resolver_name>` is specified below and the
+    // <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>` is specified below and the
     // named resolver is capable of named port resolution.
     string named_port = 4;
   }
@@ -117,7 +117,7 @@ message BindConfig {
 
   // Whether to set the *IP_FREEBIND* option when creating the socket. When this
   // flag is set to true, allows the :ref:`source_address
-  // <envoy_api_field_config.cluster.v3.UpstreamBindConfig.source_address>` to be an IP address
+  // <envoy_v3_api_field_config.cluster.v3.UpstreamBindConfig.source_address>` to be an IP address
   // that is not configured on the system running Envoy. When this flag is set
   // to false, the option *IP_FREEBIND* is disabled on the socket. When this
   // flag is not set (default), the socket is not modified, i.e. the option is

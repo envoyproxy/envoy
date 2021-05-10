@@ -43,8 +43,7 @@ public:
     }
     Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
     quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-        dispatcher, transport_socket_factory, host->cluster().statsScope(), time_source,
-        source_address);
+        dispatcher, transport_socket_factory, time_source, source_address);
     Quic::configQuicInitialFlowControlWindow(
         host_->cluster().http3Options().quic_protocol_options(), quic_info_->quic_config_);
   }

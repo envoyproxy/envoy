@@ -32,7 +32,7 @@ message UpstreamTlsContext {
   // .. attention::
   //
   //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` to enable
+  //   :ref:`trusted_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` to enable
   //   verification.
   CommonTlsContext common_tls_context = 1;
 
@@ -101,8 +101,8 @@ message DownstreamTlsContext {
     // Config for controlling stateless TLS session resumption: setting this to true will cause the TLS
     // server to not issue TLS session tickets for the purposes of stateless TLS session resumption.
     // If set to false, the TLS server will issue TLS session tickets and encrypt/decrypt them using
-    // the keys specified through either :ref:`session_ticket_keys <envoy_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`
-    // or :ref:`session_ticket_keys_sds_secret_config <envoy_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys_sds_secret_config>`.
+    // the keys specified through either :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`
+    // or :ref:`session_ticket_keys_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys_sds_secret_config>`.
     // If this config is set to false and no keys are explicitly configured, the TLS server will issue
     // TLS session tickets and encrypt/decrypt them using an internally-generated and managed key, with the
     // implication that sessions cannot be resumed across hot restarts or on different hosts.
@@ -256,7 +256,7 @@ message CommonTlsContext {
   // Supplies the list of ALPN protocols that the listener should expose. In
   // practice this is likely to be set to one of two values (see the
   // :ref:`codec_type
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.codec_type>`
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.codec_type>`
   // parameter in the HTTP connection manager for more information):
   //
   // * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.

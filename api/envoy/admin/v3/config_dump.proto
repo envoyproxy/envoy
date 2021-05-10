@@ -53,11 +53,11 @@ message ConfigDump {
   // The following configurations are currently supported and will be dumped in the order given
   // below:
   //
-  // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v3.BootstrapConfigDump>`
-  // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v3.ClustersConfigDump>`
-  // * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v3.EndpointsConfigDump>`
-  // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v3.ListenersConfigDump>`
-  // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v3.RoutesConfigDump>`
+  // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_v3_api_msg_admin.v3.BootstrapConfigDump>`
+  // * *clusters*: :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`
+  // * *endpoints*:  :ref:`EndpointsConfigDump <envoy_v3_api_msg_admin.v3.EndpointsConfigDump>`
+  // * *listeners*: :ref:`ListenersConfigDump <envoy_v3_api_msg_admin.v3.ListenersConfigDump>`
+  // * *routes*:  :ref:`RoutesConfigDump <envoy_v3_api_msg_admin.v3.RoutesConfigDump>`
   //
   // EDS Configuration will only be dumped by using parameter `?include_eds`
   //
@@ -126,7 +126,7 @@ message ListenersConfigDump {
         "envoy.admin.v2alpha.ListenersConfigDump.DynamicListenerState";
 
     // This is the per-resource version information. This version is currently taken from the
-    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time
+    // :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time
     // that the listener was loaded. In the future, discrete per-listener versions may be supported
     // by the API.
     string version_info = 1;
@@ -174,7 +174,7 @@ message ListenersConfigDump {
     ClientResourceStatus client_status = 6;
   }
 
-  // This is the :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` in the
+  // This is the :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` in the
   // last processed LDS discovery response. If there are only static bootstrap listeners, this field
   // will be "".
   string version_info = 1;
@@ -212,7 +212,7 @@ message ClustersConfigDump {
         "envoy.admin.v2alpha.ClustersConfigDump.DynamicCluster";
 
     // This is the per-resource version information. This version is currently taken from the
-    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time
+    // :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time
     // that the cluster was loaded. In the future, discrete per-cluster versions may be supported by
     // the API.
     string version_info = 1;
@@ -235,7 +235,7 @@ message ClustersConfigDump {
     ClientResourceStatus client_status = 5;
   }
 
-  // This is the :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` in the
+  // This is the :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` in the
   // last processed CDS discovery response. If there are only static bootstrap clusters, this field
   // will be "".
   string version_info = 1;
@@ -280,7 +280,7 @@ message RoutesConfigDump {
         "envoy.admin.v2alpha.RoutesConfigDump.DynamicRouteConfig";
 
     // This is the per-resource version information. This version is currently taken from the
-    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+    // :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
     // the route configuration was loaded.
     string version_info = 1;
 
@@ -340,7 +340,7 @@ message ScopedRoutesConfigDump {
     string name = 1;
 
     // This is the per-resource version information. This version is currently taken from the
-    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+    // :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
     // the scoped routes configuration was loaded.
     string version_info = 2;
 
@@ -450,7 +450,7 @@ message EndpointsConfigDump {
   // [#next-free-field: 6]
   message DynamicEndpointConfig {
     // [#not-implemented-hide:] This is the per-resource version information. This version is currently taken from the
-    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+    // :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
     // the endpoint configuration was loaded.
     string version_info = 1;
 

@@ -25,6 +25,9 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response");
     MutationUtils::applyCommonHeaderResponse(response, *headers_);
+    if (response.response().clear_route_cache()) {
+      filter_callbacks_->clearRouteCache();
+    }
     callback_state_ = CallbackState::Idle;
     clearWatermark();
     message_timer_->disableTimer();
@@ -66,6 +69,9 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
     modifyBufferedData([this, &response](Buffer::Instance& data) {
       MutationUtils::applyCommonBodyResponse(response, headers_, data);
     });
+    if (response.response().clear_route_cache()) {
+      filter_callbacks_->clearRouteCache();
+    }
     headers_ = nullptr;
     callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();

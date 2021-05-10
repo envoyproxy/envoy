@@ -65,6 +65,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
+    "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
     "envoy.reloadable_features.hash_multiple_header_values",
@@ -107,9 +108,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
     // TODO(asraa): Flip to true after staging.
     "envoy.reloadable_features.enable_new_http1_parser",
-    // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
-    // v2 url is removed from codebase.
-    "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.

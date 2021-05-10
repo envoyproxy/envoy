@@ -33,7 +33,7 @@ message PostgresProxy {
   // terminate SSL session, but will pass all the packets to the upstream server.
   // If the value is true, the Postgres proxy filter will try to terminate SSL
   // session. In order to do that, the filter chain must use :ref:`starttls transport socket
-  // <envoy_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+  // <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
   // If the filter does not manage to terminate the SSL session, it will close the connection from the client.
   // Refer to official documentation for details
   // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.

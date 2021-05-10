@@ -68,8 +68,9 @@ public:
         .WillRepeatedly(ReturnRef(empty_string_list_));
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
-    verifier_ =
-        std::make_unique<EnvoyQuicProofVerifier>(store_, client_context_config_, time_system_);
+    auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
+        store_, client_context_config_, time_system_);
+    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
 protected:
