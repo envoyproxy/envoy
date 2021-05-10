@@ -1,9 +1,8 @@
 #include <array>
-#include <functional>
 
 #include "envoy/common/scope_tracker.h"
 
-#include "common/common/opaque_scope_tracker.h"
+#include "common/common/scope_tracked_object_stack.h"
 #include "common/common/utility.h"
 
 #include "test/test_common/utility.h"
@@ -18,10 +17,11 @@ TEST(OpaqueScopeTrackedObjectTest, ShouldDumpTrackedObjectsInFILO) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   MessageTrackedObject first{"first"};
   MessageTrackedObject second{"second"};
-  std::vector<std::reference_wrapper<const ScopeTrackedObject>> tracked_objects{first, second};
 
-  OpaqueScopeTrackedObject opaque_tracker{std::move(tracked_objects)};
-  opaque_tracker.dumpState(ostream, 0);
+  ScopeTrackedObjectStack encapsulated_object;
+  encapsulated_object.add(first);
+  encapsulated_object.add(second);
+  encapsulated_object.dumpState(ostream, 0);
 
   EXPECT_EQ(ostream.contents(), "secondfirst");
 }

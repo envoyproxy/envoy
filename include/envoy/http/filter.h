@@ -17,6 +17,8 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/scope_tracked_object_stack.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -292,8 +294,7 @@ public:
    * @return an opaque ScopeTrackedObject that should be registered on the
    * dispatcher.
    */
-  virtual void restoreContextOnContinue(
-      std::vector<std::reference_wrapper<const ScopeTrackedObject>>& tracked_objects) PURE;
+  virtual void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) PURE;
 };
 
 /**

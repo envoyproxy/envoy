@@ -433,10 +433,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "opaque_scope_tracker_test",
-    srcs = ["opaque_scope_tracker_test.cc"],
+    name = "scope_tracked_object_stack_test",
+    srcs = ["scope_tracked_object_stack_test.cc"],
     deps = [
-        "//source/common/common:opaque_scope_tracker",
+        "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:utility_lib",
     ],
 )

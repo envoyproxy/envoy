@@ -18,7 +18,6 @@
 #include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
-#include "common/common/opaque_scope_tracker.h"
 #include "common/grpc/common.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -143,8 +142,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Tracing::Span& activeSpan() override;
   Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
-  void restoreContextOnContinue(
-      std::vector<std::reference_wrapper<const ScopeTrackedObject>>& tracked_objects) override;
+  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -922,8 +920,7 @@ public:
     return filter_manager_callbacks_.enableInternalRedirectsWithBody();
   }
 
-  void
-  contextOnContinue(std::vector<std::reference_wrapper<const ScopeTrackedObject>>& tracked_objects);
+  void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
 private:
   // Indicates which filter to start the iteration with.

@@ -211,7 +211,7 @@ envoy_cc_library(
         "//include/envoy/matcher:matcher_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:linked_object",
-        "//source/common/common:opaque_scope_tracker",
+        "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
         "//source/common/http/matching:data_impl_lib",
