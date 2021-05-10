@@ -79,7 +79,6 @@ public:
   const LowerCaseString Pragma{"pragma"};
   const LowerCaseString Referer{"referer"};
   const LowerCaseString Vary{"vary"};
-  const LowerCaseString WwwAuthenticate{"www-authenticate"};
 
   struct {
     const std::string Gzip{"gzip"};
