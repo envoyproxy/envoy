@@ -292,7 +292,7 @@ htmlhelp_basename = 'envoydoc'
 rediraffe_redirects = "redirects.txt"
 
 with open("versions.json") as f:
-    versions = json.load(f.read())
+    versions = json.load(f)
 
 
 intersphinx_mapping = {
