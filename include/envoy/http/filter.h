@@ -291,8 +291,8 @@ public:
    * to restore crash context. If not explicitly used by the filter itself, this
    * gets invoked in ActiveStreamFilterBase::commonContinue().
    *
-   * @return an opaque ScopeTrackedObject that should be registered on the
-   * dispatcher.
+   * @param tracked_object_stack ScopeTrackedObjectStack where relevant ScopeTrackedObjects will be
+   * added to.
    */
   virtual void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) PURE;
 };
