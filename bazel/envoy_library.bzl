@@ -93,6 +93,7 @@ EXTENSION_CATEGORIES = [
     "envoy.retry_priorities",
     "envoy.stats_sinks",
     "envoy.thrift_proxy.filters",
+    "envoy.sip_proxy.filters",
     "envoy.tracers",
     "envoy.transport_sockets.downstream",
     "envoy.transport_sockets.upstream",

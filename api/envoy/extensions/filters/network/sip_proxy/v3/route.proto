@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.sip_proxy.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.sip_proxy.v3";
+option java_outer_classname = "RouteProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Sip Proxy Route Configuration]
+// Sip Proxy :ref:`configuration overview <config_network_filters_sip_proxy>`.
+
+// [#protodoc-title: Router]
+// Sip router :ref:`configuration overview <config_sip_filters_router>`.
+
+message RouteConfiguration {
+  string name = 1;
+  repeated Route routes = 2;
+}
+
+message Route {
+  RouteMatch match = 1 [(validate.rules).message = {required: true}];
+  RouteAction route = 2 [(validate.rules).message = {required: true}];
+}
+
+message RouteMatch {
+  oneof match_specifier {
+    option (validate.required) = true;
+
+    string domain = 1;
+  }
+
+  // Inverts whatever matching is done in the :ref:`method_name
+  // <envoy_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name>` or
+  // :ref:`service_name
+  // <envoy_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name>` fields.
+  // Cannot be combined with wildcard matching as that would result in routes never being matched.
+  //
+  // .. note::
+  //
+  //   This does not invert matching done as part of the :ref:`headers field
+  //   <envoy_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>` field. To
+  //   invert header matching, see :ref:`invert_match
+  //   <envoy_api_field_config.route.v3.HeaderMatcher.invert_match>`.
+  bool invert = 2;
+
+  // Specifies a set of headers that the route should match on. The router will check the request’s
+  // headers against all the specified headers in the route config. A match will happen if all the
+  // headers in the route are present in the request with the same values (or based on presence if
+  // the value field is not in the config). Note that this only applies for Thrift transports and/or
+  // protocols that support headers
+  repeated config.route.v3.HeaderMatcher headers = 3;
+}
+
+message RouteAction {
+  oneof cluster_specifier {
+    option (validate.required) = true;
+
+    // Indicates a single upstream cluster to which the request should be routed
+    // to.
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Envoy will determine the cluster to route to by reading the value of the
+    // Thrift header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist Envoy will
+    // respond with an unknown method exception or an internal error exception,
+    // respectively
+    string cluster_header = 6 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+  }
+
+  // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
+  // the upstream cluster with metadata matching what is set in this field will be considered.
+  // Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
+  // <envoy_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.metadata_match>`,
+  // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
+  // metadata key.
+  config.core.v3.Metadata metadata_match = 3;
+
+  // Specifies a set of rate limit configurations that could be applied to the route.
+  // N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
+  // action with the header name ":method-name".
+  repeated config.route.v3.RateLimit rate_limits = 4;
+
+  // Strip the service prefix from the method name, if there's a prefix. For
+  // example, the method call Service:method would end up being just method.
+  bool strip_service_name = 5;
+}

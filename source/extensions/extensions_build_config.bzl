@@ -143,6 +143,7 @@ EXTENSIONS = {
     "envoy.filters.network.sni_dynamic_forward_proxy":  "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
     "envoy.filters.network.wasm":                       "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
+    "envoy.filters.network.sip_proxy":               "//source/extensions/filters/network/sip_proxy:config",
 
     #
     # UDP filters
@@ -174,6 +175,13 @@ EXTENSIONS = {
 
     "envoy.filters.thrift.router":                      "//source/extensions/filters/network/thrift_proxy/router:config",
     "envoy.filters.thrift.ratelimit":                   "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
+
+    #
+    # Sip filters
+    #
+
+    "envoy.filters.sip_proxy.router":                      "//source/extensions/filters/network/sip_proxy/router:config",
+    "envoy.filters.sip_proxy.ratelimit":                   "//source/extensions/filters/network/sip_proxy/filters/ratelimit:config",
 
     #
     # Tracers
