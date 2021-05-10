@@ -41,7 +41,7 @@ message StreamTapsRequest {
     config.core.v3.Node node = 1 [(validate.rules).message = {required: true}];
 
     // The opaque identifier that was set in the :ref:`output config
-    // <envoy_api_field_config.tap.v3.StreamingGrpcSink.tap_id>`.
+    // <envoy_v3_api_field_config.tap.v3.StreamingGrpcSink.tap_id>`.
     string tap_id = 2;
   }
 

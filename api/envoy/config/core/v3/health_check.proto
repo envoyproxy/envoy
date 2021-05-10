@@ -85,7 +85,7 @@ message HealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The host header can be customized for a specific endpoint by setting the
-    // :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
+    // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
     string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
@@ -114,7 +114,7 @@ message HealthCheck {
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
-    // semantics of :ref:`Int64Range <envoy_api_msg_type.v3.Int64Range>`. The start and end of each
+    // semantics of :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each
     // range are required. Only statuses in the range [100, 600) are allowed.
     repeated type.v3.Int64Range expected_statuses = 9;
 
@@ -123,7 +123,7 @@ message HealthCheck {
 
     // An optional service name parameter which is used to validate the identity of
     // the health checked cluster using a :ref:`StringMatcher
-    // <envoy_api_msg_type.matcher.v3.StringMatcher>`. See the :ref:`architecture overview
+    // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
   }
@@ -170,7 +170,7 @@ message HealthCheck {
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The authority header can be customized for a specific endpoint by setting
-    // the :ref:`hostname <envoy_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
+    // the :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
     string authority = 2
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
@@ -205,7 +205,7 @@ message HealthCheck {
 
     // Specifies the ALPN protocols for health check connections. This is useful if the
     // corresponding upstream is using ALPN-based :ref:`FilterChainMatch
-    // <envoy_api_msg_config.listener.v3.FilterChainMatch>` along with different protocols for health checks
+    // <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` along with different protocols for health checks
     // versus data connections. If empty, no ALPN protocols will be set on health check connections.
     repeated string alpn_protocols = 1;
   }
@@ -339,7 +339,7 @@ message HealthCheck {
   TlsOptions tls_options = 21;
 
   // Optional key/value pairs that will be used to match a transport socket from those specified in the cluster's
-  // :ref:`tranport socket matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  // :ref:`tranport socket matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
   // For example, the following match criteria
   //
   // .. code-block:: yaml
@@ -347,7 +347,7 @@ message HealthCheck {
   //  transport_socket_match_criteria:
   //    useMTLS: true
   //
-  // Will match the following :ref:`cluster socket match <envoy_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>`
+  // Will match the following :ref:`cluster socket match <envoy_v3_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>`
   //
   // .. code-block:: yaml
   //
@@ -360,13 +360,13 @@ message HealthCheck {
   //      config: { ... } # tls socket configuration
   //
   // If this field is set, then for health checks it will supersede an entry of *envoy.transport_socket* in the
-  // :ref:`LbEndpoint.Metadata <envoy_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
+  // :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
   // This allows using different transport socket capabilities for health checking versus proxying to the
   // endpoint.
   //
   // If the key/values pairs specified do not match any
-  // :ref:`transport socket matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`,
-  // the cluster's :ref:`transport socket <envoy_api_field_config.cluster.v3.Cluster.transport_socket>`
+  // :ref:`transport socket matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`,
+  // the cluster's :ref:`transport socket <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`
   // will be used for health check socket configuration.
   google.protobuf.Struct transport_socket_match_criteria = 23;
 }

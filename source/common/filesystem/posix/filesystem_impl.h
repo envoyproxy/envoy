@@ -46,5 +46,7 @@ private:
   friend class FileSystemImplTest;
 };
 
+using FileImpl = FileImplPosix;
+using InstanceImpl = InstanceImplPosix;
 } // namespace Filesystem
 } // namespace Envoy

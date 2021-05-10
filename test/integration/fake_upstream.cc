@@ -479,16 +479,6 @@ makeListenSocket(const FakeUpstreamConfig& config,
                                                 : makeTcpListenSocket(address));
 }
 
-FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                           const FakeUpstreamConfig& config)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(), makeListenSocket(config, address),
-                   config) {
-  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
-            address->ip()->addressAsString(), address->ip()->port(),
-            Network::Test::addressVersionAsString(address->ip()->version()),
-            config.udp_fake_upstream_.has_value());
-}
-
 FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
