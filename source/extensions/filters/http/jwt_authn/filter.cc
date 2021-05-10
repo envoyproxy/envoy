@@ -127,7 +127,7 @@ void Filter::onComplete(const Status& status) {
           if (status != Status::JwtMissed) {
             absl::StrAppend(&value, ", error=\"", InvalidTokenErrorString, "\"");
           }
-          headers.setCopy(Http::LowerCaseString("www-authenticate"), value);
+          headers.setCopy(Http::CustomHeaders::get().WwwAuthenticate, value);
         },
         absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
