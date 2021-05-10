@@ -48,12 +48,12 @@ message Bootstrap {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.Bootstrap.StaticResources";
 
-    // Static :ref:`Listeners <envoy_api_msg_config.listener.v3.Listener>`. These listeners are
+    // Static :ref:`Listeners <envoy_v3_api_msg_config.listener.v3.Listener>`. These listeners are
     // available regardless of LDS configuration.
     repeated listener.v3.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
-    // <envoy_api_field_config.bootstrap.v3.Bootstrap.DynamicResources.cds_config>`, it's necessary
+    // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.DynamicResources.cds_config>`, it's necessary
     // to have some initial cluster definitions available to allow Envoy to know
     // how to speak to the management server. These cluster definitions may not
     // use :ref:`EDS <arch_overview_dynamic_config_eds>` (i.e. they should be static
@@ -61,7 +61,7 @@ message Bootstrap {
     repeated cluster.v3.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
-    // <envoy_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`
+    // <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`
     repeated envoy.extensions.transport_sockets.tls.v3.Secret secrets = 3;
   }
 
@@ -72,7 +72,7 @@ message Bootstrap {
 
     reserved 4;
 
-    // All :ref:`Listeners <envoy_api_msg_config.listener.v3.Listener>` are provided by a single
+    // All :ref:`Listeners <envoy_v3_api_msg_config.listener.v3.Listener>` are provided by a single
     // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     core.v3.ConfigSource lds_config = 1;
 
@@ -80,7 +80,7 @@ message Bootstrap {
     // [#not-implemented-hide:]
     string lds_resources_locator = 5;
 
-    // All post-bootstrap :ref:`Cluster <envoy_api_msg_config.cluster.v3.Cluster>` definitions are
+    // All post-bootstrap :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` definitions are
     // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
     // configuration source.
     core.v3.ConfigSource cds_config = 2;
@@ -91,10 +91,10 @@ message Bootstrap {
 
     // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
-    // <envoy_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
-    // <envoy_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`. Only
-    // :ref:`ConfigSources <envoy_api_msg_config.core.v3.ConfigSource>` that have
-    // the :ref:`ads <envoy_api_field_config.core.v3.ConfigSource.ads>` field set will be
+    // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
+    // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`. Only
+    // :ref:`ConfigSources <envoy_v3_api_msg_config.core.v3.ConfigSource>` that have
+    // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
     core.v3.ApiConfigSource ads_config = 3;
   }
@@ -152,7 +152,7 @@ message Bootstrap {
   ClusterManager cluster_manager = 4;
 
   // Health discovery service config option.
-  // (:ref:`core.ApiConfigSource <envoy_api_msg_config.core.v3.ApiConfigSource>`)
+  // (:ref:`core.ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>`)
   core.v3.ApiConfigSource hds_config = 14;
 
   // Optional file system path to search for startup flag files.
@@ -200,7 +200,7 @@ message Bootstrap {
   //
   // .. attention::
   //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
-  //  <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
+  //  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
   trace.v3.Tracing tracing = 9
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -221,7 +221,7 @@ message Bootstrap {
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
   // should normally be minimal overhead, but when using
-  // :ref:`statsd <envoy_api_msg_config.metrics.v3.StatsdSink>`, it will send each observed value
+  // :ref:`statsd <envoy_v3_api_msg_config.metrics.v3.StatsdSink>`, it will send each observed value
   // over the wire individually because the statsd protocol doesn't have any way to represent a
   // histogram summary. Be aware that this can be a very large volume of data.
   bool enable_dispatcher_stats = 16;
@@ -239,13 +239,13 @@ message Bootstrap {
 
   // Optional proxy version which will be used to set the value of :ref:`server.version statistic
   // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
-  // :ref:`stats sinks <envoy_api_msg_config.metrics.v3.StatsSink>`.
+  // :ref:`stats sinks <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
-  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
+  // when :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
+  // :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
   // Setting this value causes failure if the
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
@@ -291,7 +291,7 @@ message Bootstrap {
 
   // Global map of CertificateProvider instances. These instances are referred to by name in the
   // :ref:`CommonTlsContext.CertificateProviderInstance.instance_name
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance.instance_name>`
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance.instance_name>`
   // field.
   // [#not-implemented-hide:]
   map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
@@ -309,7 +309,7 @@ message Admin {
 
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
-  // :ref:`address <envoy_api_field_config.bootstrap.v3.Admin.address>` is set.
+  // :ref:`address <envoy_v3_api_field_config.bootstrap.v3.Admin.address>` is set.
   // Deprecated in favor of *access_log* which offers more options.
   string access_log_path = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
@@ -349,9 +349,9 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <envoy_api_msg_config.cluster.v3.Cluster>` must be defined in the :ref:`Bootstrap
+  // <envoy_v3_api_msg_config.cluster.v3.Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
-  // <envoy_api_field_config.bootstrap.v3.Bootstrap.StaticResources.clusters>`. This is unrelated to
+  // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.clusters>`. This is unrelated to
   // the :option:`--service-cluster` option which does not `affect zone aware
   // routing <https://github.com/envoyproxy/envoy/issues/774>`_.
   string local_cluster_name = 1;
@@ -365,8 +365,8 @@ message ClusterManager {
 
   // A management server endpoint to stream load stats to via
   // *StreamLoadStats*. This must have :ref:`api_type
-  // <envoy_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
-  // <envoy_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
+  // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
+  // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
   core.v3.ApiConfigSource load_stats_config = 4;
 }
 

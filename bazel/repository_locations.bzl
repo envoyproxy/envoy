@@ -65,11 +65,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "50ea97bb4289441f4f87537e8c145ffb79b1c9ba",
-        sha256 = "3c905c71e9f2f29f4c24d9e980c95a45c73510e10b9baa6199e3fa4acfafba5e",
+        version = "2d4bdba38113cd9bf758c2609f40ce90014e52af",
+        sha256 = "8e872990609d67f9b635790020672d1972b906bed30e4d08d97f964be1ced483",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2021-04-14",
+        release_date = "2021-05-06",
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -77,17 +77,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
+        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/dev release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-90.0.4395.0(linux/dev)
-        version = "b049eae83d25977661556dcd913b35fbafb3a93a",
-        sha256 = "d78f7b11b8665feea1b6def8e6f235ad8671db8de950f5429f1bf2b3503b3894",
+        # chromium-92.0.4491.6 (linux/dev)
+        version = "c5ad6dcb65e532589e8acb9e9adbde62463af13d",
+        sha256 = "6b4674999af85c4a19f2b51132db3507520070923cd967bb1cd157d43b3f68d9",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-01-25",
+        release_date = "2021-04-22",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -948,8 +948,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "4b33df7638637fcc680291daa9d7a57c59e0411e",
-        sha256 = "e78507e04dc8b154ced5b19d6175bd1435fd850fdd127bce541d31799db06cd4",
+        version = "31c75e0039f2f5c42dc6e12556cb151a38da6d8b",
+        sha256 = "779e7a8e0fd8ed8b3133b464a8e5a9974bdedb345792d3a6148cb5a87e26976b",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -964,7 +964,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-04-20",
+        release_date = "2021-05-06",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

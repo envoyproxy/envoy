@@ -122,8 +122,7 @@ To add an extension config to the API, the steps below should be followed:
        deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
    )
    ```
-1. Add to the v3 extension config proto `import "udpa/annotations/migrate.proto";`
-   and `import "udpa/annotations/status.proto";`
+1. Add to the v3 extension config proto `import "udpa/annotations/status.proto";`
 1. If this is still WiP and subject to breaking changes, set
    `option (udpa.annotations.file_status).work_in_progress = true;`.
 1. Add to the v3 extension config proto a file level

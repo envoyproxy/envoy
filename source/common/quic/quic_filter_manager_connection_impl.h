@@ -142,6 +142,12 @@ public:
     codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
   }
 
+  uint32_t maxIncomingHeadersCount() { return max_headers_count_; }
+
+  void setMaxIncomingHeadersCount(uint32_t max_headers_count) {
+    max_headers_count_ = max_headers_count;
+  }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -179,6 +185,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   std::string transport_failure_reason_;
   uint32_t bytes_to_send_{0};
+  uint32_t max_headers_count_{std::numeric_limits<uint32_t>::max()};
   // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
   // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
   // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's

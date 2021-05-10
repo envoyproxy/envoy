@@ -148,7 +148,7 @@ message AttributeContext {
 
     // The HTTP request body in bytes. This is used instead of
     // :ref:`body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` when
-    // :ref:`pack_as_bytes <envoy_api_field_extensions.filters.http.ext_authz.v4alpha.BufferSettings.pack_as_bytes>`
+    // :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>`
     // is set to true.
     bytes raw_body = 12;
   }

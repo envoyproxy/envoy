@@ -28,8 +28,8 @@ message RouteConfiguration {
 
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.Rds.route_config_name>` in
-  // :ref:`envoy_api_msg_extensions.filters.network.http_connection_manager.v4alpha.Rds`.
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.Rds.route_config_name>` in
+  // :ref:`envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.Rds`.
   string name = 1;
 
   // An array of virtual hosts that make up the route table.
@@ -53,8 +53,8 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be added to each response that
   // the connection manager encodes. Headers specified at this level are applied
-  // after headers from any enclosed :ref:`envoy_api_msg_config.route.v4alpha.VirtualHost` or
-  // :ref:`envoy_api_msg_config.route.v4alpha.RouteAction`. For more information, including details on
+  // after headers from any enclosed :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost` or
+  // :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.v4alpha.HeaderValueOption response_headers_to_add = 4
@@ -68,8 +68,8 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be added to each request
   // routed by the HTTP connection manager. Headers specified at this level are
-  // applied after headers from any enclosed :ref:`envoy_api_msg_config.route.v4alpha.VirtualHost` or
-  // :ref:`envoy_api_msg_config.route.v4alpha.RouteAction`. For more information, including details on
+  // applied after headers from any enclosed :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost` or
+  // :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.v4alpha.HeaderValueOption request_headers_to_add = 6
@@ -100,22 +100,22 @@ message RouteConfiguration {
   // route table will load and the router filter will return a 404 if the route
   // is selected at runtime. This setting defaults to true if the route table
   // is statically defined via the :ref:`route_config
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.route_config>`
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.route_config>`
   // option. This setting default to false if the route table is loaded dynamically via the
   // :ref:`rds
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.rds>`
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>`
   // option. Users may wish to override the default behavior in certain cases (for example when
   // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 7;
 
   // The maximum bytes of the response :ref:`direct response body
-  // <envoy_api_field_config.route.v4alpha.DirectResponseAction.body>` size. If not specified the default
+  // <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` size. If not specified the default
   // is 4096.
   //
   // .. warning::
   //
   //   Envoy currently holds the content of :ref:`direct response body
-  //   <envoy_api_field_config.route.v4alpha.DirectResponseAction.body>` in memory. Be careful setting
+  //   <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` in memory. Be careful setting
   //   this to be larger than the default 4KB, since the allocated memory for direct response body
   //   is not subject to data plane buffering controls.
   //
