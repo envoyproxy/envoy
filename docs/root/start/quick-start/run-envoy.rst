@@ -82,6 +82,10 @@ Run Envoy with the demo configuration
 
 The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configuration.
 
+.. note::
+
+   The configuration file extension must be ``yaml``.
+
 .. tabs::
 
    .. tab:: System
