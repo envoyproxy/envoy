@@ -6,7 +6,6 @@
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
-using ::testing::InSequence;
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +38,7 @@ public:
   JwksAsyncFetcherTest() : stats_(generateMockStats(context_.scope())) {}
 
   // init manager is used in is_slow_listener mode
-  bool init_manager_used() const {
+  bool initManagerUsed() const {
     return config_.has_async_fetch() && !config_.async_fetch().fast_listener();
   }
 
@@ -52,7 +51,7 @@ public:
       }
     }
 
-    if (init_manager_used()) {
+    if (initManagerUsed()) {
       EXPECT_CALL(context_.init_manager_, add(_))
           .WillOnce(Invoke([this](const Init::Target& target) {
             init_target_handle_ = target.createHandle("test");
@@ -76,7 +75,7 @@ public:
         stats_,
         [this](google::jwt_verify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
 
-    if (init_manager_used()) {
+    if (initManagerUsed()) {
       init_target_handle_->initialize(init_watcher_);
     }
   }
@@ -128,7 +127,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetch) {
   // Jwks response is not received yet
   EXPECT_EQ(out_jwks_array_.size(), 0);
 
-  if (init_manager_used()) {
+  if (initManagerUsed()) {
     // Verify ready is not called.
     init_watcher_.expectReady().Times(0);
     EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(&init_watcher_));
@@ -160,7 +159,7 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetch) {
   // Jwks response is not received yet
   EXPECT_EQ(out_jwks_array_.size(), 0);
 
-  if (init_manager_used()) {
+  if (initManagerUsed()) {
     // Verify ready is not called.
     init_watcher_.expectReady().Times(0);
     EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(&init_watcher_));
