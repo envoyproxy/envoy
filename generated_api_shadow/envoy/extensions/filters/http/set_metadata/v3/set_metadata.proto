@@ -4,7 +4,6 @@ package envoy.extensions.filters.http.set_metadata.v3;
 
 import "google/protobuf/struct.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -24,6 +23,9 @@ message Config {
   // The metadata namespace.
   string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The value to update the namespace with.
+  // The value to update the namespace with. See
+  // :ref:`the filter documentation <config_http_filters_set_metadata>` for
+  // more information on how this value is merged with potentially existing
+  // ones.
   google.protobuf.Struct value = 2;
 }

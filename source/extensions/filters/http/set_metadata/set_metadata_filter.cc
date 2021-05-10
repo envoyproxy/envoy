@@ -18,27 +18,27 @@ namespace SetMetadataFilter {
 namespace {
 
 void pbStructUpdate(ProtobufWkt::Struct& obj, ProtobufWkt::Struct const& with) {
-  auto& objfields = *obj.mutable_fields();
+  auto& obj_fields = *obj.mutable_fields();
 
   for (auto const& [key, val] : with.fields()) {
-    auto& objkey = objfields[key];
+    auto& obj_key = obj_fields[key];
     switch (val.kind_case()) {
     // For scalars, the last one wins.
     case ProtobufWkt::Value::kNullValue:
     case ProtobufWkt::Value::kNumberValue:
     case ProtobufWkt::Value::kStringValue:
     case ProtobufWkt::Value::kBoolValue:
-      objkey = val;
+      obj_key = val;
       break;
     // If we got a structure, recursively update.
     case ProtobufWkt::Value::kStructValue:
-      pbStructUpdate(*objkey.mutable_struct_value(), val.struct_value());
+      pbStructUpdate(*obj_key.mutable_struct_value(), val.struct_value());
       break;
     // For lists, append the new values.
     case ProtobufWkt::Value::kListValue: {
-      auto& objkeyvec = *objkey.mutable_list_value()->mutable_values();
+      auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
       auto& vals = val.list_value().values();
-      objkeyvec.MergeFrom(vals);
+      obj_key_vec.MergeFrom(vals);
       break;
     }
     case ProtobufWkt::Value::KIND_NOT_SET:
@@ -59,12 +59,12 @@ SetMetadataFilter::SetMetadataFilter(const ConfigSharedPtr config) : config_(con
 SetMetadataFilter::~SetMetadataFilter() = default;
 
 Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  const auto metadataNamespace = config_->metadataNamespace();
+  const auto metadata_namespace = config_->metadataNamespace();
   auto& metadata = *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
-  ProtobufWkt::Struct& orgfields = metadata[metadataNamespace];
-  ProtobufWkt::Struct const& tomerge = config_->value();
+  ProtobufWkt::Struct& org_fields = metadata[metadata_namespace];
+  ProtobufWkt::Struct const& to_merge = config_->value();
 
-  pbStructUpdate(orgfields, tomerge);
+  pbStructUpdate(org_fields, to_merge);
 
   return Http::FilterHeadersStatus::Continue;
 }
