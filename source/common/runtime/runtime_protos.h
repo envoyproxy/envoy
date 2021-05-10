@@ -24,7 +24,7 @@ public:
     return static_cast<uint32_t>(runtime_.snapshot().getInteger(runtime_key_, default_value_));
   }
 
-protected:
+private:
   const std::string runtime_key_;
   const uint32_t default_value_;
   Runtime::Loader& runtime_;
