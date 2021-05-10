@@ -191,7 +191,9 @@ protected:
             *sds_tls_certificate_secrets_);
     // We replace path based secrets with inlined secrets on update.
     resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_certificate_chain());
-    resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_private_key());
+    if (sds_tls_certificate_secrets_->has_private_key()) {
+      resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_private_key());
+    }
   }
   void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
   std::vector<std::string> getDataSourceFilenames() override;
