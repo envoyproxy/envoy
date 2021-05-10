@@ -104,6 +104,9 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   bind_errors, Counter, Total errors binding the socket to the configured source address
   assignment_timeout_received, Counter, Total assignments received with endpoint lease information.
   assignment_stale, Counter, Number of times the received assignments went stale before new assignments arrived.
+  endpoints_added, Counter, Total endpoints added (either via static config, DNS or EDS)
+  endpoints_modified, Counter, Total endpoints modified (via DNS or EDS)
+  endpoints_removed, Counter, Total endpoints removed (via DNS or EDS)
 
 Health check statistics
 -----------------------

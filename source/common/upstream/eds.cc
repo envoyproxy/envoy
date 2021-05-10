@@ -258,6 +258,10 @@ bool EdsClusterImpl::updateHostsPerLocality(
   const bool hosts_updated =
       updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             updated_hosts, all_hosts_, all_new_hosts);
+  info_->stats().endpoints_added_.add(hosts_added.size());
+  ASSERT(new_hosts.size() >= hosts_added.size());
+  info_->stats().endpoints_modified_.add(new_hosts.size() - hosts_added.size());
+  info_->stats().endpoints_removed_.add(hosts_removed.size());
   if (hosts_updated || host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),

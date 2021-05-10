@@ -507,6 +507,9 @@ public:
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
   COUNTER(bind_errors)                                                                             \
+  COUNTER(endpoints_added)                                                                         \
+  COUNTER(endpoints_modified)                                                                      \
+  COUNTER(endpoints_removed)                                                                       \
   COUNTER(lb_healthy_panic)                                                                        \
   COUNTER(lb_local_cluster_not_ok)                                                                 \
   COUNTER(lb_recalculate_zone_structures)                                                          \

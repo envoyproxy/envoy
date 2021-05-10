@@ -116,6 +116,12 @@ public:
     VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   }
 
+  void expectEndpointUpdateCounts(uint64_t added, uint64_t modified, uint64_t removed) {
+    EXPECT_EQ(added, stats_.counter("cluster.name.endpoints_added").value());
+    EXPECT_EQ(modified, stats_.counter("cluster.name.endpoints_modified").value());
+    EXPECT_EQ(removed, stats_.counter("cluster.name.endpoints_removed").value());
+  }
+
   bool initialized_{};
   Stats::TestUtil::TestStore stats_;
   Ssl::MockContextManager ssl_context_manager_;
@@ -341,6 +347,7 @@ void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
   test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(test.initialized_);
   EXPECT_EQ(0UL, test.stats_.counter("cluster.name.update_no_rebuild").value());
+  test.expectEndpointUpdateCounts(1, 0, 0);
   EXPECT_EQ(30UL,
             test.stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate)
                 .value());
@@ -350,6 +357,7 @@ void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
 
   endpoint->mutable_load_balancing_weight()->set_value(31);
   test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  test.expectEndpointUpdateCounts(1, 1, 0);
   EXPECT_EQ(expect_rebuild ? 0UL : 1UL,
             test.stats_.counter("cluster.name.update_no_rebuild").value());
   EXPECT_EQ(31UL,
@@ -577,6 +585,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 
   // Since the host health didn't change, expect no rebuild.
   EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
+  // After 6 updates to the initial set of 6 clusters, we should end up with 36 modifications
+  expectEndpointUpdateCounts(6, 36, 0);
 }
 
 // Validate that onConfigUpdate() updates the hostname.
@@ -718,6 +728,7 @@ TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
     EXPECT_EQ(removed_host->address()->asString(), hosts[1]->address()->asString());
     EXPECT_NE(removed_host, hosts[1]);
   }
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.endpoints_removed").value());
 }
 
 // Verify that a host is removed when it is still passing active HC, but has been previously
@@ -835,6 +846,7 @@ TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 1);
   }
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.endpoints_removed").value());
 }
 
 // Verifies that if an endpoint is moved to a new priority, the active hc status is preserved.
@@ -1199,6 +1211,8 @@ TEST_F(EdsTest, EndpointMoved) {
         EXPECT_TRUE(removed.empty());
       });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  // Hosts will be counted as removed when moved from one priority to another
+  EXPECT_EQ(2UL, stats_.counter("cluster.name.endpoints_removed").value());
 
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -1547,6 +1561,7 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
+  expectEndpointUpdateCounts(9, 0, 0);
 
   {
     auto& hosts_per_locality =
@@ -1567,6 +1582,10 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
   add_hosts_to_locality("oceania", "bear", "best", 2, 1);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
+  // Since port is monotonically incrementing this update should cause all previously added 9 hosts
+  // to be removed
+  expectEndpointUpdateCounts(15, 0, 9);
+
   {
     auto& hosts_per_locality =
         cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
@@ -1582,6 +1601,7 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
   // Clear out the new ClusterLoadAssignment. This should leave us with 0 localities per priority.
   cluster_load_assignment.clear_endpoints();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  expectEndpointUpdateCounts(15, 0, 15);
 
   {
     auto& hosts_per_locality =
