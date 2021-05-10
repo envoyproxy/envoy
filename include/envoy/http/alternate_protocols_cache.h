@@ -105,7 +105,7 @@ public:
 
   /**
    * Returns the number of entries in the map.
-   * @return the number if entires in the map.
+   * @return the number if entries in the map.
    */
   virtual size_t size() const PURE;
 };
