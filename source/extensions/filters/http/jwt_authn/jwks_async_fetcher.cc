@@ -37,7 +37,7 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
   }
 
   // Register to init_manager, force the listener to wait for the fetching.
-  init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this] { fetch(); });
+  init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { fetch(); });
   context_.initManager().add(*init_target_);
 }
 
@@ -74,15 +74,22 @@ void JwksAsyncFetcher::handleFetchDone() {
 }
 
 void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
-  fetcher_.reset();
   stats_.jwks_fetch_success_.inc();
 
   done_fn_(std::move(jwks));
   handleFetchDone();
+
+  // Note: not to free fetcher_ within onJwksSuccess or onJwksError function.
+  // They are passed to fetcher_->fetch() and are called by fetcher_ after fetch is done.
+  // After calling these callback functions, fetch_ calls its reset() function.
+  // If fetcher_ is freed by the callback,  calling reset() will crash.
+
+  // Not need to free fetcher_. At the next fetch() or at destructor, its cancel()
+  // function is called before it is freed. Its cancel() can be called anytime regardless
+  // fetch is completed.
 }
 
 void JwksAsyncFetcher::onJwksError(Failure) {
-  fetcher_.reset();
   stats_.jwks_fetch_failed_.inc();
 
   ENVOY_LOG(warn, "{}: failed", debug_name_);
