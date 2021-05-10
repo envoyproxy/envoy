@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "envoy/common/time.h"
