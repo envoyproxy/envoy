@@ -451,8 +451,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_cache_test",
-    srcs = ["alternate_protocols_cache_test.cc"],
+    name = "alternate_protocols_cache_impl_test",
+    srcs = ["alternate_protocols_cache_impl_test.cc"],
     deps = [
         ":common_lib",
         "//source/common/http:alternate_protocols_cache",

@@ -1,4 +1,4 @@
-#include "common/http/alternate_protocols_cache.h"
+#include "common/http/alternate_protocols_cache_impl.h"
 #include "common/http/conn_pool_grid.h"
 
 #include "test/common/http/common.h"
