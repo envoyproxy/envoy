@@ -43,7 +43,6 @@ fi
 SCRIPT_DIR="$(dirname "$0")"
 SRC_DIR="$(dirname "$SCRIPT_DIR")"
 ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
-API_DIR="${SRC_DIR}"/api
 CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
