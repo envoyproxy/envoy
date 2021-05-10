@@ -21,22 +21,16 @@ static constexpr FlagSet DefaultFlags{
 class FileSystemImplTest : public testing::Test {
 protected:
   filesystem_os_id_t getFd(File* file) {
-#ifdef WIN32
-    auto file_impl = dynamic_cast<FileImplWin32*>(file);
-#else
-    auto file_impl = dynamic_cast<FileImplPosix*>(file);
-#endif
+    auto file_impl = dynamic_cast<FileImpl*>(file);
     RELEASE_ASSERT(file_impl != nullptr, "failed to cast File* to FileImpl*");
     return file_impl->fd_;
   }
-#ifdef WIN32
-  InstanceImplWin32 file_system_;
-#else
+#ifndef WIN32
   Api::SysCallStringResult canonicalPath(const std::string& path) {
     return file_system_.canonicalPath(path);
   }
-  InstanceImplPosix file_system_;
 #endif
+  InstanceImpl file_system_;
 };
 
 TEST_F(FileSystemImplTest, FileExists) {

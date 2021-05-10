@@ -8,7 +8,7 @@ gRPC HTTP/1.1 reverse bridge
 * This filter should be configured with the name *envoy.filters.http.grpc_http1_reverse_bridge*.
 
 This is a filter that enables converting an incoming gRPC request into a HTTP/1.1 request to allow
-a server that does not understand HTTP/2 or gRPC semantics to handle the request.
+a server that does not understand HTTP/2 or HTTP/3 or gRPC semantics to handle the request.
 
 The filter works by:
 
