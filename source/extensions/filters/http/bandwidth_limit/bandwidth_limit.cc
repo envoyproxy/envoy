@@ -19,7 +19,7 @@ namespace BandwidthLimitFilter {
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                            Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
     : runtime_(runtime), scope_(scope), time_source_(time_source),
-      enable_mode_(config.enable_mode()),
+      enable_mode_(config.enableMode()),
       limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, limit_kbps, 0)),
       fill_interval_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
           config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))),
@@ -49,7 +49,7 @@ BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
 Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   const auto* config = getConfig();
 
-  if (config->enabled() && (config->enable_mode() & BandwidthLimit::Decode)) {
+  if (config->enabled() && (config->enableMode() & BandwidthLimit::Decode)) {
     config->stats().decode_enabled_.inc();
     decode_limiter_ = std::make_unique<StreamRateLimiter>(
         config->limit(), decoder_callbacks_->decoderBufferLimit(),
@@ -67,7 +67,7 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
         },
         [config](uint64_t len) { config->stats().decode_allowed_size_.set(len); },
         const_cast<FilterConfig*>(config)->timeSource(), decoder_callbacks_->dispatcher(),
-        decoder_callbacks_->scope(), config->tokenBucket(), config->fill_interval());
+        decoder_callbacks_->scope(), config->tokenBucket(), config->fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -107,7 +107,7 @@ Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailer
 Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
   auto* config = getConfig();
 
-  if (config->enabled() && (config->enable_mode() & BandwidthLimit::Encode)) {
+  if (config->enabled() && (config->enableMode() & BandwidthLimit::Encode)) {
     config->stats().encode_enabled_.inc();
 
     encode_limiter_ = std::make_unique<StreamRateLimiter>(
@@ -126,7 +126,7 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
         },
         [config](uint64_t len) { config->stats().encode_allowed_size_.set(len); },
         const_cast<FilterConfig*>(config)->timeSource(), encoder_callbacks_->dispatcher(),
-        encoder_callbacks_->scope(), config->tokenBucket(), config->fill_interval());
+        encoder_callbacks_->scope(), config->tokenBucket(), config->fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;

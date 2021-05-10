@@ -70,10 +70,10 @@ public:
   // Must call enabled() before calling limit().
   uint64_t limit() const { return limit_kbps_; }
   bool enabled() const { return enabled_.enabled(); }
-  EnableMode enable_mode() const { return enable_mode_; };
+  EnableMode enableMode() const { return enable_mode_; };
   std::shared_ptr<SharedTokenBucketImpl> tokenBucket() { return token_bucket_; }
   const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const { return token_bucket_; }
-  std::chrono::milliseconds fill_interval() const { return fill_interval_; }
+  std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
 private:
   friend class FilterTest;

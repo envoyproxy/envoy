@@ -9,10 +9,8 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
