@@ -99,7 +99,6 @@ public:
    * AlternateProtocolsCacheImpl.
    * @param origin The origin to find alternate protocols for.
    * @return An optional list of alternate protocols for the given origin.
-   *
    */
   virtual OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) PURE;
 
