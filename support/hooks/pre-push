@@ -32,31 +32,6 @@ do
       RANGE="$REMOTE_SHA..$LOCAL_SHA"
     fi
 
-    # Provide a white-list to ignore the DCO verify on specific commits
-    DCO_WHITE_LIST_PATH="$(dirname "$(realpath "$0")")/../../dco_verify_white_list.txt"
-    DCO_WHITE_LIST=""
-    if [ -f "$DCO_WHITE_LIST_PATH" ]
-    then
-      WHITE_LIST="$(cat "$DCO_WHITE_LIST_PATH")"
-    fi
-
-    # Verify DCO signoff. We do this before the format checker, since it has
-    # some probability of failing spuriously, while this check never should.
-    #
-    # In general, we can't assume that the commits are signed off by author
-    # pushing, so we settle for just checking that there is a signoff at all.
-    SIGNED_OFF=$(git rev-list --no-merges --grep "^Signed-off-by: " "$RANGE")
-    NOT_SIGNED_OFF=$(git rev-list --no-merges "$RANGE" | grep -Fxv "$SIGNED_OFF" | grep -Fxv "$WHITE_LIST")
-
-    if [ -n "$NOT_SIGNED_OFF" ]
-    then
-      echo >&2 "ERROR: The following commits do not have DCO signoff:"
-      while read -r commit; do
-        echo "  $(git log --pretty=oneline --abbrev-commit -n 1 "$commit")"
-      done <<< "$NOT_SIGNED_OFF"
-      exit 1
-    fi
-
     # NOTE: The `tools` directory will be the same relative to the support
     # directory, independent of whether we're in a submodule, so no need to use
     # our `relpath` helper.
