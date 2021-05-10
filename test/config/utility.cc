@@ -68,6 +68,18 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+    transport_socket:
+      name: "starttls"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig
+        cleartext_socket_config:
+        tls_socket_config:
+          common_tls_context:
+            tls_certificates:
+              certificate_chain:
+                filename: {}
+              private_key:
+                filename: {}
   listeners:
     name: listener_0
     address:
@@ -75,7 +87,9 @@ static_resources:
         address: 127.0.0.1
         port_value: 0
 )EOF",
-                     Platform::null_device_path, Platform::null_device_path);
+                     Platform::null_device_path, Platform::null_device_path, //);
+                     TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
+                     TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
 }
 
 std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
@@ -117,12 +131,17 @@ std::string ConfigHelper::tcpProxyConfig() {
   return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
+        name: startTls
+        typed_config:
+          "@type": type.googleapis.com/test.integration.starttls.StartTlsFilterConfig
+)EOF");
+#if 0
         name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF");
+#endif
 }
 
 std::string ConfigHelper::startTlsConfig() {
