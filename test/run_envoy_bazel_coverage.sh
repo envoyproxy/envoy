@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -e
 
 LLVM_VERSION="11.0.1"
@@ -25,7 +26,7 @@ then
 fi
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
-[[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=false
+[[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
 [[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.5
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
@@ -40,36 +41,23 @@ echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
 # projects that want to run coverage on a different/combined target.
 # Command-line arguments take precedence over ${COVERAGE_TARGET}.
 if [[ $# -gt 0 ]]; then
-  COVERAGE_ARGS=("$@")
+  COVERAGE_TARGETS=("$@")
 elif [[ -n "${COVERAGE_TARGET}" ]]; then
-  COVERAGE_ARGS=("${COVERAGE_TARGET}")
+  COVERAGE_TARGETS=("${COVERAGE_TARGET}")
 else
-  COVERAGE_ARGS=(//test/...)
+  COVERAGE_TARGETS=(//test/...)
 fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
   # Filter targets to just fuzz tests.
-  _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_ARGS[*]})")
+  _targets=$(bazel query "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
   COVERAGE_TARGETS=()
   while read -r line; do COVERAGE_TARGETS+=("$line"); done \
-    <<< "$_targets"
-  # TODO(asraa): Remove when http-parser removed.
-  # Gather all targets dependending on HTTP/1.1 parser for new parser.
-  _integration_targets=$(bazel query "attr('tags', 'fuzz_target', //test/...) intersect filter('.*integration.*',//test/...)")
-  INTEGRATION_TARGETS=()
-  while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
-    <<< "$_integration_targets"
+      <<< "$_targets"
   BAZEL_BUILD_OPTIONS+=(
       "--config=fuzz-coverage"
       "--test_tag_filters=-nocoverage")
 else
-  COVERAGE_TARGETS=("${COVERAGE_ARGS[*]}")
-  # TODO(asraa): Remove when http-parser removed.
-  # Gather integration targets for new parser.
-  _integration_targets=$(bazel query "filter('.*integration.*',${COVERAGE_TARGETS[*]})")
-  INTEGRATION_TARGETS=()
-  while read -r line; do INTEGRATION_TARGETS+=("$line"); done \
-    <<< "$_integration_targets"
   BAZEL_BUILD_OPTIONS+=(
       "--config=test-coverage"
       "--test_tag_filters=-nocoverage,-fuzz_target")
@@ -89,13 +77,7 @@ mkdir -p "${COVERAGE_DIR}"
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 
-# Also run integration tests with the new HTTP/1.1 parser.
-# TODO(asraa): Remove when http-parser is removed.
-bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" --define use_new_http1_parser_in_integration_tests=true "${INTEGRATION_TARGETS[@]}"
-COVERAGE_DATA2="${COVERAGE_DIR}/coverage2.dat"
-cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA2}"
-
-COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" "${COVERAGE_DATA2}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
+COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
 COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
 if [ "${FUZZ_COVERAGE}" == "true" ]
