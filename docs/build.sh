@@ -132,14 +132,6 @@ function generate_api_rst() {
 
 generate_api_rst v3
 
-# Fixup anchors and references in v3 so they form a distinct namespace.
-# TODO(htuch): Do this in protodoc generation in the future.
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
-
-# TODO(phlax): Remove this once above is removed
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_v2_api_#envoy_api_#g"
-
 # xDS protocol spec.
 mkdir -p "${GENERATED_RST_DIR}/api-docs"
 cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"

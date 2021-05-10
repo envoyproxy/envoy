@@ -101,9 +101,9 @@ message ClusterLoadAssignment {
   }
 
   // Name of the cluster. This will be the :ref:`service_name
-  // <envoy_api_field_config.cluster.v3.Cluster.EdsClusterConfig.service_name>` value if specified
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.EdsClusterConfig.service_name>` value if specified
   // in the cluster :ref:`EdsClusterConfig
-  // <envoy_api_msg_config.cluster.v3.Cluster.EdsClusterConfig>`.
+  // <envoy_v3_api_msg_config.cluster.v3.Cluster.EdsClusterConfig>`.
   string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // List of endpoints to load balance to.
