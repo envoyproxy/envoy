@@ -49,7 +49,7 @@ message StreamAccessLogsMessage {
     config.core.v4alpha.Node node = 1 [(validate.rules).message = {required: true}];
 
     // The friendly name of the log configured in :ref:`CommonGrpcAccessLogConfig
-    // <envoy_api_msg_extensions.access_loggers.grpc.v4alpha.CommonGrpcAccessLogConfig>`.
+    // <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig>`.
     string log_name = 2 [(validate.rules).string = {min_len: 1}];
   }
 
