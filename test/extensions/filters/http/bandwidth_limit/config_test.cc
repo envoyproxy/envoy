@@ -51,8 +51,8 @@ TEST(Factory, RouteSpecificFilterConfig) {
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
-  EXPECT_EQ(config->fill_interval().count(), 100);
-  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_DecodeAndEncode);
+  EXPECT_EQ(config->fillInterval().count(), 100);
+  EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_DecodeAndEncode);
   EXPECT_FALSE(config->tokenBucket() == nullptr);
 }
 
@@ -73,9 +73,9 @@ TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_Disabled);
+  EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_Disabled);
   EXPECT_EQ(config->limit(), 10);
-  EXPECT_EQ(config->fill_interval().count(), 100);
+  EXPECT_EQ(config->fillInterval().count(), 100);
 }
 
 TEST(Factory, RouteSpecificFilterConfigDefaultFillInterval) {
@@ -96,7 +96,7 @@ TEST(Factory, RouteSpecificFilterConfigDefaultFillInterval) {
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
-  EXPECT_EQ(config->fill_interval().count(), 50);
+  EXPECT_EQ(config->fillInterval().count(), 50);
 }
 
 TEST(Factory, PerRouteConfigNoLimits) {

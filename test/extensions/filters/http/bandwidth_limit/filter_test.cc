@@ -94,7 +94,7 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fill_interval().count());
+  EXPECT_EQ(50UL, config_->fillInterval().count());
 
   // Send a small amount of data which should be within limit.
   Buffer::OwnedImpl data1("hello");
@@ -175,7 +175,7 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fill_interval().count());
+  EXPECT_EQ(50UL, config_->fillInterval().count());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(response_headers_));
@@ -265,7 +265,7 @@ TEST_F(FilterTest, BandwidthLimitOnDecodeAndEncode) {
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fill_interval().count());
+  EXPECT_EQ(50UL, config_->fillInterval().count());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(response_headers_));
