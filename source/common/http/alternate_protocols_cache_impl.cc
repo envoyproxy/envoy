@@ -4,12 +4,12 @@ namespace Envoy {
 namespace Http {
 
 AlternateProtocolsCacheImpl::AlternateProtocol::AlternateProtocol(absl::string_view alpn,
-                                                              absl::string_view hostname,
-                                                              uint32_t port)
+                                                                  absl::string_view hostname,
+                                                                  uint32_t port)
     : alpn_(alpn), hostname_(hostname), port_(port) {}
 
 AlternateProtocolsCacheImpl::Origin::Origin(absl::string_view scheme, absl::string_view hostname,
-                                        uint32_t port)
+                                            uint32_t port)
     : scheme_(scheme), hostname_(hostname), port_(port) {}
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(TimeSource& time_source)
@@ -18,8 +18,8 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(TimeSource& time_source
 AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
-                                              const std::vector<AlternateProtocol>& protocols,
-                                              const MonotonicTime& expiration) {
+                                                  const std::vector<AlternateProtocol>& protocols,
+                                                  const MonotonicTime& expiration) {
   Entry& entry = protocols_[origin];
   if (entry.protocols_ != protocols) {
     entry.protocols_ = protocols;

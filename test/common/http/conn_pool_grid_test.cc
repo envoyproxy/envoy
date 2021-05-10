@@ -109,7 +109,8 @@ public:
     grid_.encoder_ = &encoder_;
   }
 
-  OptRef<AlternateProtocolsCacheImpl> maybeCreateAlternateProtocolsCacheImpl(bool use_alternate_protocols) {
+  OptRef<AlternateProtocolsCacheImpl>
+  maybeCreateAlternateProtocolsCacheImpl(bool use_alternate_protocols) {
     if (!use_alternate_protocols) {
       return makeOptRefFromPtr<AlternateProtocolsCacheImpl>(nullptr);
     }

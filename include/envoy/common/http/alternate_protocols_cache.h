@@ -77,8 +77,9 @@ public:
 
   // Sets the possible alternative protocols which can be used to connect to the
   // specified origin. Expires after the specified expiration time.
-  virtual void setAlternatives(const Origin& origin, const std::vector<AlternateProtocol>& protocols,
-                       const MonotonicTime& expiration) PURE;
+  virtual void setAlternatives(const Origin& origin,
+                               const std::vector<AlternateProtocol>& protocols,
+                               const MonotonicTime& expiration) PURE;
 
   // Returns the possible alternative protocols which can be used to connect to the
   // specified origin, or nullptr if not alternatives are found. The returned pointer
