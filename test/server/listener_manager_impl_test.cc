@@ -91,7 +91,8 @@ public:
   }
 };
 
-class ListenerManagerImplForInPlaceFilterChainUpdateTest : public ListenerManagerImplTest {
+class ListenerManagerImplForInPlaceFilterChainUpdateTest : public Event::SimulatedTimeSystem,
+                                                           public ListenerManagerImplTest {
 public:
   envoy::config::listener::v3::Listener createDefaultListener() {
     envoy::config::listener::v3::Listener listener_proto;
@@ -4916,6 +4917,88 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners().size());
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
+}
+
+TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdatingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Update foo into warming.
+  const auto listener_foo_update1_proto = parseListenerFromV3Yaml(R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF");
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true, listener_foo);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(listener_foo_update1_proto, "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // The warmed up starts the drain timer.
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
+  listener_foo_update1->target_.ready();
+  // Sub warming and bump draining filter chain.
+  checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 1);
+  worker_->callAddCompletion(true);
+
+  auto listener_foo_update2_proto = listener_foo_update1_proto;
+  listener_foo_update2_proto.set_traffic_direction(
+      ::envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
+  expectUpdateToThenDrain(listener_foo_update2_proto, listener_foo_update1);
+  // Bump modified.
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 1);
+
+  expectRemove(listener_foo_update2_proto, listener_foo_update2);
+  // Bump removed and sub active.
+  checkStats(__LINE__, 1, 2, 1, 0, 0, 0, 1);
+
+  // Timer expires, worker close connections if any.
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  filter_chain_drain_timer->invokeCallback();
+
+  // Once worker clean up is done, it's safe for the main thread to remove the original listener.
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+  // Sub draining filter chain.
+  checkStats(__LINE__, 1, 2, 1, 0, 0, 0, 0);
 }
 
 TEST_F(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
