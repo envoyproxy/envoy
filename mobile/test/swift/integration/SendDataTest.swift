@@ -9,6 +9,7 @@ final class SendDataTests: XCTestCase {
     let apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
     let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+    let requestStringMatch = "match_me"
     let config =
     """
     static_resources:
@@ -41,7 +42,7 @@ final class SendDataTests: XCTestCase {
                   match_config:
                     http_request_generic_body_match:
                       patterns:
-                        - string_match: match_me
+                        - string_match: \(requestStringMatch)
               - name: envoy.filters.http.buffer
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
@@ -61,7 +62,7 @@ final class SendDataTests: XCTestCase {
                                                authority: "example.com", path: "/test")
       .addUpstreamHttpProtocol(.http2)
       .build()
-    let body = try XCTUnwrap("match_me".data(using: .utf8))
+    let body = try XCTUnwrap(requestStringMatch.data(using: .utf8))
 
     client
       .newStreamPrototype()
