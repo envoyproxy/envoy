@@ -14,6 +14,7 @@
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
 
+#include "test/common/secret/private_key_provider.pb.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/config_tracker.h"
 #include "test/mocks/server/instance.h"
@@ -1009,6 +1010,61 @@ static_secrets:
         inline_bytes: "W3JlZGFjdGVkXQ=="
 )EOF";
   checkConfigDump(TestEnvironment::substitute(expected_config_dump));
+}
+
+TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
+  Server::MockInstance server;
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+
+  envoy::config::core::v3::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Random::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
+
+  auto secret_provider =
+      secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
+  const std::string yaml =
+      R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+  private_key_provider:
+    provider_name: test
+    typed_config:
+      "@type": type.googleapis.com/test.common.secret.pkp.TestPrivateKeyMethodConfig
+      private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  EXPECT_TRUE(typed_secret.tls_certificate().has_private_key_provider());
+  EXPECT_FALSE(typed_secret.tls_certificate().has_private_key());
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+  init_target_handle->initialize(init_watcher);
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, "");
+  EXPECT_TRUE(secret_provider->secret()->has_private_key_provider());
+  EXPECT_FALSE(secret_provider->secret()->has_private_key());
+
+  // Fail because there isn't a real private key message provider, but not because the configuration
+  // is incorrect.
+  EXPECT_THROW_WITH_MESSAGE(
+      Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_),
+      EnvoyException, "Failed to load incomplete certificate from <inline>, ");
 }
 
 } // namespace
