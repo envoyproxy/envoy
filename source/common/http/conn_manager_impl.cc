@@ -260,13 +260,17 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
 
-  // Set the account to start accounting.
-  Buffer::BufferMemoryAccountSharedPtr downstream_request_account =
-      std::make_shared<Buffer::BufferMemoryAccountImpl>();
-  response_encoder.getStream().setAccount(downstream_request_account);
-
+  // Set the account to start accounting if enabled. This is still a
+  // work-in-progress, and will be removed when other features using the
+  // accounting are implemented.
+  Buffer::BufferMemoryAccountSharedPtr downstream_request_account;
+  if (Runtime::runtimeFeatureEnabled("envoy.test_only.per_stream_buffer_accounting")) {
+    downstream_request_account = std::make_shared<Buffer::BufferMemoryAccountImpl>();
+    response_encoder.getStream().setAccount(downstream_request_account);
+  }
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
                                               std::move(downstream_request_account)));
+
   new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);

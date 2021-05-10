@@ -61,10 +61,11 @@ TrackedWatermarkBufferFactory::create(std::function<void()> below_low_watermark,
       },
       [this](BufferMemoryAccountSharedPtr& account, TrackedWatermarkBuffer* buffer) {
         absl::MutexLock lock(&mutex_);
-        // Buffers should only be bound once.
-        ASSERT(actively_bound_buffers_.find(buffer) == actively_bound_buffers_.end());
-        account_infos_[account].emplace(buffer);
-        actively_bound_buffers_.emplace(buffer);
+        // Only track non-null accounts.
+        if (account) {
+          account_infos_[account].emplace(buffer);
+          actively_bound_buffers_.emplace(buffer);
+        }
       },
       below_low_watermark, above_high_watermark, above_overflow_watermark);
 }

@@ -19,10 +19,22 @@
 #include "socket_interface_swap.h"
 
 namespace Envoy {
+namespace {
+std::string IpVersionAndBufferAccountingTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return fmt::format(
+      "{}_{}",
+      TestUtility::ipTestParamsToString(::testing::TestParamInfo<Network::Address::IpVersion>(
+          std::get<0>(params.param), params.index)),
+      std::get<1>(params.param) ? "with_per_stream_buffer_accounting"
+                                : "without_per_stream_buffer_accounting");
+}
+} // namespace
 
-class HttpBufferWatermarksTest : public SocketInterfaceSwap,
-                                 public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public HttpIntegrationTest {
+class HttpBufferWatermarksTest
+    : public SocketInterfaceSwap,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   struct BufferParams {
     const uint32_t connection_watermark;
@@ -89,7 +101,10 @@ public:
 
   // TODO(kbaichoo): Parameterize on the client codec type when other protocols
   // (H1, H3) support buffer accounting.
-  HttpBufferWatermarksTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+  HttpBufferWatermarksTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())) {
+    config_helper_.addRuntimeOverride("envoy.test_only.per_stream_buffer_accounting",
+                                      streamBufferAccounting() ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -98,6 +113,8 @@ public:
 protected:
   std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
       std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+
+  bool streamBufferAccounting() { return std::get<1>(GetParam()); }
 
   std::string printAccounts() {
     std::stringstream stream;
@@ -118,9 +135,10 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, HttpBufferWatermarksTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, HttpBufferWatermarksTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    IpVersionAndBufferAccountingTestParamsToString);
 
 // We should create four buffers each billing the same downstream request's
 // account which originated the chain.
@@ -138,7 +156,11 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   upstream_request1 = std::move(upstream_request_);
 
   // Check the expected number of buffers per account
-  EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+  } else {
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
+  }
 
   // Send the second request.
   auto response2 = codec_client_->makeRequestWithBody(default_request_headers_, 1000);
@@ -146,7 +168,11 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   upstream_request2 = std::move(upstream_request_);
 
   // Check the expected number of buffers per account
-  EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(2, 8));
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(2, 8));
+  } else {
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
+  }
 
   // Respond to the first request and wait for complete
   upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -155,7 +181,11 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   ASSERT_TRUE(upstream_request1->complete());
 
   // Check the expected number of buffers per account
-  EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(1, 4));
+  } else {
+    EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
+  }
 
   // Respond to the second request and wait for complete
   upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -192,10 +222,12 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   // Wait for all requests to have accounted for the requests we've sent.
-  EXPECT_TRUE(
-      buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
-      << "buffer total: " << buffer_factory_->totalBufferSize()
-      << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(
+        buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
+        << "buffer total: " << buffer_factory_->totalBufferSize()
+        << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
+  }
 
   writev_matcher_->setResumeWrites();
 
@@ -230,10 +262,12 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
   // Wait for all requests to buffered the response from upstream.
-  EXPECT_TRUE(
-      buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
-      << "buffer total: " << buffer_factory_->totalBufferSize()
-      << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(
+        buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
+        << "buffer total: " << buffer_factory_->totalBufferSize()
+        << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
+  }
 
   writev_matcher_->setResumeWrites();
 

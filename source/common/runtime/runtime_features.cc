@@ -114,6 +114,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // TODO(kbaichoo): Remove when this is no longer test only.
+    "envoy.test_only.per_stream_buffer_accounting",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
