@@ -3,19 +3,21 @@
 namespace Envoy {
 namespace Http {
 
-AlternateProtocolsCache::AlternateProtocol::AlternateProtocol(absl::string_view alpn,
+AlternateProtocolsCacheImpl::AlternateProtocol::AlternateProtocol(absl::string_view alpn,
                                                               absl::string_view hostname,
                                                               uint32_t port)
     : alpn_(alpn), hostname_(hostname), port_(port) {}
 
-AlternateProtocolsCache::Origin::Origin(absl::string_view scheme, absl::string_view hostname,
+AlternateProtocolsCacheImpl::Origin::Origin(absl::string_view scheme, absl::string_view hostname,
                                         uint32_t port)
     : scheme_(scheme), hostname_(hostname), port_(port) {}
 
-AlternateProtocolsCache::AlternateProtocolsCache(TimeSource& time_source)
+AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(TimeSource& time_source)
     : time_source_(time_source) {}
 
-void AlternateProtocolsCache::setAlternatives(const Origin& origin,
+AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
+
+void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                               const std::vector<AlternateProtocol>& protocols,
                                               const MonotonicTime& expiration) {
   Entry& entry = protocols_[origin];
@@ -27,11 +29,11 @@ void AlternateProtocolsCache::setAlternatives(const Origin& origin,
   }
 }
 
-OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
-AlternateProtocolsCache::findAlternatives(const Origin& origin) {
+OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>>
+AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end()) {
-    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCache::AlternateProtocol>>(
+    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>>(
         nullptr);
   }
 
@@ -39,13 +41,13 @@ AlternateProtocolsCache::findAlternatives(const Origin& origin) {
   if (time_source_.monotonicTime() > entry.expiration_) {
     // Expire the entry.
     protocols_.erase(entry_it);
-    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCache::AlternateProtocol>>(
+    return makeOptRefFromPtr<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>>(
         nullptr);
   }
   return makeOptRef(entry.protocols_);
 }
 
-size_t AlternateProtocolsCache::size() const { return protocols_.size(); }
+size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
 
 } // namespace Http
 } // namespace Envoy

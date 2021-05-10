@@ -165,6 +165,7 @@ envoy_cc_library(
     hdrs = ["alternate_protocols_cache_impl.h"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//include/envoy/common/http:alternate_protocols_cache_interface",
     ],
 )
 
