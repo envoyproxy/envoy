@@ -277,6 +277,20 @@ void StartTlsIntegrationTest::initialize() {
   config_helper_.renameListener("tcp_proxy");
   //  addStartTlsSwitchFilter(config_helper_);
 
+  // Add transport socket to cluster_0
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig starttls_config;
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext* tls_context =
+        starttls_config.mutable_tls_socket_config();
+    auto* tls_certificate = tls_context->mutable_common_tls_context()->add_tls_certificates();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+    cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.starttls");
+    cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls_config);
+  });
   // Setup factories and contexts for upstream clear-text raw buffer transport socket.
   auto config = std::make_unique<envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer>();
 
@@ -321,7 +335,6 @@ void StartTlsIntegrationTest::initialize() {
   //  END
 
 #if 0
-#endif
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
 #if 0
@@ -351,6 +364,7 @@ void StartTlsIntegrationTest::initialize() {
         socket->addressProvider().localAddress()->ip()->addressAsString(),
         socket->addressProvider().localAddress()->ip()->port());
   });
+#endif
   BaseIntegrationTest::initialize();
 
   Network::Address::InstanceConstSharedPtr address =

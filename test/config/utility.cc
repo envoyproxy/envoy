@@ -68,18 +68,6 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
-    transport_socket:
-      name: "starttls"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig
-        cleartext_socket_config:
-        tls_socket_config:
-          common_tls_context:
-            tls_certificates:
-              certificate_chain:
-                filename: {}
-              private_key:
-                filename: {}
   listeners:
     name: listener_0
     address:
@@ -87,9 +75,7 @@ static_resources:
         address: 127.0.0.1
         port_value: 0
 )EOF",
-                     Platform::null_device_path, Platform::null_device_path, //);
-                     TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
-                     TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+                     Platform::null_device_path, Platform::null_device_path);
 }
 
 std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
