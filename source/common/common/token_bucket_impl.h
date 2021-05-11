@@ -28,9 +28,10 @@ public:
   void maybeReset(uint64_t num_tokens) override;
 
 private:
-  const double max_tokens_;
-  const double fill_rate_;
-  double tokens_;
+  const uint64_t max_tokens_;
+  const uint64_t fill_rate_;
+  uint64_t tokens_;
+  uint64_t last_tokens_{0};
   MonotonicTime last_fill_;
   TimeSource& time_source_;
 };
