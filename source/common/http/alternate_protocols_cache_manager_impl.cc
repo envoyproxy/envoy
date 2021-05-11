@@ -16,8 +16,9 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
   if (existing_cache != caches_.end()) {
     if (!Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
       throw EnvoyException(
-          fmt::format("options specified alternate protocols cache '{}' with different settings",
-                      options.name()));
+          fmt::format("options specified alternate protocols cache '{}' with different settings"
+                      " old '{}' new '{}'", options.name(),
+                      existing_cache->second.options_.DebugString(), options.DebugString()));
     }
 
     return existing_cache->second.cache_;

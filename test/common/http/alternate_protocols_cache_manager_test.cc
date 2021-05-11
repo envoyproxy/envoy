@@ -15,11 +15,11 @@ class AlternateProtocolsCacheManagerTest : public testing::Test,
 public:
   AlternateProtocolsCacheManagerTest()
       : factory_(singleton_manager_, simTime(), tls_), manager_(factory_.get()) {
-    config1_.set_name(name1_);
-    config1_.mutable_max_entries()->set_value(max_entries1_);
+    options1_.set_name(name1_);
+    options1_.mutable_max_entries()->set_value(max_entries1_);
 
-    config1_.set_name(name2_);
-    config1_.mutable_max_entries()->set_value(max_entries2_);
+    options2_.set_name(name2_);
+    options2_.mutable_max_entries()->set_value(max_entries2_);
   }
 
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
@@ -31,8 +31,8 @@ public:
   const int max_entries1_ = 10;
   const int max_entries2_ = 20;
 
-  envoy::config::core::v3::AlternateProtocolsCacheOptions config1_;
-  envoy::config::core::v3::AlternateProtocolsCacheOptions config2_;
+  envoy::config::core::v3::AlternateProtocolsCacheOptions options1_;
+  envoy::config::core::v3::AlternateProtocolsCacheOptions options2_;
 };
 
 TEST_F(AlternateProtocolsCacheManagerTest, FactoryGet) {
@@ -41,16 +41,28 @@ TEST_F(AlternateProtocolsCacheManagerTest, FactoryGet) {
 }
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCache) {
-  AlternateProtocolsCacheSharedPtr cache = manager_->getCache(config1_);
+  AlternateProtocolsCacheSharedPtr cache = manager_->getCache(options1_);
   EXPECT_NE(nullptr, cache);
-  EXPECT_EQ(cache, manager_->getCache(config1_));
+  EXPECT_EQ(cache, manager_->getCache(options1_));
 }
 
-TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForDifferentConfig) {
-  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(config1_);
-  AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(config2_);
+TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForDifferentOptions) {
+  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_);
+  AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(options2_);
   EXPECT_NE(nullptr, cache2);
   EXPECT_NE(cache1, cache2);
+}
+
+TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForConflictingOptions) {
+  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_);
+  options2_.set_name(options1_.name());
+  try {
+    AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(options2_);
+    FAIL();
+  } catch (const EnvoyException& e) {
+    EXPECT_THAT(e.what(), testing::HasSubstr("options specified alternate protocols cache 'name1' with different settings"));
+  }
+
 }
 
 } // namespace
