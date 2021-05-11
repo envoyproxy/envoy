@@ -67,7 +67,7 @@ private:
 // If it receives a data which is not known keyword it means that transport socket has not been
 // successfully converted to use TLS and filter receives either encrypted data or TLS handshake
 // messages.
-class StartTlsSwitchFilter : public Network::ReadFilter {
+class StartTlsSwitchFilter : public Network::Filter {
 public:
   ~StartTlsSwitchFilter() override {
     if (upstream_connection_) {
@@ -79,9 +79,13 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
+  Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
+  }
+  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) override {
+    write_callbacks_ = &callbacks;
   }
 
   static std::shared_ptr<StartTlsSwitchFilter>
@@ -96,8 +100,10 @@ public:
     UpstreamReadFilter(std::weak_ptr<StartTlsSwitchFilter> parent) : parent_(parent) {}
 
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      ENVOY_LOG_MISC(debug, "EXTRA READ FILTER RECEIVED SOME DATA");
       if (auto parent = parent_.lock()) {
         parent->upstreamWrite(data, end_stream);
+        parent->onWrite(data, end_stream);
         return Network::FilterStatus::Continue;
       } else {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
@@ -121,6 +127,7 @@ private:
 
   std::weak_ptr<StartTlsSwitchFilter> self_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
+  Network::WriteFilterCallbacks* write_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_{};
   Upstream::ClusterManager& cluster_manager_;
 };
@@ -130,7 +137,7 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   auto h = c->loadBalancer().chooseHost(nullptr);
   upstream_connection_ =
       h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
-  //  upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
+  upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
   upstream_connection_->connect();
   return Network::FilterStatus::Continue;
 }
@@ -145,6 +152,11 @@ Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& data, bool 
 
   upstreamWrite(data, end_stream);
   upstream_connection_->write(data, end_stream);
+  return Network::FilterStatus::Continue;
+}
+
+Network::FilterStatus StartTlsSwitchFilter::onWrite(Buffer::Instance& buf, bool end_stream) {
+  read_callbacks_->connection().write(buf, end_stream);
   return Network::FilterStatus::Continue;
 }
 
@@ -459,6 +471,12 @@ TEST_P(StartTlsIntegrationTest, SwitchToTls) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(11));
 
   // dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  const std::string data("upstream");
+  ASSERT_TRUE(fake_upstream_connection->write(data, false));
+
+  // Wait for confirmation
+  payload_reader_->set_data_to_wait_for("upstream");
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
