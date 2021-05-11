@@ -646,7 +646,7 @@ message HttpConnectionManager {
   // processing of request by HTTP filters or routing.
   // This affects the upstream host header.
   // Without setting this option, incoming requests with host `example.com.` will not match against
-  // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
+  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
   bool strip_trailing_host_dot = 46;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11 [
