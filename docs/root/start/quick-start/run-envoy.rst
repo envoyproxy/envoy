@@ -82,8 +82,8 @@ Run Envoy with the demo configuration
 
 The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configuration.
 
-Envoy will parse the config file according to extensions, please see
-:ref:`command line options <operations_cli>` for further information.
+Envoy will parse the config file according to the file extension, please see
+:ref:`command line options <operations_cli#cmdoption-c>` for further information.
 
 
 .. tabs::
