@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "alternate_protocols_cache_interface",
     hdrs = ["alternate_protocols_cache.h"],
-    deps = ["//include/envoy/common:time_interface"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(

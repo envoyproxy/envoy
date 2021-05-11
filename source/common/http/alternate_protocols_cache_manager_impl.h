@@ -6,7 +6,6 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
-
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {

@@ -92,7 +92,7 @@ message AlternateProtocolsCacheOptions {
   //   The implementation is approximate and enforced independently on each worker thread, thus
   //   it is possible for the maximum hosts in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
-  google.protobuf.UInt32Value max_hosts = 2 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_entries = 2 [(validate.rules).uint32 = {gt: 0}];
 }
 
 // [#next-free-field: 6]

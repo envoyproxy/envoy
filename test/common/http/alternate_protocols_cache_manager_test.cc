@@ -16,10 +16,10 @@ public:
   AlternateProtocolsCacheManagerTest()
       : factory_(singleton_manager_, simTime(), tls_), manager_(factory_.get()) {
     config1_.set_name(name1_);
-    config1_.mutable_max_hosts()->set_value(max_hosts1_);
+    config1_.mutable_max_entries()->set_value(max_entries1_);
 
     config1_.set_name(name2_);
-    config1_.mutable_max_hosts()->set_value(max_hosts2_);
+    config1_.mutable_max_entries()->set_value(max_entries2_);
   }
 
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
@@ -28,8 +28,8 @@ public:
   AlternateProtocolsCacheManagerSharedPtr manager_;
   const std::string name1_ = "name1";
   const std::string name2_ = "name2";
-  const int max_hosts1_ = 10;
-  const int max_hosts2_ = 20;
+  const int max_entries1_ = 10;
+  const int max_entries2_ = 20;
 
   envoy::config::core::v3::AlternateProtocolsCacheOptions config1_;
   envoy::config::core::v3::AlternateProtocolsCacheOptions config2_;
