@@ -22,7 +22,8 @@ public:
 
   uint32_t value() const {
     uint64_t raw_value = runtime_.snapshot().getInteger(runtime_key_, default_value_);
-    return raw_value > std::numeric_limits<uint32_t>::max() ? default_value_ : static_cast<uint32_t>(raw_value);
+    return raw_value > std::numeric_limits<uint32_t>::max() ? default_value_
+                                                            : static_cast<uint32_t>(raw_value);
   }
 
 private:
