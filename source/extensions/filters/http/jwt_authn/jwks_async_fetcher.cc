@@ -41,12 +41,6 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
   context_.initManager().add(*init_target_);
 }
 
-JwksAsyncFetcher::~JwksAsyncFetcher() {
-  if (fetcher_) {
-    fetcher_->cancel();
-  }
-}
-
 std::chrono::seconds JwksAsyncFetcher::getCacheDuration(const RemoteJwks& remote_jwks) {
   if (remote_jwks.has_cache_duration()) {
     return std::chrono::seconds(DurationUtil::durationToSeconds(remote_jwks.cache_duration()));
@@ -84,9 +78,9 @@ void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   // After calling these callback functions, fetch_ calls its reset() function.
   // If fetcher_ is freed by the callback,  calling reset() will crash.
 
-  // Not need to free fetcher_. At the next fetch() or at destructor, its cancel()
-  // function is called before it is freed. Its cancel() can be called anytime regardless
-  // fetch is completed.
+  // Not need to free fetcher_. At the next fetch(), it will be freed with a cancel() call.
+  // The cancel() is needed to cancel the old call before the new one is created.
+  // But it is a no-op if the call is completed.
 }
 
 void JwksAsyncFetcher::onJwksError(Failure) {

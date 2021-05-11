@@ -37,8 +37,6 @@ public:
                    Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
                    JwtAuthnFilterStats& stats, JwksDoneFetched done_fn);
 
-  ~JwksAsyncFetcher() override;
-
   // Get the remote Jwks cache duration.
   static std::chrono::seconds
   getCacheDuration(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks);
