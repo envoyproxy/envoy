@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.experimental_compiler_features.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.experimental_compiler_features.v3";
+option java_outer_classname = "ExperimentalCompilerFeaturesProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#next-free-field: 10]
+message ExperimentalCompilerFeatures {
+  // These two variables will be added as key/value header
+  // The key string will be the header's key name while the value string will be
+  // the header's value for that key
+  string key = 1;
+
+  string value = 2;
+
+  // Indicates whether to enable or not C++20 Associative Container Use Contains feature.
+  // this includes:
+  // std::map<Key,T,Compare,Allocator>::contains
+  // std::set<Key,Compare,Allocator>::contains
+  // If true, the extension will run the code blocks that implements said feature.
+  // Feature info:
+  // https://en.cppreference.com/w/cpp/container/map/contains
+  // https://en.cppreference.com/w/cpp/container/set/contains
+  // Paper:
+  // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0458r2.html
+  bool associative_container_use_contains = 3;
+
+  // This variable is used for testing.
+  // string to be used with contains()
+  // In other words, it will look up if this string is in a map/test (this map/test is predefined)
+  // Example: associative_container_string = "this is an example string";
+  // map.contains(associative_container_string);
+  string associative_container_string = 4;
+
+  // Indicates whether to enable or not C++20 Using Enum feature.
+  // If true, the extension will run the code blocks that implements said feature.
+  // Feature info:
+  // https://en.cppreference.com/w/cpp/language/enum#Using-enum-declaration
+  // Paper:
+  // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1099r5.html
+  bool enum_members_in_scope = 5;
+
+  // This variable is used for testing.
+  // string to be used to initialize the enum class
+  // This string will be matched to a value of the enum class
+  // A switch case is implemented using enum, evaluating the
+  // enum value that matches associative_container_string
+  // Example: associative_container_string = "red";
+  // my_enum{enum value that matches associative_container_string};
+  string enum_value = 6;
+
+  // Indicates whether to enable or not C++20 std::basic_string_view<CharT,Traits>::starts_with feature.
+  // If true, the extension will run the code blocks that implements .starts_with() function.
+  // Feature info:
+  // https://en.cppreference.com/w/cpp/string/basic_string/starts_with
+  // Paper:
+  // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0457r2.html
+  bool str_starts_with = 7;
+
+  // Indicates whether to enable or not C++20 std::basic_string_view<CharT,Traits>::ends_with feature.
+  // If true, the extension will run the code blocks that implements .ends_with() function.
+  // Feature info:
+  // https://en.cppreference.com/w/cpp/string/basic_string/starts_with
+  // Paper:
+  // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0457r2.html
+  bool str_ends_with = 8;
+
+  // This variable is used for testing.
+  // string to be used with the .starts_with() or .ends_with() function
+  // Example 1: start_end_string = "token:superSecretToken_ip:127.0.0.1";
+  // start_end_string.starts_with("token:superSecretToken_");
+  // Example 2: start_end_string = "server:NorthAmerica_ip:127.0.0.1";
+  // start_end_string.ends_with("_ip:127.0.0.1");
+  string start_end_string = 9;
+}

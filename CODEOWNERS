@@ -174,3 +174,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
+# HTTP demo filter with C++20 features (optional)
+/*/extensions/filters/http/experimental_compiler_features @martinezlucas98 

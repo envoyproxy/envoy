@@ -69,6 +69,7 @@ proto_library(
         "//envoy/extensions/filters/http/decompressor/v3:pkg",
         "//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/filters/http/dynamo/v3:pkg",
+        "//envoy/extensions/filters/http/experimental_compiler_features/v3:pkg",
         "//envoy/extensions/filters/http/ext_authz/v3:pkg",
         "//envoy/extensions/filters/http/ext_proc/v3alpha:pkg",
         "//envoy/extensions/filters/http/fault/v3:pkg",

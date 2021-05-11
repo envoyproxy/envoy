@@ -96,6 +96,7 @@ EXTENSIONS = {
     "envoy.filters.http.squash":                        "//source/extensions/filters/http/squash:config",
     "envoy.filters.http.tap":                           "//source/extensions/filters/http/tap:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
+    "envoy.filters.http.experimental_compiler_features":            "//source/extensions/filters/http/experimental_compiler_features:config",
 
     #
     # Listener filters
