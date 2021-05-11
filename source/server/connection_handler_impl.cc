@@ -88,12 +88,13 @@ void ConnectionHandlerImpl::removeFilterChains(
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
       listener.second.tcpListener()->get().deferredRemoveFilterChains(filter_chains);
-      // Completion is deferred because the above removeFilterChains() may defer delete connection.
-      Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
-      return;
+      break;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  // Reach here if the target listener is found or the target listener was removed by a full
+  // listener update. In either case, the completion must be deferred so that any active connection
+  // referencing the filter chain can finish prior to deletion.
+  Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {

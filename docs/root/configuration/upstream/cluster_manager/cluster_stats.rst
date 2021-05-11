@@ -38,6 +38,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_active, Gauge, Total active connections
   upstream_cx_http1_total, Counter, Total HTTP/1.1 connections
   upstream_cx_http2_total, Counter, Total HTTP/2 connections
+  upstream_cx_http3_total, Counter, Total HTTP/3 connections
   upstream_cx_connect_fail, Counter, Total connection failures
   upstream_cx_connect_timeout, Counter, Total connection connect timeouts
   upstream_cx_idle_timeout, Counter, Total connection idle timeouts
@@ -51,7 +52,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_destroy_with_active_rq, Counter, Total connections destroyed with 1+ active request
   upstream_cx_destroy_local_with_active_rq, Counter, Total connections destroyed locally with 1+ active request
   upstream_cx_destroy_remote_with_active_rq, Counter, Total connections destroyed remotely with 1+ active request
-  upstream_cx_close_notify, Counter, Total connections closed via HTTP/1.1 connection close header or HTTP/2 GOAWAY
+  upstream_cx_close_notify, Counter, Total connections closed via HTTP/1.1 connection close header or HTTP/2 or HTTP/3 GOAWAY
   upstream_cx_rx_bytes_total, Counter, Total received connection bytes
   upstream_cx_rx_bytes_buffered, Gauge, Received connection bytes currently buffered
   upstream_cx_tx_bytes_total, Counter, Total sent connection bytes
@@ -63,7 +64,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
-  upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2) circuit breaking and were failed
+  upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2 and above) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
   upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
