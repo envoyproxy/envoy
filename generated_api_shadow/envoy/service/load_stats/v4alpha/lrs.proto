@@ -20,10 +20,10 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // Load Reporting Service is an Envoy API to emit load reports. Envoy will initiate a bi-directional
 // stream with a management server. Upon connecting, the management server can send a
-// :ref:`LoadStatsResponse <envoy_api_msg_service.load_stats.v4alpha.LoadStatsResponse>` to a node it is
+// :ref:`LoadStatsResponse <envoy_v3_api_msg_service.load_stats.v3.LoadStatsResponse>` to a node it is
 // interested in getting the load reports for. Envoy in this node will start sending
-// :ref:`LoadStatsRequest <envoy_api_msg_service.load_stats.v4alpha.LoadStatsRequest>`. This is done periodically
-// based on the :ref:`load reporting interval <envoy_api_field_service.load_stats.v4alpha.LoadStatsResponse.load_reporting_interval>`
+// :ref:`LoadStatsRequest <envoy_v3_api_msg_service.load_stats.v3.LoadStatsRequest>`. This is done periodically
+// based on the :ref:`load reporting interval <envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`
 // For details, take a look at the :ref:`Load Reporting Service sandbox example <install_sandboxes_load_reporting_service>`.
 
 service LoadReportingService {
@@ -83,7 +83,7 @@ message LoadStatsResponse {
 
   // If true, the client should send all clusters it knows about.
   // Only clients that advertise the "envoy.lrs.supports_send_all_clusters" capability in their
-  // :ref:`client_features<envoy_api_field_config.core.v4alpha.Node.client_features>` field will honor this field.
+  // :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field will honor this field.
   bool send_all_clusters = 4;
 
   // The minimum interval of time to collect stats over. This is only a minimum for two reasons:

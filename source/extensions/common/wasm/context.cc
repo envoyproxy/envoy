@@ -166,6 +166,12 @@ uint64_t Context::getCurrentTimeNanoseconds() {
       .count();
 }
 
+uint64_t Context::getMonotonicTimeNanoseconds() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+             wasm()->time_source_.monotonicTime().time_since_epoch())
+      .count();
+}
+
 void Context::onCloseTCP() {
   if (tcp_connection_closed_ || !in_vm_context_created_) {
     return;
