@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <queue>
 #include <set>
@@ -632,7 +633,7 @@ private:
         host_weight = host_weight * time_bias_ * aggressionFactor(time_factor);
       }
     }
-     return host_weight;
+    return host_weight;
   }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;

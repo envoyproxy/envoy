@@ -929,11 +929,13 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
                                                                 const HostsSource&) {
   HostSharedPtr candidate_host = nullptr;
+
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
     HostSharedPtr sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
+
       // Make a first choice to start the comparisons.
       candidate_host = sampled_host;
       continue;
