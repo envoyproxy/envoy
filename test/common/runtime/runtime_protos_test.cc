@@ -40,7 +40,7 @@ default_value: 99
   EXPECT_EQ(1024, test_uint32.value());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("foo.bar", 99)).WillOnce(Return(1ull << 33));
-  EXPECT_EQ(0, test_uint32.value());
+  EXPECT_EQ(99, test_uint32.value());
 }
 
 TEST_F(RuntimeProtosTest, PercentBasicTest) {
