@@ -20,7 +20,7 @@
 
 namespace Envoy {
 namespace {
-std::string IpVersionAndBufferAccountingTestParamsToString(
+std::string ipVersionAndBufferAccountingTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return fmt::format(
       "{}_{}",
@@ -138,7 +138,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, HttpBufferWatermarksTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    IpVersionAndBufferAccountingTestParamsToString);
+    ipVersionAndBufferAccountingTestParamsToString);
 
 // We should create four buffers each billing the same downstream request's
 // account which originated the chain.
