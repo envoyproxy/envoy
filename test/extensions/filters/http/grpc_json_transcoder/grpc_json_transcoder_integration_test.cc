@@ -113,8 +113,7 @@ protected:
       response_headers.setContentType("application/grpc");
       if (grpc_response_messages.empty() && !always_send_trailers) {
         response_headers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-        response_headers.setGrpcMessage(
-            absl::string_view(grpc_status.message().data(), grpc_status.message().size()));
+        response_headers.setGrpcMessage(grpc_status.message().as_string());
         upstream_request_->encodeHeaders(response_headers, true);
       } else {
         response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
@@ -128,8 +127,7 @@ protected:
         }
         Http::TestResponseTrailerMapImpl response_trailers;
         response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-        response_trailers.setGrpcMessage(
-            absl::string_view(grpc_status.message().data(), grpc_status.message().size()));
+        response_trailers.setGrpcMessage(grpc_status.message().as_string());
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());
@@ -422,8 +420,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData)
   Http::TestResponseTrailerMapImpl response_trailers;
   auto grpc_status = Status();
   response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-  response_trailers.setGrpcMessage(
-      absl::string_view(grpc_status.message().data(), grpc_status.message().size()));
+  response_trailers.setGrpcMessage(grpc_status.message().as_string());
   upstream_request_->encodeTrailers(response_trailers);
   EXPECT_TRUE(upstream_request_->complete());
 
@@ -465,8 +462,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
   Http::TestResponseTrailerMapImpl response_trailers;
   auto grpc_status = Status();
   response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-  response_trailers.setGrpcMessage(
-      absl::string_view(grpc_status.message().data(), grpc_status.message().size()));
+  response_trailers.setGrpcMessage(grpc_status.message().as_string());
   upstream_request_->encodeTrailers(response_trailers);
   EXPECT_TRUE(upstream_request_->complete());
 
