@@ -137,12 +137,13 @@ public:
         "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
     }
 
+    std::string_view precompiled = {};
+
     if (GetParam() /* allow_precompiled */) {
       const auto section = wasm_vm_->getPrecompiledSectionName();
       if (section.empty()) {
         return false;
       }
-      std::string_view precompiled = {};
       if (!proxy_wasm::utils::BytecodeUtil::getCustomSection(code, section, precompiled)) {
         return false;
       }
@@ -150,14 +151,14 @@ public:
       if (precompiled.empty()) {
         return false;
       }
-      return wasm_vm_->load(precompiled, true, {});
-    } else {
-      std::string stripped;
-      if (!proxy_wasm::utils::BytecodeUtil::getStrippedSource(code, stripped)) {
-        return false;
-      }
-      return wasm_vm_->load(stripped, false, {});
     }
+
+    std::string stripped;
+    if (!proxy_wasm::utils::BytecodeUtil::getStrippedSource(code, stripped)) {
+      return false;
+    }
+
+    return wasm_vm_->load(stripped, precompiled, {});
   }
 
 protected:
