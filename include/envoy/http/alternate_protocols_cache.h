@@ -98,9 +98,9 @@ public:
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the
-   * specified origin, or nullptr if not alternatives are found. The returned pointer
-   * is owned by the AlternateProtocolsCacheImpl and is valid until the next operation on
-   * AlternateProtocolsCacheImpl.
+   * specified origin, or nullptr if not alternatives are found. The returned reference
+   * is owned by the AlternateProtocolsCache and is valid until the next operation on the
+   * AlternateProtocolsCache.
    * @param origin The origin to find alternate protocols for.
    * @return An optional list of alternate protocols for the given origin.
    */
