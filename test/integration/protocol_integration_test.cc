@@ -2295,4 +2295,23 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.set_path_with_escaped_slashes_action(
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::REJECT_REQUEST);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setPath("/test/long%2Furl");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  EXPECT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
 } // namespace Envoy
