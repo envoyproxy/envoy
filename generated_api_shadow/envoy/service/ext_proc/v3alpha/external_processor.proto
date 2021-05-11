@@ -264,7 +264,6 @@ message CommonResponse {
   // along with the CONTINUE_AND_REPLACE status.
   config.core.v3.HeaderMap trailers = 4;
 
-  // [#not-implemented-hide:]
   // Clear the route cache for the current request.
   // This is necessary if the remote server
   // modified headers that are used to calculate the route.

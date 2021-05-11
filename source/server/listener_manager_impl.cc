@@ -438,42 +438,25 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
 
   ListenerImpl& new_listener_ref = *new_listener;
 
-  // We mandate that a listener with the same name must have the same configured address. This
-  // avoids confusion during updates and allows us to use the same bound address. Note that in
-  // the case of port 0 binding, the new listener will implicitly use the same bound port from
-  // the existing listener.
-  bool active_listener_exists = false;
-  bool warming_listener_exists = false;
-  if (existing_warming_listener != warming_listeners_.end() &&
-      *(*existing_warming_listener)->address() != *new_listener->address()) {
-    warming_listener_exists = true;
-  }
-  if (existing_active_listener != active_listeners_.end() &&
-      *(*existing_active_listener)->address() != *new_listener->address()) {
-    active_listener_exists = true;
-  }
-  if (active_listener_exists || warming_listener_exists) {
-    const std::string message =
-        fmt::format("error updating listener: '{}' has a different address '{}' from existing "
-                    "listener address '{}'",
-                    name, new_listener->address()->asString(),
-                    warming_listener_exists ? (*existing_warming_listener)->address()->asString()
-                                            : (*existing_active_listener)->address()->asString());
-    ENVOY_LOG(warn, "{}", message);
-    throw EnvoyException(message);
-  }
-
   bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory());
+    if (*(*existing_warming_listener)->address() != *new_listener->address()) {
+      setNewOrDrainingSocketFactory(name, config.address(), *new_listener, config.reuse_port());
+    } else {
+      new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory());
+    }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
-    // have been started or not. Either way we get the socket from the existing listener.
-    new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory());
+    // have been started or not.
+    if (*(*existing_active_listener)->address() != *new_listener->address()) {
+      setNewOrDrainingSocketFactory(name, config.address(), *new_listener, config.reuse_port());
+    } else {
+      new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory());
+    }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -482,49 +465,9 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
       *existing_active_listener = std::move(new_listener);
     }
   } else {
-    // Typically we catch address issues when we try to bind to the same address multiple times.
-    // However, for listeners that do not bind we must check to make sure we are not duplicating.
-    // This is an edge case and nothing will explicitly break, but there is no possibility that
-    // two listeners that do not bind will ever be used. Only the first one will be used when
-    // searched for by address. Thus we block it.
-    if (!new_listener->bindToPort() &&
-        (hasListenerWithAddress(warming_listeners_, *new_listener->address()) ||
-         hasListenerWithAddress(active_listeners_, *new_listener->address()))) {
-      const std::string message =
-          fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
-                      name, new_listener->address()->asString());
-      ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
-    }
-
     // We have no warming or active listener so we need to make a new one. What we do depends on
-    // whether workers have been started or not. Additionally, search through draining listeners
-    // to see if there is a listener that has a socket factory for the same address we are
-    // configured for and doesn't use SO_REUSEPORT. This is an edge case, but may happen if a
-    // listener is removed and then added back with a same or different name and intended to listen
-    // on the same address. This should work and not fail.
-    Network::ListenSocketFactorySharedPtr draining_listen_socket_factory;
-    auto existing_draining_listener = std::find_if(
-        draining_listeners_.cbegin(), draining_listeners_.cend(),
-        [&new_listener](const DrainingListener& listener) {
-          return listener.listener_->listenSocketFactory().sharedSocket().has_value() &&
-                 listener.listener_->listenSocketFactory().sharedSocket()->get().isOpen() &&
-                 *new_listener->address() ==
-                     *listener.listener_->listenSocketFactory().localAddress();
-        });
-
-    if (existing_draining_listener != draining_listeners_.cend()) {
-      draining_listen_socket_factory = existing_draining_listener->listener_->getSocketFactory();
-    }
-
-    Network::Socket::Type socket_type =
-        Network::Utility::protobufAddressSocketType(config.address());
-    new_listener->setSocketFactory(
-        draining_listen_socket_factory
-            ? draining_listen_socket_factory
-            : createListenSocketFactory(config.address(), *new_listener,
-                                        (socket_type == Network::Socket::Type::Datagram) ||
-                                            config.reuse_port()));
+    // whether workers have been started or not.
+    setNewOrDrainingSocketFactory(name, config.address(), *new_listener, config.reuse_port());
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -1046,6 +989,50 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;
+}
+
+void ListenerManagerImpl::setNewOrDrainingSocketFactory(
+    const std::string& name, const envoy::config::core::v3::Address& proto_address,
+    ListenerImpl& listener, bool reuse_port) {
+  // Typically we catch address issues when we try to bind to the same address multiple times.
+  // However, for listeners that do not bind we must check to make sure we are not duplicating. This
+  // is an edge case and nothing will explicitly break, but there is no possibility that two
+  // listeners that do not bind will ever be used. Only the first one will be used when searched for
+  // by address. Thus we block it.
+  if (!listener.bindToPort() && (hasListenerWithAddress(warming_listeners_, *listener.address()) ||
+                                 hasListenerWithAddress(active_listeners_, *listener.address()))) {
+    const std::string message =
+        fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
+                    name, listener.address()->asString());
+    ENVOY_LOG(warn, "{}", message);
+    throw EnvoyException(message);
+  }
+
+  // Search through draining listeners to see if there is a listener that has a socket factory for
+  // the same address we are configured for and doesn't use SO_REUSEPORT. This is an edge case, but
+  // may happen if a listener is removed and then added back with a same or different name and
+  // intended to listen on the same address. This should work and not fail.
+  Network::ListenSocketFactorySharedPtr draining_listen_socket_factory;
+  auto existing_draining_listener = std::find_if(
+      draining_listeners_.cbegin(), draining_listeners_.cend(),
+      [&listener](const DrainingListener& draining_listener) {
+        return draining_listener.listener_->listenSocketFactory().sharedSocket().has_value() &&
+               draining_listener.listener_->listenSocketFactory().sharedSocket()->get().isOpen() &&
+               *listener.address() ==
+                   *draining_listener.listener_->listenSocketFactory().localAddress();
+      });
+
+  if (existing_draining_listener != draining_listeners_.cend()) {
+    draining_listen_socket_factory = existing_draining_listener->listener_->getSocketFactory();
+  }
+
+  Network::Socket::Type socket_type = Network::Utility::protobufAddressSocketType(proto_address);
+  listener.setSocketFactory(
+      draining_listen_socket_factory
+          ? draining_listen_socket_factory
+          : createListenSocketFactory(proto_address, listener,
+                                      (socket_type == Network::Socket::Type::Datagram) ||
+                                          reuse_port));
 }
 
 Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFactory(

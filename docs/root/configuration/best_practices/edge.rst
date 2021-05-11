@@ -20,7 +20,7 @@ HTTP proxies should additionally configure:
   to true (to avoid consuming HTTP headers from external clients, see :ref:`HTTP header sanitizing <config_http_conn_man_header_sanitizing>`
   for details),
 * :ref:`connection and stream timeouts <faq_configuration_timeouts>`,
-* :ref:`HTTP/2 maximum concurrent streams limit <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>` to 100,
+* :ref:`HTTP/2 maximum concurrent streams limit <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>` and :ref:`HTTP/3 maximum concurrent streams limit <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>` to 100
 * :ref:`HTTP/2 initial stream window size limit <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_stream_window_size>` to 64 KiB,
 * :ref:`HTTP/2 initial connection window size limit <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_connection_window_size>` to 1 MiB.
 * :ref:`headers_with_underscores_action setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>` to REJECT_REQUEST, to protect upstream services that treat '_' and '-' as interchangeable.

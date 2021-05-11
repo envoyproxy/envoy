@@ -160,11 +160,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "alternate_protocols",
-    srcs = ["alternate_protocols.cc"],
-    hdrs = ["alternate_protocols.h"],
+    name = "alternate_protocols_cache",
+    srcs = ["alternate_protocols_cache_impl.cc"],
+    hdrs = ["alternate_protocols_cache_impl.h"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//include/envoy/http:alternate_protocols_cache_interface",
     ],
 )
 
@@ -173,6 +174,7 @@ envoy_cc_library(
     srcs = ["conn_pool_grid.cc"],
     hdrs = ["conn_pool_grid.h"],
     deps = [
+        ":alternate_protocols_cache",
         ":http3_status_tracker",
         ":mixed_conn_pool",
         "//source/common/http/http3:conn_pool_lib",

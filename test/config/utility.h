@@ -137,6 +137,9 @@ public:
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
+  // A cluster that uses the startTls transport socket.
+  static envoy::config::cluster::v3::Cluster buildStartTlsCluster(const std::string& address,
+                                                                  int port);
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
