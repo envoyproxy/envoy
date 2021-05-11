@@ -76,8 +76,8 @@ TagNameValues::TagNameValues() {
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
   addTokenized(MONGO_CMD, "mongo.*.cmd.$.**");
 
-  // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
-  addTokenized(GRPC_BRIDGE_METHOD, "cluster.*.grpc.*.$.**");
+  // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.].(<grpc_method_name>.)[<stat_name>]
+  addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\..*?\.grpc\..*\.((.*)\.))");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
   addTokenized(HTTP_USER_AGENT, "http.*.user_agent.$.**");
@@ -94,8 +94,9 @@ TagNameValues::TagNameValues() {
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
   addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<NAME>\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
 
-  // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addTokenized(GRPC_BRIDGE_SERVICE, "cluster.*.grpc.$.**");
+  // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.).[<grpc_method_name>].[<stat_name>]
+  // Trailing '\..*\.' matches the method name and metric name (if present)
+  addRe2(GRPC_BRIDGE_SERVICE, R"(^cluster\..*?\.grpc\.((.*)\.).*\.)");
 
   // tcp.(<stat_prefix>.)*
   addTokenized(TCP_PREFIX, "tcp.$.**");

@@ -273,14 +273,15 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   Tag grpc_service;
   grpc_service.name_ = tag_names.GRPC_BRIDGE_SERVICE;
-  grpc_service.value_ = "grpc_service_1";
+  grpc_service.value_ = "fully.qualified.grpc_service_1";
 
   Tag grpc_method;
   grpc_method.name_ = tag_names.GRPC_BRIDGE_METHOD;
   grpc_method.value_ = "grpc_method_1";
 
-  regex_tester.testRegex("cluster.grpc_cluster.grpc.grpc_service_1.grpc_method_1.success",
-                         "cluster.grpc.success", {grpc_cluster, grpc_method, grpc_service});
+  regex_tester.testRegex(
+      "cluster.grpc_cluster.grpc.fully.qualified.grpc_service_1.grpc_method_1.success",
+      "cluster.grpc.success", {grpc_cluster, grpc_method, grpc_service});
 
   // Virtual host and cluster
   Tag vhost;
