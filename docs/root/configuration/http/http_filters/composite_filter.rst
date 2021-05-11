@@ -5,7 +5,7 @@ Composite Filter
 
 .. attention::
 
-   The composite filter is experimental and is currently under active development.
+   The composite filter is in alpha and is currently under active development.
    Capabilities will be expanded over time and the configuration structures are likely to change.
 
 The composite filter allows delegating filter actions to a filter specified by a
