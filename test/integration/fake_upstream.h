@@ -397,13 +397,9 @@ public:
   bool connected() const { return shared_connection_.connected(); }
 
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
-    // shared_connection_.connection().startSecureTransport();
     auto conn = dynamic_cast<Envoy::Network::ConnectionImpl*>(&shared_connection_.connection());
-    // transport_socket = std::move(transport_socket);
-    // transport_socket->setTransportSocketCallbacks(*this);
     conn->transportSocket() = std::move(transport_socket);
     conn->transportSocket()->setTransportSocketCallbacks(*conn);
-    // conn->startSecureTransport();
   }
 
 protected:
