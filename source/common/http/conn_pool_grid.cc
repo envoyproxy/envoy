@@ -192,7 +192,7 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    OptRef<AlternateProtocolsCache> alternate_protocols,
+    OptRef<AlternateProtocolsCacheImpl> alternate_protocols,
     std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
@@ -351,8 +351,8 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
   }
   uint32_t port = host_->address()->ip()->port();
   // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-  AlternateProtocolsCache::Origin origin("https", host_->hostname(), port);
-  OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
+  AlternateProtocolsCacheImpl::Origin origin("https", host_->hostname(), port);
+  OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       alternate_protocols_->findAlternatives(origin);
   if (!protocols.has_value()) {
     ENVOY_LOG(trace, "No alternate protocols available for host '{}', skipping HTTP/3.",
@@ -360,7 +360,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     return false;
   }
 
-  for (const AlternateProtocolsCache::AlternateProtocol& protocol : protocols.ref()) {
+  for (const AlternateProtocolsCacheImpl::AlternateProtocol& protocol : protocols.ref()) {
     // TODO(RyanTheOptimist): Handle alternate protocols which change hostname or port.
     if (!protocol.hostname_.empty() || protocol.port_ != port) {
       ENVOY_LOG(trace,
