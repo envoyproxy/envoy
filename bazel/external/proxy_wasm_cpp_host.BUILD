@@ -18,9 +18,9 @@ cc_library(
         "src/*.h",
         "src/*.cc",
         "src/common/*.h",
-        "src/common/*.cc",
         "src/third_party/*.h",
         "src/third_party/*.cc",
+        "src/utils/*.cc",
     ]),
     deps = [
         ":include",
