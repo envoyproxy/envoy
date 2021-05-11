@@ -1,0 +1,26 @@
+version: "3.7"
+services:
+  envoy-stats:
+    build:
+      context: .
+      dockerfile: Dockerfile-gzip
+    volumes:
+      - ./gzip-envoy.yaml:/etc/gzip-envoy.yaml
+    networks:
+      - envoymesh
+    ports:
+      - "8001:8001"
+      - "8002:8002"
+      - "8089:8089"
+
+  service:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service-envoy.yaml:/etc/service-envoy.yaml
+    networks:
+      - envoymesh
+
+networks:
+  envoymesh: {}
