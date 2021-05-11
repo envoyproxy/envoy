@@ -1,8 +1,16 @@
 #pragma once
 
+#include <map>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include "envoy/common/optref.h"
+#include "envoy/common/time.h"
+#include "envoy/http/alternate_protocols_cache.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/http/alternate_protocols_cache.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -12,7 +20,7 @@ public:
   AlternateProtocolsCacheImpl(ThreadLocal::Instance& tls, TimeSource& time_source);
   ~AlternateProtocolsCacheImpl() override;
 
-  // AlternateProtocols
+  // AlternateProtocolsCache
   void setAlternatives(const Origin& origin, const std::vector<AlternateProtocol>& protocols,
                        const MonotonicTime& expiration) override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;

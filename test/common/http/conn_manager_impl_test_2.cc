@@ -1737,7 +1737,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
 }
 
 // This test verifies proper sequences of decodeData() and encodeData() are called
-// when the first filer is "stopped" and "continue" in following case:
+// when the first filter is "stopped" and "continue" in following case:
 //
 // 3 decode filters:
 //

@@ -32,15 +32,16 @@ response trailers to a compliant gRPC server. It works by doing the following:
   work with unary gRPC APIs.
 
 This filter also collects stats for all gRPC requests that transit, even if those requests are
-normal gRPC requests over HTTP/2.
+normal gRPC requests over HTTP/2 or above.
 
 More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
 
 .. attention::
 
-   Note that statistics are also collected by the dedicated :ref:`gRPC stats filter
-   <config_http_filters_grpc_stats>`. The use of this filter for gRPC telemetry
-   has been deprecated.
+   Note that statistics should be collected by the dedicated :ref:`gRPC stats filter
+   <config_http_filters_grpc_stats>` instead. The use of this filter for gRPC telemetry
+   has been disabled. Set the runtime value of ``envoy.reloadable_features.grpc_bridge_stats_disabled``
+   to false to turn on stat collection.
 
 Statistics
 ----------

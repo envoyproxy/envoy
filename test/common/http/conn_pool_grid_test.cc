@@ -1,4 +1,4 @@
-#include "common/http/alternate_protocols_cache.h"
+#include "envoy/http/alternate_protocols_cache.h"
 #include "common/http/alternate_protocols_cache_impl.h"
 #include "common/http/conn_pool_grid.h"
 
@@ -100,7 +100,7 @@ class ConnectivityGridTestBase : public Event::TestUsingSimulatedTime, public te
 public:
   ConnectivityGridTestBase(bool use_alternate_protocols)
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
-        alternate_protocols_(maybeCreateAlternateProtocolsCache(use_alternate_protocols)),
+        alternate_protocols_(maybeCreateAlternateProtocolsCacheImpl(use_alternate_protocols)),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
@@ -111,7 +111,7 @@ public:
   }
 
   AlternateProtocolsCacheSharedPtr
-  maybeCreateAlternateProtocolsCache(bool use_alternate_protocols) {
+  maybeCreateAlternateProtocolsCacheImpl(bool use_alternate_protocols) {
     AlternateProtocolsCacheSharedPtr cache;
     if (!use_alternate_protocols) {
       return nullptr;
@@ -120,8 +120,8 @@ public:
   }
 
   void addHttp3AlternateProtocol() {
-    AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
-    const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+    AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
+    const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
         {"h3-29", "", origin.port_}};
     alternate_protocols_->setAlternatives(origin, protocols,
                                           simTime().monotonicTime() + Seconds(5));
@@ -153,9 +153,9 @@ public:
 };
 
 // Tests of the Grid in which an alternate protocols cache is configured.
-class ConnectivityGridWithAlternateProtocolsCacheTest : public ConnectivityGridTestBase {
+class ConnectivityGridWithAlternateProtocolsCacheImplTest : public ConnectivityGridTestBase {
 public:
-  ConnectivityGridWithAlternateProtocolsCacheTest() : ConnectivityGridTestBase(true) {}
+  ConnectivityGridWithAlternateProtocolsCacheImplTest() : ConnectivityGridTestBase(true) {}
 };
 
 // Test the first pool successfully connecting.
@@ -461,7 +461,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 }
 
 // Test that when HTTP/3 is broken then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessAfterBroken) {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessAfterBroken) {
   addHttp3AlternateProtocol();
   grid_.markHttp3Broken();
   EXPECT_EQ(grid_.first(), nullptr);
@@ -479,7 +479,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessAfterBroken) {
 }
 
 // Test the HTTP/3 pool successfully connecting when HTTP/3 is available.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, Success) {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, Success) {
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_.first(), nullptr);
 
@@ -495,7 +495,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, Success) {
 }
 
 // Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3) {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace",
@@ -511,9 +511,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3) {
 }
 
 // Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithExpiredHttp3) {
-  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithExpiredHttp3) {
+  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "", origin.port_}};
   alternate_protocols_->setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
   simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
@@ -534,9 +534,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithExpiredHttp3)
 
 // Test that when the alternate protocol specifies a different host, then the HTTP/3 pool is
 // skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingHostname) {
-  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingHostname) {
+  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "otherhostname", origin.port_}};
   alternate_protocols_->setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
 
@@ -555,9 +555,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMat
 
 // Test that when the alternate protocol specifies a different port, then the HTTP/3 pool is
 // skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingPort) {
-  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingPort) {
+  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"h3-29", "", origin.port_ + 1}};
   alternate_protocols_->setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
 
@@ -575,9 +575,9 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMat
 }
 
 // Test that when the alternate protocol specifies an invalid ALPN, then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingAlpn) {
-  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
-  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingAlpn) {
+  AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"http/2", "", origin.port_}};
   alternate_protocols_->setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
 

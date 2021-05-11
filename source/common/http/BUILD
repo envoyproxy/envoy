@@ -166,13 +166,13 @@ envoy_cc_library(
         "alternate_protocols_cache_manager_impl.cc",
     ],
     hdrs = [
-        "alternate_protocols_cache.h",
         "alternate_protocols_cache_impl.h",
         "alternate_protocols_cache_manager_impl.h",
     ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:alternate_protocols_cache_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:resource_manager_interface",
