@@ -137,7 +137,9 @@ public:
           "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
     }
 
+    // clang-format off
     std::string_view precompiled = {};
+    // clang-format on
 
     if (GetParam() /* allow_precompiled */) {
       const auto section = wasm_vm_->getPrecompiledSectionName();
