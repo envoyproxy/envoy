@@ -9,6 +9,8 @@ final class SendTrailersTests: XCTestCase {
     let apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
     let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+    let matcherTrailerName = "test-trailer"
+    let matcherTrailerValue = "test.code"
     let config =
     """
     static_resources:
@@ -41,8 +43,8 @@ final class SendTrailersTests: XCTestCase {
                   match_config:
                     http_request_trailers_match:
                       headers:
-                        - name: "test-trailer"
-                          exact_match: test.code
+                        - name: \(matcherTrailerName)
+                          exact_match: \(matcherTrailerValue)
               - name: envoy.filters.http.buffer
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
@@ -64,7 +66,7 @@ final class SendTrailersTests: XCTestCase {
       .build()
     let body = try XCTUnwrap("match_me".data(using: .utf8))
     let requestTrailers = RequestTrailersBuilder()
-      .add(name: "test-trailer", value: "test.code")
+      .add(name: matcherTrailerName, value: matcherTrailerValue)
       .build()
 
     client
