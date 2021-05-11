@@ -39,10 +39,7 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
     // TODO(#10008): We should remove the "1 +" below, so we can get empty
     // segments, which trigger some inconsistent handling as described in that
     // bug.
-    uint32_t num_bytes = (1 + data[index]) & 0x7;
-    if (index == 0 && num_bytes == 0) {
-      return;
-    }
+    uint32_t num_bytes = 1 + (data[index] & 0x7);
 
     // Carve out the segment and use the 4th bit from the control-byte to
     // determine whether to treat this segment symbolic or not.
