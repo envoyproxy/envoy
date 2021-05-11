@@ -744,7 +744,7 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   EXPECT_TRUE(
       TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
 
-  server_->dispatcher().post([&] { stats_store_.merge_cb_(); });
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
   EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
 
@@ -752,7 +752,7 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   // be recorded.
   server_->dispatcher().post([&] { server_->flushStats(); });
 
-  server_->dispatcher().post([&] { stats_store_.merge_cb_(); });
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
   EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
 
