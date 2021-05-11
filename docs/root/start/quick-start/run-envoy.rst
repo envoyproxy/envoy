@@ -82,9 +82,13 @@ Run Envoy with the demo configuration
 
 The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configuration.
 
-.. note::
+Valid extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
+JSON, YAML, `binary proto3
+<https://developers.google.com/protocol-buffers/docs/encoding>`_ and `text
+proto3
+<https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.text_format>`_
+formats respectively.
 
-   The configuration file extension must be ``yaml``.
 
 .. tabs::
 
