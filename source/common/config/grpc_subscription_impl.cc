@@ -8,7 +8,6 @@
 #include "common/config/xds_resource.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
-#include "common/protobuf/type_util.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
