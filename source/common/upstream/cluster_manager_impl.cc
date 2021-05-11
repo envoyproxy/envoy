@@ -1523,7 +1523,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
 #ifdef ENVOY_ENABLE_QUIC
     // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
-    auto alternate_protocols = makeOptRefFromPtr<Http::AlternateProtocolsCache>(nullptr);
+    auto alternate_protocols = makeOptRefFromPtr<Http::AlternateProtocolsCacheImpl>(nullptr);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,

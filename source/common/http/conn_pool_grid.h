@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/http/alternate_protocols_cache.h"
+#include "common/http/alternate_protocols_cache_impl.h"
 #include "common/http/conn_pool_base.h"
 #include "common/http/http3_status_tracker.h"
 
@@ -132,7 +132,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                   OptRef<AlternateProtocolsCache> alternate_protocols,
+                   OptRef<AlternateProtocolsCacheImpl> alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
@@ -192,7 +192,7 @@ private:
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
   // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
-  OptRef<AlternateProtocolsCache> alternate_protocols_;
+  OptRef<AlternateProtocolsCacheImpl> alternate_protocols_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and

@@ -9,6 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "alternate_protocols_cache_interface",
+    hdrs = ["alternate_protocols_cache.h"],
+    deps = ["//include/envoy/common:time_interface"],
+)
+
+envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
     deps = [":codec_interface"],

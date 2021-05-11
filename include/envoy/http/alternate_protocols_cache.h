@@ -13,13 +13,17 @@
 namespace Envoy {
 namespace Http {
 
-// Tracks alternate protocols that can be used to make an HTTP connection to an origin server.
-// See https://tools.ietf.org/html/rfc7838 for HTTP Alternate Services and
-// https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04 for the
-// "HTTPS" DNS resource record.
+/**
+ * Tracks alternate protocols that can be used to make an HTTP connection to an origin server.
+ * See https://tools.ietf.org/html/rfc7838 for HTTP Alternate Services and
+ * https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04 for the
+ * "HTTPS" DNS resource record.
+ */
 class AlternateProtocolsCache {
 public:
-  // Represents an HTTP origin to be connected too.
+  /**
+   * Represents an HTTP origin to be connected too.
+   */
   struct Origin {
   public:
     Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port);
@@ -56,7 +60,9 @@ public:
     uint32_t port_{};
   };
 
-  // Represents an alternative protocol that can be used to connect to an origin.
+  /**
+   * Represents an alternative protocol that can be used to connect to an origin.
+   */
   struct AlternateProtocol {
   public:
     AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port);
@@ -73,34 +79,34 @@ public:
     uint32_t port_;
   };
 
-  explicit AlternateProtocolsCache(TimeSource& time_source);
+  virtual ~AlternateProtocolsCache() = default;
 
-  // Sets the possible alternative protocols which can be used to connect to the
-  // specified origin. Expires after the specified expiration time.
-  void setAlternatives(const Origin& origin, const std::vector<AlternateProtocol>& protocols,
-                       const MonotonicTime& expiration);
+  /**
+   * Sets the possible alternative protocols which can be used to connect to the
+   * specified origin. Expires after the specified expiration time.
+   * @param origin The origin to set alternate protocols for.
+   * @param protocols A list of alternate protocols.
+   * @param expiration The time after which the alternatives are no longer valid.
+   */
+  virtual void setAlternatives(const Origin& origin,
+                               const std::vector<AlternateProtocol>& protocols,
+                               const MonotonicTime& expiration) PURE;
 
-  // Returns the possible alternative protocols which can be used to connect to the
-  // specified origin, or nullptr if not alternatives are found. The returned pointer
-  // is owned by the AlternateProtocolsCache and is valid until the next operation on
-  // AlternateProtocolsCache.
-  OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin);
+  /**
+   * Returns the possible alternative protocols which can be used to connect to the
+   * specified origin, or nullptr if not alternatives are found. The returned pointer
+   * is owned by the AlternateProtocolsCacheImpl and is valid until the next operation on
+   * AlternateProtocolsCacheImpl.
+   * @param origin The origin to find alternate protocols for.
+   * @return An optional list of alternate protocols for the given origin.
+   */
+  virtual OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) PURE;
 
-  // Returns the number of entries in the map.
-  size_t size() const;
-
-private:
-  struct Entry {
-    std::vector<AlternateProtocol> protocols_;
-    MonotonicTime expiration_;
-  };
-
-  // Time source used to check expiration of entries.
-  TimeSource& time_source_;
-
-  // Map from hostname to list of alternate protocols.
-  // TODO(RyanTheOptimist): Add a limit to the size of this map and evict based on usage.
-  std::map<Origin, Entry> protocols_;
+  /**
+   * Returns the number of entries in the map.
+   * @return the number if entries in the map.
+   */
+  virtual size_t size() const PURE;
 };
 
 } // namespace Http
