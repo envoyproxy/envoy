@@ -375,9 +375,8 @@ public:
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }
 
-  void runMergeCallback() {
-    merge_cb_();
-  }
+  void runMergeCallback() { merge_cb_(); }
+
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
