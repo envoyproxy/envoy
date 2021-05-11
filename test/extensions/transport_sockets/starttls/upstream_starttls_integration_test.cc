@@ -225,7 +225,7 @@ class StartTlsIntegrationTest : public testing::TestWithParam<Network::Address::
                                 public BaseIntegrationTest {
 public:
   StartTlsIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()),
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig()),
         stream_info_(timeSystem(), nullptr) {}
   void initialize() override;
   void addStartTlsSwitchFilter(ConfigHelper& config_helper);
@@ -275,7 +275,7 @@ void StartTlsIntegrationTest::initialize() {
       }));
 
   config_helper_.renameListener("tcp_proxy");
-  //  addStartTlsSwitchFilter(config_helper_);
+  // addStartTlsSwitchFilter(config_helper_);
 
   // Add transport socket to cluster_0
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -290,6 +290,15 @@ void StartTlsIntegrationTest::initialize() {
         TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.starttls");
     cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls_config);
+  });
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()->mutable_listeners(0)->add_filter_chains();
+    config_helper_.addNetworkFilter(R"EOF(
+      name: startTls
+      typed_config:
+        "@type": type.googleapis.com/test.integration.starttls.StartTlsFilterConfig
+    )EOF");
   });
   // Setup factories and contexts for upstream clear-text raw buffer transport socket.
   auto config = std::make_unique<envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer>();

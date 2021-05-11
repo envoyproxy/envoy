@@ -117,17 +117,12 @@ std::string ConfigHelper::tcpProxyConfig() {
   return absl::StrCat(baseConfig(), R"EOF(
     filter_chains:
       filters:
-        name: startTls
-        typed_config:
-          "@type": type.googleapis.com/test.integration.starttls.StartTlsFilterConfig
-)EOF");
-#if 0
         name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-#endif
+)EOF");
 }
 
 std::string ConfigHelper::startTlsConfig() {
