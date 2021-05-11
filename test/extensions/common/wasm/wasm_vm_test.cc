@@ -134,7 +134,7 @@ public:
 
     if (code.empty()) {
       code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
     }
 
     std::string_view precompiled = {};
