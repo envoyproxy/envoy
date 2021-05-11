@@ -71,7 +71,7 @@ message Locality {
 
   // Defines the local service zone where Envoy is running. Though optional, it
   // should be set if discovery service routing is used and the discovery
-  // service exposes :ref:`zone data <envoy_api_field_config.endpoint.v4alpha.LocalityLbEndpoints.locality>`,
+  // service exposes :ref:`zone data <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`,
   // either in this message or via :option:`--service-zone`. The meaning of zone
   // is context dependent, e.g. `Availability Zone (AZ)
   // <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
@@ -224,16 +224,15 @@ message Node {
 message Metadata {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.Metadata";
 
-  reserved 1;
-
-  reserved "filter_metadata";
+  // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
+  // namespace is reserved for Envoy's built-in filters.
+  map<string, google.protobuf.Struct> filter_metadata = 1;
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.
   // The value is encoded as google.protobuf.Any.
-  // If both :ref:`filter_metadata <envoy_api_field_config.core.v4alpha.Metadata.filter_metadata>`
-  // and typed_filter_metadata fields are present in the metadata with same keys,
-  // only typed_filter_metadata field will be parsed.
+  // If both filter_metadata and typed_filter_metadata fields are present in the
+  // metadata with same keys, only typed_filter_metadata field will be parsed.
   map<string, google.protobuf.Any> typed_filter_metadata = 2;
 }
 

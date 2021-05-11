@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.service.accesslog.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
-import "envoy/data/accesslog/v4alpha/accesslog.proto";
+import "envoy/data/accesslog/v3/accesslog.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -58,7 +58,7 @@ message StreamAccessLogsMessage {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.accesslog.v3.StreamAccessLogsMessage.HTTPAccessLogEntries";
 
-    repeated data.accesslog.v4alpha.HTTPAccessLogEntry log_entry = 1
+    repeated data.accesslog.v3.HTTPAccessLogEntry log_entry = 1
         [(validate.rules).repeated = {min_items: 1}];
   }
 
@@ -67,7 +67,7 @@ message StreamAccessLogsMessage {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.accesslog.v3.StreamAccessLogsMessage.TCPAccessLogEntries";
 
-    repeated data.accesslog.v4alpha.TCPAccessLogEntry log_entry = 1
+    repeated data.accesslog.v3.TCPAccessLogEntry log_entry = 1
         [(validate.rules).repeated = {min_items: 1}];
   }
 
