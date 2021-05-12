@@ -43,4 +43,9 @@ message AwsRequestSigning {
   // value set here would be used for signing whereas the value set in the HCM would be used
   // for host header forwarding which is not the desired outcome.
   string host_rewrite = 3;
+
+  // Instead of buffering the request to calculate the payload hash, use the literal string ``UNSIGNED-PAYLOAD``
+  // to calculate the payload hash. Not all services support this option. See the `S3
+  // <https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html>`_ policy for details.
+  bool use_unsigned_payload = 4;
 }
