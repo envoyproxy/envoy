@@ -6,8 +6,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/bazelbuild/bazel-skylib",
         version = "1.0.3",
         sha256 = "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c",
-        urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
         release_date = "2020-08-27",
+        urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
         use_category = ["api"],
     ),
     com_envoyproxy_protoc_gen_validate = dict(
@@ -16,9 +16,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/envoyproxy/protoc-gen-validate",
         version = "9db8e779b46119eef7d67e3d1120c118d593611c",
         sha256 = "a3bfcf965499bfb17299a6931325eab653f99306dac413a5205e4b65e6ab027d",
+        release_date = "2021-03-16",
         strip_prefix = "protoc-gen-validate-{version}",
         urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/{version}.tar.gz"],
-        release_date = "2021-03-16",
         use_category = ["api"],
         implied_untracked_deps = [
             "com_github_iancoleman_strcase",
@@ -34,9 +34,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/bazelbuild/buildtools",
         version = "4.0.0",
         sha256 = "0d3ca4ed434958dda241fb129f77bd5ef0ce246250feed2d5a5470c6f29a77fa",
+        release_date = "2021-02-04",
         strip_prefix = "buildtools-4.0.0",
         urls = ["https://github.com/bazelbuild/buildtools/archive/4.0.0.tar.gz"],
-        release_date = "2021-02-03",
         use_category = ["api"],
     ),
     com_github_cncf_udpa = dict(
@@ -46,9 +46,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # During the UDPA -> xDS migration, we aren't working with releases.
         version = "b88cc788a63e5b38ee334a2e702c67901355ae2c",
         sha256 = "3220df8564f217665b6e17776569c5f748178c2b9cbf83bb55a13ddc0a3738f0",
+        release_date = "2021-03-23",
         strip_prefix = "xds-{version}",
         urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],
-        release_date = "2021-03-23",
         use_category = ["api"],
     ),
     com_github_openzipkin_zipkinapi = dict(
@@ -57,9 +57,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/openzipkin/zipkin-api",
         version = "0.2.2",
         sha256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b",
+        release_date = "2019-08-23",
         strip_prefix = "zipkin-api-{version}",
         urls = ["https://github.com/openzipkin/zipkin-api/archive/{version}.tar.gz"],
-        release_date = "2019-08-23",
         use_category = ["api"],
     ),
     com_google_googleapis = dict(
@@ -69,9 +69,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/googleapis/googleapis",
         version = "82944da21578a53b74e547774cf62ed31a05b841",
         sha256 = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405",
+        release_date = "2019-12-02",
         strip_prefix = "googleapis-{version}",
         urls = ["https://github.com/googleapis/googleapis/archive/{version}.tar.gz"],
-        release_date = "2019-12-02",
         use_category = ["api"],
     ),
     opencensus_proto = dict(
@@ -80,9 +80,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/census-instrumentation/opencensus-proto",
         version = "0.3.0",
         sha256 = "b7e13f0b4259e80c3070b583c2f39e53153085a6918718b1c710caf7037572b0",
+        release_date = "2020-07-21",
         strip_prefix = "opencensus-proto-{version}/src",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v{version}.tar.gz"],
-        release_date = "2020-07-21",
         use_category = ["api"],
     ),
     prometheus_metrics_model = dict(
@@ -91,9 +91,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/prometheus/client_model",
         version = "60555c9708c786597e6b07bf846d0dc5c2a46f54",
         sha256 = "6748b42f6879ad4d045c71019d2512c94be3dd86f60965e9e31e44a3f464323e",
+        release_date = "2020-06-23",
         strip_prefix = "client_model-{version}",
         urls = ["https://github.com/prometheus/client_model/archive/{version}.tar.gz"],
-        release_date = "2020-06-23",
         use_category = ["api"],
     ),
     rules_proto = dict(
@@ -102,9 +102,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/bazelbuild/rules_proto",
         version = "40298556293ae502c66579620a7ce867d5f57311",
         sha256 = "aa1ee19226f707d44bee44c720915199c20c84a23318bb0597ed4e5c873ccbd5",
+        release_date = "2020-08-17",
         strip_prefix = "rules_proto-{version}",
         urls = ["https://github.com/bazelbuild/rules_proto/archive/{version}.tar.gz"],
-        release_date = "2020-08-17",
         use_category = ["api"],
     ),
     opentelemetry_proto = dict(
@@ -113,9 +113,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/open-telemetry/opentelemetry-proto",
         version = "0.7.0",
         sha256 = "39cc1fb45039c7687354ca497aff8a55c71d0f1e484f6b81124ba9d821c36441",
+        release_date = "2021-01-27",
         strip_prefix = "opentelemetry-proto-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
-        release_date = "2020-12-09",
         use_category = ["api"],
     ),
 )

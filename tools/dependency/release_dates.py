@@ -15,9 +15,11 @@ import os
 import sys
 
 import github
-
 import exports
 import utils
+
+from colorama import Fore, Style
+from packaging import version
 
 
 # Thrown on errors related to release date.
@@ -40,9 +42,10 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
         latest_release = repo.get_latest_release()
         if latest_release.created_at > release_date and latest_release.tag_name != metadata_version:
             print(
-                f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
-                f'{latest_release.tag_name}@<{latest_release.created_at}>')
-    except github.UnknownObjectException:
+                Fore.YELLOW
+                + f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
+                f'{latest_release.tag_name}@<{latest_release.created_at}>' + Style.RESET_ALL)
+    except github.GithubException as e:
         pass
 
 
@@ -50,7 +53,7 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
 def verify_and_print_release_date(dep, github_release_date, metadata_release_date):
     mismatch = ''
     iso_release_date = format_utc_date(github_release_date)
-    print(f'{dep} has a GitHub release date {iso_release_date}')
+    print(Fore.GREEN + f'{dep} has a GitHub release date {iso_release_date}' + Style.RESET_ALL)
     if iso_release_date != metadata_release_date:
         raise ReleaseDateError(f'Mismatch with metadata release date of {metadata_release_date}')
 
@@ -58,14 +61,39 @@ def verify_and_print_release_date(dep, github_release_date, metadata_release_dat
 # Extract release date from GitHub API.
 def get_release_date(repo, metadata_version, github_release):
     if github_release.tagged:
-        tags = repo.get_tags()
-        for tag in tags:
-            if tag.name == github_release.version:
-                return tag.commit.commit.committer.date
+
+        try:
+            latest = repo.get_latest_release()
+        except github.GithubException as e:
+            latest = ''
+            pass
+
+        if latest and (github_release.version <= latest.tag_name):
+            release = repo.get_release(github_release.version)
+            return release.published_at
+        else:
+            tags = repo.get_tags()
+            current_metadata_tag_commit_date = ''
+            for tag in tags.reversed:
+                if tag.name == github_release.version:
+                    current_metadata_tag_commit_date = tag.commit.commit.committer.date
+                if not (version.parse(tag.name).is_prerelease) and version.parse(
+                        tag.name) > version.parse(github_release.version):
+                    print(
+                        Fore.YELLOW +
+                        f'*WARNING* {repo.name} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}>: '
+                        f'{tag.name}@<{tag.commit.commit.committer.date}>' + Style.RESET_ALL)
+            return current_metadata_tag_commit_date
         return None
     else:
-        assert (metadata_version == github_release.version)
+        assert metadata_version == github_release.version
         commit = repo.get_commit(github_release.version)
+        commits = repo.get_commits(since=commit.commit.committer.date)
+        if commits.totalCount - 1 > 0:
+            print(
+                Fore.YELLOW +
+                f'*WARNING* {repo.name} has {str(commits.totalCount - 1)} commits since {github_release.version}@<{commit.commit.committer.date}>'
+                + Style.RESET_ALL)
         return commit.commit.committer.date
 
 
@@ -75,6 +103,7 @@ def verify_and_print_release_dates(repository_locations, github_instance):
         release_date = None
         # Obtain release information from GitHub API.
         github_release = utils.get_github_release_from_urls(metadata['urls'])
+        print('github_release: ', github_release)
         if not github_release:
             print(f'{dep} is not a GitHub repository')
             continue
@@ -107,6 +136,8 @@ if __name__ == '__main__':
             spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token))
     except ReleaseDateError as e:
         print(
+            Fore.RED +
             f'An error occurred while processing {path}, please verify the correctness of the '
-            f'metadata: {e}')
+            f'metadata: {e}'
+            + Style.RESET_ALL)
         sys.exit(1)
