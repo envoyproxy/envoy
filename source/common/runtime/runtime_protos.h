@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Runtime {
 
 // Helper class for runtime-derived uint32.
-class UInt32 {
+class UInt32 : Logger::Loggable<Logger::Id::runtime> {
 public:
   UInt32(const envoy::config::core::v3::RuntimeUInt32& uint32_proto, Runtime::Loader& runtime)
       : runtime_key_(uint32_proto.runtime_key()), default_value_(uint32_proto.default_value()),
@@ -22,8 +22,13 @@ public:
 
   uint32_t value() const {
     uint64_t raw_value = runtime_.snapshot().getInteger(runtime_key_, default_value_);
-    return raw_value > std::numeric_limits<uint32_t>::max() ? default_value_
-                                                            : static_cast<uint32_t>(raw_value);
+    if (raw_value > std::numeric_limits<uint32_t>::max()) {
+      ENVOY_LOG_EVERY_POW_2(warn,
+                            "value:{} of {} is larger than uint32 max, return default instead",
+                            raw_value, runtime_key_);
+      return default_value_;
+    }
+    return static_cast<uint32_t>(raw_value);
   }
 
 private:
