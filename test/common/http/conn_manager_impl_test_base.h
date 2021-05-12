@@ -62,6 +62,8 @@ public:
   ResponseHeaderMap* sendResponseHeaders(ResponseHeaderMapPtr&& response_headers);
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);
+  void testPathNormalization(const RequestHeaderMap& request_headers,
+                             const ResponseHeaderMap& expected_response);
 
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
@@ -142,6 +144,11 @@ public:
     return headers_with_underscores_action_;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return path_with_escaped_slashes_action_;
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -208,13 +215,17 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
   const LocalReply::LocalReplyPtr local_reply_;
-  bool strip_trailing_host_dot_ = false;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   NiceMock<MockResponseEncoder> response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction path_with_escaped_slashes_action_{
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+              KEEP_UNCHANGED};
+  bool strip_trailing_host_dot_ = false;
 };
 
 } // namespace Http
