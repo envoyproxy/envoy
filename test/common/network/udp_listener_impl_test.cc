@@ -57,7 +57,7 @@ public:
     ON_CALL(override_syscall_, supportsMmsg())
         .WillByDefault(Return(os_calls.latched().supportsMmsg()));
     ON_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
-        .WillByDefault(Return(std::numeric_limits<size_t>::max()));
+        .WillByDefault(Return(MAX_NUM_PACKETS_PER_EVENT_LOOP));
 
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());

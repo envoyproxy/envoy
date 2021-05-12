@@ -9,6 +9,7 @@
 #include "envoy/network/listener.h"
 
 #include "server/active_listener_base.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -83,8 +84,8 @@ public:
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
   size_t numPacketsExpectedPerEventLoop() const final {
-    // This will be capped by UDP listener limit anyway.
-    return std::numeric_limits<size_t>::max();
+    // TODO(mattklein123) change this to a reasonable number if needed.
+    return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
   }
 
   // Network::UdpWorker

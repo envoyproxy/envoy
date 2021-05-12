@@ -179,9 +179,8 @@ private:
       cluster_.cluster_stats_.sess_rx_datagrams_dropped_.add(dropped);
     }
     size_t numPacketsExpectedPerEventLoop() const final {
-      // This will be capped by MAX_NUM_PACKETS_PER_EVENT_LOOP packets anyway.
-      // TODO(mattklein123) change this limit to a reasonable number if needed.
-      return std::numeric_limits<size_t>::max();
+      // TODO(mattklein123) change this to a reasonable number if needed.
+      return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
     }
 
     ClusterInfo& cluster_;

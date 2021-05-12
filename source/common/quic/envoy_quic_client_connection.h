@@ -54,8 +54,7 @@ public:
     // TODO(mattklein123): Emit a stat for this.
   }
   size_t numPacketsExpectedPerEventLoop() const override {
-    // Use ~32k to read the same amount as a TCP connection.
-    return 32u;
+    return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
 
   // Register file event and apply socket options.

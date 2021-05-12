@@ -219,7 +219,7 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
 }
 
 size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
-  // Expect each session to read 32 packets per READ event.
+  // Expect each session to read packets_received_to_connection_count_ratio_ number of packets in this read event.
   return quic_dispatcher_->NumSessions() * packets_received_to_connection_count_ratio_;
 }
 
@@ -227,7 +227,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
     : concurrency_(concurrency), enabled_(config.enabled()),
       packets_received_to_connection_count_ratio_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_received_to_connection_count_ratio, 32)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_per_connection
+                                          , DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
   uint64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;

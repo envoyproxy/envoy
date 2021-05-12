@@ -77,7 +77,7 @@ void UdpListenerImpl::handleReadCallback() {
       config_.prefer_gro_, packets_dropped_);
   if (result == nullptr) {
     // No error. The number of reads was limited by read rate. There are more packets to read.
-    // Register READ for next event loop.
+    // Register to read more in the next event loop.
     socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;
   }

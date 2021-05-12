@@ -373,7 +373,7 @@ public:
 
   /**
    * Read some packets from a given UDP socket and pass the packet to a given
-   * UdpPacketProcessor. Only read no more than MAX_NUM_PACKETS_PER_EVENT_LOOP packets.
+   * UdpPacketProcessor. Read no more than MAX_NUM_PACKETS_PER_EVENT_LOOP packets.
    * @param handle is the UDP socket to read from.
    * @param local_address is the socket's local address used to populate port.
    * @param udp_packet_processor is the callback to receive the packets.
