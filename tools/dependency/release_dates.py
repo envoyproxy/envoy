@@ -136,8 +136,7 @@ if __name__ == '__main__':
             spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token))
     except ReleaseDateError as e:
         print(
-            Fore.RED +
-            f'An error occurred while processing {path}, please verify the correctness of the '
-            f'metadata: {e}'
-            + Style.RESET_ALL)
+            Fore.RED
+            + f'An error occurred while processing {path}, please verify the correctness of the '
+            f'metadata: {e}' + Style.RESET_ALL)
         sys.exit(1)
