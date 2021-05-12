@@ -357,6 +357,7 @@ public:
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
     absl::MutexLock lock(&lock_);
     auto conn = dynamic_cast<Envoy::Network::ConnectionImpl*>(&connection_);
+    prev_transport_sockets_.push_back(std::move(conn->transportSocket()));
     conn->transportSocket() = std::move(transport_socket);
     conn->transportSocket()->setTransportSocketCallbacks(*conn);
   }
@@ -366,6 +367,7 @@ private:
   absl::Mutex lock_;
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
+  std::vector<Network::TransportSocketPtr> prev_transport_sockets_;
 };
 
 using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
