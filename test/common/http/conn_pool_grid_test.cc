@@ -12,7 +12,6 @@
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -117,7 +116,7 @@ public:
     if (!use_alternate_protocols) {
       return nullptr;
     }
-    return std::make_shared<AlternateProtocolsCacheImpl>(tls_, simTime());
+    return std::make_shared<AlternateProtocolsCacheImpl>(simTime());
   }
 
   void addHttp3AlternateProtocol() {
@@ -135,7 +134,6 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
   ConnectivityGridForTest grid_;
   Upstream::HostDescriptionConstSharedPtr host_;

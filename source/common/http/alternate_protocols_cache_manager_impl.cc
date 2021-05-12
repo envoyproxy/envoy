@@ -10,14 +10,19 @@ namespace Http {
 
 SINGLETON_MANAGER_REGISTRATION(alternate_protocols_cache_manager);
 
+AlternateProtocolsCacheManagerImpl::AlternateProtocolsCacheManagerImpl(TimeSource& time_source, ThreadLocal::Instance& tls)
+    : time_source_(time_source), slot_(tls) {
+  slot_.set([](Event::Dispatcher& /*dispatcher*/) { return std::make_shared<State>(); });
+}
+
 AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
     const envoy::config::core::v3::AlternateProtocolsCacheOptions& options) {
-  const auto& existing_cache = caches_.find(options.name());
-  if (existing_cache != caches_.end()) {
+  const auto& existing_cache = (*slot_).caches_.find(options.name());
+  if (existing_cache != (*slot_).caches_.end()) {
     if (!Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
       throw EnvoyException(fmt::format(
           "options specified alternate protocols cache '{}' with different settings"
-          " old '{}' new '{}'",
+          " first '{}' second '{}'",
           options.name(), existing_cache->second.options_.DebugString(), options.DebugString()));
     }
 
@@ -25,8 +30,8 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
   }
 
   AlternateProtocolsCacheSharedPtr new_cache =
-      std::make_shared<AlternateProtocolsCacheImpl>(tls_, time_source_);
-  caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
+      std::make_shared<AlternateProtocolsCacheImpl>(time_source_);
+  (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }
 

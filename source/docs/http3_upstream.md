@@ -1,7 +1,17 @@
 ### Overview
 
 Support for Upstream HTTP/3 connections is slightly more complex than for HTTP/1 or HTTP/2
-and this document attempts to describe it.
+and requires specific configurations to enable it. HTTP/3 is only attempted to servers which
+advertise HTTP/3 support either via [HTTP Alternative Services](https://tools.ietf.org/html/rfc7838)
+or the [HTTPS DNS resource record](https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04).
+If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead. Further,
+HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
+It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
+means that Upstream HTTP/3 connection attempts might be blocked by the network and should fall
+back to using HTTP/2. On such networks, the Upstream connection code needs to
+track that HTTP/3 connects attemps are not succeeding and avoid making connections
+which are doomed to fail. On networks where HTTP/3 is working correctly, however, the
+Upstream connection code should avoid attempting HTTP/2 unnecessarily.
 
 ### Components
 

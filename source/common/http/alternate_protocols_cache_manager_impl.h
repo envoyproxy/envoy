@@ -14,8 +14,7 @@ namespace Http {
 class AlternateProtocolsCacheManagerImpl : public AlternateProtocolsCacheManager,
                                            public Singleton::Instance {
 public:
-  AlternateProtocolsCacheManagerImpl(TimeSource& time_source, ThreadLocal::Instance& tls)
-      : time_source_(time_source), tls_(tls) {}
+  AlternateProtocolsCacheManagerImpl(TimeSource& time_source, ThreadLocal::Instance& tls);
 
   // AlternateProtocolsCacheManager
   AlternateProtocolsCacheSharedPtr
@@ -32,11 +31,19 @@ private:
     AlternateProtocolsCacheSharedPtr cache_;
   };
 
+  // Per-thread state.
+  struct State : public ThreadLocal::ThreadLocalObject {
+    // Map from config name to cache for that config.
+    absl::flat_hash_map<std::string, CacheWithOptions> caches_;
+  };
   TimeSource& time_source_;
-  ThreadLocal::Instance& tls_;
 
-  // Map from config name to cache for that config.
-  absl::flat_hash_map<std::string, CacheWithOptions> caches_;
+  // Thread local state for the cache
+  ThreadLocal::TypedSlot<State> slot_;
+
+  // Create slot and store a Thread-Local-CacheManager
+  // Each TLCM will have the map from config name to cache
+
 };
 
 class AlternateProtocolsCacheManagerFactoryImpl : public AlternateProtocolsCacheManagerFactory {

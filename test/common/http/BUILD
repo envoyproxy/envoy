@@ -433,7 +433,6 @@ envoy_cc_test(
         "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/stats:stats_mocks",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
@@ -458,7 +457,6 @@ envoy_cc_test(
         ":common_lib",
         "//source/common/http:alternate_protocols_cache",
         "//test/mocks:common_lib",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
