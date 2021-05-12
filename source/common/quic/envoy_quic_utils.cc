@@ -20,15 +20,11 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
   if (!quic_address.IsInitialized()) {
     return nullptr;
   }
-  StatusOr<Network::Address::InstanceConstSharedPtr> error_or_instance =
-      Network::Address::addressFromSockAddr(quic_address.generic_address(),
-                                            quic_address.host().address_family() ==
-                                                    quic::IpAddressFamily::IP_V4
-                                                ? sizeof(sockaddr_in)
-                                                : sizeof(sockaddr_in6),
-                                            false);
-  RELEASE_ASSERT(error_or_instance.ok(), error_or_instance.status().ToString());
-  return *error_or_instance;
+  return Network::Address::getAddressFromSockAddrOrDie(
+      quic_address.generic_address(),
+      quic_address.host().address_family() == quic::IpAddressFamily::IP_V4 ? sizeof(sockaddr_in)
+                                                                           : sizeof(sockaddr_in6),
+      -1, false);
 }
 
 quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip) {

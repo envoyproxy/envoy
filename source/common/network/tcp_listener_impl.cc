@@ -86,10 +86,9 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     if (remote_addr.ss_family == AF_UNIX) {
       remote_address = io_handle->peerAddress();
     } else {
-      StatusOr<Address::InstanceConstSharedPtr> error_or_address = Address::addressFromSockAddr(
-          remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
-      RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
-      remote_address = *error_or_address;
+      remote_address = Address::getAddressFromSockAddrOrDie(remote_addr, remote_addr_len, -1,
+                                                            local_address->ip()->version() ==
+                                                                Address::IpVersion::v6);
     }
 
     cb_.onAccept(

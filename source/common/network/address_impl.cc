@@ -107,6 +107,24 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+Address::InstanceConstSharedPtr
+getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t fd, bool v6only) {
+  // Set v6only to false so that mapped-v6 address can be normalize to v4
+  // address. Though dual stack may be disabled, it's still okay to assume the
+  // address is from a dual stack socket. This is because mapped-v6 address
+  // must come from a dual stack socket. An actual v6 address can come from
+  // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
+  // address and the socket is actually v6 only, the returned address will be
+  // regarded as a v6 address from dual stack socket. However, this address is not going to be
+  // used to create socket. Wrong knowledge of dual stack support won't hurt.
+  StatusOr<Address::InstanceConstSharedPtr> error_or_addr =
+      Address::addressFromSockAddr(ss, ss_len, v6only);
+  if (!error_or_addr.ok()) {
+    PANIC(fmt::format("Invalid address for fd: {}", fd));
+  }
+  return *error_or_addr;
+}
+
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
@@ -119,8 +137,9 @@ Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* so
   friendly_name_.append(ip_.friendly_address_);
   friendly_name_.push_back(':');
   friendly_name_.append(port.data(), port.size());
-  if (!validateProtocolSupported().ok()) {
-    throw EnvoyException("Ipv4 not supported");
+  absl::Status status = validateProtocolSupported();
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
   }
 }
 
@@ -139,8 +158,9 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
   }
 
   friendly_name_ = absl::StrCat(address, ":", port);
-  if (!validateProtocolSupported().ok()) {
-    throw EnvoyException("Ipv4 not supported");
+  absl::Status status = validateProtocolSupported();
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
   }
   ip_.friendly_address_ = address;
 }
@@ -152,13 +172,14 @@ Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
   ip_.ipv4_.address_.sin_port = htons(port);
   ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
   friendly_name_ = absl::StrCat("0.0.0.0:", port);
-  if (!validateProtocolSupported().ok()) {
-    throw EnvoyException("Ipv4 not supported");
+  absl::Status status = validateProtocolSupported();
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
   }
   ip_.friendly_address_ = "0.0.0.0";
 }
 
-Ipv4Instance::Ipv4Instance(absl::Status&, const sockaddr_in* address,
+Ipv4Instance::Ipv4Instance(absl::Status& error, const sockaddr_in* address,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
@@ -171,6 +192,7 @@ Ipv4Instance::Ipv4Instance(absl::Status&, const sockaddr_in* address,
   friendly_name_.append(ip_.friendly_address_);
   friendly_name_.push_back(':');
   friendly_name_.append(port.data(), port.size());
+  error = validateProtocolSupported();
 }
 
 bool Ipv4Instance::operator==(const Instance& rhs) const {
@@ -238,8 +260,9 @@ Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   ip_.ipv6_.v6only_ = v6only;
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
-  if (!validateProtocolSupported().ok()) {
-    throw EnvoyException("Ipv6 not supported");
+  absl::Status status = validateProtocolSupported();
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
   }
 }
 
@@ -261,8 +284,9 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
   // Just in case address is in a non-canonical format, format from network address.
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
-  if (!validateProtocolSupported().ok()) {
-    throw EnvoyException("Ipv6 not supported");
+  absl::Status status = validateProtocolSupported();
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
   }
 }
 
@@ -309,13 +333,14 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t 
   pipe_.mode_ = mode;
 }
 
-Ipv6Instance::Ipv6Instance(absl::Status&, const sockaddr_in6& address, bool v6only,
+Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   ip_.ipv6_.address_ = address;
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   ip_.ipv6_.v6only_ = v6only;
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+  status = validateProtocolSupported();
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,

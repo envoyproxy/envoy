@@ -30,6 +30,10 @@ namespace Address {
 StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
                                                      bool v6only = true);
 
+Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
+                                                            socklen_t ss_len, os_fd_t fd,
+                                                            bool v6only = true);
+
 /**
  * Base class for all address types.
  */
@@ -60,10 +64,6 @@ public:
   template <typename InstanceType, typename... Args>
   static StatusOr<InstanceConstPtr> createInstancePtr(Args&&... args) {
     absl::Status status;
-    status = InstanceType::validateProtocolSupported();
-    if (!status.ok()) {
-      return status;
-    }
     std::unique_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
     if (!status.ok()) {
       return status;
@@ -74,7 +74,6 @@ public:
   template <typename InstanceType, typename... Args>
   static StatusOr<InstanceType> createInstance(Args&&... args) {
     absl::Status status;
-    status = InstanceType::validateProtocolSupported();
     if (!status.ok()) {
       return status;
     }

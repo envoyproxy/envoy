@@ -169,6 +169,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (completed_) {
     if (!cancelled_) {
+      // Use a raw try here because it is used in both main thread and filter.
+      // Can not convert to use status code as there may be unexpected exceptions.
       try {
         callback_(resolution_status, std::move(address_list));
       } catch (const EnvoyException& e) {

@@ -260,10 +260,9 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
         (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      StatusOr<Address::InstanceConstSharedPtr> error_or_instance = Address::addressFromSockAddr(
-          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-      RELEASE_ASSERT(error_or_instance.ok(), error_or_instance.status().ToString());
-      ret = *error_or_instance;
+      ret = Address::getAddressFromSockAddrOrDie(
+          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6),
+          -1, true);
       if (!isLoopbackAddress(*ret)) {
         break;
       }
@@ -420,12 +419,9 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
-  StatusOr<Address::InstanceConstSharedPtr> error_or_address =
-      Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
-  if (!error_or_address.ok()) {
-    throw EnvoyException(error_or_address.status().ToString());
-  }
-  return *error_or_address;
+  return Address::getAddressFromSockAddrOrDie(orig_addr, 0, -1,
+                                              true /* default for v6 constructor */);
+
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
