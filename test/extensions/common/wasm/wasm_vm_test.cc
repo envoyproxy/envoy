@@ -141,6 +141,8 @@ public:
     std::string_view precompiled = {};
     // clang-format on
 
+    // Load precompiled module on Linux-x86_64, since it's only support there.
+#if defined(__linux__) && defined(__x86_64__)
     if (GetParam() /* allow_precompiled */) {
       // Section name is expected to be available in the tested runtimes.
       const auto section_name = wasm_vm_->getPrecompiledSectionName();
@@ -150,13 +152,12 @@ public:
       if (!proxy_wasm::BytecodeUtil::getCustomSection(code, section_name, precompiled)) {
         return false;
       }
-#if defined(__linux__) && defined(__x86_64__)
-      // Precompiled module is expected to be available in the test file on Linux-x86_64.
+      // Precompiled module is expected to be available in the test file.
       if (precompiled.empty()) {
         return false;
       }
-#endif
     }
+#endif
 
     std::string stripped;
     if (!proxy_wasm::BytecodeUtil::getStrippedSource(code, stripped)) {
@@ -172,19 +173,25 @@ protected:
   WasmVmPtr wasm_vm_;
 };
 
-INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest, testing::Values(false, true));
+INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest,
+#if defined(__linux__) && defined(__x86_64__)
+                         testing::Values(false, true)
+#else
+                         testing::Values(false)
+#endif
+);
 
-TEST_P(WasmVmTest, V8BadCode) { EXPECT_FALSE(init("bad code")); }
+TEST_P(WasmVmTest, V8BadCode) { ASSERT_FALSE(init("bad code")); }
 
 TEST_P(WasmVmTest, V8Load) {
-  EXPECT_TRUE(init());
+  ASSERT_TRUE(init());
   EXPECT_TRUE(wasm_vm_->runtime() == "v8");
   EXPECT_TRUE(wasm_vm_->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm_->clone() != nullptr);
 }
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
-  EXPECT_TRUE(init());
+  ASSERT_TRUE(init());
 
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   EXPECT_FALSE(wasm_vm_->link("test"));
@@ -200,7 +207,7 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 }
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
-  EXPECT_TRUE(init());
+  ASSERT_TRUE(init());
 
   wasm_vm_->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
@@ -223,7 +230,7 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 }
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
-  EXPECT_TRUE(init());
+  ASSERT_TRUE(init());
 
   wasm_vm_->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
@@ -256,7 +263,7 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 }
 
 TEST_P(WasmVmTest, V8Memory) {
-  EXPECT_TRUE(init());
+  ASSERT_TRUE(init());
 
   wasm_vm_->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm_->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
