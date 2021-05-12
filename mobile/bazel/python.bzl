@@ -1,6 +1,9 @@
 abi_bzl_template = """\
-def python_abi():
-    return "{python_abi}"
+def python_tag():
+    return "{python_tag}"
+
+def abi_tag():
+    return "{abi_tag}"
 """
 
 # we reuse the PYTHON_BIN_PATH environment variable from pybind11 so that the
@@ -23,7 +26,7 @@ def _get_python_bin(rctx):
 
     fail("cannot find python binary")
 
-def _get_python_abi(rctx, python_bin):
+def _get_python_tag(rctx, python_bin):
     result = rctx.execute([
         python_bin,
         "-c",
@@ -34,11 +37,30 @@ def _get_python_abi(rctx, python_bin):
     ])
     return result.stdout.splitlines()[0]
 
+def _get_abi_tag(rctx, python_bin):
+    result = rctx.execute([
+        python_bin,
+        "-c",
+        "import platform;" +
+        "import sys;" +
+        "assert platform.python_implementation() == 'CPython';" +
+        "version = platform.python_version_tuple();" +
+        "print(f'cp{version[0]}{version[1]}{sys.abiflags}')",
+    ])
+    return result.stdout.splitlines()[0]
+
 def _declare_python_abi_impl(rctx):
     python_bin = _get_python_bin(rctx)
-    python_abi = _get_python_abi(rctx, python_bin)
+    python_tag = _get_python_tag(rctx, python_bin)
+    abi_tag = _get_abi_tag(rctx, python_bin)
     rctx.file("BUILD")
-    rctx.file("abi.bzl", abi_bzl_template.format(python_abi = python_abi))
+    rctx.file(
+        "abi.bzl",
+        abi_bzl_template.format(
+            python_tag = python_tag,
+            abi_tag = abi_tag,
+        ),
+    )
 
 declare_python_abi = repository_rule(
     implementation = _declare_python_abi_impl,
