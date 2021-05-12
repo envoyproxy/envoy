@@ -1,6 +1,7 @@
 #include "server/filter_chain_manager_impl.h"
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/event/dispatcher.h"
 
 #include "common/common/cleanup.h"
 #include "common/common/empty_string.h"
@@ -35,9 +36,10 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
 }
-Common::CallbackHandlePtr
-PerFilterChainFactoryContextImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
-  return parent_context_.drainDecision().addOnDrainCloseCb(cb);
+Common::ThreadSafeCallbackHandlePtr
+PerFilterChainFactoryContextImpl::addOnDrainCloseCb(Event::Dispatcher& dispatcher,
+                                                    DrainCloseCb cb) const {
+  return parent_context_.drainDecision().addOnDrainCloseCb(dispatcher, cb);
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }

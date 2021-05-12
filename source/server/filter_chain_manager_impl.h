@@ -5,6 +5,8 @@
 #include <memory>
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
@@ -48,7 +50,8 @@ public:
 
   // DrainDecision
   bool drainClose() const override;
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override;
+  Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
+                                                        DrainCloseCb cb) const override;
 
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;

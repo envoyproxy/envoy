@@ -129,7 +129,7 @@ public:
   ABSL_MUST_USE_RESULT ThreadSafeCallbackHandlePtr add(Event::Dispatcher& dispatcher,
                                                        Callback callback) {
     Thread::LockGuard lock(lock_);
-    auto new_callback = std::make_shared<CallbackHolder>(*this, callback, dispatcher);
+    auto new_callback = std::make_shared<CallbackHolder>(*this, callback);
     callbacks_.push_back(CallbackListEntry(std::weak_ptr(new_callback), dispatcher));
     // Get the list iterator of added callback handle, which will be used to remove itself from
     // callbacks_ list.
@@ -150,7 +150,7 @@ public:
   void runCallbacksWith(std::function<std::tuple<CallbackArgs...>(void)> run_with) {
     Thread::LockGuard lock(lock_);
     for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
-      auto [cb, cb_dispatcher] = *(it++);
+      auto& [cb, cb_dispatcher] = *(it++);
 
       // sanity check cb is valid before attempting to schedule a dispatch
       if (cb.expired()) {
@@ -176,10 +176,8 @@ public:
 
 private:
   struct CallbackHolder : public CallbackHandle {
-    CallbackHolder(ThreadSafeCallbackManager& parent, Callback cb,
-                   Event::Dispatcher& callback_dispatcher)
-        : cb_(cb), callback_dispatcher_(callback_dispatcher),
-          parent_dispatcher_(parent.dispatcher_), parent_(parent),
+    CallbackHolder(ThreadSafeCallbackManager& parent, Callback cb)
+        : cb_(cb), parent_dispatcher_(parent.dispatcher_), parent_(parent),
           still_alive_(parent.still_alive_) {}
 
     ~CallbackHolder() override {
@@ -192,7 +190,6 @@ private:
     }
 
     Callback cb_;
-    Event::Dispatcher& callback_dispatcher_;
     Event::Dispatcher& parent_dispatcher_;
 
     ThreadSafeCallbackManager& parent_;

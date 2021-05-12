@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
@@ -44,7 +45,10 @@ public:
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
   bool drainClose() const override { return false; }
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override { return nullptr; }
+  Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher&,
+                                                        DrainCloseCb) const override {
+    return nullptr;
+  }
 
 protected:
   ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,

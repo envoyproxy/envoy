@@ -5,6 +5,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
@@ -130,8 +131,9 @@ public:
   bool drainClose() const override {
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override {
-    return server_.drainManager().addOnDrainCloseCb(cb);
+  Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
+                                                        DrainCloseCb cb) const override {
+    return server_.drainManager().addOnDrainCloseCb(dispatcher, cb);
   }
   Server::DrainManager& drainManager();
 
