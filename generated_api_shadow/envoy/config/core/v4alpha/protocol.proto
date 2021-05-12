@@ -74,6 +74,10 @@ message UpstreamHttpProtocolOptions {
   bool auto_san_validation = 2;
 }
 
+// Configures the alternate protocols cache which tracks alternate protocols that can be used to
+// make an HTTP connection to an origin server. See https://tools.ietf.org/html/rfc7838 for
+// HTTP Alternate Services and https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04
+// for the "HTTPS" DNS resource record.
 message AlternateProtocolsCacheOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.AlternateProtocolsCacheOptions";
@@ -90,7 +94,7 @@ message AlternateProtocolsCacheOptions {
   // .. note:
   //
   //   The implementation is approximate and enforced independently on each worker thread, thus
-  //   it is possible for the maximum hosts in the cache to go slightly above the configured
+  //   it is possible for the maximum entries in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
   google.protobuf.UInt32Value max_entries = 2 [(validate.rules).uint32 = {gt: 0}];
 }

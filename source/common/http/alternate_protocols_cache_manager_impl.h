@@ -36,14 +36,11 @@ private:
     // Map from config name to cache for that config.
     absl::flat_hash_map<std::string, CacheWithOptions> caches_;
   };
+
   TimeSource& time_source_;
 
-  // Thread local state for the cache
+  // Thread local state for the cache.
   ThreadLocal::TypedSlot<State> slot_;
-
-  // Create slot and store a Thread-Local-CacheManager
-  // Each TLCM will have the map from config name to cache
-
 };
 
 class AlternateProtocolsCacheManagerFactoryImpl : public AlternateProtocolsCacheManagerFactory {

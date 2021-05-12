@@ -9,7 +9,7 @@ HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2
 It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
 means that Upstream HTTP/3 connection attempts might be blocked by the network and should fall
 back to using HTTP/2. On such networks, the Upstream connection code needs to
-track that HTTP/3 connects attemps are not succeeding and avoid making connections
+track that HTTP/3 connects attempts are not succeeding and avoid making connections
 which are doomed to fail. On networks where HTTP/3 is working correctly, however, the
 Upstream connection code should avoid attempting HTTP/2 unnecessarily.
 
