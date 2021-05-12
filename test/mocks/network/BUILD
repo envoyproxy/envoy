@@ -49,6 +49,7 @@ envoy_cc_mock(
         ":connection_mocks",
         ":transport_socket_mocks",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/event:dispatcher_interface"
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",

@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/server/drain_manager.h"
 
 #include "gmock/gmock.h"
@@ -18,7 +19,8 @@ public:
 
   // Network::DrainManager
   MOCK_METHOD(bool, drainClose, (), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (override));
+  MOCK_METHOD(Common::ThreadSafeCallbackHandlePtr, addOnDrainCloseCb,
+              (Event::Dispatcher & dispatcher, DrainCloseCb cb), (const, override));
 
   // Server::DrainManager
   MOCK_METHOD(bool, draining, (), (const));

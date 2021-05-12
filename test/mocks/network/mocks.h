@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -160,7 +161,8 @@ public:
   MockDrainDecision();
   ~MockDrainDecision() override;
 
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (override));
+  MOCK_METHOD(Common::ThreadSafeCallbackHandlePtr, addOnDrainCloseCb,
+              (Event::Dispatcher & dispatcher, DrainCloseCb cb), (const, override));
   MOCK_METHOD(bool, drainClose, (), (const));
 };
 
