@@ -6,6 +6,7 @@
 #include "server/drain_manager_impl.h"
 
 #include "test/mocks/server/instance.h"
+#include "test/mocks/event/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -156,6 +157,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
 }
 
 TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
+  constexpr int num_cbs = 20;
   const bool drain_gradually = GetParam();
   ON_CALL(server_.options_, drainStrategy())
       .WillByDefault(Return(drain_gradually ? Server::DrainStrategy::Gradual
@@ -164,34 +166,128 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
 
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
-  // Register callbacks (store in array to keep in scope for test)
-  std::array<testing::MockFunction<void(std::chrono::milliseconds)>, 20> cbs;
-  std::array<Common::CallbackHandlePtr, 20> cb_handles;
-  for (auto i = 0; i < 20; i++) {
-    auto& cb = cbs[i];
-    if (drain_gradually) {
-      auto step = 1000 / 20;
-      EXPECT_CALL(cb, Call(_))
-          .Times(1)
-          .WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
-            // Everything should happen within the first 1/4 of the drain time
-            EXPECT_LT(delay.count(), 1001);
+  Event::MockDispatcher cb_dispatcher;
+  EXPECT_CALL(cb_dispatcher, post(_))
+      .Times(num_cbs)
+      .WillRepeatedly(Invoke([](std::function<void()> cb) { cb(); }));
 
-            // Validate that our wait times are spread out (within some small error)
-            EXPECT_EQ(delay.count(), i * step);
-          }));
-    } else {
-      EXPECT_CALL(cb, Call(std::chrono::milliseconds{0}));
+  {
+    // Register callbacks (store in array to keep in scope for test)
+    std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
+    std::array<Common::ThreadSafeCallbackHandlePtr, num_cbs> cb_handles;
+    for (auto i = 0; i < num_cbs; i++) {
+      auto& cb = cbs[i];
+      if (drain_gradually) {
+        auto step = 1000 / num_cbs;
+        EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
+          // Everything should happen within the first 1/4 of the drain time
+          EXPECT_LT(delay.count(), 1001);
+
+          // Validate that our wait times are spread out (within some small error)
+          EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
+        }));
+      } else {
+        EXPECT_CALL(cb, Call(std::chrono::milliseconds{0}));
+      }
+
+      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb_dispatcher, cb.AsStdFunction());
     }
-
-    cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
+    drain_manager.startDrainSequence([] {});
   }
 
-  drain_manager.startDrainSequence([] {});
   EXPECT_TRUE(drain_manager.draining());
 }
 
 INSTANTIATE_TEST_SUITE_P(DrainStrategies, DrainManagerImplTest, testing::Bool());
+
+// Test gradual draining when there are more callbacks than milliseconds in the drain time,
+// which should cause some drains to happen within roughly the same window.
+TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
+  constexpr int num_cbs = 3000;
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(4)));
+
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  Event::MockDispatcher cb_dispatcher;
+  // Wire up the dispatcher for callbacks to execute immediately
+  EXPECT_CALL(cb_dispatcher, post(_))
+      .Times(num_cbs)
+      .WillRepeatedly(Invoke([](std::function<void()> cb) { cb(); }));
+
+  // // Write up the server dispatcher to store up post() callbacks to execute after
+  // // our current code (similar to how it would work with a real dispatcher)
+  // std::vector<std::function<void()>> server_dispatcher_cbs;
+  // ON_CALL(server_.dispatcher_, post(_))
+  //     .WillByDefault(Invoke([&server_dispatcher_cbs](std::function<void()> cb) {
+  //       server_dispatcher_cbs.push_back(cb);
+  //     }));
+
+  {
+    // Register callbacks (store in array to keep in scope for test)
+    std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
+    std::array<Common::ThreadSafeCallbackHandlePtr, num_cbs> cb_handles;
+    for (auto i = 0; i < num_cbs; i++) {
+      auto& cb = cbs[i];
+      auto step = 1000.0 / num_cbs;
+      EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
+        // Everything should happen within the first 1/4 of the drain time
+        EXPECT_LT(delay.count(), 1001);
+
+        // Validate that our wait times are spread out (within some small error)
+        EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
+      }));
+
+      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb_dispatcher, cb.AsStdFunction());
+    }
+    drain_manager.startDrainSequence([] {});
+  }
+
+  // // call server dispatchers which should complete CB de-registration
+  // for (auto& cb : server_dispatcher_cbs) {
+  //   cb();
+  // }
+
+  EXPECT_TRUE(drain_manager.draining());
+}
+
+// Test gradual draining when the number of callbacks does not evenly divide into
+// the drain time.
+TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
+  constexpr int num_cbs = 30;
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  Event::MockDispatcher cb_dispatcher;
+  EXPECT_CALL(cb_dispatcher, post(_))
+      .Times(num_cbs)
+      .WillRepeatedly(Invoke([](std::function<void()> cb) { cb(); }));
+
+  {
+    // Register callbacks (store in array to keep in scope for test)
+    std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
+    std::array<Common::ThreadSafeCallbackHandlePtr, num_cbs> cb_handles;
+    for (auto i = 0; i < num_cbs; i++) {
+      auto& cb = cbs[i];
+      auto step = 250.0 / num_cbs;
+      EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
+        // Everything should happen within the first 1/4 of the drain time
+        EXPECT_LT(delay.count(), 251);
+
+        // Validate that our wait times are spread out (within some small error)
+        EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
+      }));
+
+      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb_dispatcher, cb.AsStdFunction());
+    }
+
+    drain_manager.startDrainSequence([] {});
+  }
+
+  EXPECT_TRUE(drain_manager.draining());
+}
 
 } // namespace
 } // namespace Server
