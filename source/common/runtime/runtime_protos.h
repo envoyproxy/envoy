@@ -23,9 +23,10 @@ public:
   uint32_t value() const {
     uint64_t raw_value = runtime_.snapshot().getInteger(runtime_key_, default_value_);
     if (raw_value > std::numeric_limits<uint32_t>::max()) {
-      ENVOY_LOG_EVERY_POW_2(warn,
-                            "value:{} of {} is larger than uint32 max, return default instead",
-                            raw_value, runtime_key_);
+      ENVOY_LOG_EVERY_POW_2(
+          warn,
+          "parsed runtime value:{} of {} is larger than uint32 max, returning default instead",
+          raw_value, runtime_key_);
       return default_value_;
     }
     return static_cast<uint32_t>(raw_value);
