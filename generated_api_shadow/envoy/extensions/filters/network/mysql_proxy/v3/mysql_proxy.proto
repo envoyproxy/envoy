@@ -25,11 +25,11 @@ message AuthInfo {
   config.core.v3.DataSource password = 2 [(udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 6]
 message MySQLProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy";
 
+  // DatabaseRoutes use database name as key to route.
   message DatabaseRoutes {
     message Route {
       // String database name that must exact match with client connection db name. https://dev.mysql.com/doc/refman/5.7/en/identifier-length.html
@@ -54,11 +54,6 @@ message MySQLProxy {
   // If the access log field is empty, access logs will not be written.
   string access_log = 2;
 
-  // [#not-implemented-hide:] enable manage MySQL protocol at proxy. Default is false.
-  // * When enable_manage_protocol is true, MySQL filter is a terminal filter, it's config should put at the last of filter chain, in the same time, MySQLProtocolOptions should be set at corresponding config of cluster for connecting to upstream database.
-  // * When enable_manage_protocol is false, MySQL filter is not a terminal filter, it's config can not put at the last of filter chain, the routes and downstream_auth_info fields will be ignore.
-  bool enable_manage_protocol = 3;
-
   // List of **unique** db name used to separate connections from different database to different
   // clusters.
   //
@@ -80,14 +75,17 @@ message MySQLProxy {
   // * ``jdbc:mysql://host1:9001/database_a`` would sent command to cluster_a.
   // * ``jdbc:mysql://host1:9001/database_c`` will return ER_ER_BAD_DB_ERROR.
   // * ``jdbc:mysql://host1:9001/`` will send command to catch_all_cluster.
-  DatabaseRoutes database_routes = 4;
+  // .. note::
+  //   If `database_routes` is set, MySQL proxy will manage the upstream connections, it becomes terminal filter, should be put at last in filter chian.
+  //   If `database_routes` is not set, MySQL proxy works as a transport proxy, and must not be put at last in filter chain.
+  DatabaseRoutes database_routes = 3;
 
-  // Downstream client username/password.
+  // [#not-implemented-hide:] Downstream client username/password.
   // * If the username/password is not match, then ER_ACCESS_DENIED_ERROR will return;
-  AuthInfo downstream_auth_info = 5;
+  AuthInfo downstream_auth_info = 4;
 }
 
-// MySQLProtocolOptions specifies MySQL upstream protocol options. This object is used in
+// [#not-implemented-hide:] MySQLProtocolOptions specifies MySQL upstream protocol options. This object is used in
 // :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
 // keyed by the name `envoy.filters.network.mysql_proxy`.
 message MySQLProtocolOptions {

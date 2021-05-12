@@ -25,7 +25,7 @@ private:
   bool isTerminalFilterByProtoTyped(
       const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy& proto_config,
       Server::Configuration::FactoryContext&) override {
-    return proto_config.enable_manage_protocol();
+    return proto_config.has_database_routes();
   }
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy& proto_config,

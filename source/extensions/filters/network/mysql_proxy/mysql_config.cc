@@ -36,7 +36,7 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
   MySQLFilterConfigSharedPtr filter_config(
       std::make_shared<MySQLFilterConfig>(stat_prefix, context.scope()));
 
-  if (!proto_config.enable_manage_protocol()) {
+  if (!proto_config.has_database_routes()) {
     return [filter_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<MySQLMoniterFilter>(filter_config));
     };
