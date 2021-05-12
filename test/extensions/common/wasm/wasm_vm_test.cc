@@ -142,11 +142,12 @@ public:
     // clang-format on
 
     if (GetParam() /* allow_precompiled */) {
-      const auto section = wasm_vm_->getPrecompiledSectionName();
-      if (section.empty()) {
+      // Section name is expected to be available in the tested runtimes.
+      const auto section_name = wasm_vm_->getPrecompiledSectionName();
+      if (section_name.empty()) {
         return false;
       }
-      if (!proxy_wasm::utils::BytecodeUtil::getCustomSection(code, section, precompiled)) {
+      if (!proxy_wasm::BytecodeUtil::getCustomSection(code, section_name, precompiled)) {
         return false;
       }
       // Precompiled module is expected to be available in the test file.
@@ -156,7 +157,7 @@ public:
     }
 
     std::string stripped;
-    if (!proxy_wasm::utils::BytecodeUtil::getStrippedSource(code, stripped)) {
+    if (!proxy_wasm::BytecodeUtil::getStrippedSource(code, stripped)) {
       return false;
     }
 
