@@ -15,13 +15,15 @@ uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
     const uint64_t new_fill_tokens =
         std::chrono::duration_cast<std::chrono::microseconds>(time_now - last_fill_).count() *
             fill_rate_ +
-        last_tokens_;
-    const uint64_t new_tokens = new_fill_tokens / 1000000;
-    const uint64_t last_clac = new_fill_tokens % 1000000;
-    last_tokens_ = last_clac;
+        residual_tokens_;
 
-    tokens_ = std::min(new_tokens + tokens_, max_tokens_);
-    last_fill_ = time_now;
+    if (new_fill_tokens >= 1000000) {
+      const uint64_t last_clac = new_fill_tokens % 1000000;
+      residual_tokens_ = last_clac;
+      const uint64_t new_tokens = new_fill_tokens / 1000000;
+      tokens_ = std::min(new_tokens + tokens_, max_tokens_);
+      last_fill_ = time_now;
+    }
   }
 
   if (allow_partial) {

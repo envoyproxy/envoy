@@ -29,9 +29,9 @@ public:
 
 private:
   const uint64_t max_tokens_;
-  const uint64_t fill_rate_;
+  const double fill_rate_;
   uint64_t tokens_;
-  uint64_t last_tokens_{0};
+  uint64_t residual_tokens_{0};
   MonotonicTime last_fill_;
   TimeSource& time_source_;
 };
