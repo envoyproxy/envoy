@@ -141,6 +141,8 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   StreamInfo::UpstreamTiming upstream_timing_;
   const MonotonicTime start_time_;
+  // This is wrapped in an optional, since we want to avoid computing zero size headers when in
+  // reality we just didn't get a response back.
   absl::optional<uint64_t> response_headers_size_{};
   // Copies of upstream headers/trailers. These are only set if upstream
   // access logging is configured.
