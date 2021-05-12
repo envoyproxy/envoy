@@ -88,6 +88,7 @@ version_info: '0'
 resources:
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
+  connect_timeout: 5s
   type: EDS
   eds_cluster_config:
     eds_config:
@@ -183,6 +184,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     {
       envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_1");
+      cluster.mutable_connect_timeout()->set_seconds(5);
       expectAdd("cluster_1", "v1");
       auto* resource = resources.Add();
       resource->mutable_resource()->PackFrom(cluster);
@@ -192,6 +194,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     {
       envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_2");
+      cluster.mutable_connect_timeout()->set_seconds(5);
       expectAdd("cluster_2", "v1");
       auto* resource = resources.Add();
       resource->mutable_resource()->PackFrom(cluster);
@@ -208,6 +211,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     {
       envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_3");
+      cluster.mutable_connect_timeout()->set_seconds(5);
       expectAdd("cluster_3", "v2");
       auto* resource = resources.Add();
       resource->mutable_resource()->PackFrom(cluster);
@@ -260,6 +264,7 @@ version_info: '0'
 resources:
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
+  connect_timeout: 5s
   type: EDS
   eds_cluster_config:
     eds_config:
@@ -267,6 +272,7 @@ resources:
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster2
+  connect_timeout: 5s
   type: EDS
   eds_cluster_config:
     eds_config:
@@ -291,6 +297,7 @@ version_info: '1'
 resources:
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
+  connect_timeout: 5s
   type: EDS
   eds_cluster_config:
     eds_config:
@@ -298,6 +305,7 @@ resources:
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster3
+  connect_timeout: 5s
   type: EDS
   eds_cluster_config:
     eds_config:
@@ -329,6 +337,7 @@ version_info: '0'
 resources:
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
+  connect_timeout: 5s
   type: EDS
   eds_cluster_config:
     eds_config:
@@ -336,6 +345,7 @@ resources:
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
+  connect_timeout: 5s
   type: EDS
   eds_cluster_config:
     eds_config:
