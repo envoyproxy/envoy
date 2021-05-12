@@ -7,13 +7,7 @@ namespace Envoy {
 namespace Filesystem {
 
 MemfileInstanceImpl::MemfileInstanceImpl()
-#ifdef WIN32
-    : file_system_{new InstanceImplWin32()},
-#else
-    : file_system_{new InstanceImplPosix()},
-#endif
-      use_memfiles_(false) {
-}
+    : file_system_{new InstanceImpl()}, use_memfiles_(false) {}
 
 MemfileInstanceImpl& fileSystemForTest() {
   static MemfileInstanceImpl* file_system = new MemfileInstanceImpl();
