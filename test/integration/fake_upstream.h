@@ -354,6 +354,13 @@ public:
     parented_ = true;
   }
 
+  void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
+    absl::MutexLock lock(&lock_);
+    auto conn = dynamic_cast<Envoy::Network::ConnectionImpl*>(&connection_);
+    conn->transportSocket() = std::move(transport_socket);
+    conn->transportSocket()->setTransportSocketCallbacks(*conn);
+  }
+
 private:
   Network::Connection& connection_;
   absl::Mutex lock_;
@@ -397,10 +404,7 @@ public:
   bool connected() const { return shared_connection_.connected(); }
 
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
-    absl::MutexLock lock(&lock_);
-    auto conn = dynamic_cast<Envoy::Network::ConnectionImpl*>(&shared_connection_.connection());
-    conn->transportSocket() = std::move(transport_socket);
-    conn->transportSocket()->setTransportSocketCallbacks(*conn);
+    shared_connection_.setTransportSocket(std::move(transport_socket));
   }
 
 protected:
