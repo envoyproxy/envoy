@@ -313,7 +313,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
 }
 
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance& response, AdminStream&) {
+                                       Buffer::Chunker& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
 
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));

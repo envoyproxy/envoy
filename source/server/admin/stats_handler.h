@@ -3,7 +3,6 @@
 #include <regex>
 #include <string>
 
-#include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/admin.h"
@@ -25,28 +24,28 @@ public:
 
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream&);
+                                  Buffer::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
                                        Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance& response, AdminStream&);
+                                       Buffer::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
                                             Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Instance& response, AdminStream&);
+                                            Buffer::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
                                               Http::ResponseHeaderMap& response_headers,
-                                              Buffer::Instance& response, AdminStream&);
+                                              Buffer::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
                                              Http::ResponseHeaderMap& response_headers,
-                                             Buffer::Instance& response, AdminStream&);
+                                             Buffer::Chunker& response, AdminStream&);
   Http::Code handlerStats(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                          Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
                           AdminStream&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Instance& response, AdminStream&);
+                                    Buffer::Chunker& response, AdminStream&);
   Http::Code handlerContention(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&);
+                               Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                               AdminStream&);
 
 private:
   template <class StatType>

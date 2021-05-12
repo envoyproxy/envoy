@@ -65,7 +65,7 @@ public:
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
   [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,              \
-         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {                \
+         Buffer::Chunker& data, Server::AdminStream& admin_stream) -> Http::Code {                 \
     return X(path_and_query, response_headers, data, admin_stream);                                \
   }
 

@@ -305,7 +305,7 @@ private:
    * URL handlers.
    */
   Http::Code handlerAdminHome(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                              Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
                               AdminStream&);
 
   Http::Code handlerHelp(absl::string_view path_and_query,

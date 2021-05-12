@@ -20,7 +20,7 @@ public:
   InitDumpHandler(Server::Instance& server);
 
   Http::Code handlerInitDump(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                             Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
                              AdminStream&) const;
 
 private:

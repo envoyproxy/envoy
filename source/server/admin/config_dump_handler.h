@@ -2,7 +2,6 @@
 #pragma once
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/buffer/buffer.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -23,8 +22,8 @@ public:
   ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server);
 
   Http::Code handlerConfigDump(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&) const;
+                               Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                               AdminStream&) const;
 
 private:
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
