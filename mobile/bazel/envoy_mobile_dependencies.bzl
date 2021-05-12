@@ -7,11 +7,13 @@ load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@rules_proto_grpc//protobuf:repositories.bzl", "protobuf_repos")
 load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos = "java_repos")
+load("@rules_python//python:pip.bzl", "pip_install")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 
 def envoy_mobile_dependencies():
     swift_dependencies()
     kotlin_dependencies()
+    python_dependencies()
 
 def swift_dependencies():
     apple_support_dependencies()
@@ -58,3 +60,12 @@ def kotlin_dependencies():
     )
     protobuf_repos()
     rules_proto_grpc_java_repos()
+
+def python_dependencies():
+    # TODO: bifurcate dev deps vs. prod deps
+    # pip_install(
+    #     requirements = ":dev_requirements.txt",
+    # )
+    pip_install(
+        requirements = ":requirements.txt",
+    )
