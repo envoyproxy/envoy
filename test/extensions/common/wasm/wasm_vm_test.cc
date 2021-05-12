@@ -150,10 +150,12 @@ public:
       if (!proxy_wasm::BytecodeUtil::getCustomSection(code, section_name, precompiled)) {
         return false;
       }
-      // Precompiled module is expected to be available in the test file.
+#if defined(__linux__) && defined(__x86_64__)
+      // Precompiled module is expected to be available in the test file on Linux-x86_64.
       if (precompiled.empty()) {
         return false;
       }
+#endif
     }
 
     std::string stripped;
