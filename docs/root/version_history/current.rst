@@ -22,7 +22,7 @@ Minor Behavior Changes
 * http: serve HEAD requests from cache.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
-
+* tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
 
 
 Bug Fixes
@@ -47,6 +47,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2``; Envoy will now always send GOAWAY to HTTP2 downstreams when the :ref:`disable_keepalive <config_overload_manager_overload_actions>` overload action is active.
 * http: removed ``envoy.reloadable_features.http_match_on_all_headers`` runtime guard and legacy code paths.
 * http: removed ``envoy.reloadable_features.unify_grpc_handling`` runtime guard and legacy code paths.
+* tcp: added support for :ref:`preconnecting <v1.18.0:envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>`. Preconnecting is off by default, but recommended for clusters serving latency-sensitive traffic.
 * tls: removed ``envoy.reloadable_features.tls_use_io_handle_bio`` runtime guard and legacy code path.
 
 New Features
