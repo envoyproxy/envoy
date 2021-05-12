@@ -20,36 +20,6 @@ namespace Address {
 
 namespace {
 
-class InstanceFactory {
-  template <typename InstanceType, typename... Args>
-  StatusOr<InstanceType> createInstance(Args&&... args) {
-    absl::Status status;
-    status = InstanceType::validateProtocolSupported();
-    if (!status.ok()) {
-      return status;
-    }
-    InstanceType instance(status, std::forward<Args>(args)...);
-    if (!status.ok()) {
-      return status;
-    }
-    return instance;
-  }
-
-  template <typename InstanceType, typename... Args>
-  StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
-    absl::Status status;
-    status = InstanceType::validateProtocolSupported();
-    if (!status.ok()) {
-      return status;
-    }
-    std::shared_ptr<InstanceType> instance{new InstanceType(status, std::forward<Args>(args)...)};
-    if (!status.ok()) {
-      return status;
-    }
-    return instance;
-  }
-};
-
 // Constructs a readable string with the embedded nulls in the abstract path replaced with '@'.
 std::string friendlyNameFromAbstractPath(absl::string_view path) {
   std::string friendly_name(path.data(), path.size());
