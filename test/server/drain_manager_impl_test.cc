@@ -215,14 +215,6 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
       .Times(num_cbs)
       .WillRepeatedly(Invoke([](std::function<void()> cb) { cb(); }));
 
-  // // Write up the server dispatcher to store up post() callbacks to execute after
-  // // our current code (similar to how it would work with a real dispatcher)
-  // std::vector<std::function<void()>> server_dispatcher_cbs;
-  // ON_CALL(server_.dispatcher_, post(_))
-  //     .WillByDefault(Invoke([&server_dispatcher_cbs](std::function<void()> cb) {
-  //       server_dispatcher_cbs.push_back(cb);
-  //     }));
-
   {
     // Register callbacks (store in array to keep in scope for test)
     std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
@@ -242,11 +234,6 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
     }
     drain_manager.startDrainSequence([] {});
   }
-
-  // // call server dispatchers which should complete CB de-registration
-  // for (auto& cb : server_dispatcher_cbs) {
-  //   cb();
-  // }
 
   EXPECT_TRUE(drain_manager.draining());
 }
