@@ -146,7 +146,7 @@ void ProxyFilter::onHotKey(PendingRequest& request) {
     std::string resp_string = "Collect " + std::to_string(hk_collector_->getHotKeyHeats(hotkeys)) +
                               " keys in the period !";
     for (auto& it : hotkeys) {
-      resp_string += "\nkey:" + it.first + " hit:" + std::to_string(it.second);
+      resp_string += "\nkey:" + it.first + " heat:" + std::to_string(it.second);
     }
     response->type(Common::Redis::RespType::SimpleString);
     response->asString().swap(resp_string);
