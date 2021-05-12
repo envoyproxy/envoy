@@ -8,8 +8,6 @@
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 
-#include "extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
-
 #include "absl/container/node_hash_map.h"
 #include "jwt_verify_lib/check_audience.h"
 

@@ -7,6 +7,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "extensions/filters/http/common/jwks_fetcher.h"
+#include "extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 #include "extensions/filters/http/jwt_authn/stats.h"
 
 #include "jwt_verify_lib/jwks.h"
@@ -21,11 +22,6 @@ using JwksCachePtr = std::unique_ptr<JwksCache>;
 
 using JwksConstPtr = std::unique_ptr<const ::google::jwt_verify::Jwks>;
 using JwksConstSharedPtr = std::shared_ptr<const ::google::jwt_verify::Jwks>;
-
-/**
- *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
- */
-using CreateJwksFetcherCb = std::function<Common::JwksFetcherPtr(Upstream::ClusterManager&)>;
 
 /**
  * Interface to access all configured Jwt rules and their cached Jwks objects.
