@@ -55,7 +55,7 @@ message StringMatcher {
     // * The regex ``\d{3}`` does not match the value *123.456*
     //
     // .. attention::
-    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
+    //   This field has been deprecated in favor of ``safe_regex`` as it is not safe for use with
     //   untrusted input in all cases.
     string regex = 4 [
       deprecated = true,

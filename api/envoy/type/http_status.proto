@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // For more details: https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 enum StatusCode {
   // Empty - This code not part of the HTTP status code specification, but it is needed for proto
-  // `enum` type.
+  // ``enum`` type.
   Empty = 0;
 
   Continue = 100;
