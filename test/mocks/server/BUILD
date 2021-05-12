@@ -71,7 +71,7 @@ envoy_cc_mock(
     srcs = ["drain_manager.cc"],
     hdrs = ["drain_manager.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface"
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:drain_manager_interface",
     ],
 )
