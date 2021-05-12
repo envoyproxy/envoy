@@ -40,10 +40,12 @@ message QuicProtocolOptions {
   core.v4alpha.RuntimeFeatureFlag enabled = 4;
 
   // A multiplier to number of connections which is used to determine how many packets to read per
-  // event loop. A reasonable ratio should allow the listener to process enough payload but not
+  // event loop. A reasonable number should allow the listener to process enough payload but not
   // starve TCP and other UDP sockets and also prevent long event loop duration.
   // The default value is 32. This means if there are N QUIC connections, the total number of
   // packets to read in each READ event will be 32 * N.
-  google.protobuf.UInt32Value packets_received_to_connection_count_ratio = 5
+  // The actual number of packets to read in total by the UDP listener is also
+  // bound by 6000, regardless of this field or how many connections there are.
+  google.protobuf.UInt32Value packets_to_read_per_connection = 5
       [(validate.rules).uint32 = {gte: 1}];
 }

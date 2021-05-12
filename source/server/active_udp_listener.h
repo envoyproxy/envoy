@@ -8,8 +8,9 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
-#include "server/active_listener_base.h"
 #include "common/network/utility.h"
+
+#include "server/active_listener_base.h"
 
 namespace Envoy {
 namespace Server {
