@@ -23,4 +23,12 @@ final class TagsBuilderTests: XCTestCase {
               .build()
     XCTAssertEqual(tags.allTags(), ["testKey2": "testValue2"])
   }
+
+  func testPutAllTagToTags() {
+    let tagsMap = ["testKey1": "testValue1", "testKey2": "testValue2"]
+    let tags = TagsBuilder()
+              .putAll(tags: tagsMap)
+              .build()
+    XCTAssertEqual(tags.allTags(), ["testKey1": "testValue1", "testKey2": "testValue2"])
+  }
 }

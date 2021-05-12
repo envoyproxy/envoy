@@ -58,6 +58,18 @@ public class TagsBuilder {
   }
 
   /**
+   * Adds all tags from map to this builder.
+   *
+   * @param tags: A map of tags.
+   *
+   * @return TagsBuilder, This builder.
+   */
+  public fun putAll(tags: Map<String, String>): TagsBuilder {
+    this.tags.putAll(tags)
+    return this
+  }
+
+  /**
    * Build the tags using the current builder.
    *
    * @return Tags, New instance of Tags.
