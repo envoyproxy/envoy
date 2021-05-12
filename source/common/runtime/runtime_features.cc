@@ -106,15 +106,14 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
     "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
-    // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
-    // v2 url is removed from codebase.
-    "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
+    "envoy.reloadable_features.experimental_matching_api",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
