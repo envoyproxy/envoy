@@ -42,9 +42,8 @@ fi
 # Environment setup.
 export TEST_TMPDIR=${BUILD_DIR}/tmp
 
-#[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=(--nocache_test_results)
+[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=(--nocache_test_results)
 
-BAZEL_EXTRA_TEST_OPTIONS+=(--nocache_test_results)
 BAZEL_STARTUP_OPTIONS+=("--output_base=${TEST_TMPDIR/\/c/c:}")
 BAZEL_BUILD_OPTIONS=(
     -c opt
