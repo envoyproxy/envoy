@@ -397,6 +397,7 @@ public:
   bool connected() const { return shared_connection_.connected(); }
 
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
+    absl::MutexLock lock(&lock_);
     auto conn = dynamic_cast<Envoy::Network::ConnectionImpl*>(&shared_connection_.connection());
     conn->transportSocket() = std::move(transport_socket);
     conn->transportSocket()->setTransportSocketCallbacks(*conn);
