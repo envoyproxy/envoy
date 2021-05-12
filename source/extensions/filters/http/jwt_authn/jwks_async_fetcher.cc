@@ -88,6 +88,8 @@ void JwksAsyncFetcher::onJwksError(Failure) {
 
   ENVOY_LOG(warn, "{}: failed", debug_name_);
   handleFetchDone();
+
+  // Note: not to free fetcher_ in this function. Please see comment at onJwksSuccess.
 }
 
 } // namespace JwtAuthn
