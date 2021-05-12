@@ -14,6 +14,9 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
+* http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
+  and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
+  ``envoy.reloadable_features.experimental_matching_api`` to true.
 * http: replaced setting ``envoy.reloadable_features.strict_1xx_and_204_response_headers`` with settings
   ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers``
   (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
