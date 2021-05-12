@@ -51,7 +51,7 @@ Removed Config or Runtime
 
 New Features
 ------------
-
+* crash support: restore crash context when processing requests or responses due to a filter's callback if the callback doesn't already restore the context.
 * http: added upstream and downstream alpha HTTP/3 support! See :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` for downstream and the new http3_protocol_options in :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` for upstream HTTP/3.
 * listener: added ability to change an existing listener's address.
 * metric service: added support for sending metric tags as labels. This can be enabled by setting the :ref:`emit_tags_as_labels <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels>` field to true.

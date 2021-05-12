@@ -101,10 +101,10 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::StopAndContinueConfig& proto_config, const std::string&,
       Server::Configuration::FactoryContext&) override {
-    bool setScopeTrackedObject = proto_config.install_scope_tracked_object();
-    return [setScopeTrackedObject](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    bool set_scope_tacked_object = proto_config.install_scope_tracked_object();
+    return [set_scope_tacked_object](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(
-          std::make_shared<::Envoy::StopIterationAndContinueFilter>(setScopeTrackedObject));
+          std::make_shared<::Envoy::StopIterationAndContinueFilter>(set_scope_tacked_object));
     };
   }
 };
