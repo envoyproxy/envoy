@@ -33,7 +33,7 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
       crypto_config_(std::make_unique<quic::QuicCryptoClientConfig>(
           std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory)),
           std::make_unique<EnvoyQuicSessionCache>(time_source))),
-          buffer_limit_(buffer_limit) {
+      buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
 }
 
