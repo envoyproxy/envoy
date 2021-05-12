@@ -124,6 +124,9 @@ public:
   void initialize() override {
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api",
+                                      "true");
+
     // Add an xDS cluster for extension config discovery.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
