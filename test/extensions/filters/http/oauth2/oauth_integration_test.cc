@@ -126,7 +126,7 @@ typed_config:
     HttpIntegrationTest::initialize();
   }
 
-  void validateHmac(const Http::ResponseHeaderMap& headers, absl::string_view host,
+  bool validateHmac(const Http::ResponseHeaderMap& headers, absl::string_view host,
                     absl::string_view hmac_secret) {
     std::string expires = Http::Utility::parseSetCookieValue(headers, "OauthExpires");
     std::string token = Http::Utility::parseSetCookieValue(headers, "BearerToken");
@@ -142,7 +142,7 @@ typed_config:
 
     OAuth2CookieValidator validator{api_->timeSource()};
     validator.setParams(validate_headers, std::string(hmac_secret));
-    ASSERT_TRUE(validator.isValid());
+    return validator.isValid();
   }
 
   void doAuthenticationFlow(absl::string_view token_secret, absl::string_view hmac_secret) {
@@ -185,7 +185,8 @@ typed_config:
     // We should get an immediate redirect back.
     response->waitForHeaders();
 
-    validateHmac(response->headers(), headers.Host()->value().getStringView(), hmac_secret);
+    EXPECT_TRUE(
+        validateHmac(response->headers(), headers.Host()->value().getStringView(), hmac_secret));
 
     EXPECT_EQ("302", response->headers().getStatusValue());
 
