@@ -54,22 +54,33 @@ for how to update or override dependencies.
     On Ubuntu, run the following:
     ```console
     sudo apt-get install \
-       libtool \
-       cmake \
-       automake \
        autoconf \
+       automake \
+       cmake \
+       curl \
+       libtool \
        make \
        ninja-build \
-       curl \
+       patch \
+       python3-pip \
        unzip \
-       virtualenv \
-       patch
+       virtualenv
     ```
 
     ### Fedora
     On Fedora (maybe also other red hat distros), run the following:
     ```console
-    dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
+    dnf install \
+        aspell-en \
+        cmake \
+        libatomic \
+        libstdc++ \
+        libstdc++-static \
+        libtool \
+        lld \
+        ninja-build \
+        patch \
+        python3-pip
     ```
 
     ### Linux
