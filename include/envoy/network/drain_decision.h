@@ -5,6 +5,7 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 
 #include "absl/base/attributes.h"
 
@@ -27,11 +28,14 @@ public:
    * @brief Register a callback to be called proactively when a drain decision enters into a
    *        'close' state.
    *
+   * @param dispatcher Event dispatcher to use to schedule the callback. This should be the
+   * dispatcher associated with the thread in which the @b cb is registered.
    * @param cb Callback to be called once drain decision enters close state
    * @return handle to remove callback
    */
   ABSL_MUST_USE_RESULT
-  virtual Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const PURE;
+  virtual Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
+                                                                DrainCloseCb cb) const PURE;
 };
 
 } // namespace Network

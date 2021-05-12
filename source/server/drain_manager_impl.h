@@ -5,6 +5,7 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/drain_manager.h"
@@ -28,7 +29,8 @@ public:
 
   // Network::DrainDecision
   bool drainClose() const override;
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override;
+  Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
+                                                        DrainCloseCb cb) const override;
 
   // Server::DrainManager
   void startDrainSequence(std::function<void()> drain_complete_cb) override;

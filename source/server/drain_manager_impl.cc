@@ -5,6 +5,7 @@
 #include <functional>
 
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
@@ -14,7 +15,7 @@ namespace Server {
 
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type)
-    : server_(server), drain_type_(drain_type) {}
+    : server_(server), drain_type_(drain_type), cbs_(server_.dispatcher()) {}
 
 bool DrainManagerImpl::drainClose() const {
   // If we are actively health check failed and the drain type is default, always drain close.
@@ -52,8 +53,9 @@ bool DrainManagerImpl::drainClose() const {
          (server_.api().randomGenerator().random() % server_.options().drainTime().count());
 }
 
-Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
-  return cbs_.add(cb);
+Common::ThreadSafeCallbackHandlePtr
+DrainManagerImpl::addOnDrainCloseCb(Event::Dispatcher& dispatcher, DrainCloseCb cb) const {
+  return cbs_.add(dispatcher, cb);
 }
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
@@ -75,8 +77,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   // Call registered on-drain callbacks - immediately
   if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
     std::chrono::milliseconds no_delay{0};
-    cbs_.runCallbacksWith([&](auto cb) { cb(no_delay); });
-    cbs_.runCallbacks(no_delay);
+    cbs_.runCallbacksWith([no_delay = no_delay]() { return no_delay; });
     return;
   }
 
@@ -89,13 +90,13 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   ASSERT(server_.options().drainTime() >= remaining_time);
 
   uint32_t step_count = 0;
-  cbs_.runCallbacksWith([&](auto cb) {
+  cbs_.runCallbacksWith([&]() {
     // switch to floating-point math to avoid issues with integer division
     std::chrono::milliseconds delay{static_cast<int64_t>(
         static_cast<double>(step_count) / 4 / cbs_.size() *
         std::chrono::duration_cast<std::chrono::milliseconds>(remaining_time).count())};
-    cb(delay);
     step_count++;
+    return delay;
   });
 }
 
