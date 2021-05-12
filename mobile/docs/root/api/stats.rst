@@ -10,6 +10,11 @@ Pulse (Stats)
 Pulse is Envoy Mobile's stats library, used for capturing client application time series
 metrics. Currently the following types of metrics are supported: ``Counter``, ``Gauge``, ``Timer``, and ``Distribution``.
 
+Pulse also supports custom tags (cardinality). For each type of the metrics, there are two ways to add custom tags:
+
+1. on metrics creation
+2. on metrics reporting
+
 This library (like all of Envoy Mobile) is under active development.
 
 To leverage Pulse, obtain an instance of a ``PulseClient`` from an Envoy Mobile ``Engine``
@@ -33,6 +38,22 @@ serves as the identifier of the counter. The string formed from the example code
 
 Store the instance of the counter, then use it to increment as necessary.
 
+In addition, to attach custom tags on metric creation:
+
+**Kotlin example**::
+
+  pulseClient.counter(
+    Element("foo"), Element("bar"),
+    tags = TagsBuilder().add("os", "Android").add("app_type", "rider").build()
+  )
+
+**Swift example**::
+
+  pulseClient.counter(
+    elements: ["foo", "bar"],
+    tags: TagsBuilder().add(name: "os", value: "Android").add(name: "app_type", value: "rider").build()
+  )
+
 -----------
 ``Counter``
 -----------
@@ -54,6 +75,24 @@ The count argument of ``increment`` is defaulted with a value of ``1``.
   // Increment the counter by 5
   // Swift
   counter.increment(count: 5)
+
+A ``Counter`` can be incremented with custom tags. To be concise, this doc shows examples of attching custom tagging for ``Counter`` on increment. Similar APIs are available for all metrics types to attach tags on metrics reporting.
+
+**Example**::
+
+  // Increment the counter by 5 with tags
+  // Kotlin
+  counter.increment(
+    tags: TagsBuilder().add("os", "Android").add("app_type", "rider").build(),
+    count: 5
+  )
+
+  // Increment the counter by 5 with tags
+  // Swift
+  counter.increment(
+    tags: TagsBuilder().add(name: "os", value: "Android").add(name: "app_type", value: "rider").build()
+    count: 5
+  )
 
 ---------
 ``Gauge``
