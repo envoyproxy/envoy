@@ -230,33 +230,21 @@ envoy_cmake_external(
     lib_source = "@org_llvm_llvm//:all",
     static_libraries = select({
         "//conditions:default": [
-            # Order from llvm-config --libnames.
-            "libLLVMInterpreter.a",
-            "libLLVMWindowsManifest.a",
-            "libLLVMLibDriver.a",
-            "libLLVMObjectYAML.a",
-            "libLLVMCoverage.a",
-            "libLLVMLineEditor.a",
-            "libLLVMDlltoolDriver.a",
-            "libLLVMOption.a",
-            "libLLVMTableGen.a",
-            "libLLVMFuzzMutate.a",
-            "libLLVMSymbolize.a",
-            "libLLVMCoroutines.a",
-            "libLLVMDebugInfoPDB.a",
-            "libLLVMLTO.a",
-            "libLLVMObjCARCOpts.a",
-            "libLLVMMIRParser.a",
+            # Order from llvm-config --libnames asmparser core debuginfodwarf
+            #   engine lto mcparser mirparser orcjit passes runtimedyld
+            #   support x86asmparser x86desc
             "libLLVMOrcJIT.a",
             "libLLVMOrcError.a",
             "libLLVMJITLink.a",
+            "libLLVMMIRParser.a",
+            "libLLVMLTO.a",
             "libLLVMPasses.a",
+            "libLLVMObjCARCOpts.a",
             "libLLVMipo.a",
             "libLLVMInstrumentation.a",
             "libLLVMVectorize.a",
             "libLLVMLinker.a",
             "libLLVMIRReader.a",
-            "libLLVMAsmParser.a",
             "libLLVMX86Disassembler.a",
             "libLLVMX86AsmParser.a",
             "libLLVMX86CodeGen.a",
@@ -264,7 +252,6 @@ envoy_cmake_external(
             "libLLVMGlobalISel.a",
             "libLLVMSelectionDAG.a",
             "libLLVMAsmPrinter.a",
-            "libLLVMDebugInfoDWARF.a",
             "libLLVMCodeGen.a",
             "libLLVMScalarOpts.a",
             "libLLVMInstCombine.a",
@@ -281,13 +268,15 @@ envoy_cmake_external(
             "libLLVMAnalysis.a",
             "libLLVMProfileData.a",
             "libLLVMRuntimeDyld.a",
+            "libLLVMDebugInfoDWARF.a",
             "libLLVMObject.a",
             "libLLVMTextAPI.a",
             "libLLVMMCParser.a",
-            "libLLVMBitReader.a",
             "libLLVMMC.a",
             "libLLVMDebugInfoCodeView.a",
             "libLLVMDebugInfoMSF.a",
+            "libLLVMBitReader.a",
+            "libLLVMAsmParser.a",
             "libLLVMCore.a",
             "libLLVMRemarks.a",
             "libLLVMBitstreamReader.a",
@@ -297,6 +286,7 @@ envoy_cmake_external(
         ],
     }),
     tags = ["skip_on_windows"],
+    alwayslink = True,
 )
 
 envoy_cmake_external(
@@ -335,7 +325,6 @@ envoy_cmake_external(
     static_libraries = ["libvmlib.a"],
     tags = ["skip_on_windows"],
     deps = [":llvm"],
-    alwayslink = True,
 )
 
 envoy_cmake_external(
