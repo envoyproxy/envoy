@@ -20,7 +20,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
                          Network::TransportSocketFactory& transport_socket_factory,
                          TimeSource& time_source,
-                         Network::Address::InstanceConstSharedPtr server_addr);
+                         Network::Address::InstanceConstSharedPtr server_addr,
+                         uint32_t buffer_limit);
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
@@ -32,6 +33,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // be updated with SDS.
   std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   quic::QuicConfig quic_config_;
+  const uint32_t buffer_limit_;
 };
 
 std::unique_ptr<Network::ClientConnection>
