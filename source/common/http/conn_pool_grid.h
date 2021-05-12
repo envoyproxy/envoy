@@ -1,6 +1,8 @@
 #pragma once
 
+#include "common/http/alternate_protocols_cache_impl.h"
 #include "common/http/conn_pool_base.h"
+#include "common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -130,6 +132,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                   OptRef<AlternateProtocolsCacheImpl> alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
@@ -150,8 +153,17 @@ public:
   // Returns true if pool is the grid's HTTP/3 connection pool.
   bool isPoolHttp3(const ConnectionPool::Instance& pool);
 
-  bool isHttp3Broken() const { return is_http3_broken_; }
-  void setIsHttp3Broken(bool is_http3_broken) { is_http3_broken_ = is_http3_broken; }
+  // Returns true if HTTP/3 is currently broken. While HTTP/3 is broken the grid will not
+  // attempt to make new HTTP/3 connections.
+  bool isHttp3Broken() const;
+
+  // Marks HTTP/3 broken for a period of time subject to exponential backoff. While HTTP/3
+  // is broken the grid will not attempt to make new HTTP/3 connections.
+  void markHttp3Broken();
+
+  // Marks that HTTP/3 is working, which resets the exponential backoff counter in the
+  // event that HTTP/3 is marked broken again.
+  void markHttp3Confirmed();
 
 private:
   friend class ConnectivityGridForTest;
@@ -159,6 +171,10 @@ private:
   // Called by each pool as it drains. The grid is responsible for calling
   // drained_callbacks_ once all pools have drained.
   void onDrainReceived();
+
+  // Returns true if HTTP/3 should be attempted because there is an alternate protocol
+  // that specifies HTTP/3 and HTTP/3 is not broken.
+  bool shouldAttemptHttp3();
 
   // Creates the next pool in the priority list, or absl::nullopt if all pools
   // have been created.
@@ -174,7 +190,9 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
-  bool is_http3_broken_{};
+  Http3StatusTracker http3_status_tracker_;
+  // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
+  OptRef<AlternateProtocolsCacheImpl> alternate_protocols_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and

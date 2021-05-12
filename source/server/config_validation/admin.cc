@@ -10,7 +10,7 @@ bool ValidationAdmin::addHandler(const std::string&, const std::string&, Handler
 
 bool ValidationAdmin::removeHandler(const std::string&) { return true; }
 
-const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+const Network::Socket& ValidationAdmin::socket() { return *socket_; }
 
 ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; }
 

@@ -164,7 +164,7 @@ DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
-RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
+RELOADABLE_FLAG_REGEX = re.compile(".*(...)(envoy.reloadable_features.[^ ]*)\s.*")
 INVALID_REFLINK = re.compile(".* ref:.*")
 OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
 # C++17 feature, lacks sufficient support across various libraries / compilers.
@@ -173,6 +173,7 @@ FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
+FLAG_REGEX = re.compile("    \"(.*)\",")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -249,6 +250,15 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/mongo_proxy",
   "extensions/filters/network/common",
   "extensions/filters/network/common/redis",
+}
+
+UNSORTED_FLAGS = {
+  "envoy.reloadable_features.activate_timers_next_event_loop",
+  "envoy.reloadable_features.check_ocsp_policy",
+  "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
+  "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
+  "envoy.reloadable_features.upstream_http2_flood_checks",
+  "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 }
 # yapf: enable
 
@@ -494,6 +504,30 @@ class FormatChecker:
         subdir = path[0:slash]
         return subdir in SUBDIR_SET
 
+    # simple check that all flags between "Begin alphabetically sorted section."
+    # and the end of the struct are in order (except the ones that already aren't)
+    def check_runtime_flags(self, file_path, error_messages):
+        in_flag_block = False
+        previous_flag = ""
+        for line_number, line in enumerate(self.read_lines(file_path)):
+            if "Begin alphabetically" in line:
+                in_flag_block = True
+                continue
+            if not in_flag_block:
+                continue
+            if "}" in line:
+                break
+
+            match = FLAG_REGEX.match(line)
+            if not match:
+                error_messages.append("%s does not look like a reloadable flag" % line)
+                break
+
+            if previous_flag:
+                if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
+                    error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
+            previous_flag = line
+
     def check_current_release_notes(self, file_path, error_messages):
         first_word_of_prior_line = ''
         next_word_to_check = ''  # first word after :
@@ -527,13 +561,12 @@ class FormatChecker:
             if invalid_reflink_match:
                 report_error("Found text \" ref:\". This should probably be \" :ref:\"\n%s" % line)
 
-            # make sure flags are surrounded by ``s
+            # make sure flags are surrounded by ``s (ie "inline literal")
             flag_match = RELOADABLE_FLAG_REGEX.match(line)
             if flag_match:
-                if not flag_match.groups()[0].startswith(' `'):
+                if not flag_match.groups()[0].startswith(' ``'):
                     report_error(
-                        "Flag `%s` should be enclosed in a single set of back ticks"
-                        % flag_match.groups()[1])
+                        "Flag %s should be enclosed in double back ticks" % flag_match.groups()[1])
 
             if line.startswith("* "):
                 if not ends_with_period(prior_line):
@@ -581,6 +614,9 @@ class FormatChecker:
             # This only validates entries for the current release as very old release
             # notes have a different format.
             self.check_current_release_notes(file_path, error_messages)
+        if file_path.endswith("source/common/runtime/runtime_features.cc"):
+            # Do runtime alphabetical order checks.
+            self.check_runtime_flags(file_path, error_messages)
 
         def check_format_errors(line, line_number):
 

@@ -40,8 +40,8 @@ public:
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
 
     absl::WriterMutexLock lock(&address_lock_);
-    address_ = address;
-    health_check_address_ = health_check_address;
+    setAddress(address);
+    setHealthCheckAddress(health_check_address);
   }
 
   // Upstream::Host

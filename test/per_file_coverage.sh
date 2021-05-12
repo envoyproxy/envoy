@@ -58,7 +58,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls:95.0"
 "source/extensions/wasm_runtime:50.0"
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
-"source/extensions/wasm_runtime/wavm:0.0" # Noe enabled in coverage build
+"source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:85.7" # Death tests within extensions
 "source/extensions/watchdog/profile_action:85.7"
 "source/server:94.4" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239

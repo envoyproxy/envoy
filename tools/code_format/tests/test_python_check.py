@@ -239,7 +239,7 @@ def test_python_on_checks_complete(patches, results):
     diff_path, failed = results
     patched = patches(
         "open",
-        "checker.ForkingChecker.fork",
+        "checker.ForkingChecker.subproc_run",
         "checker.Checker.on_checks_complete",
         ("PythonChecker.diff_file_path", dict(new_callable=PropertyMock)),
         ("PythonChecker.has_failed", dict(new_callable=PropertyMock)),

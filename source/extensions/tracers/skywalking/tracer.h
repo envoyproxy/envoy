@@ -6,8 +6,7 @@
 
 #include "extensions/tracers/skywalking/trace_segment_reporter.h"
 
-#include "cpp2sky/segment_context.h"
-#include "cpp2sky/tracer.h"
+#include "cpp2sky/tracing_context.h"
 #include "cpp2sky/well_known_names.h"
 
 namespace Envoy {
@@ -15,42 +14,12 @@ namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-using cpp2sky::CurrentSegmentSpanPtr;
-using cpp2sky::SegmentContextPtr;
-using SkywalkingTracer = cpp2sky::Tracer;
+using cpp2sky::TracingContextPtr;
+using cpp2sky::TracingSpanPtr;
 
 const Http::LowerCaseString& skywalkingPropagationHeaderKey();
 
-class Span : public Tracing::Span {
-public:
-  Span(CurrentSegmentSpanPtr span_entity, SegmentContextPtr segment_context,
-       SkywalkingTracer& parent_tracer)
-      : parent_tracer_(parent_tracer), span_entity_(span_entity),
-        segment_context_(segment_context) {}
-
-  // Tracing::Span
-  void setOperation(absl::string_view) override {}
-  void setTag(absl::string_view name, absl::string_view value) override;
-  void log(SystemTime timestam, const std::string& event) override;
-  void finishSpan() override;
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
-  Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
-                              SystemTime start_time) override;
-  void setSampled(bool do_sample) override;
-  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
-  void setBaggage(absl::string_view, absl::string_view) override {}
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
-
-  const SegmentContextPtr segmentContext() { return segment_context_; }
-  const CurrentSegmentSpanPtr spanEntity() { return span_entity_; }
-
-private:
-  SkywalkingTracer& parent_tracer_;
-  CurrentSegmentSpanPtr span_entity_;
-  SegmentContextPtr segment_context_;
-};
-
-class Tracer : public SkywalkingTracer {
+class Tracer {
 public:
   Tracer(TraceSegmentReporterPtr reporter);
 
@@ -59,7 +28,7 @@ public:
    *
    * @param segment_context The segment context.
    */
-  void sendSegment(SegmentContextPtr segment_context) override;
+  void sendSegment(TracingContextPtr tracing_context);
 
   /*
    * Create a new span based on the segment context and parent span.
@@ -75,14 +44,42 @@ public:
    * @return The unique ptr to the newly created span.
    */
   Tracing::SpanPtr startSpan(const Tracing::Config& config, SystemTime start_time,
-                             const std::string& operation, SegmentContextPtr segment_context,
-                             CurrentSegmentSpanPtr parent);
+                             const std::string& operation, TracingContextPtr tracing_context,
+                             TracingSpanPtr parent);
 
 private:
   TraceSegmentReporterPtr reporter_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
+
+class Span : public Tracing::Span {
+public:
+  Span(TracingSpanPtr span_entity, TracingContextPtr tracing_context, Tracer& parent_tracer)
+      : parent_tracer_(parent_tracer), span_entity_(span_entity),
+        tracing_context_(tracing_context) {}
+
+  // Tracing::Span
+  void setOperation(absl::string_view) override {}
+  void setTag(absl::string_view name, absl::string_view value) override;
+  void log(SystemTime timestamp, const std::string& event) override;
+  void finishSpan() override;
+  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
+                              SystemTime start_time) override;
+  void setSampled(bool do_sample) override;
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
+
+  const TracingContextPtr tracingContext() { return tracing_context_; }
+  const TracingSpanPtr spanEntity() { return span_entity_; }
+
+private:
+  Tracer& parent_tracer_;
+  TracingSpanPtr span_entity_;
+  TracingContextPtr tracing_context_;
+};
 
 } // namespace SkyWalking
 } // namespace Tracers

@@ -185,9 +185,19 @@ public:
 
   /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
+   * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.
    */
-  static void stripPortFromHost(RequestHeaderMap& headers, absl::optional<uint32_t> listener_port);
+  static absl::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
+                                                    absl::optional<uint32_t> listener_port);
+
+  /**
+   * @brief Return the index of the port, or npos if the host has no port
+   *
+   * Note this does not do validity checks on the port, it just finds the
+   * trailing : which is not a part of an IP address.
+   */
+  static absl::string_view::size_type getPortStart(absl::string_view host);
 
   /* Does a common header check ensuring required headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and

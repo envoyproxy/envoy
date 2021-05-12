@@ -316,13 +316,12 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-  if (socket_type == Network::Socket::Type::Datagram) {
-    return;
+  if (socket_type != Network::Socket::Type::Datagram) {
+    buildSocketOptions();
+    buildOriginalDstListenerFilter();
+    buildProxyProtocolListenerFilter();
+    buildTlsInspectorListenerFilter();
   }
-  buildSocketOptions();
-  buildOriginalDstListenerFilter();
-  buildProxyProtocolListenerFilter();
-  buildTlsInspectorListenerFilter();
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the

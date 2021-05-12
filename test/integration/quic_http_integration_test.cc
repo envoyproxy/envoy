@@ -21,6 +21,7 @@
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -36,6 +37,7 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_transport_socket_factory.h"
 #include "test/common/quic/test_utils.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
@@ -54,17 +56,6 @@ public:
 
 void updateResource(AtomicFileUpdater& updater, double pressure) {
   updater.update(absl::StrCat(pressure));
-}
-
-void setUpstreamTimeout(
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
-  auto* route =
-      hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
-  uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
-  auto* timeout = route->mutable_timeout();
-  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
-  // upstream_response_timeout.
-  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 
 // A test that sets up its own client connection with customized quic version and connection ID.
@@ -110,19 +101,15 @@ public:
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
-    // TODO(danzh) defer setting flow control window till getting http3 options. This requires
-    // QUICHE support to set the session's flow controller after instantiation.
-    quic_config_.SetInitialStreamFlowControlWindowToSend(
-        Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-    quic_config_.SetInitialSessionFlowControlWindowToSend(
-        1.5 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(
-        quic_config_, supported_versions_, std::move(connection), persistent_info.server_id_,
-        persistent_info.crypto_config_.get(), &push_promise_index_, *dispatcher_,
+        persistent_info.quic_config_, supported_versions_, std::move(connection),
+        persistent_info.server_id_, persistent_info.crypto_config_.get(), &push_promise_index_,
+        *dispatcher_,
+        // Use smaller window than the default one to have test coverage of client codec buffer
+        // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-    session->Initialize();
     return session;
   }
 
@@ -212,7 +199,7 @@ public:
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
       // The BPF filter and ActiveQuicListener::destination() look at the 1st word of connection id
-      // in the packet header. And currently all QUIC versions support 8 bytes connection id. So
+      // in the packet header. And currently all QUIC versions support >= 8 bytes connection id. So
       // create connections with the first 4 bytes of connection id different from each
       // other so they should be evenly distributed.
       designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
@@ -223,34 +210,51 @@ public:
     constexpr auto timeout_first = std::chrono::seconds(15);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
     if (GetParam().first == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
     } else {
-      test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u, timeout_first);
+      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
       if (GetParam().first == Network::Address::IpVersion::v4) {
         test_server_->waitForGaugeEq(
-            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u,
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
         test_server_->waitForCounterEq(
-            fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i), 1u,
+            fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_total", i), 1u,
             timeout_subsequent);
       } else {
         test_server_->waitForGaugeEq(
-            fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i), 1u,
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
         test_server_->waitForCounterEq(
-            fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u,
+            fmt::format("listener.[__1]_0.worker_{}.downstream_cx_total", i), 1u,
             timeout_subsequent);
       }
     }
     for (size_t i = 0; i < concurrency_; ++i) {
+      fake_upstream_connection_ = nullptr;
+      upstream_request_ = nullptr;
+      auto encoder_decoder =
+          codec_clients[i]->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}});
+      auto& request_encoder = encoder_decoder.first;
+      auto response = std::move(encoder_decoder.second);
+      codec_clients[i]->sendData(request_encoder, 0, true);
+      waitForNextUpstreamRequest();
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                       {"set-cookie", "foo"},
+                                                                       {"set-cookie", "bar"}},
+                                       true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+      EXPECT_TRUE(response->complete());
       codec_clients[i]->close();
     }
   }
 
 protected:
-  quic::QuicConfig quic_config_;
   quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
   EnvoyQuicConnectionHelper conn_helper_;
@@ -271,6 +275,36 @@ INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
+}
+
+TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
+  // Make sure both connections use the same PersistentQuicInfoImpl.
+  concurrency_ = 1;
+  initialize();
+  // Start the first connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Send a complete request on the first connection.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  // Close the first connection.
+  codec_client_->close();
+  // Start a second connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Send a complete request on the second connection.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  // Ensure 0-RTT was used by second connection.
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_TRUE(static_cast<quic::QuicCryptoClientStream*>(
+                  quic::test::QuicSessionPeer::GetMutableCryptoStream(quic_session))
+                  ->EarlyDataAccepted());
+  // Close the second connection.
+  codec_client_->close();
 }
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndResponseWithBody) {
@@ -312,7 +346,7 @@ TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
-  config_helper_.addConfigModifier(setUpstreamTimeout);
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
                                        false, false, nullptr,
@@ -320,13 +354,14 @@ TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024, /*response_size=*/1024,
                                        false);
 }
 
 TEST_P(QuicHttpIntegrationTest, LargeFlowControlOnAndGiantBody) {
-  config_helper_.addConfigModifier(setUpstreamTimeout);
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/128 * 1024,
                                  /*downstream_buffer_limit=*/128 * 1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024,
@@ -383,7 +418,18 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
   testMultipleQuicConnections();
 }
 
-TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
+// Tests that the packets from a connection with CID longer than 8 bytes are routed to the same
+// worker.
+TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
+  concurrency_ = 8;
+  set_reuse_port_ = true;
+  initialize();
+  // Setup 9-byte CID for the next connection.
+  designated_connection_ids_.push_back(quic::test::TestConnectionIdNineBytesLong(2u));
+  testRouterHeaderOnlyRequestAndResponse();
+}
+
+TEST_P(QuicHttpIntegrationTest, PortMigration) {
   concurrency_ = 2;
   set_reuse_port_ = true;
   initialize();

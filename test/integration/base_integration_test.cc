@@ -67,6 +67,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,

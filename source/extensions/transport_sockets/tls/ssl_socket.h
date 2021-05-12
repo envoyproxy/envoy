@@ -118,6 +118,8 @@ public:
 
   const Ssl::ClientContextConfig& config() const { return *config_; }
 
+  Envoy::Ssl::ClientContextSharedPtr sslCtx();
+
 private:
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
