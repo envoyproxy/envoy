@@ -19,7 +19,6 @@ getContext(Network::TransportSocketFactory& transport_socket_factory) {
   auto* quic_socket_factory =
       dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
   ASSERT(quic_socket_factory != nullptr);
-  ASSERT(quic_socket_factory->sslCtx() != nullptr);
   return quic_socket_factory->sslCtx();
 }
 
@@ -39,6 +38,7 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
 
 namespace {
 // TODO(alyssawilk, danzh2010): This is mutable static info that is required for the QUICHE code.
+
 // This was preexisting but should either be removed or potentially moved inside
 // PersistentQuicInfoImpl.
 struct StaticInfo {
