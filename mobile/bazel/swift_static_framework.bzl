@@ -61,6 +61,7 @@ def _swift_static_framework_impl(ctx):
         ]
 
         if len(objc_headers) == 1:
+            input_modules_docs.append(objc_headers[0])
             zip_args.append(_zip_header_arg(module_name, objc_headers[0]))
         else:
             header_names = [header.basename for header in objc_headers]
