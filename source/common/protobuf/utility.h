@@ -658,6 +658,11 @@ public:
                                      ProtobufWkt::Timestamp& timestamp);
 };
 
+class StructUtil {
+public:
+  static void update(ProtobufWkt::Struct& obj, ProtobufWkt::Struct const& with);
+};
+
 } // namespace Envoy
 
 namespace std {
