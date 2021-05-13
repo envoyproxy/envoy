@@ -192,7 +192,7 @@ public:
   const std::vector<Http::OriginalIPDetectionSharedPtr>&
   originalIpDetectionExtensions() const override {
     return detection_extensions_;
-  };
+  }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();

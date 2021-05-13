@@ -24,32 +24,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#extension: envoy.http.original_ip_detection.custom_header]
 message CustomHeaderConfig {
-  // Configuration options for rejecting requests when detection fails.
-  message RejectOptions {
-    // If reject_request_if_detection_fails is set, this sets the HTTP status that is sent downstream
-    // when detection fails. The default status is HTTP 403 Forbidden.
-    //
-    // .. note::
-    //   If this is set to < 400 or > 511, the default status 403 will be used instead.
-    type.v3.HttpStatus status_on_error = 1;
-
-    // If reject_request_if_detection_fails is set, this sets the HTTP body in the response
-    // when detection fails. If not set, an empty body is used.
-    string body_on_error = 2;
-  }
-
   // The header name containing the original downstream remote address, if present.
   //
   // Note: in the case of a multi-valued header, only the first value is tried and the rest are ignored.
   string header_name = 1
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: true}];
 
-  // If set to true, the extension is allowed to decide if the detected address should be treated as
-  // trusted. If a detected address is considered trusted, it might be used as input to determine
+  // If set to true, the extension could decide that the detected address should be treated as
+  // trusted by the HCM. If the address is considered trusted, it might be used as input to determine
   // if the request is internal (among other things).
   bool allow_extension_to_set_address_as_trusted = 2;
 
-  // If set, requests for which either the configured header is missing or parsing an IP from its
-  // value fails will be rejected with these options.
-  RejectOptions reject_options = 3;
+  // If this is set, the request will be rejected when detection fails using it as the HTTP response status.
+  //
+  // .. note::
+  //   If this is set to < 400 or > 511, the default status 403 will be used instead.
+  type.v3.HttpStatus reject_with_status = 3;
 }

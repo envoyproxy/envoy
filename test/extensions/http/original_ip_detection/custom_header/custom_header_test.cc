@@ -22,12 +22,7 @@ protected:
     envoy::extensions::http::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
     config.set_header_name("x-real-ip");
     config.set_allow_extension_to_set_address_as_trusted(true);
-
-    auto* reject_options = config.mutable_reject_options();
-    reject_options->set_body_on_error("detection failed");
-    auto* status_on_error = reject_options->mutable_status_on_error();
-    status_on_error->set_code(code);
-
+    config.set_status_on_error(code);
     custom_header_extension_ = std::make_shared<CustomHeaderIPDetection>(config);
   }
 
@@ -47,7 +42,7 @@ TEST_F(CustomHeaderTest, Detection) {
 
     const auto& reject_options = result.reject_options.value();
     EXPECT_EQ(reject_options.response_code, Envoy::Http::Code::Unauthorized);
-    EXPECT_EQ(reject_options.body, "detection failed");
+    EXPECT_EQ(reject_options.body, "");
   }
 
   // Bad IP in the header.
@@ -62,7 +57,7 @@ TEST_F(CustomHeaderTest, Detection) {
 
     const auto& reject_options = result.reject_options.value();
     EXPECT_EQ(reject_options.response_code, Envoy::Http::Code::Unauthorized);
-    EXPECT_EQ(reject_options.body, "detection failed");
+    EXPECT_EQ(reject_options.body, "");
   }
 
   // Good IPv4.
@@ -101,7 +96,7 @@ TEST_F(CustomHeaderTest, FallbacksToDefaultResponseCode) {
 
   const auto& reject_options = result.reject_options.value();
   EXPECT_EQ(reject_options.response_code, Envoy::Http::Code::Forbidden);
-  EXPECT_EQ(reject_options.body, "detection failed");
+  EXPECT_EQ(reject_options.body, "");
 }
 
 } // namespace CustomHeader

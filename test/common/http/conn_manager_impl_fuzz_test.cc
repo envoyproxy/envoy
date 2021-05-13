@@ -204,13 +204,13 @@ public:
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  const std::vector<Http::OriginalIPDetectionSharedPtr>&
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
     return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         KEEP_UNCHANGED;
   }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
