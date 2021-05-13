@@ -232,6 +232,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
+  configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
@@ -283,6 +284,8 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
         options->push_back(std::make_shared<Network::SocketOptionImpl>(
             envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
             absl::string_view(reinterpret_cast<char*>(&prog), sizeof(prog))));
+      } else {
+        ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
       }
     });
 

@@ -199,8 +199,13 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 } // namespace Utility
 } // namespace Http2
+
 namespace Http3 {
 namespace Utility {
+
+const uint32_t OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
+
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,

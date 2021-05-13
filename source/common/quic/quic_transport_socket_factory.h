@@ -112,7 +112,8 @@ public:
     return fallback_factory_->createTransportSocket(options);
   }
 
-  // TODO(14829) make sure that clientContextConfig() is safe when secrets are updated.
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
+
   const Ssl::ClientContextConfig& clientContextConfig() const {
     return fallback_factory_->config();
   }

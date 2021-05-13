@@ -10,9 +10,9 @@ alabaster==0.7.12 \
     # via
     #   -r docs/requirements.txt
     #   sphinx
-babel==2.9.0 \
-    --hash=sha256:9d35c22fcc79893c3ecc85ac4a56cde1ecf3f19c540bba0922308a6c06ca6fa5 \
-    --hash=sha256:da031ab54472314f210b0adcff1588ee5d1d1d0ba4dbd07b94dba82bde791e05
+babel==2.9.1 \
+    --hash=sha256:ab49e12b91d937cd11f0b67cb259a57ab4ad2b59ac7a3b41d6c06c0ac5b0def9 \
+    --hash=sha256:bc0c176f9f6a994582230df350aa6e05ba2ebe4b3ac317eab29d9be5d2768da0
     # via
     #   -r docs/requirements.txt
     #   sphinx
@@ -106,9 +106,9 @@ packaging==20.9 \
     # via
     #   -r docs/requirements.txt
     #   sphinx
-pygments==2.8.1 \
-    --hash=sha256:2656e1a6edcdabf4275f9a3640db59fd5de107d88e8663c5d4e9a0fa62f77f94 \
-    --hash=sha256:534ef71d539ae97d4c3a4cf7d6f110f214b0e687e92f9cb9d2a3b0d3101289c8
+pygments==2.9.0 \
+    --hash=sha256:d66e804411278594d764fc69ec36ec13d9ae9147193a1740cd34d272ca383b8e \
+    --hash=sha256:a18f47b506a429f6f4b9df81bb02beab9ca21d0a5fee38ed15aef65f0545519f
     # via
     #   -r docs/requirements.txt
     #   sphinx
@@ -131,9 +131,9 @@ requests==2.25.1 \
     # via
     #   -r docs/requirements.txt
     #   sphinx
-six==1.15.0 \
-    --hash=sha256:30639c035cdb23534cd4aa2dd52c3bf48f06e5f4a941509c8bafd8ce11080259 \
-    --hash=sha256:8b74bedcbbbaca38ff6d7491d76f2b06b3592611af620f8426e82dddb04a5ced
+six==1.16.0 \
+    --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254 \
+    --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926
     # via
     #   -r docs/requirements.txt
     #   sphinxcontrib-httpdomain
@@ -157,13 +157,13 @@ sphinx-rtd-theme==0.5.2 \
     --hash=sha256:32bd3b5d13dc8186d7a42fc816a23d32e83a4827d7d9882948e7b837c232da5a \
     --hash=sha256:4a05bdbe8b1446d77a01e20a23ebc6777c74f43237035e76be89699308987d6f
     # via -r docs/requirements.txt
-sphinx-tabs==2.1.0 \
-    --hash=sha256:0b5a8dd71d87197a01eef3b9d1e1a70513f4dd45e8af7783d1ab74c3fb2cbc6c \
-    --hash=sha256:9d8db61afe9499aa84b33bc1c0d891f8a0df88ae513739f5babde15430c1fdaf
+sphinx-tabs==3.0.0 \
+    --hash=sha256:2abbcaaa3b8a857de06f3db31762a7bdd17aba1b8979d000f193debe6f917c2c \
+    --hash=sha256:3f766762fffacc99828cb877a9e4cb8ac0ba3582f2a054ea68248e5e026e5612
     # via -r docs/requirements.txt
-sphinx==3.5.4 \
-    --hash=sha256:19010b7b9fa0dc7756a6e105b2aacd3a80f798af3c25c273be64d7beeb482cb1 \
-    --hash=sha256:2320d4e994a191f4b4be27da514e46b3d6b420f2ff895d064f52415d342461e8
+sphinx==4.0.1 \
+    --hash=sha256:b2566f5f339737a6ef37198c47d56de1f4a746c722bebdb2fe045c34bfd8b9d0 \
+    --hash=sha256:cf5104777571b2b7f06fa88ee08fade24563f4a0594cf4bd17d31c47b8740b4c
     # via
     #   -r docs/requirements.txt
     #   sphinx-copybutton

@@ -15,12 +15,6 @@
 
 namespace Envoy {
 
-// TODO(#14829) categorize or fix all failures.
-#define EXCLUDE_UPSTREAM_HTTP3                                                                     \
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {                                     \
-    return;                                                                                        \
-  }
-
 INSTANTIATE_TEST_SUITE_P(Protocols, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
@@ -310,7 +304,6 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
-  EXCLUDE_UPSTREAM_HTTP3; // fails: no 200s.
   config_helper_.addFilter(
       fmt::format(R"EOF(
   name: pause-filter{}
