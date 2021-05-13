@@ -173,7 +173,7 @@ def envoy_cc_library(
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
-    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+    _deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
         repository + "//include/envoy/common:base_includes",
         repository + "//source/common/common:fmt_lib",
         envoy_external_dep_path("abseil_flat_hash_map"),
