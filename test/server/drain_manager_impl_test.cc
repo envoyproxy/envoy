@@ -5,8 +5,8 @@
 
 #include "server/drain_manager_impl.h"
 
-#include "test/mocks/server/instance.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
