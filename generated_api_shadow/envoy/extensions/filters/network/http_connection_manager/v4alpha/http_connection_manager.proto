@@ -96,6 +96,36 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
+  // Determines the action for request that contain %2F, %2f, %5C or %5c sequences in the URI path.
+  // This operation occurs before URL normalization and the merge slashes transformations if they were enabled.
+  enum PathWithEscapedSlashesAction {
+    // Default behavior specific to implementation (i.e. Envoy) of this configuration option.
+    // Envoy, by default, takes the KEEP_UNCHANGED action.
+    // NOTE: the implementation may change the default behavior at-will.
+    IMPLEMENTATION_SPECIFIC_DEFAULT = 0;
+
+    // Keep escaped slashes.
+    KEEP_UNCHANGED = 1;
+
+    // Reject client request with the 400 status. gRPC requests will be rejected with the INTERNAL (13) error code.
+    // The "httpN.downstream_rq_failed_path_normalization" counter is incremented for each rejected request.
+    REJECT_REQUEST = 2;
+
+    // Unescape %2F and %5C sequences and redirect request to the new path if these sequences were present.
+    // Redirect occurs after path normalization and merge slashes transformations if they were configured.
+    // NOTE: gRPC requests will be rejected with the INTERNAL (13) error code.
+    // This option minimizes possibility of path confusion exploits by forcing request with unescaped slashes to
+    // traverse all parties: downstream client, intermediate proxies, Envoy and upstream server.
+    // The "httpN.downstream_rq_redirected_with_normalized_path" counter is incremented for each
+    // redirected request.
+    UNESCAPE_AND_REDIRECT = 3;
+
+    // Unescape %2F and %5C sequences.
+    // Note: this option should not be enabled if intermediaries perform path based access control as
+    // it may lead to path confusion vulnerabilities.
+    UNESCAPE_AND_FORWARD = 4;
+  }
+
   // [#next-free-field: 10]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
@@ -274,7 +304,7 @@ message HttpConnectionManager {
     type.http.v3.PathTransformation http_filter_transformation = 2;
   }
 
-  reserved 27, 11, 45;
+  reserved 27, 11;
 
   reserved "idle_timeout";
 
@@ -563,6 +593,13 @@ message HttpConnectionManager {
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool merge_slashes = 33;
+
+  // Action to take when request URL path contains escaped slash sequences (%2F, %2f, %5C and %5c).
+  // The default value can be overridden by the :ref:`http_connection_manager.path_with_escaped_slashes_action<config_http_conn_man_runtime_path_with_escaped_slashes_action>`
+  // runtime variable.
+  // The :ref:`http_connection_manager.path_with_escaped_slashes_action_sampling<config_http_conn_man_runtime_path_with_escaped_slashes_action_enabled>` runtime
+  // variable can be used to apply the action to a portion of all requests.
+  PathWithEscapedSlashesAction path_with_escaped_slashes_action = 45;
 
   // The configuration of the request ID extension. This includes operations such as
   // generation, validation, and associated tracing operations. If empty, the
