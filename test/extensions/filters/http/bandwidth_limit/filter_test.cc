@@ -40,6 +40,11 @@ public:
     return counter != nullptr ? counter->value() : 0;
   }
 
+  uint64_t findGauge(const std::string& name) {
+    const auto gauge = TestUtility::findGauge(stats_, name);
+    return gauge != nullptr ? gauge->value() : 0;
+  }
+
   NiceMock<Stats::IsolatedStoreImpl> stats_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_filter_callbacks_;
@@ -69,12 +74,12 @@ TEST_F(FilterTest, Disabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.decode_enabled"));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.encode_enabled"));
 }
 
 TEST_F(FilterTest, BandwidthLimitOnDecode) {
@@ -93,6 +98,7 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
+  EXPECT_EQ(1U, findCounter("test.http_bandwidth_limit.decode_enabled"));
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
@@ -100,9 +106,12 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   Buffer::OwnedImpl data1("hello");
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data1, false));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(5, findGauge("test.http_bandwidth_limit.decode_incoming_size"));
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual("hello"), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(5, findGauge("test.http_bandwidth_limit.decode_allowed_size"));
 
   // Advance time by 1s which should refill all tokens.
   time_system_.advanceTimeWait(std::chrono::seconds(1));
@@ -112,12 +121,16 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data2(std::string(1126, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data2, false));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.decode_incoming_size"));
 
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(decoder_filter_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.decode_allowed_size"));
+  EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.decode_incoming_size"));
 
   // Fire timer, also advance time.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
@@ -125,10 +138,14 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.decode_allowed_size"));
+  EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.decode_incoming_size"));
 
   // Get new data with current data buffered, not end_stream.
   Buffer::OwnedImpl data3(std::string(51, 'b'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data3, false));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.decode_incoming_size"));
 
   // Fire timer, also advance time.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
@@ -136,6 +153,7 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.decode_allowed_size"));
 
   // Fire timer, also advance time. No timer enable because there is nothing
   // buffered.
@@ -143,6 +161,7 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.decode_allowed_size"));
 
   // Advance time by 1s for a full refill.
   time_system_.advanceTimeWait(std::chrono::seconds(1));
@@ -152,9 +171,12 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data4, true));
+  EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.decode_incoming_size"));
   EXPECT_CALL(decoder_filter_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
   token_timer->invokeCallback();
+  EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.decode_allowed_size"));
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.decode_pending"));
 
   filter_->onDestroy();
 }
@@ -182,14 +204,18 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(1U, findCounter("test.http_bandwidth_limit.encode_enabled"));
 
   // Send a small amount of data which should be within limit.
   Buffer::OwnedImpl data1("hello");
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.encode_pending"));
+  EXPECT_EQ(5, findGauge("test.http_bandwidth_limit.encode_incoming_size"));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(5, findGauge("test.http_bandwidth_limit.encode_allowed_size"));
 
   // Advance time by 1s which should refill all tokens.
   time_system_.advanceTimeWait(std::chrono::seconds(1));
@@ -199,12 +225,16 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data2(std::string(1126, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
+  EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.encode_incoming_size"));
 
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.encode_pending"));
+  EXPECT_EQ(1126, findGauge("test.http_bandwidth_limit.encode_incoming_size"));
+  EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.encode_allowed_size"));
 
   // Fire timer, also advance time.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
@@ -212,6 +242,7 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.encode_allowed_size"));
 
   // Get new data with current data buffered, not end_stream.
   Buffer::OwnedImpl data3(std::string(51, 'b'));
@@ -223,6 +254,7 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.encode_allowed_size"));
 
   // Fire timer, also advance time. No time enable because there is nothing
   // buffered.
@@ -230,6 +262,7 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
   token_timer->invokeCallback();
+  EXPECT_EQ(51, findGauge("test.http_bandwidth_limit.encode_allowed_size"));
 
   // Advance time by 1s for a full refill.
   time_system_.advanceTimeWait(std::chrono::seconds(1));
@@ -239,9 +272,12 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
+  EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.encode_incoming_size"));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
   token_timer->invokeCallback();
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.encode_pending"));
+  EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.encode_allowed_size"));
 
   filter_->onDestroy();
 }
