@@ -13,8 +13,8 @@ CustomHeaderIPDetection::CustomHeaderIPDetection(
         config)
     : header_name_(config.header_name()),
       allow_trusted_address_checks_(config.allow_extension_to_set_address_as_trusted()) {
-  if (config.has_status_on_error()) {
-    const auto reject_code = toErrorCode(config.status_on_error().code());
+  if (config.has_reject_with_status()) {
+    const auto reject_code = toErrorCode(config.reject_with_status().code());
     reject_options_ = {reject_code, ""};
   }
 }
