@@ -79,7 +79,7 @@ BAZEL_BUILD_OPTIONS+=(
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:generate_extension_rst -- "${GENERATED_RST_DIR}"
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:generate_external_dep_rst

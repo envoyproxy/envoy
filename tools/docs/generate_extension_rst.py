@@ -6,7 +6,7 @@ from collections import defaultdict
 import json
 import os
 import pathlib
-import subprocess
+import sys
 
 
 def format_item(extension, metadata):
@@ -20,20 +20,9 @@ def format_item(extension, metadata):
 
 
 if __name__ == '__main__':
-    try:
-        generated_rst_dir = os.environ["GENERATED_RST_DIR"]
-    except KeyError:
-        raise SystemExit(
-            "Path to an output directory must be specified with GENERATED_RST_DIR env var")
+    extension_db_path = sys.argv[1]
+    generated_rst_dir = sys.argv[2]
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
-
-    try:
-        extension_db_path = os.environ["EXTENSION_DB_PATH"]
-    except KeyError:
-        raise SystemExit(
-            "Path to a json extension db must be specified with EXTENSION_DB_PATH env var")
-    if not os.path.exists(extension_db_path):
-        subprocess.run("tools/extensions/generate_extension_db".split(), check=True)
     extension_db = json.loads(pathlib.Path(extension_db_path).read_text())
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)

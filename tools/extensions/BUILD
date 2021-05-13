@@ -10,8 +10,13 @@ py_binary(
     srcs = ["generate_extension_db.py"],
 )
 
-py_binary(
-    name = "generate_extension_rst",
-    srcs = ["generate_extension_rst.py"],
-    data = [":generate_extension_db"],
+genrule(
+    name = "extension_db",
+    outs = ["extension_db.json"],
+    cmd = "$(location :generate_extension_db) > $@",
+    tools = [
+        ":generate_extension_db",
+        "//source/extensions:extensions_build_config.bzl",
+        "//test/extensions/filters/network/common/fuzz:uber_per_readfilter.cc",
+    ],
 )

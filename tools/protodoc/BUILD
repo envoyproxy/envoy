@@ -24,6 +24,7 @@ py_binary(
     data = [
         "//docs:protodoc_manifest.yaml",
         "//docs:v2_mapping.json",
+        "//tools/extensions:extension_db",
     ],
     visibility = ["//visibility:public"],
     deps = [
