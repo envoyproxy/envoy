@@ -29,7 +29,6 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/codec_stats.h"
 #include "common/network/connection_balancer_impl.h"
-#include "common/network/connection_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/udp_listener_impl.h"
@@ -354,20 +353,11 @@ public:
     parented_ = true;
   }
 
-  void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
-    absl::MutexLock lock(&lock_);
-    auto conn = dynamic_cast<Envoy::Network::ConnectionImpl*>(&connection_);
-    prev_transport_sockets_.push_back(std::move(conn->transportSocket()));
-    conn->transportSocket() = std::move(transport_socket);
-    conn->transportSocket()->setTransportSocketCallbacks(*conn);
-  }
-
 private:
   Network::Connection& connection_;
   absl::Mutex lock_;
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
-  std::vector<Network::TransportSocketPtr> prev_transport_sockets_;
 };
 
 using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
@@ -404,10 +394,6 @@ public:
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
-
-  void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
-    shared_connection_.setTransportSocket(std::move(transport_socket));
-  }
 
 protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
@@ -676,6 +662,8 @@ public:
 
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
   const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
+
+  Event::DispatcherPtr& dispatcher() { return dispatcher_; }
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;

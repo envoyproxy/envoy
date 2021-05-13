@@ -261,7 +261,23 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
       tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
           absl::string_view(""), std::vector<std::string>(),
           std::vector<std::string>{"envoyalpn"}));
-  fake_upstream_connection->setTransportSocket(std::move(ts));
+
+  // Synchronization object used to suspend execution
+  // until dispatcher completes transport socket conversion.
+  absl::Notification notification;
+
+  // Execute transport socket conversion to TLS on the same thread where received data
+  // is dispatched. Otherwise conversion may collide with data processing.
+  fake_upstreams_[0]->dispatcher()->post([&]() {
+    auto connection =
+        dynamic_cast<Envoy::Network::ConnectionImpl*>(&fake_upstream_connection->connection());
+    connection->transportSocket() = std::move(ts);
+    connection->transportSocket()->setTransportSocketCallbacks(*connection);
+    notification.Notify();
+  });
+
+  // Wait until the transport socket conversion completes.
+  notification.WaitForNotification();
 
   // Send message which will trigger upstream starttls to use secure mode.
   ASSERT_TRUE(tcp_client->write("switch"));
