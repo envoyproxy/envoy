@@ -1,6 +1,6 @@
 # 1. Fix linking with unbundled toolchain on macOS.
 # 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
-# 3. Fix MSAN linking.
+# 3. Fix building and linking with MSAN.
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -348,6 +348,8 @@ template("gcc_toolchain") {
@@ -53,3 +53,17 @@
 
  if (use_libfuzzer && (is_linux || is_chromeos)) {
    if (is_asan) {
+--- wee8/build/config/compiler/BUILD.gn
++++ wee8/build/config/compiler/BUILD.gn
+@@ -736,11 +736,6 @@ config("compiler") {
+     cflags += [ "-fcomplete-member-pointers" ]
+   }
+
+-  # TODO(crbug/1185183): Remove after next clang roll
+-  if (is_clang && !is_nacl && is_linux && is_msan) {
+-    cflags += [ "-flegacy-pass-manager" ]
+-  }
+-
+   # Pass the same C/C++ flags to the objective C/C++ compiler.
+   cflags_objc += cflags_c
+   cflags_objcc += cflags_cc
