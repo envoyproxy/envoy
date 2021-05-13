@@ -10,7 +10,8 @@ bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSl
       replicas_.size() != rhs.replicas_.size()) {
     return false;
   }
-
+  // The value type is shared_ptr, and the shared_ptr is not same one even for same ip:port.
+  // so, just compare the key here.
   return std::equal(replicas_.begin(), replicas_.end(), rhs.replicas_.begin(), rhs.replicas_.end(),
                     [](const auto& it1, const auto& it2) { return it1.first == it2.first; });
 }
