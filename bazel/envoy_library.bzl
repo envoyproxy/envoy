@@ -173,23 +173,35 @@ def envoy_cc_library(
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+        repository + "//include/envoy/common:base_includes",
+        repository + "//source/common/common:fmt_lib",
+        envoy_external_dep_path("abseil_flat_hash_map"),
+        envoy_external_dep_path("abseil_flat_hash_set"),
+        envoy_external_dep_path("abseil_strings"),
+        envoy_external_dep_path("spdlog"),
+        envoy_external_dep_path("fmtlib"),
+    ]
+
+    _copts = envoy_copts(repository) + copts
+
+    print("CALLING CC LIBRARY")
+    print("name:" + name)
+    print("srcs:" + srcs)
+    print("hdrs:" + hdrs)
+    print("deps:" + _deps)
+    print("defines:" + defines)
+    print("copts:" + _copts)
+
     cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = envoy_copts(repository) + copts,
+        copts = _copts,
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//include/envoy/common:base_includes",
-            repository + "//source/common/common:fmt_lib",
-            envoy_external_dep_path("abseil_flat_hash_map"),
-            envoy_external_dep_path("abseil_flat_hash_set"),
-            envoy_external_dep_path("abseil_strings"),
-            envoy_external_dep_path("spdlog"),
-            envoy_external_dep_path("fmtlib"),
-        ],
+        deps = _deps,
         include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
