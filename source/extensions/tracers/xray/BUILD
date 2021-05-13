@@ -41,7 +41,7 @@ envoy_cc_library(
         ":daemon_cc_proto",
         "//include/envoy/common:time_interface",
         "//include/envoy/server:tracer_config_interface",
-        "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/tracing:trace_driver_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
         "//source/common/common:random_generator_lib",
@@ -49,7 +49,8 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:common_values_lib",
+        "//source/common/tracing:null_span_lib",
     ],
 )
 
