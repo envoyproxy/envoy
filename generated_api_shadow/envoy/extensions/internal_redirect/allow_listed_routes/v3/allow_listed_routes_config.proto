@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.internal_redirect_predicates.allow_listed_routes]
 message AllowListedRoutesConfig {
   // The list of routes that's allowed as redirect target by this predicate,
-  // identified by the route's :ref:`name <envoy_api_field_config.route.v3.Route.route>`.
+  // identified by the route's :ref:`name <envoy_v3_api_field_config.route.v3.Route.route>`.
   // Empty route names are not allowed.
   repeated string allowed_route_names = 1
       [(validate.rules).repeated = {items {string {min_len: 1}}}];

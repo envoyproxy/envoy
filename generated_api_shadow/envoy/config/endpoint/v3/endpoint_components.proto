@@ -37,8 +37,8 @@ message Endpoint {
     uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
 
     // By default, the host header for L7 health checks is controlled by cluster level configuration
-    // (see: :ref:`host <envoy_api_field_config.core.v3.HealthCheck.HttpHealthCheck.host>` and
-    // :ref:`authority <envoy_api_field_config.core.v3.HealthCheck.GrpcHealthCheck.authority>`). Setting this
+    // (see: :ref:`host <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.host>` and
+    // :ref:`authority <envoy_v3_api_field_config.core.v3.HealthCheck.GrpcHealthCheck.authority>`). Setting this
     // to a non-empty value allows overriding the cluster level configuration for a specific
     // endpoint.
     string hostname = 2;
@@ -50,7 +50,7 @@ message Endpoint {
   //
   //   The form of host address depends on the given cluster type. For STATIC or EDS,
   //   it is expected to be a direct IP address (or something resolvable by the
-  //   specified :ref:`resolver <envoy_api_field_config.core.v3.SocketAddress.resolver_name>`
+  //   specified :ref:`resolver <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>`
   //   in the Address). For LOGICAL or STRICT DNS, it is expected to be hostname,
   //   and will be resolved via DNS.
   core.v3.Address address = 1;
@@ -67,7 +67,7 @@ message Endpoint {
   // The hostname associated with this endpoint. This hostname is not used for routing or address
   // resolution. If provided, it will be associated with the endpoint, and can be used for features
   // that require a hostname, like
-  // :ref:`auto_host_rewrite <envoy_api_field_config.route.v3.RouteAction.auto_host_rewrite>`.
+  // :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`.
   string hostname = 3;
 }
 
@@ -92,7 +92,7 @@ message LbEndpoint {
   // name should be specified as *envoy.lb*. An example boolean key-value pair
   // is *canary*, providing the optional canary status of the upstream host.
   // This may be matched against in a route's
-  // :ref:`RouteAction <envoy_api_msg_config.route.v3.RouteAction>` metadata_match field
+  // :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` metadata_match field
   // to subset the endpoints considered in cluster load balancing.
   core.v3.Metadata metadata = 3;
 
