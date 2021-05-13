@@ -472,19 +472,18 @@ public:
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
   /**
-<<<<<<< HEAD
-   * @return vector of OriginalIPDetectionSharedPtr original IP detection extensions.
-   */
-  virtual const std::vector<OriginalIPDetectionSharedPtr>&
-  originalIpDetectionExtensions() const PURE;
-=======
    * @return the action HttpConnectionManager should take when receiving client request
    * with URI path containing %2F, %2f, %5c or %5C sequences.
    */
   virtual envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const PURE;
->>>>>>> upstream/main
+
+  /**
+   * @return vector of OriginalIPDetectionSharedPtr original IP detection extensions.
+   */
+  virtual const std::vector<OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const PURE;
 };
 } // namespace Http
 } // namespace Envoy
