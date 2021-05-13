@@ -186,12 +186,12 @@ def envoy_cc_library(
     _copts = envoy_copts(repository) + copts
 
     print("CALLING CC LIBRARY")
-    print("name:" + name)
-    print("srcs:" + srcs)
-    print("hdrs:" + hdrs)
-    print("deps:" + _deps)
-    print("defines:" + defines)
-    print("copts:" + _copts)
+    print("name:" + str(name))
+    print("srcs:" + str(srcs))
+    print("hdrs:" + str(hdrs))
+    print("deps:" + str(_deps))
+    print("defines:" + str(defines))
+    print("copts:" + str(_copts))
 
     cc_library(
         name = name,
