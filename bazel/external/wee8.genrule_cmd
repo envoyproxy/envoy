@@ -95,14 +95,15 @@ WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
 # TODO(PiotrSikora): remove when fixed upstream.
 WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
 
-# Support arm64.
-if [[ $${ARCH} == "aarch64" || $${ARCH} == "arm64" ]]; then
+# Set target architecture.
+if [[ $${ARCH} == "x86_64" ]]; then
+  WEE8_BUILD_ARGS+=" target_cpu=\"x64\""
+elif [[ $${ARCH} == "aarch64" || $${ARCH} == "arm64" ]]; then
   WEE8_BUILD_ARGS+=" target_cpu=\"arm64\""
-fi
-
-# Support ppc64le.
-if [[ $${ARCH} == "ppc64le" ]]; then
+elif [[ $${ARCH} == "ppc64le" ]]; then
   WEE8_BUILD_ARGS+=" target_cpu=\"ppc64\""
+elif [[ $${ARCH} == "s390x" ]]; then
+  WEE8_BUILD_ARGS+=" target_cpu=\"s390x\""
 fi
 
 # Select gn tool for the current platform.

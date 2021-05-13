@@ -443,11 +443,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_test",
-    srcs = ["alternate_protocols_test.cc"],
+    name = "http3_status_tracker_test",
+    srcs = ["http3_status_tracker_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:alternate_protocols",
+        "//source/common/http:http3_status_tracker",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "alternate_protocols_cache_impl_test",
+    srcs = ["alternate_protocols_cache_impl_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols_cache",
         "//test/mocks:common_lib",
         "//test/test_common:simulated_time_system_lib",
     ],

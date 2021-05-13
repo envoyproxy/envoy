@@ -82,16 +82,12 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
                                                      const quic::QuicSocketAddress& client_address,
                                                      const std::string& hostname) {
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
-  Network::ConnectionSocketImpl connection_socket(
-      std::make_unique<QuicIoHandleWrapper>(listen_socket_.ioHandle()),
-      quicAddressToEnvoyAddressInstance(server_address),
-      quicAddressToEnvoyAddressInstance(client_address));
-  connection_socket.setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
-  connection_socket.setRequestedServerName(hostname);
-  connection_socket.setRequestedApplicationProtocols({"h2"});
+  // TODO(danzh) modify QUICHE to make quic session or ALPN accessible to avoid hard-coded ALPN.
+  Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
+      listen_socket_.ioHandle(), server_address, client_address, hostname, "h3-29");
   const Network::FilterChain* filter_chain =
-      filter_chain_manager_.findFilterChain(connection_socket);
+      filter_chain_manager_.findFilterChain(*connection_socket);
+
   if (filter_chain == nullptr) {
     listener_stats_.no_filter_chain_match_.inc();
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");

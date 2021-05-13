@@ -87,8 +87,9 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         }
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
+  absl::string_view details;
   auto envoy_headers2 =
-      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator);
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator, 100, details);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
 
   quic::QuicHeaderList quic_headers2;
@@ -105,8 +106,8 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         }
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
-  EXPECT_EQ(nullptr,
-            quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers2, validator));
+  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers2, validator,
+                                                                           100, details));
 }
 
 } // namespace Quic

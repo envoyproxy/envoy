@@ -34,6 +34,25 @@ public:
   TestRequestHeaderMapImpl headers_;
 };
 
+TEST_F(HeaderUtilityTest, HasHost) {
+  const std::vector<std::pair<std::string, bool>> host_headers{
+      {"localhost", false},      // w/o port part
+      {"localhost:443", true},   // name w/ port
+      {"", false},               // empty
+      {":443", true},            // just port
+      {"192.168.1.1", false},    // ipv4
+      {"192.168.1.1:443", true}, // ipv4 w/ port
+      {"[fc00::1]:443", true},   // ipv6 w/ port
+      {"[fc00::1]", false},      // ipv6
+  };
+
+  for (const auto& host_pair : host_headers) {
+    EXPECT_EQ(HeaderUtility::getPortStart(host_pair.first) != absl::string_view::npos,
+              host_pair.second)
+        << host_pair.first;
+  }
+}
+
 // Port's part from host header get removed
 TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   const std::vector<std::pair<std::string, std::string>> host_headers{
@@ -69,8 +88,22 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   }
 }
 
-// Port's part from host header won't be removed if method is "connect"
 TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost:443", "localhost"},
+  };
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first, true);
+    HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
+// Port's part from host header won't be removed if method is "connect"
+TEST_F(HeaderUtilityTest, RemovePortsFromHostConnectLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.strip_port_from_connect", "false"}});
   const std::vector<std::pair<std::string, std::string>> host_headers{
       {"localhost:443", "localhost:443"},
   };

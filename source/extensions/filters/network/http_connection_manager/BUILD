@@ -23,6 +23,7 @@ envoy_cc_extension(
     # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
+        ":dependency_manager",
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:codec_interface",
@@ -52,9 +53,9 @@ envoy_cc_extension(
         "//source/common/router:rds_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/tracing:http_tracer_config_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:http_tracer_manager_lib",
+        "//source/common/tracing:tracer_config_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",

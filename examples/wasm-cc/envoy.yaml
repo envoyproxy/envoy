@@ -22,28 +22,29 @@ static_resources:
                   prefix: "/"
                 route:
                   cluster: web_service
+
           http_filters:
           - name: envoy.filters.http.wasm
             typed_config:
-              "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-              type_url: type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
-              value:
-                config:
-                  name: "my_plugin"
-                  root_id: "my_root_id"
-                  configuration:
-                    "@type": "type.googleapis.com/google.protobuf.StringValue"
-                    value: |
-                      {}
-                  vm_config:
-                    runtime: "envoy.wasm.runtime.v8"
-                    vm_id: "my_vm_id"
-                    code:
-                      local:
-                        filename: "lib/envoy_filter_http_wasm_example.wasm"
-                    configuration: {}
+              "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+              config:
+                name: "my_plugin"
+                root_id: "my_root_id"
+                # if your wasm filter requires custom configuration you can add
+                # as follows
+                configuration:
+                  "@type": "type.googleapis.com/google.protobuf.StringValue"
+                  value: |
+                    {}
+                vm_config:
+                  runtime: "envoy.wasm.runtime.v8"
+                  vm_id: "my_vm_id"
+                  code:
+                    local:
+                      filename: "lib/envoy_filter_http_wasm_example.wasm"
           - name: envoy.filters.http.router
             typed_config: {}
+
   clusters:
   - name: web_service
     connect_timeout: 0.25s

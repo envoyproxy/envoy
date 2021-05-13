@@ -227,38 +227,48 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
-void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
-                                      absl::optional<uint32_t> listener_port) {
-
-  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
+                                                          absl::optional<uint32_t> listener_port) {
+  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strip_port_from_connect")) {
     // According to RFC 2817 Connect method should have port part in host header.
     // In this case we won't strip it even if configured to do so.
-    return;
+    return absl::nullopt;
   }
   const absl::string_view original_host = headers.getHostValue();
-  const absl::string_view::size_type port_start = original_host.rfind(':');
+  const absl::string_view::size_type port_start = getPortStart(original_host);
   if (port_start == absl::string_view::npos) {
-    return;
+    return absl::nullopt;
+  }
+  const absl::string_view port_str = original_host.substr(port_start + 1);
+  uint32_t port = 0;
+  if (!absl::SimpleAtoi(port_str, &port)) {
+    return absl::nullopt;
+  }
+  if (listener_port.has_value() && port != listener_port) {
+    // We would strip ports only if it is specified and they are the same, as local port of the
+    // listener.
+    return absl::nullopt;
+  }
+  const absl::string_view host = original_host.substr(0, port_start);
+  headers.setHost(host);
+  return port;
+}
+
+absl::string_view::size_type HeaderUtility::getPortStart(absl::string_view host) {
+  const absl::string_view::size_type port_start = host.rfind(':');
+  if (port_start == absl::string_view::npos) {
+    return absl::string_view::npos;
   }
   // According to RFC3986 v6 address is always enclosed in "[]". section 3.2.2.
-  const auto v6_end_index = original_host.rfind("]");
+  const auto v6_end_index = host.rfind(']');
   if (v6_end_index == absl::string_view::npos || v6_end_index < port_start) {
-    if ((port_start + 1) > original_host.size()) {
-      return;
+    if ((port_start + 1) > host.size()) {
+      return absl::string_view::npos;
     }
-    const absl::string_view port_str = original_host.substr(port_start + 1);
-    uint32_t port = 0;
-    if (!absl::SimpleAtoi(port_str, &port)) {
-      return;
-    }
-    if (listener_port.has_value() && port != listener_port) {
-      // We would strip ports only if it is specified and they are the same, as local port of the
-      // listener.
-      return;
-    }
-    const absl::string_view host = original_host.substr(0, port_start);
-    headers.setHost(host);
+    return port_start;
   }
+  return absl::string_view::npos;
 }
 
 absl::optional<std::reference_wrapper<const absl::string_view>>

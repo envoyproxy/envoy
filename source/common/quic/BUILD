@@ -113,6 +113,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_session_cache_lib",
+    srcs = ["envoy_quic_session_cache.cc"],
+    hdrs = ["envoy_quic_session_cache.h"],
+    external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
+    deps = [
+        "@com_googlesource_quiche//:quic_core_crypto_crypto_handshake_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "spdy_server_push_utils_for_envoy_lib",
     srcs = ["spdy_server_push_utils_for_envoy.cc"],
     tags = ["nofips"],
@@ -150,6 +161,7 @@ envoy_cc_library(
         ":envoy_quic_connection_helper_lib",
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_server_session_lib",
+        ":envoy_quic_session_cache_lib",
         ":envoy_quic_utils_lib",
         "//include/envoy/http:codec_interface",
         "//include/envoy/registry",
@@ -180,8 +192,8 @@ envoy_cc_library(
     hdrs = ["quic_filter_manager_connection_impl.h"],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_connection_lib",
         ":envoy_quic_simulated_watermark_buffer_lib",
+        ":quic_network_connection_lib",
         ":send_buffer_monitor_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:connection_interface",
@@ -192,6 +204,7 @@ envoy_cc_library(
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/network:connection_base_lib",
         "//source/common/stream_info:stream_info_lib",
+        "@com_googlesource_quiche//:quic_core_connection_lib",
     ],
 )
 
@@ -208,6 +221,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_source_lib",
+        ":envoy_quic_server_connection_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
@@ -255,17 +269,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_connection_lib",
-    srcs = ["envoy_quic_connection.cc"],
-    hdrs = ["envoy_quic_connection.h"],
+    name = "quic_network_connection_lib",
+    srcs = ["quic_network_connection.cc"],
+    hdrs = ["quic_network_connection.h"],
     tags = ["nofips"],
     deps = [
-        ":quic_io_handle_wrapper_lib",
         "//include/envoy/network:connection_interface",
         "//source/common/network:listen_socket_lib",
-        "//source/common/quic:envoy_quic_utils_lib",
-        "//source/extensions/transport_sockets:well_known_names",
-        "@com_googlesource_quiche//:quic_core_connection_lib",
     ],
 )
 
@@ -275,8 +285,12 @@ envoy_cc_library(
     hdrs = ["envoy_quic_server_connection.h"],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_connection_lib",
+        ":quic_io_handle_wrapper_lib",
+        ":quic_network_connection_lib",
+        "//source/common/quic:envoy_quic_utils_lib",
+        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:connection_handler_lib",
+        "@com_googlesource_quiche//:quic_core_connection_lib",
     ],
 )
 
@@ -286,11 +300,12 @@ envoy_cc_library(
     hdrs = ["envoy_quic_client_connection.h"],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_connection_lib",
         ":envoy_quic_packet_writer_lib",
+        ":quic_network_connection_lib",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
+        "@com_googlesource_quiche//:quic_core_connection_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -354,8 +369,12 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
+        "//source/common/quic:quic_io_handle_wrapper_lib",
+        "//source/extensions/transport_sockets:well_known_names",
+        "@com_googlesource_quiche//:quic_core_config_lib",
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

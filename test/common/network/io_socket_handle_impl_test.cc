@@ -24,8 +24,7 @@ namespace Network {
 namespace {
 
 TEST(IoSocketHandleImplTest, TestIoSocketError) {
-  IoSocketError error1(SOCKET_ERROR_AGAIN);
-  EXPECT_DEBUG_DEATH(error1.getErrorCode(),
+  EXPECT_DEBUG_DEATH(IoSocketError(SOCKET_ERROR_AGAIN),
                      ".*assert failure: .* Details: Didn't use getIoSocketEagainInstance.*");
   EXPECT_EQ(errorDetails(SOCKET_ERROR_AGAIN),
             IoSocketError::getIoSocketEagainInstance()->getErrorDetails());
@@ -58,10 +57,14 @@ TEST(IoSocketHandleImplTest, TestIoSocketError) {
   EXPECT_EQ(IoSocketError::IoErrorCode::AddressNotAvailable, error8.getErrorCode());
   EXPECT_EQ(errorDetails(SOCKET_ERROR_ADDR_NOT_AVAIL), error8.getErrorDetails());
 
+  IoSocketError error9(SOCKET_ERROR_CONNRESET);
+  EXPECT_EQ(IoSocketError::IoErrorCode::ConnectionReset, error9.getErrorCode());
+  EXPECT_EQ(errorDetails(SOCKET_ERROR_CONNRESET), error9.getErrorDetails());
+
   // Random unknown error
-  IoSocketError error9(123);
-  EXPECT_EQ(IoSocketError::IoErrorCode::UnknownError, error9.getErrorCode());
-  EXPECT_EQ(errorDetails(123), error9.getErrorDetails());
+  IoSocketError error10(123);
+  EXPECT_EQ(IoSocketError::IoErrorCode::UnknownError, error10.getErrorCode());
+  EXPECT_EQ(errorDetails(123), error10.getErrorDetails());
 }
 
 TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) {

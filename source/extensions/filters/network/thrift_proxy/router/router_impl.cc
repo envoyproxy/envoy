@@ -584,7 +584,7 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
 }
 
 void Router::UpstreamRequest::chargeResponseTiming() {
-  if (charged_response_timing_) {
+  if (charged_response_timing_ || !request_complete_) {
     return;
   }
   charged_response_timing_ = true;

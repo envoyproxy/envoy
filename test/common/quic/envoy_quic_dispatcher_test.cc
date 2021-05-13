@@ -109,22 +109,7 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  void processValidChloPacketAndCheckStatus(bool should_buffer) {
-    quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
-                                          ? quic::QuicIpAddress::Loopback4()
-                                          : quic::QuicIpAddress::Loopback6(),
-                                      54321);
-    quic::QuicBufferedPacketStore* buffered_packets =
-        quic::test::QuicDispatcherPeer::GetBufferedPackets(&envoy_quic_dispatcher_);
-    if (!should_buffer) {
-      // Set QuicDispatcher::new_sessions_allowed_per_event_loop_ to
-      // |kNumSessionsToCreatePerLoopForTests| so that received CHLOs can be
-      // processed immediately.
-      envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
-      EXPECT_FALSE(buffered_packets->HasChlosBuffered());
-      EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id_));
-    }
-
+  void processValidChloPacket(const quic::QuicSocketAddress& peer_addr) {
     // Create a Quic Crypto or TLS1.3 CHLO packet.
     EnvoyQuicClock clock(*dispatcher_);
     Buffer::OwnedImpl payload = generateChloPacketToSend(
@@ -142,7 +127,25 @@ public:
     envoy_quic_dispatcher_.ProcessPacket(
         envoyIpAddressToQuicSocketAddress(listen_socket_->addressProvider().localAddress()->ip()),
         peer_addr, *received_packet);
+  }
 
+  void processValidChloPacketAndCheckStatus(bool should_buffer) {
+    quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                          ? quic::QuicIpAddress::Loopback4()
+                                          : quic::QuicIpAddress::Loopback6(),
+                                      54321);
+    quic::QuicBufferedPacketStore* buffered_packets =
+        quic::test::QuicDispatcherPeer::GetBufferedPackets(&envoy_quic_dispatcher_);
+    if (!should_buffer) {
+      // Set QuicDispatcher::new_sessions_allowed_per_event_loop_ to
+      // |kNumSessionsToCreatePerLoopForTests| so that received CHLOs can be
+      // processed immediately.
+      envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+      EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+      EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id_));
+    }
+
+    processValidChloPacket(peer_addr);
     if (should_buffer) {
       // Incoming CHLO packet is buffered, because ProcessPacket() is called before
       // ProcessBufferedChlos().
@@ -170,6 +173,7 @@ public:
     ASSERT(envoy_connection->addressProvider().localAddress() != nullptr);
     EXPECT_EQ(*listen_socket_->addressProvider().localAddress(),
               *envoy_connection->addressProvider().localAddress());
+    EXPECT_EQ(64 * 1024, envoy_connection->max_inbound_header_list_size());
   }
 
   void processValidChloPacketAndInitializeFilters(bool should_buffer) {
@@ -189,6 +193,23 @@ public:
           read_filter->callbacks_->connection().setConnectionStats(
               {read_total, read_current, write_total, write_current, nullptr, nullptr});
         }});
+    EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
+    EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+        .WillOnce(Invoke([this](const Network::ConnectionSocket& socket) {
+          switch (GetParam().second) {
+          case QuicVersionType::GquicQuicCrypto:
+            EXPECT_EQ("", socket.requestedApplicationProtocols()[0]);
+            break;
+          case QuicVersionType::GquicTls:
+            EXPECT_EQ("h3-T051", socket.requestedApplicationProtocols()[0]);
+            break;
+          case QuicVersionType::Iquic:
+            EXPECT_EQ("h3-29", socket.requestedApplicationProtocols()[0]);
+            break;
+          }
+          EXPECT_EQ("test.example.org", socket.requestedServerName());
+          return &proof_source_->filterChain();
+        }));
     EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
         .WillOnce(ReturnRef(filter_factory));
     EXPECT_CALL(listener_config_, filterChainFactory());
@@ -197,12 +218,17 @@ public:
                             const std::vector<Network::FilterFactoryCb>& filter_factories) {
           EXPECT_EQ(1u, filter_factories.size());
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+          dynamic_cast<EnvoyQuicServerSession&>(connection)
+              .set_max_inbound_header_list_size(64 * 1024);
           return true;
         }));
     EXPECT_CALL(*read_filter, onNewConnection())
         // Stop iteration to avoid calling getRead/WriteBuffer().
         .WillOnce(Return(Network::FilterStatus::StopIteration));
-    EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+    if (!quicVersionUsesTls()) {
+      // The test utility can't generate 0-RTT packet for Quic TLS handshake yet.
+      EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+    }
 
     processValidChloPacketAndCheckStatus(should_buffer);
     EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
@@ -236,24 +262,62 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherTests, EnvoyQuicDispatcherTest,
                          testing::ValuesIn(generateTestParam()), testParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
-  if (quicVersionUsesTls()) {
-    // QUICHE doesn't support 0-RTT TLS1.3 handshake yet.
-    processValidChloPacketAndCheckStatus(false);
-    // Shutdown() to close the connection.
-    envoy_quic_dispatcher_.Shutdown();
-    return;
-  }
   processValidChloPacketAndInitializeFilters(false);
 }
 
-TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
-  if (quicVersionUsesTls()) {
-    // QUICHE doesn't support 0-RTT TLS1.3 handshake yet.
-    processValidChloPacketAndCheckStatus(true);
-    // Shutdown() to close the connection.
-    envoy_quic_dispatcher_.Shutdown();
-    return;
+TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
+  Network::MockFilterChainManager filter_chain_manager;
+  std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
+  Network::MockConnectionCallbacks network_connection_callbacks;
+  testing::StrictMock<Stats::MockCounter> read_total;
+  testing::StrictMock<Stats::MockGauge> read_current;
+  testing::StrictMock<Stats::MockCounter> write_total;
+  testing::StrictMock<Stats::MockGauge> write_current;
+
+  std::vector<Network::FilterFactoryCb> filter_factory(
+      {[&](Network::FilterManager& filter_manager) {
+        filter_manager.addReadFilter(read_filter);
+        read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
+        read_filter->callbacks_->connection().setConnectionStats(
+            {read_total, read_current, write_total, write_current, nullptr, nullptr});
+        // This will not close connection right away, but after it processes the first packet.
+        read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      }});
+  EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
+  EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+      .WillOnce(Return(&proof_source_->filterChain()));
+  EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
+      .WillOnce(ReturnRef(filter_factory));
+  EXPECT_CALL(listener_config_, filterChainFactory());
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+      .WillOnce(Invoke([](Network::Connection& connection,
+                          const std::vector<Network::FilterFactoryCb>& filter_factories) {
+        EXPECT_EQ(1u, filter_factories.size());
+        Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+        return true;
+      }));
+  EXPECT_CALL(*read_filter, onNewConnection())
+      // Stop iteration to avoid calling getRead/WriteBuffer().
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+
+  if (!quicVersionUsesTls()) {
+    EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   }
+
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+  // Set QuicDispatcher::new_sessions_allowed_per_event_loop_ to
+  // |kNumSessionsToCreatePerLoopForTests| so that received CHLOs can be
+  // processed immediately.
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+
+  processValidChloPacket(peer_addr);
+}
+
+TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
   processValidChloPacketAndInitializeFilters(true);
 }
 

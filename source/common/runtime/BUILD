@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -23,7 +24,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hash_lib",
         "//source/common/singleton:const_singleton",
-        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -78,5 +78,7 @@ envoy_cc_library(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic/platform:quiche_flags_impl_lib",
+    ]),
 )
