@@ -8,11 +8,12 @@ Set Metadata
 This filters adds or updates dynamic metadata with static data.
 
 Dynamic metadata values are updated with the following scheme. If a key
-does not exists, it's just copied into the current metadata. Otherwise:
+does not exists, it's just copied into the current metadata. If the key exists
+but has a different type, it is replaced by the new value. Otherwise:
 
- * scalar values (null, string, number, boolean) are replaced with the new value
- * list: new values are added to the current list
- * structure: recursively apply this scheme
+ * for scalar values (null, string, number, boolean) are replaced with the new value
+ * for lists: new values are added to the current list
+ * for structures: recursively apply this scheme
 
 For instance, if the namespace already contains this structure:
 
@@ -20,6 +21,7 @@ For instance, if the namespace already contains this structure:
 
    myint: 1
    mylist: ["a"]
+   mykey: ["val"]
    mytags:
      tag0: 1
 
@@ -29,6 +31,7 @@ and the value to set is:
 
    myint: 2
    mylist: ["b","c"]
+   mykey: 1
    mytags:
      tag1: 1
 
@@ -38,6 +41,7 @@ After applying this filter, the namespace will contain:
 
    myint: 2
    mylist: ["a","b","c"]
+   mykey: 1
    mytags:
      tag0: 1
      tag1: 1

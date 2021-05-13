@@ -15,40 +15,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
-namespace {
-
-void pbStructUpdate(ProtobufWkt::Struct& obj, ProtobufWkt::Struct const& with) {
-  auto& obj_fields = *obj.mutable_fields();
-
-  for (auto const& [key, val] : with.fields()) {
-    auto& obj_key = obj_fields[key];
-    switch (val.kind_case()) {
-    // For scalars, the last one wins.
-    case ProtobufWkt::Value::kNullValue:
-    case ProtobufWkt::Value::kNumberValue:
-    case ProtobufWkt::Value::kStringValue:
-    case ProtobufWkt::Value::kBoolValue:
-      obj_key = val;
-      break;
-    // If we got a structure, recursively update.
-    case ProtobufWkt::Value::kStructValue:
-      pbStructUpdate(*obj_key.mutable_struct_value(), val.struct_value());
-      break;
-    // For lists, append the new values.
-    case ProtobufWkt::Value::kListValue: {
-      auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
-      auto& vals = val.list_value().values();
-      obj_key_vec.MergeFrom(vals);
-      break;
-    }
-    case ProtobufWkt::Value::KIND_NOT_SET:
-      break;
-    }
-  }
-}
-
-} // namespace
-
 Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config) {
   namespace_ = proto_config.metadata_namespace();
   value_ = proto_config.value();
@@ -64,7 +30,7 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
   ProtobufWkt::Struct& org_fields = metadata[metadata_namespace];
   ProtobufWkt::Struct const& to_merge = config_->value();
 
-  pbStructUpdate(org_fields, to_merge);
+  StructUtil::update(org_fields, to_merge);
 
   return Http::FilterHeadersStatus::Continue;
 }
