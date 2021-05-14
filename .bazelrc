@@ -237,6 +237,10 @@ build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
+build:remote-tsan --config=remote
+build:remote-tsan --config=rbe-toolchain-clang-libc++
+build:remote-tsan --config=rbe-toolchain-tsan
+
 build:remote-msvc-cl --config=remote-windows
 build:remote-msvc-cl --config=msvc-cl
 build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
@@ -264,6 +268,10 @@ build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=rbe-toolchain-gcc
+
+build:docker-asan --config=docker-sandbox
+build:docker-asan --config=rbe-toolchain-clang-libc++
+build:docker-asan --config=rbe-toolchain-asan
 
 build:docker-msan --config=docker-sandbox
 build:docker-msan --config=rbe-toolchain-clang-libc++
