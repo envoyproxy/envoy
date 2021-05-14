@@ -1,6 +1,7 @@
 # 1. Fix linking with unbundled toolchain on macOS.
 # 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix building and linking with MSAN.
+# TODO(PiotrSikora): remove when not needed anymore (most likely in v9.2 branch):
 # 4. Fix "thread_in_wasm flag was not set" crash in debug builds (https://chromium-review.googlesource.com/c/v8/v8/+/2817598, https://chromium-review.googlesource.com/c/v8/v8/+/2867468).
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
