@@ -232,7 +232,7 @@ message CommonResponse {
     CONTINUE = 0;
 
     // Apply the specified header mutation, replace the body with the body
-    // specified in the body mutation, (if present) and do not send any
+    // specified in the body mutation (if present), and do not send any
     // further messages for this request or response even if the processing
     // mode is configured to do so.
     //
