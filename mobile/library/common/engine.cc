@@ -78,6 +78,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
     postinit_callback_handler_ = main_common->server()->lifecycleNotifier().registerCallback(
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
+          ASSERT(Thread::MainThread::isMainThread());
           client_scope_ = server_->serverFactoryContext().scope().createScope("pulse.");
           // StatNameSet is lock-free, the benefit of using it is being able to create StatsName
           // on-the-fly without risking contention on system with lots of threads.
