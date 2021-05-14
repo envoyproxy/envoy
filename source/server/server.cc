@@ -89,7 +89,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      hooks_(hooks), server_contexts_(*this) {
+      hooks_(hooks), server_contexts_(*this), stats_flush_in_progress_(false) {
   TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
       TRY_ASSERT_MAIN_THREAD {
@@ -206,6 +206,13 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, S
 }
 
 void InstanceImpl::flushStats() {
+  if (stats_flush_in_progress_) {
+    ENVOY_LOG(debug, "skipping stats flush as flush is already in progress");
+    server_stats_->dropped_stat_flushes_.inc();
+    return;
+  }
+
+  stats_flush_in_progress_ = true;
   ENVOY_LOG(debug, "flushing stats");
   // If Envoy is not fully initialized, workers will not be started and mergeHistograms
   // completion callback is not called immediately. As a result of this server stats will
@@ -256,6 +263,8 @@ void InstanceImpl::flushStatsInternal() {
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
   }
+
+  stats_flush_in_progress_ = false;
 }
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
