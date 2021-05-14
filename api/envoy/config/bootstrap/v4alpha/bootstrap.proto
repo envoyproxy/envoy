@@ -222,16 +222,11 @@ message Bootstrap {
   // :ref:`stats sinks <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 
-  // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
-  // :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
-  // specified.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 20;
-
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  // This may be overridden on a per-cluster basis in cds_config,
+  // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolvers>` and
+  // :ref:`dns_resolver_options <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolver_options>`
+  // are specified.
   core.v4alpha.DnsResolverOptions dns_resolver_options = 30;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
