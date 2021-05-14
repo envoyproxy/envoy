@@ -31,7 +31,7 @@ Example filter configuration for a globally set bandwidth limiter (e.g.: all vho
     stat_prefix: http_bandwidth_limiter
     enable_mode: DecodeAndEncode
     limit_kbps: 100
-    fill_interval: 40
+    fill_interval: 0.1s
 
 Example filter configuration for a globally disabled bandwidth limiter but enabled for a specific route:
 
@@ -60,7 +60,7 @@ The route specific configuration:
             "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
             enable_mode: DecodeAndEncode
             limit_kbps: 500
-            fill_interval: 100
+            fill_interval: 1s
       - match: { prefix: "/" }
         route: { cluster: default_service }
 
