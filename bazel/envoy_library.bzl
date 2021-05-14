@@ -115,27 +115,10 @@ EXTENSION_STATUS_VALUES = [
 
 def envoy_cc_extension(
         name,
-        security_posture,
-        category = None,
-        # Only set this for internal, undocumented extensions.
-        undocumented = False,
-        status = "stable",
         tags = [],
         extra_visibility = [],
         visibility = EXTENSION_CONFIG_VISIBILITY,
         **kwargs):
-    if not category:
-        fail("Category not set for %s" % name)
-    if type(category) == "string":
-        category = (category,)
-    for cat in category:
-        if cat not in EXTENSION_CATEGORIES:
-            fail("Unknown extension category for %s: %s" %
-                 (name, cat))
-    if security_posture not in EXTENSION_SECURITY_POSTURES:
-        fail("Unknown extension security posture: " + security_posture)
-    if status not in EXTENSION_STATUS_VALUES:
-        fail("Unknown extension status: " + status)
     if "//visibility:public" not in visibility:
         visibility = visibility + extra_visibility
 

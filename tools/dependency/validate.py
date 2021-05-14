@@ -152,7 +152,7 @@ class BuildGraph(object):
     Returns:
       Dictionary items from source/extensions/extensions_build_config.bzl.
     """
-        return extensions_build_config.EXTENSIONS.items()
+        return [(k, v["source"]) for k, v in extensions_build_config.EXTENSIONS.items()]
 
 
 class Validator(object):
