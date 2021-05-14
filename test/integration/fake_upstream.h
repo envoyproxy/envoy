@@ -574,10 +574,6 @@ public:
                const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 
-  // Creates a fake upstream bound to the specified |address|.
-  FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-               const FakeUpstreamConfig& config);
-
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                const FakeUpstreamConfig& config);
@@ -666,6 +662,8 @@ public:
 
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
   const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
+
+  Event::DispatcherPtr& dispatcher() { return dispatcher_; }
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;

@@ -12,6 +12,7 @@
 #include "common/config/xds_resource.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {

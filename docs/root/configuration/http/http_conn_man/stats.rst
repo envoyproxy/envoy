@@ -15,6 +15,7 @@ statistics:
    downstream_cx_http1_total, Counter, Total HTTP/1.1 connections
    downstream_cx_upgrades_total, Counter, Total successfully upgraded connections. These are also counted as total http1/http2 connections.
    downstream_cx_http2_total, Counter, Total HTTP/2 connections
+   downstream_cx_http3_total, Counter, Total HTTP/3 connections
    downstream_cx_destroy, Counter, Total connections destroyed
    downstream_cx_destroy_remote, Counter, Total connections destroyed due to remote close
    downstream_cx_destroy_local, Counter, Total connections destroyed due to local close
@@ -26,6 +27,7 @@ statistics:
    downstream_cx_http1_active, Gauge, Total active HTTP/1.1 connections
    downstream_cx_upgrades_active, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
+   downstream_cx_http3_active, Gauge, Total active HTTP/3 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_rx_bytes_total, Counter, Total bytes received
@@ -41,6 +43,7 @@ statistics:
    downstream_rq_total, Counter, Total requests
    downstream_rq_http1_total, Counter, Total HTTP/1.1 requests
    downstream_rq_http2_total, Counter, Total HTTP/2 requests
+   downstream_rq_http3_total, Counter, Total HTTP/3 requests
    downstream_rq_active, Gauge, Total active requests
    downstream_rq_response_before_rq_complete, Counter, Total responses sent before the request was complete
    downstream_rq_rx_reset, Counter, Total request resets received
@@ -48,6 +51,7 @@ statistics:
    downstream_rq_non_relative_path, Counter, Total requests with a non-relative HTTP path
    downstream_rq_too_large, Counter, Total requests resulting in a 413 due to buffering an overly large body
    downstream_rq_completed, Counter, Total requests that resulted in a response (e.g. does not include aborted requests)
+   downstream_rq_failed_path_normalization, Counter, Total requests redirected due to different original and normalized URL paths or when path normalization failed. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
    downstream_rq_1xx, Counter, Total 1xx responses
    downstream_rq_2xx, Counter, Total 2xx responses
    downstream_rq_3xx, Counter, Total 3xx responses
@@ -59,6 +63,7 @@ statistics:
    downstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
    downstream_rq_timeout, Counter, Total requests closed due to a timeout on the request path
    downstream_rq_overload_close, Counter, Total requests closed due to Envoy overload
+   downstream_rq_redirected_with_normalized_path, Counter, Total requests redirected due to different original and normalized URL paths. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
    rs_too_large, Counter, Total response errors due to buffering an overly large body
 
 Per user agent statistics
@@ -150,8 +155,8 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
 
 .. attention::
 
-  The HTTP/2 ``streams_active`` gauge may be greater than the HTTP connection manager
-  ``downstream_rq_active`` gauge due to differences in stream accounting between the codec and the
+  The HTTP/2 `streams_active` gauge may be greater than the HTTP connection manager
+  `downstream_rq_active` gauge due to differences in stream accounting between the codec and the
   HTTP connection manager.
 
 Tracing statistics

@@ -24,15 +24,15 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // .. attention::
 //
 //   Use of this message type has been deprecated in favor of direct use of
-//   :ref:`Tracing.Http <envoy_api_msg_config.trace.v4alpha.Tracing.Http>`.
+//   :ref:`Tracing.Http <envoy_v3_api_msg_config.trace.v3.Tracing.Http>`.
 message Tracing {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v3.Tracing";
 
   // Configuration for an HTTP tracer provider used by Envoy.
   //
   // The configuration is defined by the
-  // :ref:`HttpConnectionManager.Tracing <envoy_api_msg_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.Tracing>`
-  // :ref:`provider <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.Tracing.provider>`
+  // :ref:`HttpConnectionManager.Tracing <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing>`
+  // :ref:`provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`
   // field.
   message Http {
     option (udpa.annotations.versioning).previous_message_type =

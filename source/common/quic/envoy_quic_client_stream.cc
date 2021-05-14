@@ -40,7 +40,8 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options) {
-  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+  ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
+         "Send buffer limit should be larger than 8KB.");
 }
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(

@@ -1276,6 +1276,49 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnly) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, verify that the "clear_route_cache_ flag makes the appropriate
+// callback on the filter.
+TEST_F(HttpFilterTest, ClearRouteCache) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_, "GET");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("foo");
+  Buffer::OwnedImpl buffered_response_data;
+  setUpEncodingBuffering(buffered_response_data);
+
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+
+  EXPECT_CALL(encoder_callbacks_, clearRouteCache());
+  processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 // Using the default configuration, test the filter with a processor that
 // replies to the request_headers message incorrectly by sending a
 // request_body message, which should result in the stream being closed
