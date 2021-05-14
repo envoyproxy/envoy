@@ -49,7 +49,7 @@ check_trailing_whitespace () {
 # TODO(phlax): add hash/diff only filter for faster change linting
 #      this would also make it feasible to add as a commit/push hook
 find_text_files () {
-    git grep --cached -Il '' | grep -vE "$NOLINT_RE"
+    git diff --cached --name-only --diff-filter=ACRMTU main | grep -vE "$NOLINT_RE"
 }
 
 # Recurse text files linting language-independent checks
