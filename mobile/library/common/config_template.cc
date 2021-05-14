@@ -173,20 +173,11 @@ static_resources:
     circuit_breakers: &circuit_breakers_settings
       thresholds:
         - priority: DEFAULT
-          # n.b: with mobile clients there are scenarios where all concurrent requests might be
-          # retries (e.g., when the phone goes offline). Therefore, Envoy Mobile allows for the same
-          # amount of concurrency for retries as the default value for concurrency for requests.
-          # This configuration uses the default for max concurrent requests (1024) because there is
-          # no reasonable scenario where a mobile client should have even close to that many concurrent
-          # requests.
-          #
-          # `max_retries` could be used but maintainers advised against it, as there are plans to
-          # deprecate that setting.
-          # https://github.com/lyft/envoy-mobile/pull/811#issuecomment-619169529.
+          # Don't impose limits on concurrent retries.
           retry_budget:
             budget_percent:
               value: 100
-            min_retry_concurrency: 1024
+            min_retry_concurrency: 0xffffffff # uint32 max
   - name: base_wlan
     connect_timeout: {{ connect_timeout_seconds }}s
     lb_policy: CLUSTER_PROVIDED
@@ -341,5 +332,5 @@ layered_runtime:
     - name: static_layer_0
       static_layer:
         overload:
-          global_downstream_max_connections: 50000
+          global_downstream_max_connections: 0xffffffff # uint32 max
 )";
