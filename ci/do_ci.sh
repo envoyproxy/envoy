@@ -224,8 +224,8 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   echo "Testing ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
 
-  echo "bazel release build with gcc..."
-  bazel_binary_build release
+  echo "bazel debug binary with gcc..."
+  bazel_binary_build debug
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
