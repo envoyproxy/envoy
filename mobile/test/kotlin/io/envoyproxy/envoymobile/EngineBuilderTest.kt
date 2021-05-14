@@ -71,6 +71,16 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `specifying stream idle timeout overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addStreamIdleTimeoutSeconds(1234)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.streamIdleTimeoutSeconds).isEqualTo(1234)
+  }
+
+  @Test
   fun `specifying app version overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

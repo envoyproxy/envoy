@@ -19,6 +19,7 @@ public class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var statsFlushSeconds: UInt32 = 60
+  private var streamIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
   private var virtualClusters: String = "[]"
@@ -111,6 +112,17 @@ public class EngineBuilder: NSObject {
   @discardableResult
   public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> Self {
     self.statsFlushSeconds = statsFlushSeconds
+    return self
+  }
+
+  /// Add a custom idle timeout for HTTP streams. Defaults to 15 seconds.
+  ///
+  /// - parameter streamIdleSeconds: Idle timeout for HTTP streams.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addStreamIdleTimeoutSeconds(_ streamIdleTimeoutSeconds: UInt32) -> Self {
+    self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds
     return self
   }
 
@@ -222,6 +234,7 @@ public class EngineBuilder: NSObject {
       dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
       dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
       statsFlushSeconds: self.statsFlushSeconds,
+      streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
       appVersion: self.appVersion,
       appId: self.appId,
       virtualClusters: self.virtualClusters,
