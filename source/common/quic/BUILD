@@ -453,3 +453,12 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quic_core_session_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "envoy_quic_crypto_stream_factory_lib",
+    hdrs = ["envoy_quic_crypto_stream_factory.h"],
+    deps = [
+ "//include/envoy/config:typed_config_interface",
+ "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+        ],
+    )

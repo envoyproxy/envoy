@@ -295,3 +295,15 @@ envoy_cc_test_library(
         "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "envoy_quic_no_handshake_crypto_server_stream_lib",
+    srcs = ["envoy_quic_no_handshake_crypto_server_stream.cc"],
+    hdrs = ["envoy_quic_no_handshake_crypto_server_stream.h"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
+        "@com_googlesource_quiche//:quic_core_crypto_encryption_lib",
+        "@com_googlesource_quiche//:quic_core_session_lib",
+    ],
+)
