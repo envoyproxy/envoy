@@ -8,7 +8,6 @@
 #include "common/common/assert.h"
 
 #include "extensions/transport_sockets/tls/ssl_socket.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -135,9 +134,7 @@ class QuicTransportSocketConfigFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   // Server::Configuration::TransportSocketConfigFactory
-  std::string name() const override {
-    return Extensions::TransportSockets::TransportSocketNames::get().Quic;
-  }
+  std::string name() const override { return "envoy.transport_sockets.quic"; }
 };
 
 class QuicServerTransportSocketConfigFactory
