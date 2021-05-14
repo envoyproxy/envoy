@@ -5,13 +5,15 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/trace_driver.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
+#include "common/tracing/common_values.h"
+#include "common/tracing/null_span_impl.h"
 #include "common/upstream/cluster_update_tracker.h"
 
 #include "extensions/tracers/zipkin/span_buffer.h"
