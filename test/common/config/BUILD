@@ -75,9 +75,9 @@ envoy_cc_test(
     srcs = ["delta_subscription_state_test.cc"],
     deps = [
         "//source/common/config:delta_subscription_state_lib",
-        "//source/common/config/unified_mux:delta_subscription_state_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:new_grpc_mux_lib",
+        "//source/common/config/unified_mux:delta_subscription_state_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
