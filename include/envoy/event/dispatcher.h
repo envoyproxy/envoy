@@ -117,7 +117,7 @@ public:
   virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
 
   /**
-   * Whether there are no tracked objects registered
+   * Whether the tracked object stack is empty.
    */
   virtual bool trackedObjectStackIsEmpty() const PURE;
 

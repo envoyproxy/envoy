@@ -9,8 +9,9 @@ namespace Envoy {
 
 // Encapsulates zero or more ScopeTrackedObjects.
 //
-// This is currently used to restore the underlying request context if the
-// filter continues processing a request due to a callback that it had posted.
+// This is currently used to restore the underlying request context if a
+// filter continues processing a request or response due to being invoked directly from an
+// asynchronous callback.
 class ScopeTrackedObjectStack : public ScopeTrackedObject {
 public:
   ScopeTrackedObjectStack() = default;
