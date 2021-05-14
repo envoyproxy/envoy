@@ -16,7 +16,7 @@ The semantics of listener updates are as follows:
   references an :ref:`RDS <config_http_conn_man_rds>` configuration, that configuration will be
   resolved and fetched before the listener is moved to "active."
 * Listeners are effectively constant once created. Thus, when a listener is updated, an entirely
-  new listener is created (with the same listen socket). This listener goes through the same
+  new listener is created (if the listener's address is unchanged, the new one uses the same listen socket). This listener goes through the same
   warming process described above for a newly added listener.
 * When a listener is removed, the old listener will be placed into a "draining" state
   much like when the entire server is drained for restart. Connections owned by the listener will

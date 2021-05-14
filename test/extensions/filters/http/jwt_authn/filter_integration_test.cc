@@ -226,7 +226,7 @@ TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// This test verifies JwtRequirement specified from filer state rules
+// This test verifies JwtRequirement specified from filter state rules
 TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   // A config with metadata rules.
   const std::string auth_filter_conf = R"(

@@ -2,8 +2,6 @@
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -15,7 +13,7 @@ namespace Tap {
  */
 class TapSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  std::string name() const override { return TransportSocketNames::get().Tap; }
+  std::string name() const override { return "envoy.transport_sockets.tap"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 

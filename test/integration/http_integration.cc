@@ -327,8 +327,8 @@ void HttpIntegrationTest::initialize() {
 #ifdef ENVOY_ENABLE_QUIC
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
-  quic_transport_socket_factory_ =
-      IntegrationUtil::createQuicUpstreamTransportSocketFactory(*api_, stats_store_, san_to_match_);
+  quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
+      *api_, stats_store_, context_manager_, san_to_match_);
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
@@ -341,7 +341,7 @@ void HttpIntegrationTest::initialize() {
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
   auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, stats_store_, timeSystem(), server_addr);
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
