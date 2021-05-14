@@ -1,9 +1,8 @@
 #pragma once
 
-#include "envoy/network/filter.h"
-
 #include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.h"
 #include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.validate.h"
+#include "envoy/network/filter.h"
 
 namespace Envoy {
 namespace Extensions {

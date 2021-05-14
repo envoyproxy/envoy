@@ -1,7 +1,8 @@
 #include "extensions/filters/listener/original_dst/config_factory.h"
 
-#include "extensions/filters/listener/original_dst/original_dst.h"
 #include "envoy/registry/registry.h"
+
+#include "extensions/filters/listener/original_dst/original_dst.h"
 
 namespace Envoy {
 namespace Extensions {

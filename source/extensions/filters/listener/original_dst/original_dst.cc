@@ -12,7 +12,8 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
 
-Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(Network::Socket& socket) {
+Network::Address::InstanceConstSharedPtr
+OriginalDstFilter::getOriginalDst(Network::Socket& socket) {
   if (config_.method_ != 0) {
     ASSERT(socket.addressProvider().localAddress() != nullptr &&
            socket.addressProvider().localAddress()->type() == Network::Address::Type::Ip);

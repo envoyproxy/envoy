@@ -1,8 +1,8 @@
 #pragma once
 
-#include "extensions/filters/listener/original_dst/config.h"
-
 #include "envoy/server/filter_config.h"
+
+#include "extensions/filters/listener/original_dst/config.h"
 #include "extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
