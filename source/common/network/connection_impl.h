@@ -122,6 +122,7 @@ public:
   // Reconsider how to make fairness happen.
   void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
+  TransportSocketPtr& transportSocket() { return transport_socket_; }
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }

@@ -12,8 +12,6 @@
 #include "common/network/utility.h"
 #include "common/stats/timespan_impl.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -198,8 +196,7 @@ void ActiveTcpSocket::newConnection() {
   } else {
     // Set default transport protocol if none of the listener filters did it.
     if (socket_->detectedTransportProtocol().empty()) {
-      socket_->setDetectedTransportProtocol(
-          Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
+      socket_->setDetectedTransportProtocol("raw_buffer");
     }
     // TODO(lambdai): add integration test
     // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925

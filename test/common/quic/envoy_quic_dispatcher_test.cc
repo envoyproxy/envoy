@@ -33,7 +33,6 @@
 #include "test/common/quic/test_utils.h"
 #include "common/quic/envoy_quic_alarm_factory.h"
 #include "common/quic/envoy_quic_utils.h"
-#include "extensions/transport_sockets/well_known_names.h"
 #include "server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

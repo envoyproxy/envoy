@@ -549,6 +549,18 @@ TEST(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
+TEST(HttpUtility, TestParseSetCookie) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"set-cookie", "somekey=somevalue; someotherkey=someothervalue"},
+      {"set-cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
+      {"set-cookie", "key2=value2; key3=value3"}};
+
+  std::string key{"token"};
+  std::string value = Utility::parseSetCookieValue(headers, key);
+  EXPECT_EQ(value, "abc123");
+}
+
 TEST(HttpUtility, TestParseCookieBadValues) {
   TestRequestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
                                    {"cookie", "token2=abc123;   "},
@@ -559,6 +571,18 @@ TEST(HttpUtility, TestParseCookieBadValues) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "token2"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token3"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token4"), "abc123");
+}
+
+TEST(HttpUtility, TestParseSetCookieBadValues) {
+  TestRequestHeaderMapImpl headers{{"set-cookie", "token1=abc123; = "},
+                                   {"set-cookie", "token2=abc123;   "},
+                                   {"set-cookie", "; token3=abc123;"},
+                                   {"set-cookie", "=; token4=\"abc123\""}};
+
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token1"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token2"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token3"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token4"), "abc123");
 }
 
 TEST(HttpUtility, TestParseCookieWithQuotes) {
@@ -572,6 +596,19 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "dquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "quoteddquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, TestParseSetCookieWithQuotes) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"set-cookie", "dquote=\"; quoteddquote=\"\"\""},
+      {"set-cookie", "leadingdquote=\"foobar;"},
+      {"set-cookie", "abc=def; token=\"abc123\"; Expires=Wed, 09 Jun 2021 10:18:14 GMT"}};
+
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "dquote"), "\"");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "quoteddquote"), "\"");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
 TEST(HttpUtility, TestMakeSetCookieValue) {

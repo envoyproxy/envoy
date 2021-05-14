@@ -663,6 +663,8 @@ public:
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
   const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
 
+  Event::DispatcherPtr& dispatcher() { return dispatcher_; }
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
