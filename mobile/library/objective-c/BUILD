@@ -40,6 +40,7 @@ objc_library(
 objc_library(
     name = "envoy_objc_bridge_lib",
     hdrs = ["EnvoyBridgeUtility.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//library/common/types:c_types_lib",
     ],
