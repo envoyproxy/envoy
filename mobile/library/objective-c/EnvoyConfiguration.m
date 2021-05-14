@@ -10,6 +10,7 @@
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                   statsFlushSeconds:(UInt32)statsFlushSeconds
+           streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
                     virtualClusters:(NSString *)virtualClusters
@@ -30,6 +31,7 @@
   self.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
   self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
   self.statsFlushSeconds = statsFlushSeconds;
+  self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
   self.virtualClusters = virtualClusters;
@@ -94,6 +96,8 @@
         [NSString stringWithFormat:@"%lu", (unsigned long)self.dnsFailureRefreshSecondsMax],
     @"stats_flush_interval_seconds" :
         [NSString stringWithFormat:@"%lu", (unsigned long)self.statsFlushSeconds],
+    @"stream_idle_timeout_seconds" :
+        [NSString stringWithFormat:@"%lu", (unsigned long)self.streamIdleTimeoutSeconds],
     @"device_os" : @"iOS",
     @"app_version" : self.appVersion,
     @"app_id" : self.appId,

@@ -259,6 +259,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
+@property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
 @property (nonatomic, strong) NSString *virtualClusters;
@@ -277,6 +278,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                   statsFlushSeconds:(UInt32)statsFlushSeconds
+           streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
                     virtualClusters:(NSString *)virtualClusters

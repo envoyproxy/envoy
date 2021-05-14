@@ -29,6 +29,7 @@ open class EngineBuilder(
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
   private var statsFlushSeconds = 60
+  private var streamIdleTimeoutSeconds = 15
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var virtualClusters = "[]"
@@ -108,6 +109,18 @@ open class EngineBuilder(
    */
   fun addStatsFlushSeconds(statsFlushSeconds: Int): EngineBuilder {
     this.statsFlushSeconds = statsFlushSeconds
+    return this
+  }
+
+  /**
+   * Add a custom idle timeout for HTTP streams. Defaults to 15 seconds.
+   *
+   * @param streamIdleTimeoutSeconds idle timeout for HTTP streams.
+   *
+   * @return this builder.
+   */
+  fun addStreamIdleTimeoutSeconds(streamIdleTimeoutSeconds: Int): EngineBuilder {
+    this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds
     return this
   }
 
@@ -228,8 +241,8 @@ open class EngineBuilder(
           EnvoyConfiguration(
             statsDomain, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            statsFlushSeconds, appVersion, appId, virtualClusters, nativeFilterChain,
-            platformFilterChain, stringAccessors
+            statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId, virtualClusters,
+            nativeFilterChain, platformFilterChain, stringAccessors
           ),
           configuration.yaml,
           logLevel
@@ -241,8 +254,8 @@ open class EngineBuilder(
           EnvoyConfiguration(
             statsDomain, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            statsFlushSeconds, appVersion, appId, virtualClusters, nativeFilterChain,
-            platformFilterChain, stringAccessors
+            statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId, virtualClusters,
+            nativeFilterChain, platformFilterChain, stringAccessors
           ),
           logLevel
         )
