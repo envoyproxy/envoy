@@ -22,7 +22,8 @@ protected:
     envoy::extensions::http::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
     config.set_header_name("x-real-ip");
     config.set_allow_extension_to_set_address_as_trusted(true);
-    config.set_reject_with_status(code);
+    auto* reject_with_status = config.mutable_reject_with_status();
+    reject_with_status->set_code(code);
     custom_header_extension_ = std::make_shared<CustomHeaderIPDetection>(config);
   }
 
