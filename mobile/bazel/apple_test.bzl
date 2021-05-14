@@ -1,5 +1,6 @@
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 
 # Macro providing a way to easily/consistently define Swift unit test targets.
 #
@@ -8,7 +9,7 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 # - Sets default visibility and OS requirements
 #
 # Usage example:
-# load("@envoy_mobile//bazel:swift_test.bzl", "envoy_mobile_swift_test")
+# load("@envoy_mobile//bazel:apple_test.bzl", "envoy_mobile_swift_test")
 #
 # envoy_mobile_swift_test(
 #     name = "sample_test",
@@ -27,6 +28,23 @@ def envoy_mobile_swift_test(name, srcs, data = [], deps = []):
             "//library/swift:ios_framework_archive",
         ] + deps,
         linkopts = ["-lresolv.9"],
+        visibility = ["//visibility:private"],
+    )
+
+    ios_unit_test(
+        name = name,
+        data = data,
+        deps = [test_lib_name],
+        minimum_os_version = "11.0",
+    )
+
+def envoy_mobile_objc_test(name, srcs, data = [], deps = []):
+    test_lib_name = name + "_lib"
+    objc_library(
+        name = test_lib_name,
+        srcs = srcs,
+        data = data,
+        deps = deps,
         visibility = ["//visibility:private"],
     )
 
