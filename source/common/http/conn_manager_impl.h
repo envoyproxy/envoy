@@ -408,6 +408,7 @@ private:
 
   void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
                        absl::string_view details);
+  void createStartDrainTimer(std::chrono::milliseconds drain_delay);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
   void onDrainTimeout();

@@ -2266,6 +2266,53 @@ TEST_F(HttpConnectionManagerImplTest, SendGoAwayOnDrainBegin) {
   Mock::VerifyAndClearExpectations(codec_);
 }
 
+TEST_F(HttpConnectionManagerImplTest, DrainCloseFireAfterTimeoutDrainBegin) {
+  codec_->protocol_ = Protocol::Http2;
+  EXPECT_CALL(*codec_, shutdownNotice);
+
+  idle_timeout_ = (std::chrono::milliseconds(10));
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
+  setup(false, "", true, false, true);
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter, decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+
+  startRequest(true, "hello");
+
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  idle_timer->invokeCallback();
+
+  // Draining has already begun so invoke the begin-drain-timer callback, should be a no-op and not
+  // cause assertion failures within the connection manager.
+  drain_begin_timer_->invokeCallback();
+  EXPECT_CALL(*drain_begin_timer_, disableTimer());
+
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
   setup(false, "envoy-custom-server", false);
   setUpEncoderAndDecoder(true, true);
