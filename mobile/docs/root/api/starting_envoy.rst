@@ -135,6 +135,23 @@ Specify the rate at which Envoy Mobile should flush its queued stats.
   // Swift
   builder.addStatsFlushSeconds(5)
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addStreamIdleTimeoutSeconds``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specifies the length of time a stream should wait without a headers or data event before timing out.
+Defaults to 15 seconds.
+See `the Envoy docs <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-idle-timeout>`_
+for further information.
+
+**Example**::
+
+  // Kotlin
+  builder.addStreamIdleTimeoutSeconds(5L)
+
+  // Swift
+  builder.addStreamIdleTimeoutSeconds(5)
+
 ~~~~~~~~~~~~~~~~~
 ``addAppVersion``
 ~~~~~~~~~~~~~~~~~
