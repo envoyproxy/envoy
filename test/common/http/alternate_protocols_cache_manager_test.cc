@@ -56,14 +56,9 @@ TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForDifferentOptions) {
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForConflictingOptions) {
   AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_);
   options2_.set_name(options1_.name());
-  try {
-    AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(options2_);
-    FAIL();
-  } catch (const EnvoyException& e) {
-    EXPECT_THAT(e.what(),
-                testing::HasSubstr(
-                    "options specified alternate protocols cache 'name1' with different settings"));
-  }
+  EXPECT_THROW_WITH_REGEX(
+      manager_->getCache(options2_),
+      EnvoyException, "options specified alternate protocols cache 'name1' with different settings.*");
 }
 
 } // namespace

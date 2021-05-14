@@ -39,7 +39,7 @@ sent to the mixed pool, and whichever succeeds first will be passed back up to t
 
 ### Required configuration
 
-Specific Envoy configuration is required in order to enable the previous. components
+Specific Envoy configuration is required in order to enable the previously described components.
 
 #### Auto Cluster Pool
 

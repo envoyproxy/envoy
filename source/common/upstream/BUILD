@@ -56,7 +56,6 @@ envoy_cc_library(
         ":subset_lb_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
-        "@envoy_api//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg_cc_proto",
         "//include/envoy/http:codes_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:dns_interface",
