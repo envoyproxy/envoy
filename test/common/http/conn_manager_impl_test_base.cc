@@ -56,9 +56,9 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
 
   if (setup_drain_timer) {
     // Intercept the on-drain registration and capture drain callback
-    EXPECT_CALL(drain_close_, addOnDrainCloseCb(_))
-        .Times(1)
-        .WillOnce(Invoke([&](Network::DrainDecision::DrainCloseCb cb) -> Common::CallbackHandlePtr {
+    EXPECT_CALL(drain_close_, addOnDrainCloseCb(_, _))
+        .WillOnce(Invoke([&](Event::Dispatcher&,
+                             Network::DrainDecision::DrainCloseCb cb) -> Common::CallbackHandlePtr {
           // for our tests, invoke immediately
           drain_close_func = cb;
           return nullptr;

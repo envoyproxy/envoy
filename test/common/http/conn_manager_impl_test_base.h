@@ -46,7 +46,7 @@ public:
   ~HttpConnectionManagerImplTest() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
   void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false,
-             bool setup_drain_timer = true);
+             bool setup_drain_timer = false);
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1);
   void setUpBufferLimits();
 

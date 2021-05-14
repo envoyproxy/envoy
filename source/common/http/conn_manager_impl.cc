@@ -147,6 +147,10 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   start_drain_cb_ = drain_close_.addOnDrainCloseCb(
       read_callbacks_->connection().dispatcher(),
       [this](std::chrono::milliseconds drain_delay) -> void {
+        // de-register callback since we only want this to fire once
+        start_drain_cb_.reset();
+
+        // create timer to _begin_ draining
         if (read_callbacks_) {
           start_drain_timer_ =
               read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
