@@ -42,7 +42,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest());
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
