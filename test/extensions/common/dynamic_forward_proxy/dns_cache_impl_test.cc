@@ -1,4 +1,5 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
 #include "common/config/utility.h"
@@ -768,7 +769,7 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolverConfig) {
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
-TEST(DnsCacheConfigOptionsTest, CustomDnsResolverConfig) {
+TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolverConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -777,7 +778,8 @@ TEST(DnsCacheConfigOptionsTest, CustomDnsResolverConfig) {
   Stats::IsolatedStoreImpl store;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
-  envoy::config::core::v3::Address* dns_resolvers = config.add_dns_resolvers();
+  envoy::config::core::v3::Address* dns_resolvers =
+      config.mutable_dns_resolver()->add_dns_resolvers();
   dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
   dns_resolvers->mutable_socket_address()->set_port_value(8080);
 

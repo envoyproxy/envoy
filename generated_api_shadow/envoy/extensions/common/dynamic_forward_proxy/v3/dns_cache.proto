@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.common.dynamic_forward_proxy.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
-import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -103,12 +103,8 @@ message DnsCacheConfig {
   // server startup. Apple' API only uses UDP for DNS resolution.
   bool use_tcp_for_dns_lookups = 8;
 
-  // If DNS resolvers are specified,
-  // DNS cache will perform DNS resolution via those resolvers.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
-  // If this setting is not specified, the value defaults to the default
-  // resolver, which uses /etc/resolv.conf for configuration.
-  repeated config.core.v3.Address dns_resolvers = 9;
+  // DNS resolver configuration
+  // If specified, DNS cache will perform resolution via the underlying DNS resolvers.
+  // Otherwise, default resolvers from /etc/resolv.conf will be used.
+  config.core.v3.DnsResolver dns_resolver = 9;
 }
