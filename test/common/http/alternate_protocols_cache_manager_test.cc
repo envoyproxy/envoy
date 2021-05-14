@@ -57,8 +57,8 @@ TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForConflictingOptions) {
   AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_);
   options2_.set_name(options1_.name());
   EXPECT_THROW_WITH_REGEX(
-      manager_->getCache(options2_),
-      EnvoyException, "options specified alternate protocols cache 'name1' with different settings.*");
+      manager_->getCache(options2_), EnvoyException,
+      "options specified alternate protocols cache 'name1' with different settings.*");
 }
 
 } // namespace
