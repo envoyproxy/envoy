@@ -866,6 +866,24 @@ TEST_P(ServerInstanceImplTest, ZoneStatNameFromOption) {
             stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
 }
 
+// Validate user agent information from bootstrap Node.
+TEST_P(ServerInstanceImplTest, UserAgentOverrideFromNode) {
+  initialize("test/server/test_data/server/node_bootstrap_agent_override.yaml");
+  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  EXPECT_EQ(9, server_->localInfo().node().user_agent_build_version().major_number());
+  EXPECT_EQ(8, server_->localInfo().node().user_agent_build_version().minor_number());
+  EXPECT_EQ(7, server_->localInfo().node().user_agent_build_version().patch());
+}
+
+// Validate deprecated user agent version field from bootstrap Node.
+TEST_P(ServerInstanceImplTest, UserAgentBuildDeprecatedOverrideFromNode) {
+  initialize("test/server/test_data/server/node_bootstrap_agent_deprecated_override.yaml");
+  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  EXPECT_EQ("test", server_->localInfo().node().user_agent_version());
+}
+
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
 // set.
 TEST_P(ServerInstanceImplTest,
