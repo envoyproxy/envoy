@@ -519,7 +519,7 @@ message HttpConnectionManager {
   uint32 xff_num_trusted_hops = 19
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // The configuration for the original-IP detection extensions.
+  // The configuration for the original IP detection extensions.
   //
   // When configured the extensions will be called along with the request headers
   // and information about the downstream connection, such as the directly connected address.

@@ -31,8 +31,8 @@ message CustomHeaderConfig {
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: true}];
 
   // If set to true, the extension could decide that the detected address should be treated as
-  // trusted by the HCM. If the address is considered trusted, it might be used as input to determine
-  // if the request is internal (among other things).
+  // trusted by the HCM. If the address is considered :ref:`trusted<config_http_conn_man_headers_x-forwarded-for_trusted_client_address>`,
+  // it might be used as input to determine if the request is internal (among other things).
   bool allow_extension_to_set_address_as_trusted = 2;
 
   // If this is set, the request will be rejected when detection fails using it as the HTTP response status.

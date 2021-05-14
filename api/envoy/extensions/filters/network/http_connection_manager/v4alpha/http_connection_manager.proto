@@ -493,7 +493,7 @@ message HttpConnectionManager {
   google.protobuf.BoolValue use_remote_address = 14
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
-  // The configuration for the original-IP detection extensions.
+  // The configuration for the original IP detection extensions.
   //
   // When configured the extensions will be called along with the request headers
   // and information about the downstream connection, such as the directly connected address.
