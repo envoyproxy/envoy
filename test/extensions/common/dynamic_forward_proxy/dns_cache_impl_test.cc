@@ -778,8 +778,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolverConfig) {
   Stats::IsolatedStoreImpl store;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
-  envoy::config::core::v3::Address* dns_resolvers =
-      config.mutable_dns_resolver()->add_dns_resolvers();
+  envoy::config::core::v3::Address* dns_resolvers = config.mutable_dns_resolver()->add_resolvers();
   dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
   dns_resolvers->mutable_socket_address()->set_port_value(8080);
 
