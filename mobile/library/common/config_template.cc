@@ -99,6 +99,7 @@ static_resources:
                     prefix: "/"
                   route:
                     cluster_header: x-envoy-mobile-cluster
+                    timeout: 0s
                     retry_policy:
                       retry_back_off:
                         base_interval: 0.25s
