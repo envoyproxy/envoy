@@ -482,7 +482,10 @@ void ConnectionManagerImpl::doConnectionClose(
 }
 
 void ConnectionManagerImpl::createStartDrainTimer(std::chrono::milliseconds drain_delay) {
-  if (read_callbacks_) {
+  if (!codec_) {
+    stats_.named_.downstream_cx_drain_close_.inc();
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
+  } else if (read_callbacks_) {
     start_drain_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
       if (drain_state_ != DrainState::NotDraining) {
         return;

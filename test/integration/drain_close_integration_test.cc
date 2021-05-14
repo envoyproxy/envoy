@@ -7,12 +7,21 @@ using DrainCloseIntegrationTest = HttpProtocolIntegrationTest;
 
 // Add a health check filter and verify correct behavior when draining.
 TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
-  // The probability of drain close increases over time. With a high timeout,
-  // the probability will be very low, but the rapid retries prevent this from
-  // increasing total test time.
-  drain_time_ = std::chrono::seconds(100);
+  // Graceful draining will spread out drain initiation within the first 1/4 of
+  // the drain window, so the drain time of 20s should mean all draining is
+  // initiated within the first 5s.
+  drain_time_ = std::chrono::seconds(20);
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  // issue one request before we start draining to establish a connection and avoid
+  // racing with proactive draining
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
 
   absl::Notification drain_sequence_started;
   test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
@@ -21,14 +30,12 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   });
   drain_sequence_started.WaitForNotification();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  EXPECT_FALSE(codec_client_->disconnected());
-
-  IntegrationStreamDecoderPtr response;
-  while (!test_server_->counter("http.config_test.downstream_cx_drain_close")->value()) {
+  // Issue at least one more request to ensure we see a connection "close" for HTTP1
+  do {
     response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
-  }
+  } while (!test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_drain_close")->value(), 1L);
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -48,6 +55,15 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  // issue one request before we start draining to establish a connection and avoid
+  // racing with proactive draining
+  IntegrationStreamDecoderPtr response;
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
   absl::Notification drain_sequence_started;
   test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
     test_server_->drainManager().startDrainSequence([] {});
@@ -55,10 +71,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   });
   drain_sequence_started.WaitForNotification();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  EXPECT_FALSE(codec_client_->disconnected());
-
-  IntegrationStreamDecoderPtr response;
+  // Issue one more request to ensure we see a connection "close" for HTTP1
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
 

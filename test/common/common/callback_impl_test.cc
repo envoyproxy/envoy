@@ -88,6 +88,24 @@ TEST_F(CallbackManagerTest, ThreadSafe__All) {
   manager.runCallbacksWith([] { return 5; });
 }
 
+TEST_F(CallbackManagerTest, ThreadSafe__DestroyManagerBeforeHandle) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
+  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
+  ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
+
+  ThreadSafeCallbackHandlePtr handle;
+  {
+    ThreadSafeCallbackManager<int> manager{dispatcher};
+    handle = manager.add(cb_dispatcher, [this](int arg) -> void { called(arg); });
+    EXPECT_CALL(*this, called(5));
+    manager.runCallbacksWith([] { return 5; });
+  }
+  EXPECT_NE(nullptr, handle);
+  // It should be safe to destruct the handle after the manager.
+  handle.reset();
+}
+
 TEST_F(CallbackManagerTest, ThreadSafe__RemoveCallbackAsync) {
   InSequence s;
 

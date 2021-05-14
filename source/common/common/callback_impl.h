@@ -113,11 +113,6 @@ public:
    */
   explicit ThreadSafeCallbackManager(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
 
-  ~ThreadSafeCallbackManager() {
-    // Validate against use-after-free
-    ASSERT(callbacks_.empty());
-  }
-
   /**
    * @brief Add a callback.
 
