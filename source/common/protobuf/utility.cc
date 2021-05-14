@@ -1044,6 +1044,18 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .count()));
 }
 
+absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
+}
+
+std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
+  return "type.googleapis.com/" + std::string(type);
+}
+
 void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
   auto& obj_fields = *obj.mutable_fields();
 
