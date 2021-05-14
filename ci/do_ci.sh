@@ -229,8 +229,9 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
     "--//source/extensions/filters/http/on_demand:enabled=False")
   setup_gcc_toolchain
 
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  # Disable //test/config_test:example_configs_test so it does not fail because of excluded extensions above
+  echo "Testing ${TEST_TARGETS[*]} -//test/config_test:example_configs_test"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}" -//test/config_test:example_configs_test
 
   echo "bazel release build with gcc..."
   bazel_binary_build fastbuild
