@@ -674,7 +674,7 @@ public:
    * @param obj the object to update in-place
    * @param with the object to update \p obj with
    */
-  static void update(ProtobufWkt::Struct& obj, ProtobufWkt::Struct const& with);
+  static void update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with);
 };
 
 } // namespace Envoy

@@ -1044,7 +1044,7 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .count()));
 }
 
-void StructUtil::update(ProtobufWkt::Struct& obj, ProtobufWkt::Struct const& with) {
+void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
   auto& obj_fields = *obj.mutable_fields();
 
   for (auto const& [key, val] : with.fields()) {
