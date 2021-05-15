@@ -18,8 +18,7 @@ namespace BandwidthLimitFilter {
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                            Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
-    : runtime_(runtime), time_source_(time_source),
-      enable_mode_(config.enable_mode()),
+    : runtime_(runtime), time_source_(time_source), enable_mode_(config.enable_mode()),
       limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, limit_kbps, 0)),
       fill_interval_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
           config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))),
