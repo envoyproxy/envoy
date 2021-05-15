@@ -324,20 +324,23 @@ FilterStatus Router::messageEnd() {
 }
 
 void Router::recordRequestSize(uint64_t value) {
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats_opt =
-      cluster_->requestResponseSizeStats();
-  if (req_resp_stats_opt.has_value()) {
-    auto& req_resp_stats = req_resp_stats_opt->get();
+  record([value](Upstream::ClusterRequestResponseSizeStats& req_resp_stats) {
     req_resp_stats.upstream_rq_body_size_.recordValue(value);
-  }
+  });
 }
 
 void Router::recordResponseSize(uint64_t value) {
+  record([value](Upstream::ClusterRequestResponseSizeStats& req_resp_stats) {
+    req_resp_stats.upstream_rs_body_size_.recordValue(value);
+  });
+}
+
+void Router::record(std::function<void(Upstream::ClusterRequestResponseSizeStats&)> callback) {
   Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats_opt =
       cluster_->requestResponseSizeStats();
   if (req_resp_stats_opt.has_value()) {
     auto& req_resp_stats = req_resp_stats_opt->get();
-    req_resp_stats.upstream_rq_body_size_.recordValue(value);
+    callback(req_resp_stats);
   }
 }
 

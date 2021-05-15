@@ -290,6 +290,7 @@ private:
 
   void recordRequestSize(uint64_t value);
   void recordResponseSize(uint64_t value);
+  void record(std::function<void(Upstream::ClusterRequestResponseSizeStats&)> callback);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
