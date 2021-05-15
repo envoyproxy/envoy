@@ -286,7 +286,7 @@ private:
                                                POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
 
-  friend class UpstreamRequest;
+  friend struct UpstreamRequest;
 
   void recordRequestSize(uint64_t value);
   void recordResponseSize(uint64_t value);
