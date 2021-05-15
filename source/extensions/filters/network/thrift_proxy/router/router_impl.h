@@ -286,6 +286,11 @@ private:
                                                POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
 
+  friend class UpstreamRequest;
+
+  void recordRequestSize(uint64_t value);
+  void recordResponseSize(uint64_t value);
+
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
   Stats::StatNameSetPtr stat_name_set_;
