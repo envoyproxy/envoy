@@ -62,11 +62,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.transport_sockets.starttls",
     deps = [
         ":starttls_integration_proto_cc_proto",
-        "//source/extensions/filters/network/tcp_proxy:config",
-        "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/starttls:config",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",
-        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )
