@@ -370,6 +370,7 @@ public:
   virtual ~FakeConnectionBase() {
     absl::MutexLock lock(&lock_);
     ASSERT(initialized_);
+    ASSERT(pending_cbs_ == 0);
   }
 
   ABSL_MUST_USE_RESULT
@@ -395,16 +396,20 @@ public:
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
 
+  void postToConnectionThread(std::function<void()> cb);
+
 protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : shared_connection_(shared_connection), lock_(shared_connection.lock()),
-        time_system_(time_system) {}
+        dispatcher_(shared_connection_.connection().dispatcher()), time_system_(time_system) {}
 
   SharedConnectionWrapper& shared_connection_;
   absl::Mutex& lock_; // TODO(mattklein123): Use the shared connection lock and figure out better
                       // guarded by annotations.
+  Event::Dispatcher& dispatcher_;
   bool initialized_ ABSL_GUARDED_BY(lock_){};
   bool half_closed_ ABSL_GUARDED_BY(lock_){};
+  std::atomic<uint64_t> pending_cbs_{};
   Event::TestTimeSystem& time_system_;
 };
 
