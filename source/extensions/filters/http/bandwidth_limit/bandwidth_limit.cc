@@ -18,7 +18,7 @@ namespace BandwidthLimitFilter {
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                            Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
-    : runtime_(runtime), scope_(scope), time_source_(time_source),
+    : runtime_(runtime), time_source_(time_source),
       enable_mode_(config.enable_mode()),
       limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, limit_kbps, 0)),
       fill_interval_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
@@ -167,16 +167,16 @@ void BandwidthLimiter::updateStatsOnDecodeFinish() {
   if (decode_latency_) {
     decode_latency_->complete();
     decode_latency_.reset();
+    getConfig()->stats().decode_pending_.dec();
   }
-  getConfig()->stats().decode_pending_.dec();
 }
 
 void BandwidthLimiter::updateStatsOnEncodeFinish() {
   if (encode_latency_) {
     encode_latency_->complete();
     encode_latency_.reset();
+    getConfig()->stats().encode_pending_.dec();
   }
-  getConfig()->stats().encode_pending_.dec();
 }
 
 const FilterConfig* BandwidthLimiter::getConfig() const {

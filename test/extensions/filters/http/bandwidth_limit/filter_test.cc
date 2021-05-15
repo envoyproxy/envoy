@@ -82,7 +82,7 @@ TEST_F(FilterTest, Disabled) {
   EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.encode_enabled"));
 }
 
-TEST_F(FilterTest, BandwidthLimitOnDecode) {
+TEST_F(FilterTest, LimitOnDecode) {
   const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
@@ -181,7 +181,7 @@ TEST_F(FilterTest, BandwidthLimitOnDecode) {
   filter_->onDestroy();
 }
 
-TEST_F(FilterTest, BandwidthLimitOnEncode) {
+TEST_F(FilterTest, LimitOnEncode) {
   const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
@@ -282,7 +282,7 @@ TEST_F(FilterTest, BandwidthLimitOnEncode) {
   filter_->onDestroy();
 }
 
-TEST_F(FilterTest, BandwidthLimitOnDecodeAndEncode) {
+TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   const std::string config_yaml = R"(
   stat_prefix: test
   runtime_enabled:
@@ -408,6 +408,148 @@ TEST_F(FilterTest, BandwidthLimitOnDecodeAndEncode) {
   decode_timer->invokeCallback();
 
   filter_->onDestroy();
+}
+
+TEST_F(FilterTest, WithTrailers) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+  enable_mode: DecodeAndEncode
+  limit_kbps: 1
+  )";
+  setup(fmt::format(config_yaml, "1"));
+
+  ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1050));
+  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  Event::MockTimer* decode_timer =
+      new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+  Event::MockTimer* encode_timer =
+      new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
+
+  EXPECT_EQ(1UL, config_->limit());
+  EXPECT_EQ(50UL, config_->fillInterval().count());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  Http::MetadataMap metadata_map;
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl dec_data(std::string(102, 'd'));
+  Buffer::OwnedImpl enc_data(std::string(56, 'e'));
+
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.encode_pending"));
+  EXPECT_CALL(*decode_timer, enableTimer(std::chrono::milliseconds(0), _));
+  EXPECT_CALL(*encode_timer, enableTimer(std::chrono::milliseconds(0), _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(dec_data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(enc_data, false));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.encode_pending"));
+
+  EXPECT_CALL(*decode_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'd')), false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  decode_timer->invokeCallback();
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.decode_pending"));
+
+  // Fire timer, also advance time by 1 unit.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'd')), false));
+  decode_timer->invokeCallback();
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.decode_pending"));
+
+  // Fire timer, also advance time by 1 unit.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(*encode_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'e')), false));
+  encode_timer->invokeCallback();
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.encode_pending"));
+
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(5, 'e')), false));
+  encode_timer->invokeCallback();
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.encode_pending"));
+}
+
+TEST_F(FilterTest, WithTrailersNoEndStream) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+  enable_mode: DecodeAndEncode
+  limit_kbps: 1
+  )";
+  setup(fmt::format(config_yaml, "1"));
+
+  ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1050));
+  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  Event::MockTimer* decode_timer =
+      new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+  Event::MockTimer* encode_timer =
+      new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
+
+  EXPECT_EQ(1UL, config_->limit());
+  EXPECT_EQ(50UL, config_->fillInterval().count());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  Http::MetadataMap metadata_map;
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl dec_data(std::string(102, 'd'));
+  Buffer::OwnedImpl enc_data(std::string(56, 'e'));
+
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.encode_pending"));
+  EXPECT_CALL(*decode_timer, enableTimer(std::chrono::milliseconds(0), _));
+  EXPECT_CALL(*encode_timer, enableTimer(std::chrono::milliseconds(0), _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(dec_data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(enc_data, false));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.encode_pending"));
+
+  EXPECT_CALL(*decode_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'd')), false));
+  decode_timer->invokeCallback();
+
+  // Fire timer, also advance time by 1 unit.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'd')), false));
+  decode_timer->invokeCallback();
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.decode_pending"));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.decode_pending"));
+
+  // Fire timer, also advance time by 1 unit.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(*encode_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'e')), false));
+  encode_timer->invokeCallback();
+
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(5, 'e')), false));
+  encode_timer->invokeCallback();
+  EXPECT_EQ(1, findGauge("test.http_bandwidth_limit.encode_pending"));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.encode_pending"));
 }
 
 } // namespace BandwidthLimitFilter

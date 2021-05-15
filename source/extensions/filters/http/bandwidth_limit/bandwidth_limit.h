@@ -65,13 +65,11 @@ public:
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
   BandwidthLimitStats& stats() const { return stats_; }
-  Stats::Scope& scope() { return scope_; }
   TimeSource& timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
   uint64_t limit() const { return limit_kbps_; }
   bool enabled() const { return enabled_.enabled(); }
   EnableMode enableMode() const { return enable_mode_; };
-  std::shared_ptr<SharedTokenBucketImpl> tokenBucket() { return token_bucket_; }
   const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const { return token_bucket_; }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
@@ -81,7 +79,6 @@ private:
   static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   Runtime::Loader& runtime_;
-  Stats::Scope& scope_;
   TimeSource& time_source_;
   const EnableMode enable_mode_;
   const uint64_t limit_kbps_;
