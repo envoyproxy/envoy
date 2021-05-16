@@ -14,6 +14,7 @@
 
 #include "extensions/request_id/uuid/config.h"
 
+#include "test/common/http/ip_detection_extensions.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -108,9 +109,18 @@ public:
     ON_CALL(config_, pathWithEscapedSlashesAction())
         .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
                                   HttpConnectionManager::KEEP_UNCHANGED));
+
+    detection_extensions_.push_back(getXFFExtension(0));
+    ON_CALL(config_, originalIpDetectionExtensions())
+        .WillByDefault(ReturnRef(detection_extensions_));
   }
 
   struct MutateRequestRet {
+    MutateRequestRet() = default;
+    MutateRequestRet(const std::string& downstream_address, bool internal,
+                     Tracing::Reason trace_reason)
+        : downstream_address_(downstream_address), internal_(internal),
+          trace_reason_(trace_reason) {}
     bool operator==(const MutateRequestRet& rhs) const {
       return downstream_address_ == rhs.downstream_address_ && internal_ == rhs.internal_ &&
              trace_reason_ == rhs.trace_reason_;
@@ -119,6 +129,7 @@ public:
     std::string downstream_address_;
     bool internal_;
     Tracing::Reason trace_reason_;
+    absl::optional<OriginalIPRejectRequestOptions> reject_request_{absl::nullopt};
   };
 
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
@@ -126,9 +137,10 @@ public:
   // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol) {
     MutateRequestRet ret;
-    ret.downstream_address_ = ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, connection_, config_, route_config_, local_info_)
-                                  ->asString();
+    const auto result = ConnectionManagerUtility::mutateRequestHeaders(
+        headers, connection_, config_, route_config_, local_info_);
+    ret.downstream_address_ = result.final_remote_address->asString();
+    ret.reject_request_ = result.reject_request;
     ret.trace_reason_ =
         ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
@@ -139,6 +151,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   const std::shared_ptr<MockRequestIDExtension> request_id_extension_;
   const std::shared_ptr<RequestIDExtension> request_id_extension_to_return_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
@@ -367,6 +380,11 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 
 // Verify that xff_num_trusted_hops works when not using remote address.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
+  // Reconfigure XFF detection.
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(1));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
@@ -1758,5 +1776,32 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
     EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
   }
 }
+
+// Test detecting the original IP via a header (no rejection if it fails).
+TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
+  const std::string header_name = "x-cdn-detected-ip";
+  auto detection_extension = getCustomHeaderExtension(header_name);
+  const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {detection_extension};
+
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+
+  // Header is present.
+  {
+    TestRequestHeaderMapImpl headers{{header_name, "2.1.3.4"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "2.1.3.4:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+  }
+
+  // Header missing -- fallbacks to default behavior.
+  {
+    TestRequestHeaderMapImpl headers;
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "10.0.0.3:50000");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
