@@ -166,6 +166,19 @@ private:
     std::string friendly_address_;
   };
 
+  void initHelper(const sockaddr_in* address) {
+    memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
+    ip_.ipv4_.address_ = *address;
+    ip_.friendly_address_ = sockaddrToString(*address);
+
+    // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
+    fmt::format_int port(ntohs(address->sin_port));
+    friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
+    friendly_name_.append(ip_.friendly_address_);
+    friendly_name_.push_back(':');
+    friendly_name_.append(port.data(), port.size());
+  }
+
   IpHelper ip_;
   friend class InstanceFactory;
 };
