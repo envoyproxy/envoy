@@ -510,7 +510,7 @@ public:
    *
    * @param code the protobuf error code
    */
-  static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+  static std::string codeEnumToString(ProtobufUtil::StatusCode code);
 
   /**
    * Modifies a message such that all sensitive data (that is, fields annotated as
