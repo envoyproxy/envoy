@@ -93,25 +93,22 @@ public:
       : max_(max_active_conns), current_(0){};
 
   bool tryAllocateResource(uint64_t increment) {
-    auto curr_capacity = current_.load();
-    if (std::numeric_limits<uint64_t>::max() - increment < curr_capacity) {
-      // uint64_t overflow, cannot allocate resource.
+    uint64_t new_val = (current_ += increment);
+    if (new_val >= max_) {
+      current_ -= increment;
       return false;
-    } else {
-      current_ += increment;
-      return true;
     }
+    return true;
   }
 
   bool tryDeallocateResource(uint64_t decrement) {
-    auto curr_capacity = current_.load();
-    if (decrement > curr_capacity) {
-      // There are not enough resources to deallocate.
-      return false;
-    } else {
+    ASSERT(decrement <= current_.load());
+    // Guard against race condition.
+    if (decrement <= current_.load()) {
       current_ -= decrement;
       return true;
     }
+    return false;
   }
 
   uint64_t currentResourceUsage() const { return current_.load(); }

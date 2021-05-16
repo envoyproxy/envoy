@@ -124,10 +124,8 @@ public:
   // about overload state changes.
   void stop();
 
-  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment,
-                           ReactiveResourceUpdateCallbacks& cb);
-  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement,
-                             ReactiveResourceUpdateCallbacks& cb);
+  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment);
+  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement);
 
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.

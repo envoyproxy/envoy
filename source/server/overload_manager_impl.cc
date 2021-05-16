@@ -282,11 +282,20 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     if (reactive_resource_it !=
         OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.end()) {
       ENVOY_LOG(debug, "Adding reactive resource monitor for {}", name);
-      // TODO(nezdolik) Add factory for reactive resource monitors.
-      // Invoke corresponding resource monitor factory here.
-      reactive_resources_.try_emplace(reactive_resource_it->second, name,
-                                      std::make_unique<Server::ActiveConnectionsResourceMonitor>(1),
-                                      stats_scope);
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::ReactiveResourceMonitorFactory>(
+              resource);
+      auto config =
+          Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
+      auto monitor = factory.createReactiveResourceMonitor(*config, context);
+
+      auto result = reactive_resources_.try_emplace(
+          reactive_resource_it->second, name,
+          std::make_unique<Server::ActiveConnectionsResourceMonitor>(1), stats_scope);
+      if (!result.second) {
+        throw EnvoyException(absl::StrCat("Duplicate reactive resource monitor ", name));
+      }
+
     } else {
       ENVOY_LOG(debug, "Adding resource monitor for {}", name);
       auto& factory =
@@ -400,19 +409,13 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
 }
 
 bool OverloadManagerImpl::tryAllocateResource(OverloadReactiveResourceName resource_name,
-                                              uint64_t increment,
-                                              ReactiveResourceUpdateCallbacks& cb) {
+                                              uint64_t increment) {
   const auto reactive_resource = reactive_resources_.find(resource_name);
   if (reactive_resource != reactive_resources_.end()) {
     if (reactive_resource->second.tryAllocateResource(increment)) {
-      cb.dispatcher().post(
-          [&cb, resource_usage = reactive_resource->second.currentResourceUsage()]() {
-            cb.onSuccess(resource_usage);
-          });
       return true;
     } else {
-      cb.dispatcher().post([&cb]() { cb.onFailure(); });
-      return true;
+      return false;
     }
   } else {
     ENVOY_LOG(warn, " {Failed to allocate unknown reactive resource }");
@@ -421,19 +424,13 @@ bool OverloadManagerImpl::tryAllocateResource(OverloadReactiveResourceName resou
 }
 
 bool OverloadManagerImpl::tryDeallocateResource(OverloadReactiveResourceName resource_name,
-                                                uint64_t decrement,
-                                                ReactiveResourceUpdateCallbacks& cb) {
+                                                uint64_t decrement) {
   const auto reactive_resource = reactive_resources_.find(resource_name);
   if (reactive_resource != reactive_resources_.end()) {
     if (reactive_resource->second.tryDeallocateResource(decrement)) {
-      cb.dispatcher().post(
-          [&cb, resource_usage = reactive_resource->second.currentResourceUsage()]() {
-            cb.onSuccess(resource_usage);
-          });
       return true;
     } else {
-      cb.dispatcher().post([&cb]() { cb.onFailure(); });
-      return true;
+      return false;
     }
   } else {
     ENVOY_LOG(warn, " {Failed to deallocate unknown reactive resource }");
