@@ -249,6 +249,14 @@ absl::string_view findQueryStringStart(const HeaderString& path);
 std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 
 /**
+ * Parse a particular value out of a set-cookie
+ * @param headers supplies the headers to get the set-cookie from.
+ * @param key the key for the particular set-cookie value to return
+ * @return std::string the parsed set-cookie value, or "" if none exists
+ **/
+std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key);
+
+/**
  * Produce the value for a Set-Cookie header with the given parameters.
  * @param key is the name of the cookie that is being set.
  * @param value the value to set the cookie to; this value is trusted.
