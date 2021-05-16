@@ -14,6 +14,7 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "config_test",
+    size = "small",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -25,6 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_test",
+    size = "small",
     srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -40,6 +42,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ordering_test",
+    size = "small",
     srcs = ["ordering_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -54,6 +57,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "client_test",
+    size = "small",
     srcs = ["client_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -68,6 +72,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "mutation_utils_test",
+    size = "small",
     srcs = ["mutation_utils_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
@@ -79,6 +84,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ext_proc_integration_test",
+    size = "medium",
     srcs = ["ext_proc_integration_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [

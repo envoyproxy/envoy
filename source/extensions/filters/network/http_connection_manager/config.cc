@@ -33,8 +33,8 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
+#include "common/tracing/tracer_config_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/codec_impl.h"
@@ -91,6 +91,51 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 };
+
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+    PathWithEscapedSlashesAction
+    getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
+  // The default behavior is to leave escaped slashes unchanged.
+  uint64_t runtime_override = context.runtime().snapshot().getInteger(
+      "http_connection_manager.path_with_escaped_slashes_action", 0);
+  switch (runtime_override) {
+  default:
+    // Also includes runtime override values of 0 and 1
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        KEEP_UNCHANGED;
+  case 2:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        REJECT_REQUEST;
+  case 3:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        UNESCAPE_AND_REDIRECT;
+  case 4:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        UNESCAPE_AND_FORWARD;
+  }
+}
+
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+    PathWithEscapedSlashesAction
+    getPathWithEscapedSlashesAction(const envoy::extensions::filters::network::
+                                        http_connection_manager::v3::HttpConnectionManager& config,
+                                    Server::Configuration::FactoryContext& context) {
+  envoy::type::v3::FractionalPercent default_fraction;
+  default_fraction.set_numerator(100);
+  default_fraction.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  if (context.runtime().snapshot().featureEnabled(
+          "http_connection_manager.path_with_escaped_slashes_action_enabled", default_fraction)) {
+    return config.path_with_escaped_slashes_action() ==
+                   envoy::extensions::filters::network::http_connection_manager::v3::
+                       HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT
+               ? getPathWithEscapedSlashesActionRuntimeOverride(context)
+               : config.path_with_escaped_slashes_action();
+  }
+
+  // When action is disabled through runtime the behavior is to keep escaped slashes unchanged.
+  return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      KEEP_UNCHANGED;
+}
 
 } // namespace
 
@@ -260,7 +305,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
-      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
+      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
+      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -474,8 +520,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   const auto& filters = config.http_filters();
+  DependencyManager dependency_manager;
   for (int32_t i = 0; i < filters.size(); i++) {
-    processFilter(filters[i], i, "http", filter_factories_, "http", i == filters.size() - 1);
+    processFilter(filters[i], i, "http", "http", i == filters.size() - 1, filter_factories_,
+                  dependency_manager);
+  }
+  // TODO(auni53): Validate encode dependencies too.
+  auto status = dependency_manager.validDecodeDependencies();
+  if (!status.ok()) {
+    throw EnvoyException(std::string(status.message()));
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -488,10 +541,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
+      DependencyManager upgrade_dependency_manager;
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
-        processFilter(upgrade_config.filters(j), j, name, *factories, "http upgrade",
-                      j == upgrade_config.filters().size() - 1);
+        processFilter(upgrade_config.filters(j), j, name, "http upgrade",
+                      j == upgrade_config.filters().size() - 1, *factories,
+                      upgrade_dependency_manager);
       }
+      // TODO(auni53): Validate encode dependencies too.
+      auto status = upgrade_dependency_manager.validDecodeDependencies();
+      if (!status.ok()) {
+        throw EnvoyException(std::string(status.message()));
+      }
+
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     } else {
@@ -505,8 +566,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
-    int i, const std::string& prefix, FilterFactoriesList& filter_factories,
-    const std::string& filter_chain_type, bool last_filter_in_current_config) {
+    int i, const std::string& prefix, const std::string& filter_chain_type,
+    bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
+    DependencyManager& dependency_manager) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   if (proto_config.config_type_case() ==
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::ConfigTypeCase::
@@ -524,6 +586,7 @@ void HttpConnectionManagerConfig::processFilter(
       proto_config, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  dependency_manager.registerFilter(factory.name(), *factory.dependencies());
   bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
   Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
@@ -589,7 +652,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
         Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
-        maxRequestHeadersKb(), headersWithUnderscoresAction());
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;

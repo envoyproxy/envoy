@@ -90,8 +90,7 @@ void WatermarkBuffer::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
 }
 
-void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
-  ASSERT(low_watermark < high_watermark || (high_watermark == 0 && low_watermark == 0));
+void WatermarkBuffer::setWatermarks(uint32_t high_watermark) {
   uint32_t overflow_watermark_multiplier =
       Runtime::getInteger("envoy.buffer.overflow_multiplier", 0);
   if (overflow_watermark_multiplier > 0 &&
@@ -101,7 +100,7 @@ void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_waterm
                           "high_watermark is overflowing. Disabling overflow watermark.");
     overflow_watermark_multiplier = 0;
   }
-  low_watermark_ = low_watermark;
+  low_watermark_ = high_watermark / 2;
   high_watermark_ = high_watermark;
   overflow_watermark_ = overflow_watermark_multiplier * high_watermark;
   checkHighAndOverflowWatermarks();

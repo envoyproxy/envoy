@@ -8,4 +8,4 @@
 
 #include "test/common/quic/platform/quic_expect_bug_impl.h"
 
-#define EXPECT_SPDY_BUG_IMPL EXPECT_QUIC_BUG_IMPL
+#define EXPECT_QUICHE_BUG_IMPL EXPECT_QUIC_BUG_IMPL

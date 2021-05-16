@@ -31,6 +31,7 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/network/common/factory_base.h"
+#include "extensions/filters/network/http_connection_manager/dependency_manager.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -180,14 +181,20 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return path_with_escaped_slashes_action_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
   void
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
-                int i, const std::string& prefix, FilterFactoriesList& filter_factories,
-                const std::string& filter_chain_type, bool last_filter_in_current_config);
+                int i, const std::string& prefix, const std::string& filter_chain_type,
+                bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
+                DependencyManager& dependency_manager);
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
@@ -268,6 +275,8 @@ private:
   static const uint64_t RequestTimeoutMs = 0;
   // request header timeout is disabled by default
   static const uint64_t RequestHeaderTimeoutMs = 0;
+  const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
 };
 
 /**

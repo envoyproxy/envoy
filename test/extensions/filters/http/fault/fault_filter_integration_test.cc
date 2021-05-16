@@ -48,6 +48,26 @@ typed_config:
       numerator: 100
 )EOF";
 
+  const std::string disable_stats_fault_config_ =
+      R"EOF(
+name: fault
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+  abort:
+    header_abort: {}
+    percentage:
+      numerator: 100
+  delay:
+    header_delay: {}
+    percentage:
+      numerator: 100
+  response_rate_limit:
+    header_limit: {}
+    percentage:
+      numerator: 100
+  disable_downstream_cluster_stats: true
+)EOF";
+
   const std::string abort_grpc_fault_config_ =
       R"EOF(
 name: fault
@@ -171,6 +191,56 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+}
+
+// Request abort controlled via header configuration and enable downstream server stats.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableDownstreamServerStats) {
+  initializeFilter(header_fault_config_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-fault-abort-request", "429"},
+                                     {"x-envoy-downstream-service-cluster", "superman"}});
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.superman.aborts_injected")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.delays_injected"));
+}
+
+// Request abort controlled via header configuration and disable downstream server stats.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigDisableDownstreamServerStats) {
+  initializeFilter(disable_stats_fault_config_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-fault-abort-request", "429"},
+                                     {"x-envoy-downstream-service-cluster", "superman"}});
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.aborts_injected"));
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.delays_injected"));
 }
 
 // Request faults controlled via header configuration.

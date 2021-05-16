@@ -21,7 +21,7 @@ namespace {
 
 Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
                                                      uint32_t content_length = 0) {
-  return Http::TestRequestHeaderMapImpl{{":authority", "host"},
+  return Http::TestRequestHeaderMapImpl{{":authority", "host:80"},
                                         {"content-length", fmt::format("{}", content_length)},
                                         {":path", "/websocket/test"},
                                         {":method", "GET"},
@@ -194,25 +194,26 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
 }
 
-TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
+TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) { hcm.set_strip_any_host_port(true); });
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
   performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
+  ASSERT_EQ(upstream_request_->headers().getHostValue(), "host:80");
 
-  // Standard TCP proxy semantics post upgrade
-  codec_client_->sendData(*request_encoder_, "hello", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello"));
-
-  // Send data downstream and disconnect immediately.
-  upstream_request_->encodeData("world", false);
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-  // Verify both the data and the disconnect went through.
-  response_->waitForBodyData(5);
-  EXPECT_EQ("world", response_->body());
-  waitForClientDisconnectOrReset(Http::StreamResetReason::ConnectError);
+  codec_client_->sendData(*request_encoder_, "bye!", false);
+  codec_client_->close();
+  // Verify the final data was received and that the connection is torn down.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "bye!"));
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
@@ -322,7 +323,7 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
       });
-  auto host = config_helper_.createVirtualHost("host", "/websocket/test");
+  auto host = config_helper_.createVirtualHost("host:80", "/websocket/test");
   host.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("foo");
   config_helper_.addVirtualHost(host);
   initialize();

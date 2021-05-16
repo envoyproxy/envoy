@@ -21,6 +21,7 @@ namespace Http3 {
   COUNTER(rx_reset)                                                                                \
   COUNTER(trailers)                                                                                \
   COUNTER(tx_reset)                                                                                \
+  COUNTER(metadata_not_supported_error)                                                            \
   GAUGE(streams_active, Accumulate)
 
 /**

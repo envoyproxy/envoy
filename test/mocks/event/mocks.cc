@@ -49,9 +49,6 @@ MockTimer::MockTimer() {
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }
 
-// Ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
-// createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
-// allocated and must not be deleted by it's creator.
 MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
   dispatcher_ = dispatcher;
   EXPECT_CALL(*dispatcher, createTimer_(_))

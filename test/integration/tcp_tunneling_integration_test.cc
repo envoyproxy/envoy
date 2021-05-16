@@ -299,6 +299,110 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStrippingLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.strip_port_from_connect", "false");
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) { hcm.set_strip_any_host_port(true); });
+
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "host:80");
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
+  } else {
+    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
+              "bytestream");
+  }
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Make sure that even once the response has started, that data can continue to go upstream.
+  codec_client_->sendData(*request_encoder_, "hello", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Also test upstream to downstream data.
+  upstream_request_->encodeData(12, false);
+  response_->waitForBodyData(12);
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStripping) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.set_strip_any_host_port(true);
+        auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_request_headers_to_add()->Add();
+        auto* mutable_header = header_value_option->mutable_header();
+        mutable_header->set_key("Host-In-Envoy");
+        mutable_header->set_value("%REQ(:AUTHORITY)%");
+      });
+
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "host:80");
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    EXPECT_TRUE(upstream_request_->headers().getProtocolValue().empty());
+  } else {
+    EXPECT_EQ(upstream_request_->headers().getProtocolValue(), "bytestream");
+  }
+  auto stripped_host = upstream_request_->headers().get(Http::LowerCaseString("host-in-envoy"));
+  ASSERT_EQ(stripped_host.size(), 1);
+  EXPECT_EQ(stripped_host[0]->value(), "host");
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Make sure that even once the response has started, that data can continue to go upstream.
+  codec_client_->sendData(*request_encoder_, "hello", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Also test upstream to downstream data.
+  upstream_request_->encodeData(12, false);
+  response_->waitForBodyData(12);
+
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   initialize();
 

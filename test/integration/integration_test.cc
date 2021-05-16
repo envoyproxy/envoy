@@ -368,6 +368,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
   config_helper_.addFilter(R"EOF(
 name: matcher
 typed_config:
@@ -964,9 +965,9 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // an inline sendLocalReply to make sure the "kick" works under the call stack
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
-  // When deprecating this flag, set hcm.mutable_stream_error_on_invalid_http_message true.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.hcm_stream_error_on_invalid_message",
-                                    "false");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
 
   autonomous_upstream_ = true;
   initialize();
@@ -1917,6 +1918,12 @@ TEST_P(IntegrationTest, Preconnect) {
   while (!clients.empty()) {
     clients.front()->close();
     clients.pop_front();
+  }
+
+  for (auto& connection : fake_connections) {
+    ASSERT_TRUE(connection->close());
+    ASSERT_TRUE(connection->waitForDisconnect());
+    connection.reset();
   }
 }
 

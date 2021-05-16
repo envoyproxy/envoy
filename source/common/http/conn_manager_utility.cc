@@ -433,30 +433,57 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
 }
 
-bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
-                                                  const ConnectionManagerConfig& config) {
+ConnectionManagerUtility::NormalizePathAction
+ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
+                                             const ConnectionManagerConfig& config) {
   if (!request_headers.Path()) {
-    return true; // It's as valid as it is going to get.
+    return NormalizePathAction::Continue; // It's as valid as it is going to get.
   }
-  bool is_valid_path = true;
-  if (config.shouldNormalizePath()) {
-    is_valid_path = PathUtil::canonicalPath(request_headers);
+
+  NormalizePathAction final_action = NormalizePathAction::Continue;
+  const auto escaped_slashes_action = config.pathWithEscapedSlashesAction();
+  ASSERT(escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::
+                                       v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT);
+  if (escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::v3::
+                                    HttpConnectionManager::KEEP_UNCHANGED) {
+    auto escaped_slashes_result = PathUtil::unescapeSlashes(request_headers);
+    if (escaped_slashes_result == PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
+      if (escaped_slashes_action == envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager::REJECT_REQUEST) {
+        return NormalizePathAction::Reject;
+      } else if (escaped_slashes_action ==
+                 envoy::extensions::filters::network::http_connection_manager::v3::
+                     HttpConnectionManager::UNESCAPE_AND_REDIRECT) {
+        final_action = NormalizePathAction::Redirect;
+      } else {
+        ASSERT(escaped_slashes_action ==
+               envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager::UNESCAPE_AND_FORWARD);
+      }
+    }
   }
+
+  if (config.shouldNormalizePath() && !PathUtil::canonicalPath(request_headers)) {
+    return NormalizePathAction::Reject;
+  }
+
   // Merge slashes after path normalization to catch potential edge cases with percent encoding.
-  if (is_valid_path && config.shouldMergeSlashes()) {
+  if (config.shouldMergeSlashes()) {
     PathUtil::mergeSlashes(request_headers);
   }
-  return is_valid_path;
+
+  return final_action;
 }
 
-void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
-                                                  const ConnectionManagerConfig& config,
-                                                  uint32_t port) {
+absl::optional<uint32_t>
+ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
+                                             const ConnectionManagerConfig& config, uint32_t port) {
   if (config.stripPortType() == Http::StripPortType::Any) {
-    HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
+    return HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
   } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
-    HeaderUtility::stripPortFromHost(request_headers, port);
+    return HeaderUtility::stripPortFromHost(request_headers, port);
   }
+  return absl::nullopt;
 }
 
 } // namespace Http

@@ -22,6 +22,7 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
       : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {
     codec_.reset(codec);
+    connect();
   }
   ~CodecClientForTest() override {
     if (destroy_cb_) {
