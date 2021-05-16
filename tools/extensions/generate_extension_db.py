@@ -12,14 +12,11 @@ import sys
 from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
 
-
 # source/extensions/extensions_build_config.bzl must have a .bzl suffix for Starlark
 # import, so we are forced to do this workaround.
 _extensions_build_config_spec = spec_from_loader(
     'extensions_build_config',
-    SourceFileLoader(
-        'extensions_build_config',
-        'source/extensions/extensions_build_config.bzl'))
+    SourceFileLoader('extensions_build_config', 'source/extensions/extensions_build_config.bzl'))
 extensions_build_config = module_from_spec(_extensions_build_config_spec)
 _extensions_build_config_spec.loader.exec_module(extensions_build_config)
 
