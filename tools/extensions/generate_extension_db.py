@@ -4,7 +4,6 @@
 # extension name to metadata derived from the envoy_cc_extension target.
 
 import json
-import os
 import pathlib
 import re
 import sys
