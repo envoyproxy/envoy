@@ -18,11 +18,11 @@ public:
   RuntimeHandler(Server::Instance& server);
 
   Http::Code handlerRuntime(absl::string_view path_and_query,
-                            Http::ResponseHeaderMap& response_headers, Server::Chunker& response,
+                            Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
                             AdminStream&);
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
-                                  Server::Chunker& response, AdminStream&);
+                                  Buffer::Chunker& response, AdminStream&);
 };
 
 } // namespace Server

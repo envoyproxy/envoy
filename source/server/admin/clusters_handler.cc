@@ -17,7 +17,7 @@ namespace {
 void addCircuitBreakerSettingsAsText(const std::string& cluster_name,
                                      const std::string& priority_str,
                                      Upstream::ResourceManager& resource_manager,
-                                     Buffer::Instance& response) {
+                                     Buffer::Chunker& response) {
   response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
                            resource_manager.connections().max()));
   response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
@@ -45,7 +45,7 @@ ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(
 
 Http::Code ClustersHandler::handlerClusters(absl::string_view url,
                                             Http::ResponseHeaderMap& response_headers,
-                                            Server::Chunker& response, AdminStream&) {
+                                            Buffer::Chunker& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   const auto format_value = Utility::formatParam(query_params);
 
@@ -106,7 +106,7 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsJson(Server::Chunker& response) {
+void ClustersHandler::writeClustersAsJson(Buffer::Chunker& response) {
   envoy::admin::v3::Clusters clusters;
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -195,7 +195,7 @@ void ClustersHandler::writeClustersAsJson(Server::Chunker& response) {
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsText(Server::Chunker& response) {
+void ClustersHandler::writeClustersAsText(Buffer::Chunker& response) {
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
   for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
@@ -263,7 +263,7 @@ void ClustersHandler::writeClustersAsText(Server::Chunker& response) {
 
 void ClustersHandler::addOutlierInfo(const std::string& cluster_name,
                                      const Upstream::Outlier::Detector* outlier_detector,
-                                     Buffer::Instance& response) {
+                                     Buffer::Chunker& response) {
   if (outlier_detector) {
     response.add(fmt::format(
         "{}::outlier::success_rate_average::{:g}\n", cluster_name,

@@ -13,7 +13,7 @@ namespace Server {
 LogsHandler::LogsHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
 Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHeaderMap&,
-                                       Buffer::Instance& response, AdminStream&) {
+                                       Buffer::Chunker& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
@@ -46,7 +46,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
 }
 
 Http::Code LogsHandler::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
+                                          Buffer::Chunker& response, AdminStream&) {
   server_.accessLogManager().reopen();
   response.add("OK\n");
   return Http::Code::OK;

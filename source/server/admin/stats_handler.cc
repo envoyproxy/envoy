@@ -18,7 +18,7 @@ const uint64_t RecentLookupsCapacity = 100;
 StatsHandler::StatsHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
 Http::Code StatsHandler::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
-                                              Server::Chunker& response, AdminStream&) {
+                                              Buffer::Chunker& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -28,7 +28,7 @@ Http::Code StatsHandler::handlerResetCounters(absl::string_view, Http::ResponseH
 }
 
 Http::Code StatsHandler::handlerStatsRecentLookups(absl::string_view, Http::ResponseHeaderMap&,
-                                                   Server::Chunker& response, AdminStream&) {
+                                                   Buffer::Chunker& response, AdminStream&) {
   Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
   std::string table;
   const uint64_t total =
@@ -45,7 +45,7 @@ Http::Code StatsHandler::handlerStatsRecentLookups(absl::string_view, Http::Resp
 }
 
 Http::Code StatsHandler::handlerStatsRecentLookupsClear(absl::string_view, Http::ResponseHeaderMap&,
-                                                        Server::Chunker& response, AdminStream&) {
+                                                        Buffer::Chunker& response, AdminStream&) {
   server_.stats().symbolTable().clearRecentLookups();
   response.add("OK\n");
   return Http::Code::OK;
@@ -53,7 +53,7 @@ Http::Code StatsHandler::handlerStatsRecentLookupsClear(absl::string_view, Http:
 
 Http::Code StatsHandler::handlerStatsRecentLookupsDisable(absl::string_view,
                                                           Http::ResponseHeaderMap&,
-                                                          Server::Chunker& response, AdminStream&) {
+                                                          Buffer::Chunker& response, AdminStream&) {
   server_.stats().symbolTable().setRecentLookupCapacity(0);
   response.add("OK\n");
   return Http::Code::OK;
@@ -61,7 +61,7 @@ Http::Code StatsHandler::handlerStatsRecentLookupsDisable(absl::string_view,
 
 Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
                                                          Http::ResponseHeaderMap&,
-                                                         Server::Chunker& response, AdminStream&) {
+                                                         Buffer::Chunker& response, AdminStream&) {
   server_.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
   response.add("OK\n");
   return Http::Code::OK;
@@ -69,7 +69,7 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 
 Http::Code StatsHandler::handlerStats(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
-                                      Server::Chunker& response, AdminStream& admin_stream) {
+                                      Buffer::Chunker& response, AdminStream& admin_stream) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
@@ -139,7 +139,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
-                                                Http::ResponseHeaderMap&, Server::Chunker& response,
+                                                Http::ResponseHeaderMap&, Buffer::Chunker& response,
                                                 AdminStream&) {
   const Http::Utility::QueryParams params =
       Http::Utility::parseAndDecodeQueryString(path_and_query);
@@ -157,7 +157,7 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
 // TODO(ambuc) Export this as a server (?) stat for monitoring.
 Http::Code StatsHandler::handlerContention(absl::string_view,
                                            Http::ResponseHeaderMap& response_headers,
-                                           Server::Chunker& response, AdminStream&) {
+                                           Buffer::Chunker& response, AdminStream&) {
 
   if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

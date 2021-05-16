@@ -49,7 +49,7 @@ class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hyst
 public:
   HystrixSink(Server::Configuration::ServerFactoryContext& server, uint64_t num_buckets);
   Http::Code handlerHystrixEventStream(absl::string_view, Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance&, Server::AdminStream& admin_stream);
+                                       Buffer::Chunker&, Server::AdminStream& admin_stream);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
 

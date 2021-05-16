@@ -2,6 +2,7 @@
 
 #include "envoy/admin/v3/tap.pb.h"
 #include "envoy/admin/v3/tap.pb.validate.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
@@ -85,10 +86,9 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::Ch
   return Http::Code::OK;
 }
 
-Http::Code AdminHandler::badRequest(Server::Chunker& response, absl::string_view error) {
-  absl::string_view error_string = absl::StrCat("handler bad request: ", error);
-  ENVOY_LOG(debug, error_string);
-  response.reportError(Http::Code::BadRequest, error_string);
+Http::Code AdminHandler::badRequest(Buffer::Chunker& response, absl::string_view error) {
+  ENVOY_LOG(debug, "handler bad request: {}", error);
+  response.add(error);
   return Http::Code::BadRequest;
 }
 

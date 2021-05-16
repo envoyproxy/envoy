@@ -119,7 +119,7 @@ ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Inst
 
 Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
                                                 Http::ResponseHeaderMap& response_headers,
-                                                Server::Chunker& response, AdminStream&) const {
+                                                Buffer::Chunker& response, AdminStream&) const {
   Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);

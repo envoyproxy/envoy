@@ -292,7 +292,7 @@ HystrixSink::HystrixSink(Server::Configuration::ServerFactoryContext& server,
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Http::ResponseHeaderMap& response_headers,
-                                                  Buffer::Instance&,
+                                                  Buffer::Chunker&,
                                                   Server::AdminStream& admin_stream) {
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.TextEventStream);

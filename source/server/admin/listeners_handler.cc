@@ -14,7 +14,7 @@ namespace Server {
 ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
 Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                                   Buffer::Instance& response, AdminStream&) {
+                                                   Buffer::Chunker& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
   ListenerManager::StopListenersType stop_listeners_type =
@@ -40,7 +40,7 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::
 
 Http::Code ListenersHandler::handlerListenerInfo(absl::string_view url,
                                                  Http::ResponseHeaderMap& response_headers,
-                                                 Buffer::Instance& response, AdminStream&) {
+                                                 Buffer::Chunker& response, AdminStream&) {
   const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   const auto format_value = Utility::formatParam(query_params);
 
@@ -53,7 +53,7 @@ Http::Code ListenersHandler::handlerListenerInfo(absl::string_view url,
   return Http::Code::OK;
 }
 
-void ListenersHandler::writeListenersAsJson(Buffer::Instance& response) {
+void ListenersHandler::writeListenersAsJson(Buffer::Chunker& response) {
   envoy::admin::v3::Listeners listeners;
   for (const auto& listener : server_.listenerManager().listeners()) {
     envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
@@ -64,7 +64,7 @@ void ListenersHandler::writeListenersAsJson(Buffer::Instance& response) {
   response.add(MessageUtil::getJsonStringFromMessageOrError(listeners, true)); // pretty-print
 }
 
-void ListenersHandler::writeListenersAsText(Buffer::Instance& response) {
+void ListenersHandler::writeListenersAsText(Buffer::Chunker& response) {
   for (const auto& listener : server_.listenerManager().listeners()) {
     response.add(fmt::format("{}::{}\n", listener.get().name(),
                              listener.get().listenSocketFactory().localAddress()->asString()));

@@ -18,7 +18,7 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
-bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
+bool filterParam(Http::Utility::QueryParams params, Buffer::Chunker& response,
                  absl::optional<std::regex>& regex);
 
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params);

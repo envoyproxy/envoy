@@ -10,7 +10,7 @@ namespace Server {
 ProfilingHandler::ProfilingHandler(const std::string& profile_path) : profile_path_(profile_path) {}
 
 Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                                Server::Chunker& response, AdminStream&) {
+                                                Buffer::Chunker& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
@@ -34,7 +34,7 @@ Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view url, Http::Res
 }
 
 Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view url, Http::ResponseHeaderMap&,
-                                                 Server::Chunker& response, AdminStream&) {
+                                                 Buffer::Chunker& response, AdminStream&) {
   if (!Profiler::Heap::profilerEnabled()) {
     response.add("The current build does not support heap profiler");
     return Http::Code::NotImplemented;

@@ -19,15 +19,15 @@ public:
 
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::ResponseHeaderMap& response_headers,
-                                 Server::Chunker& response, AdminStream&);
+                                 Buffer::Chunker& response, AdminStream&);
 
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
-                                    Server::Chunker& response, AdminStream&);
+                                    Buffer::Chunker& response, AdminStream&);
 
   Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
-                                  Server::Chunker& response, AdminStream&);
+                                  Buffer::Chunker& response, AdminStream&);
 };
 
 } // namespace Server

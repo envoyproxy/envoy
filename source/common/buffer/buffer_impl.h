@@ -626,7 +626,7 @@ private:
   const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
-class LibEventInstance : public Instance {
+class LibEventInstance : public Instance, public Chunker {
 public:
   // Called after accessing the memory in buffer() directly to allow any post-processing.
   virtual void postProcess() PURE;

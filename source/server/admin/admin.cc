@@ -250,7 +250,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Instance& response, AdminStream& admin_stream) {
+                                  Buffer::Chunker& response, AdminStream& admin_stream) {
 
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
@@ -302,7 +302,7 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
 }
 
 Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
-                                  Buffer::Instance& response, AdminStream&) {
+                                  Buffer::Chunker& response, AdminStream&) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
@@ -422,14 +422,6 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(absl::nullopt, *listener_);
   }
-}
-
-void Chunker::add(absl::string_view data) {
-  ENVOY_LOG(debug, data);
-}
-
-void Chunker::reportError(Http::Code code, absl::string_view error_text) {
- ENVOY_LOG(debug, error_string);
 }
 
 } // namespace Server

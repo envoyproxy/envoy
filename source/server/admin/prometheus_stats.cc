@@ -63,7 +63,7 @@ struct MetricLessThan {
  */
 template <class StatType>
 uint64_t outputStatType(
-    Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
+    Buffer::Chunker& response, const bool used_only, const absl::optional<std::regex>& regex,
     const std::vector<Stats::RefcountPtr<StatType>>& metrics,
     const std::function<std::string(
         const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
@@ -211,7 +211,7 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extracted_na
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Chunker& response,
     const bool used_only, const absl::optional<std::regex>& regex) {
 
   uint64_t metric_name_count = 0;
