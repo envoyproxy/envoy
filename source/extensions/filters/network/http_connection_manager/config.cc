@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
@@ -343,6 +344,34 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
   request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+
+  // Check if IP detection extensions were configured, otherwise fall back to XFF.
+  auto ip_detection_extensions = config.original_ip_detection_extensions();
+  if (ip_detection_extensions.empty()) {
+    envoy::extensions::http::original_ip_detection::xff::v3::XffConfig xff_config;
+    xff_config.set_xff_num_trusted_hops(xff_num_trusted_hops_);
+
+    auto* extension = ip_detection_extensions.Add();
+    extension->set_name("envoy.http.original_ip_detection.xff");
+    extension->mutable_typed_config()->PackFrom(xff_config);
+  }
+
+  original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
+  for (const auto& extension_config : ip_detection_extensions) {
+    auto* factory =
+        Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(extension_config);
+    if (!factory) {
+      throw EnvoyException(
+          fmt::format("Original IP detection extension not found: '{}'", extension_config.name()));
+    }
+
+    auto extension = factory->createExtension(extension_config.typed_config(), context_);
+    if (!extension) {
+      throw EnvoyException(fmt::format("Original IP detection extension could not be created: '{}'",
+                                       extension_config.name()));
+    }
+    original_ip_detection_extensions_.push_back(extension);
+  }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
@@ -740,7 +769,7 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   if (config.tracing().has_provider()) {
     return &config.tracing().provider();
   }
-  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();

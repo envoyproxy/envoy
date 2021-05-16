@@ -269,6 +269,14 @@ EXTENSIONS = {
     #
 
     "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+
+    #
+    # Original IP detection
+    #
+
+    "envoy.http.original_ip_detection.custom_header":        "//source/extensions/http/original_ip_detection/custom_header:config",
+    "envoy.http.original_ip_detection.xff":                  "//source/extensions/http/original_ip_detection/xff:config",
+
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
