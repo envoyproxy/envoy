@@ -317,37 +317,17 @@ FilterStatus Router::messageEnd() {
   upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
                                              upstream_request_buffer_);
 
-  recordRequestSize(transport_buffer.length());
+  recordClusterScopeHistogram({upstream_rq_size_}, Stats::Histogram::Unit::Bytes,
+                              transport_buffer.length());
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
 }
 
-void Router::recordRequestSize(uint64_t value) {
-  record([value](Upstream::ClusterRequestResponseSizeStats& req_resp_stats) {
-    req_resp_stats.upstream_rq_body_size_.recordValue(value);
-  });
-}
-
-void Router::recordResponseSize(uint64_t value) {
-  record([value](Upstream::ClusterRequestResponseSizeStats& req_resp_stats) {
-    req_resp_stats.upstream_rs_body_size_.recordValue(value);
-  });
-}
-
-void Router::record(std::function<void(Upstream::ClusterRequestResponseSizeStats&)> callback) {
-  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats_opt =
-      cluster_->requestResponseSizeStats();
-  if (req_resp_stats_opt.has_value()) {
-    auto& req_resp_stats = req_resp_stats_opt->get();
-    callback(req_resp_stats);
-  }
-}
-
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
 
-  recordResponseSize(data.length());
+  recordClusterScopeHistogram({upstream_rs_size_}, Stats::Histogram::Unit::Bytes, data.length());
 
   if (upstream_request_->upgrade_response_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "reading upgrade response: {} bytes", *callbacks_, data.length());
@@ -528,7 +508,9 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
     upgrade_response_ =
         protocol_->attemptUpgrade(*transport_, *conn_state_, parent_.upstream_request_buffer_);
     if (upgrade_response_ != nullptr) {
-      parent_.recordRequestSize(parent_.upstream_request_buffer_.length());
+      parent_.recordClusterScopeHistogram({parent_.upstream_rq_size_},
+                                          Stats::Histogram::Unit::Bytes,
+                                          parent_.upstream_request_buffer_.length());
       conn_data_->connection().write(parent_.upstream_request_buffer_, false);
       return;
     }

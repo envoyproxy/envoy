@@ -190,6 +190,8 @@ public:
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
+        upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
+        upstream_rs_size_(stat_name_set_->add("thrift.upstream_rs_size")),
         passthrough_supported_(false) {}
 
   ~Router() override = default;
@@ -286,12 +288,6 @@ private:
                                                POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
 
-  friend struct UpstreamRequest;
-
-  void recordRequestSize(uint64_t value);
-  void recordResponseSize(uint64_t value);
-  void record(std::function<void(Upstream::ClusterRequestResponseSizeStats&)> callback);
-
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
   Stats::StatNameSetPtr stat_name_set_;
@@ -305,6 +301,8 @@ private:
   const Stats::StatName upstream_resp_exception_;
   const Stats::StatName upstream_resp_invalid_type_;
   const Stats::StatName upstream_rq_time_;
+  const Stats::StatName upstream_rq_size_;
+  const Stats::StatName upstream_rs_size_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};
