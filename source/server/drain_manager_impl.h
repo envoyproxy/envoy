@@ -3,6 +3,7 @@
 #include <chrono>
 #include <functional>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -26,6 +27,8 @@ namespace Server {
 class DrainManagerImpl : Logger::Loggable<Logger::Id::main>, public DrainManager {
 public:
   DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type);
+  DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type,
+                   Event::Dispatcher& dispatcher);
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -36,6 +39,10 @@ public:
   void startDrainSequence(std::function<void()> drain_complete_cb) override;
   bool draining() const override { return draining_; }
   void startParentShutdownSequence() override;
+  DrainManagerSharedPtr
+  createChildManager(Event::Dispatcher& dispatcher,
+                     envoy::config::listener::v3::Listener::DrainType drain_type) override;
+  DrainManagerSharedPtr createChildManager(Event::Dispatcher& dispatcher) override;
 
 private:
   Instance& server_;
@@ -45,6 +52,7 @@ private:
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;
   mutable Common::ThreadSafeCallbackManager<std::chrono::milliseconds> cbs_;
+  std::vector<Common::ThreadSafeCallbackHandlePtr> child_drain_cbs_;
 
   Event::TimerPtr parent_shutdown_timer_;
 };

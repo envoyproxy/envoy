@@ -10,6 +10,8 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include <chrono>
+#include <thread>
 #include "utility.h"
 
 namespace Envoy {
@@ -392,6 +394,10 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   auto codec_client_0 = createHttpCodec("alpn0");
   auto codec_client_default = createHttpCodec("alpndefault");
 
+  expectResponseHeaderConnectionClose(*codec_client_1, false);
+  expectResponseHeaderConnectionClose(*codec_client_default, false);
+  expectResponseHeaderConnectionClose(*codec_client_0, false);
+
   Cleanup cleanup([c1 = codec_client_1.get(), c0 = codec_client_0.get(),
                    c_default = codec_client_default.get()]() {
     c1->close();
@@ -410,6 +416,8 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  // test_server_->waitForCounterGe("http.config_test.downstream_cx_drain_close", 1);
+  std::this_thread::sleep_for(std::chrono::milliseconds{50});
 
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   expectResponseHeaderConnectionClose(*codec_client_default, true);
@@ -426,6 +434,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   auto codec_client_0 = createHttpCodec("alpn0");
+  expectResponseHeaderConnectionClose(*codec_client_0, false);
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
@@ -464,6 +473,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   auto codec_client_default = createHttpCodec("alpndefault");
+  expectResponseHeaderConnectionClose(*codec_client_default, false);
   Cleanup cleanup0([c_default = codec_client_default.get()]() { c_default->close(); });
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));

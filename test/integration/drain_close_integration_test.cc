@@ -8,9 +8,9 @@ using DrainCloseIntegrationTest = HttpProtocolIntegrationTest;
 // Add a health check filter and verify correct behavior when draining.
 TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   // Graceful draining will spread out drain initiation within the first 1/4 of
-  // the drain window, so the drain time of 20s should mean all draining is
-  // initiated within the first 5s.
-  drain_time_ = std::chrono::seconds(20);
+  // the drain window, so the drain time of 100s should mean all draining is
+  // initiated within the first 25s.
+  drain_time_ = std::chrono::seconds(100);
   config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
@@ -30,13 +30,11 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   });
   drain_sequence_started.WaitForNotification();
 
-  // Issue at least one more request to ensure we see a connection "close" for HTTP1
-  do {
-    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForEndStream());
-  } while (!test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
-
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_drain_close", 1);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_drain_close")->value(), 1L);
+
+  response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
@@ -70,6 +68,9 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
     drain_sequence_started.Notify();
   });
   drain_sequence_started.WaitForNotification();
+
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_drain_close", 1);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_drain_close")->value(), 1L);
 
   // Issue one more request to ensure we see a connection "close" for HTTP1
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

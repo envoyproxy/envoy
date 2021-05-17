@@ -3,10 +3,16 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/drain_decision.h"
 
 namespace Envoy {
 namespace Server {
+
+class DrainManager;
+using DrainManagerPtr = std::unique_ptr<DrainManager>;
+using DrainManagerSharedPtr = std::shared_ptr<DrainManager>;
 
 /**
  * Handles connection draining. This concept is used globally during hot restart / server draining
@@ -14,6 +20,18 @@ namespace Server {
  */
 class DrainManager : public Network::DrainDecision {
 public:
+  /**
+   * @brief Create a child drain-manager. Will proxy the drain status from the parent, but can also
+   * be used to enact local draining.
+   *
+   * @param dispatcher Dispatcher for the current thread in which the new child drain-manager will
+   * exist.
+   */
+  virtual DrainManagerSharedPtr
+  createChildManager(Event::Dispatcher& dispatcher,
+                     envoy::config::listener::v3::Listener::DrainType drain_type) PURE;
+  virtual DrainManagerSharedPtr createChildManager(Event::Dispatcher& dispatcher) PURE;
+
   /**
    * Invoked to begin the drain procedure. (Making drain close operations more likely).
    * @param drain_complete_cb will be invoked once the drain sequence is finished. The parameter is
@@ -32,8 +50,6 @@ public:
    */
   virtual void startParentShutdownSequence() PURE;
 };
-
-using DrainManagerPtr = std::unique_ptr<DrainManager>;
 
 } // namespace Server
 } // namespace Envoy

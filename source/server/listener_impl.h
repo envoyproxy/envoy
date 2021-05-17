@@ -91,13 +91,13 @@ private:
  * The common functionality shared by PerListenerFilterFactoryContexts and
  * PerFilterChainFactoryFactoryContexts.
  */
-class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
+class ListenerFactoryContextBaseImpl final : public Configuration::DrainableFactoryContext,
                                              public Network::DrainDecision {
 public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 Server::DrainManagerPtr drain_manager);
+                                 envoy::config::listener::v3::Listener_DrainType drain_type);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
@@ -128,14 +128,12 @@ public:
   Stats::Scope& listenerScope() override;
 
   // DrainDecision
-  bool drainClose() const override {
-    return drain_manager_->drainClose() || server_.drainManager().drainClose();
-  }
+  bool drainClose() const override { return drain_manager_->drainClose(); }
   Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
                                                         DrainCloseCb cb) const override {
-    return server_.drainManager().addOnDrainCloseCb(dispatcher, cb);
+    return drain_manager_->addOnDrainCloseCb(dispatcher, cb);
   }
-  Server::DrainManager& drainManager();
+  Server::DrainManager& drainManager() override;
 
 private:
   Envoy::Server::Instance& server_;
@@ -144,7 +142,7 @@ private:
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  const Server::DrainManagerPtr drain_manager_;
+  Server::DrainManagerSharedPtr drain_manager_;
 };
 
 class ListenerImpl;
@@ -158,9 +156,10 @@ public:
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
                                 const Network::ListenerConfig* listener_config,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
+                                ListenerImpl& listener_impl,
+                                envoy::config::listener::v3::Listener_DrainType drain_type)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-            server, validation_visitor, config_message, std::move(drain_manager))),
+            server, validation_visitor, config_message, drain_type)),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,

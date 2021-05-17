@@ -267,6 +267,18 @@ public:
 };
 
 /**
+ * An implementation of FactoryContext for components that need access to a drain-manager or the
+ * ability to create child drain-managers.
+ */
+class DrainableFactoryContext : public virtual FactoryContext {
+public:
+  /**
+   * @return DrainManager& the listener specific drain manager
+   */
+  virtual Envoy::Server::DrainManager& drainManager() PURE;
+};
+
+/**
  * FactoryContext for ProtocolOptionsFactory.
  */
 using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;

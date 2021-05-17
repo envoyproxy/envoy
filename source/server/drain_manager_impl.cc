@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -16,6 +17,33 @@ namespace Server {
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type)
     : server_(server), drain_type_(drain_type), cbs_(server_.dispatcher()) {}
+
+DrainManagerImpl::DrainManagerImpl(Instance& server,
+                                   envoy::config::listener::v3::Listener::DrainType drain_type,
+                                   Event::Dispatcher& dispatcher)
+    : server_(server), drain_type_(drain_type), cbs_(dispatcher) {}
+
+DrainManagerSharedPtr
+DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
+                                     envoy::config::listener::v3::Listener::DrainType drain_type) {
+  auto child = std::make_shared<DrainManagerImpl>(server_, drain_type, dispatcher);
+
+  // Wire up the child so that when the parent starts draining, the child also sees the state-change
+  child_drain_cbs_.push_back(addOnDrainCloseCb(
+      dispatcher,
+      [child_ = std::weak_ptr<DrainManagerImpl>(child)](std::chrono::milliseconds) mutable {
+        // disregard the specified delay time and kick off the child drain immediately
+        auto child = child_.lock();
+        if (child) {
+          child->startDrainSequence([] {});
+        }
+      }));
+  return child;
+}
+
+DrainManagerSharedPtr DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher) {
+  return createChildManager(dispatcher, drain_type_);
+}
 
 bool DrainManagerImpl::drainClose() const {
   // If we are actively health check failed and the drain type is default, always drain close.

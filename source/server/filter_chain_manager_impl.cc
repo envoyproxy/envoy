@@ -30,19 +30,21 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 } // namespace
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
-    Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), init_manager_(init_manager) {}
+    Configuration::DrainableFactoryContext& parent_context, Init::Manager& init_manager)
+    : parent_context_(parent_context), init_manager_(init_manager),
+      drain_manager_(
+          parent_context.drainManager().createChildManager(parent_context.dispatcher())) {}
 
-bool PerFilterChainFactoryContextImpl::drainClose() const {
-  return is_draining_.load() || parent_context_.drainDecision().drainClose();
-}
+bool PerFilterChainFactoryContextImpl::drainClose() const { return drain_manager_->drainClose(); }
 Common::ThreadSafeCallbackHandlePtr
 PerFilterChainFactoryContextImpl::addOnDrainCloseCb(Event::Dispatcher& dispatcher,
                                                     DrainCloseCb cb) const {
-  return parent_context_.drainDecision().addOnDrainCloseCb(dispatcher, cb);
+  return drain_manager_->addOnDrainCloseCb(dispatcher, cb);
 }
 
-Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
+Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() {
+  return *drain_manager_;
+}
 
 Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
 
@@ -146,7 +148,7 @@ Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const Network::Address::InstanceConstSharedPtr& address,
-    Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
+    Configuration::DrainableFactoryContext& factory_context, Init::Manager& init_manager,
     const FilterChainManagerImpl& parent_manager)
     : address_(address), parent_context_(factory_context), origin_(&parent_manager),
       init_manager_(init_manager) {}

@@ -183,7 +183,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
+    const envoy::config::listener::v3::Listener& config,
+    envoy::config::listener::v3::Listener_DrainType drain_type)
     : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
       global_scope_(server.stats().createScope("")),
       listener_scope_(server_.stats().createScope(
@@ -191,7 +192,10 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
                       !config.stat_prefix().empty()
                           ? config.stat_prefix()
                           : Network::Address::resolveProtoAddress(config.address())->asString()))),
-      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
+      validation_visitor_(validation_visitor),
+      drain_manager_(server.drainManager().createChildManager(server.dispatcher(), drain_type)) {
+  // TODO: Find all instances of creation and remove hte drain-manager
+}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -281,8 +285,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
-          parent.server_, validation_visitor_, config, this, *this,
-          parent.factory_.createDrainManager(config.drain_type()))),
+          parent.server_, validation_visitor_, config, this, *this, config.drain_type())),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
@@ -325,8 +328,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
-    // listener constructor so that this listener's children entities could register their targets
-    // with their parent's initManager.
+    // listener constructor so that this listener's children entities could register their
+    // targets with their parent's initManager.
     parent_.server_.initManager().add(listener_init_target_);
   }
 }
@@ -348,7 +351,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      // listener_init_target_ is not used during in place update because we expect server started.
+      // listener_init_target_ is not used during in place update because we expect server
+      // started.
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
@@ -406,11 +410,11 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config_.udp_listener_config().quic_options(), concurrency);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
-    // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
-    // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
-    // looking at the GSO code there are substantial copying inefficiency so I don't think it's
-    // wise to enable to globally for now. I will circle back and fix both of the above with
-    // a non-QUICHE GSO implementation.
+    // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this
+    // causes non-QUIC integration tests to fail, which I haven't investigated yet.
+    // Additionally, from looking at the GSO code there are substantial copying inefficiency so
+    // I don't think it's wise to enable to globally for now. I will circle back and fix both of
+    // the above with a non-QUICHE GSO implementation.
     if (Api::OsSysCallsSingleton::get().supportsUdpGso()) {
       udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
     }
@@ -431,7 +435,8 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 
 void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
   // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
-  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
+  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket
+  // layer:
   if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
   }
@@ -488,8 +493,8 @@ void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
   if (config_.filter_chains().empty() && !config_.has_default_filter_chain() &&
       (socket_type == Network::Socket::Type::Stream ||
        !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
-    // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
-    // is a filter chain specified
+    // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure
+    // there is a filter chain specified
     throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
                                      address_->asString()));
   } else if (udp_listener_config_ != nullptr &&
@@ -567,7 +572,8 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
 }
 
 void ListenerImpl::buildTlsInspectorListenerFilter() {
-  // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
+  // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are
+  // removed.
   const bool need_tls_inspector = needTlsInspector(config_);
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
@@ -692,9 +698,9 @@ void ListenerImpl::debugLog(const std::string& message) {
 
 void ListenerImpl::initialize() {
   last_updated_ = listener_factory_context_->timeSource().systemTime();
-  // If workers have already started, we shift from using the global init manager to using a local
-  // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
-  // by resetting the watcher.
+  // If workers have already started, we shift from using the global init manager to using a
+  // local per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed()
+  // call by resetting the watcher.
   if (workers_started_) {
     ENVOY_LOG_MISC(debug, "Initialize listener {} local-init-manager.", name_);
     // If workers_started_ is true, dynamic_init_manager_ should be initialized by listener
@@ -705,8 +711,8 @@ void ListenerImpl::initialize() {
 
 ListenerImpl::~ListenerImpl() {
   if (!workers_started_) {
-    // We need to remove the listener_init_target_ handle from parent's initManager(), to unblock
-    // parent's initManager to get ready().
+    // We need to remove the listener_init_target_ handle from parent's initManager(), to
+    // unblock parent's initManager to get ready().
     listener_init_target_.ready();
   }
 }
@@ -720,8 +726,8 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                             bool worker_started) {
-  // The in place update needs the active listener in worker thread. worker_started guarantees the
-  // existence of that active listener.
+  // The in place update needs the active listener in worker thread. worker_started guarantees
+  // the existence of that active listener.
   if (!worker_started) {
     return false;
   }
@@ -735,8 +741,8 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   }
 
   // Full listener update currently rejects tcp listener having 0 filter chain.
-  // In place filter chain update could survive under zero filter chain but we should keep the same
-  // behavior for now. This also guards the below filter chain access.
+  // In place filter chain update could survive under zero filter chain but we should keep the
+  // same behavior for now. This also guards the below filter chain access.
   if (config.filter_chains_size() == 0) {
     return false;
   }
