@@ -306,6 +306,8 @@ private:
     mode_t mode_{0};
   };
 
+  absl::Status initHelper(const sockaddr_un* address, mode_t mode);
+
   PipeHelper pipe_;
   friend class InstanceFactory;
 };

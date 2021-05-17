@@ -310,18 +310,10 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t 
     pipe_.abstract_namespace_ = true;
     pipe_.address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
-  pipe_.address_ = *address;
-  if (pipe_.abstract_namespace_) {
-    if (mode != 0) {
-      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
-    }
-    // Replace all null characters with '@' in friendly_name_.
-    friendly_name_ = friendlyNameFromAbstractPath(
-        absl::string_view(pipe_.address_.sun_path, pipe_.address_length_));
-  } else {
-    friendly_name_ = address->sun_path;
+  absl::Status status = initHelper(address, mode);
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
   }
-  pipe_.mode_ = mode;
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
@@ -380,11 +372,16 @@ PipeInstance::PipeInstance(absl::Status& error, const sockaddr_un* address, sock
     pipe_.abstract_namespace_ = true;
     pipe_.address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
+  error = initHelper(address, mode);
+}
+
+bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
+
+absl::Status PipeInstance::initHelper(const sockaddr_un* address, mode_t mode) {
   pipe_.address_ = *address;
   if (pipe_.abstract_namespace_) {
     if (mode != 0) {
-      error = absl::FailedPreconditionError("Cannot set mode for Abstract AF_UNIX sockets");
-      return;
+      return absl::FailedPreconditionError("Cannot set mode for Abstract AF_UNIX sockets");
     }
     // Replace all null characters with '@' in friendly_name_.
     friendly_name_ = friendlyNameFromAbstractPath(
@@ -393,9 +390,8 @@ PipeInstance::PipeInstance(absl::Status& error, const sockaddr_un* address, sock
     friendly_name_ = address->sun_path;
   }
   pipe_.mode_ = mode;
+  return absl::OkStatus();
 }
-
-bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
 EnvoyInternalInstance::EnvoyInternalInstance(const std::string& address_id,
                                              const SocketInterface* sock_interface)
