@@ -212,6 +212,7 @@ envoy_cmake_external(
         "LLVM_INCLUDE_TOOLS": "off",
         "LLVM_BUILD_UTILS": "off",
         "LLVM_INCLUDE_UTILS": "off",
+        "LLVM_ENABLE_IDE": "off",
         "LLVM_ENABLE_LIBEDIT": "off",
         "LLVM_ENABLE_LIBXML2": "off",
         "LLVM_ENABLE_TERMINFO": "off",
