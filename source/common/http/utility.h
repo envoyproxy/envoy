@@ -357,8 +357,8 @@ void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_function
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
   Network::Address::InstanceConstSharedPtr address_;
-  // Whether this is the only address in the XFF header.
-  bool single_address_;
+  // Whether this address can be used to determine if it's an internal request.
+  bool allow_trusted_address_checks_;
 };
 
 /**
