@@ -7,7 +7,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 RUN pip3 install -q flask
 RUN mkdir -p /code/data
-RUN dd if=/dev/zero of="/code/data/file.txt" bs=1024 count=102400 && \
-    dd if=/dev/zero of="/code/data/file.json" bs=1024 count=102400
+RUN dd if=/dev/zero of="/code/data/file.txt" bs=1024 count=10240 \
+    && dd if=/dev/zero of="/code/data/file.json" bs=1024 count=10240
 ADD ./service.py /code
 ENTRYPOINT ["python3", "/code/service.py"]

@@ -32,7 +32,7 @@ Change to the ``examples/gzip`` directory.
 Step 2: Test Envoy's compression capabilities for upstream
 **********************************************************
 
-Here we have two endpoints: ``/file.txt`` and ``/file.json``, only ``/file.json`` would be compressed.
+Here we have two endpoints: ``/file.txt`` and ``/file.json``, only ``/file.json`` should be compressed.
 
 Let us try it:
 
