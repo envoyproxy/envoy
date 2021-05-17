@@ -169,7 +169,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
   // Try to write raw buffer when next call is done, even this is not in do[Read|Write] stack.
   if (raw_write_buffer_.length() > 0) {
     Network::IoResult result = raw_buffer_socket_->doWrite(raw_write_buffer_, false);
-    if (handshake_complete_) {
+    if (handshake_complete_ && result.action_ != Network::PostIoAction::Close) {
       callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
     }
     return result.action_;
