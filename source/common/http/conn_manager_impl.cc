@@ -730,26 +730,20 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   } else {
     // TODO(mattklein) this may result in multiple flags. This Ok?
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                   Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(request_headers_ != nullptr &&
-                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                 Http::Code::RequestTimeout, "request timeout", nullptr, absl::nullopt,
+  sendLocalReply(Http::Code::RequestTimeout, "request timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
-  sendLocalReply(request_headers_ != nullptr &&
-                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                 Http::Code::RequestTimeout, "request header timeout", nullptr, absl::nullopt,
+  sendLocalReply(Http::Code::RequestTimeout, "request header timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
 }
 
@@ -757,9 +751,7 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                   Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
+    sendLocalReply(Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
                    Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                    StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
   } else {
@@ -893,8 +885,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     filter_manager_.skipFilterChainCreation();
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
-    sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, absl::nullopt,
+    sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
@@ -923,7 +914,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     filter_manager_.streamInfo().protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
-      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, absl::nullopt,
+      sendLocalReply(Code::UpgradeRequired, "", nullptr, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
     }
@@ -937,8 +928,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   if (!request_headers_->Host()) {
     // Require host header. For HTTP/1.1 Host has already been translated to :authority.
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                   nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().MissingHost);
+    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().MissingHost);
     return;
   }
 
@@ -951,16 +942,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // is enabled on the HCM.
   if ((!HeaderUtility::isConnect(*request_headers_) || request_headers_->Path()) &&
       request_headers_->getPathValue().empty()) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().MissingPath);
+    sendLocalReply(Code::NotFound, "", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().MissingPath);
     return;
   }
 
   // Currently we only support relative paths at the application layer.
   if (!request_headers_->getPathValue().empty() && request_headers_->getPathValue()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().AbsolutePath);
+    sendLocalReply(Code::NotFound, "", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().AbsolutePath);
     return;
   }
 
@@ -973,14 +964,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       (action == ConnectionManagerUtility::NormalizePathAction::Redirect &&
        Grpc::Common::hasGrpcContentType(*request_headers_))) {
     connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                   nullptr, absl::nullopt,
+    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   } else if (action == ConnectionManagerUtility::NormalizePathAction::Redirect) {
     connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
     sendLocalReply(
-        false, Code::TemporaryRedirect, "",
+        Code::TemporaryRedirect, "",
         [new_path = request_headers_->Path()->value().getStringView()](
             Http::ResponseHeaderMap& response_headers) -> void {
           response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
@@ -1010,8 +1000,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     if (mutate_result.reject_request.has_value()) {
       const auto& reject_request_params = mutate_result.reject_request.value();
       connection_manager_.stats_.named_.downstream_rq_rejected_via_ip_detection_.inc();
-      sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                     reject_request_params.response_code, reject_request_params.body, nullptr,
+      sendLocalReply(reject_request_params.response_code, reject_request_params.body, nullptr,
                      absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().OriginalIPDetectionFailed);
       return;
@@ -1046,8 +1035,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       // contains a smuggled HTTP request.
       state_.saw_connection_close_ = true;
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
-                     nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
+      sendLocalReply(Code::Forbidden, "", nullptr, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return;
     }
     // Allow non websocket requests to go through websocket enabled routes.
