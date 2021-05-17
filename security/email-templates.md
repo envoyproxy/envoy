@@ -206,3 +206,40 @@ Thanks,
 
 $PERSON (on behalf of the Envoy security team and maintainers)
 ```
+
+## Security Advisory
+```
+Subject: Security advisory
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+
+Hello Envoy Community,
+
+The Envoy securitty team would like to announce a security advisory for a feature introduced in
+$ENVOYRELEASE. As this is a security advisory for a feature not considered production ready that may
+have been lablede as such, no fix is provided and the advisory is to not make use of this in a production
+capacity until future hardening has been done.
+
+$DEFECTSSUMMARY
+
+<!-- Provide details on features, extensions, configuration that make it likely that a system is
+vulnerable in practice. -->
+
+The CVSS score for this is [$CVSSSTRING]($CVSSURL).
+
+**How do I mitigate the vulnerability?**
+
+<!--
+[This is an optional section. Remove if there are no mitigations.]
+-->
+
+Avoid the use of feature XYZ in Envoy configuration.
+
+**Thank you**
+
+Thank you to $REPORTER, $DEVELOPERS for the coordination in making this release.
+
+Thanks,
+
+$PERSON (on behalf of the Envoy security team and maintainers)
+```
