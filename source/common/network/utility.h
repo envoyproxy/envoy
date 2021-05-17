@@ -63,7 +63,7 @@ public:
   virtual uint64_t maxDatagramSize() const PURE;
 
   /**
-   * An estimated number of packets to read in each READ event.
+   * An estimated number of packets to read in each read event.
    */
   virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };

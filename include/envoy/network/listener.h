@@ -332,7 +332,7 @@ public:
   virtual void post(Network::UdpRecvData&& data) PURE;
 
   /**
-   * An estimated number of packets this callback expects to process in current READ event.
+   * An estimated number of packets this callback expects to process in current read event.
    */
   virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };

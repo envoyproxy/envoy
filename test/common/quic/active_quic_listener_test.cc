@@ -392,7 +392,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
   maybeConfigureMocks(count + 1);
-  // Create 1 session to increase number of packet to read in the next READ event.
+  // Create 1 session to increase number of packet to read in the next read event.
   sendCHLO(quic::test::TestConnectionId());
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
