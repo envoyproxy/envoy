@@ -98,7 +98,7 @@
    }
 --- wee8/build/config/compiler/BUILD.gn
 +++ wee8/build/config/compiler/BUILD.gn
-@@ -282,7 +282,11 @@ config("compiler") {
+@@ -288,14 +288,21 @@ config("compiler") {
    # so only enable it if using_clang. See: https://gcc.gnu.org/PR97913
    # TODO(mpdenton): remove is_clang once GCC bug is fixed.
    if (!is_nacl && !is_ubsan && is_clang) {
@@ -110,8 +110,19 @@
 +    }
    }
 
+   # Don't emit the GCC version ident directives, they just end up in the
+   # .comment section or debug info taking up binary size, and makes comparing
+   # .o files built with different compiler versions harder.
+-  if (!is_win || is_clang) {
++  if (!is_win) {
+     cflags += [ "-fno-ident" ]
++  } else if (is_clang) {
++    # TODO(crbug.com/1183366): Use -fno-ident once clang-cl supports it.
++    cflags += [ "/clang:-fno-ident" ]
+   }
+
    # In general, Windows is totally different, but all the other builds share
-@@ -1543,6 +1547,13 @@ config("default_warnings") {
+@@ -1553,6 +1555,13 @@ config("default_warnings") {
      ]
    }
 
