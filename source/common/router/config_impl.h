@@ -38,6 +38,19 @@ namespace Envoy {
 namespace Router {
 
 /**
+ * Original port from the authority header.
+ */
+class OriginalConnectPort : public StreamInfo::FilterState::Object {
+public:
+  explicit OriginalConnectPort(uint32_t port) : port_(port) {}
+  const uint32_t& value() const { return port_; }
+  static const std::string& key();
+
+private:
+  const uint32_t port_;
+};
+
+/**
  * Base interface for something that matches a header.
  */
 class Matchable {

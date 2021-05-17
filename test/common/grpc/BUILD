@@ -132,6 +132,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:assert_lib",
         "//test/mocks/secret:secret_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

@@ -1,6 +1,8 @@
 #pragma once
 
+#include "common/http/alternate_protocols_cache_impl.h"
 #include "common/http/conn_pool_base.h"
+#include "common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -17,6 +19,11 @@ public:
     explicit ConnectivityOptions(const std::vector<Http::Protocol>& protocols)
         : protocols_(protocols) {}
     std::vector<Http::Protocol> protocols_;
+  };
+
+  enum class StreamCreationResult {
+    ImmediateResult,
+    StreamCreationPending,
   };
 
   using PoolIterator = std::list<ConnectionPool::InstancePtr>::iterator;
@@ -37,9 +44,9 @@ public:
                                        public LinkedObject<ConnectionAttemptCallbacks> {
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
+      ~ConnectionAttemptCallbacks() override;
 
-      // Returns true if a stream is immediately created, false if it is pending.
-      bool newStream();
+      StreamCreationResult newStream();
 
       // ConnectionPool::Callbacks
       void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -67,12 +74,8 @@ public:
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
-    // Attempt to create a new stream for pool(). Returns true if the stream has
-    // been created.
-    bool newStream();
-
-    // Removes this from the owning list, deleting it.
-    void deleteThis();
+    // Attempt to create a new stream for pool().
+    StreamCreationResult newStream();
 
     // Called on pool failure or timeout to kick off another connection attempt.
     // Returns true if there is a failover pool and a connection has been
@@ -92,6 +95,16 @@ public:
                                   absl::optional<Http::Protocol> protocol);
 
   private:
+    // Removes this from the owning list, deleting it.
+    void deleteThis();
+
+    // Marks HTTP/3 broken if the HTTP/3 attempt failed but a TCP attempt succeeded.
+    // While HTTP/3 is broken the grid will not attempt to make new HTTP/3 connections.
+    void maybeMarkHttp3Broken();
+
+    // Cancels any pending attempts and deletes them.
+    void cancelAllPendingAttempts(Envoy::ConnectionPool::CancelPolicy cancel_policy);
+
     // Tracks all the connection attempts which currently in flight.
     std::list<ConnectionAttemptCallbacksPtr> connection_attempts_;
 
@@ -100,12 +113,17 @@ public:
     // The decoder for the original newStream, needed to create streams on subsequent pools.
     Http::ResponseDecoder& decoder_;
     // The callbacks from the original caller, which must get onPoolFailure or
-    // onPoolReady unless there is call to cancel().
-    ConnectionPool::Callbacks& inner_callbacks_;
+    // onPoolReady unless there is call to cancel(). Will be nullptr if the caller
+    // has been notified while attempts are still pending.
+    ConnectionPool::Callbacks* inner_callbacks_;
     // The timer which tracks when new connections should be attempted.
     Event::TimerPtr next_attempt_timer_;
     // The iterator to the last pool which had a connection attempt.
     PoolIterator current_;
+    // True if the HTTP/3 attempt failed.
+    bool http3_attempt_failed_{};
+    // True if the TCP attempt succeeded.
+    bool tcp_attempt_succeeded_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -114,6 +132,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                   OptRef<AlternateProtocolsCacheImpl> alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
@@ -131,12 +150,31 @@ public:
   // Returns the next pool in the ordered priority list.
   absl::optional<PoolIterator> nextPool(PoolIterator pool_it);
 
+  // Returns true if pool is the grid's HTTP/3 connection pool.
+  bool isPoolHttp3(const ConnectionPool::Instance& pool);
+
+  // Returns true if HTTP/3 is currently broken. While HTTP/3 is broken the grid will not
+  // attempt to make new HTTP/3 connections.
+  bool isHttp3Broken() const;
+
+  // Marks HTTP/3 broken for a period of time subject to exponential backoff. While HTTP/3
+  // is broken the grid will not attempt to make new HTTP/3 connections.
+  void markHttp3Broken();
+
+  // Marks that HTTP/3 is working, which resets the exponential backoff counter in the
+  // event that HTTP/3 is marked broken again.
+  void markHttp3Confirmed();
+
 private:
   friend class ConnectivityGridForTest;
 
   // Called by each pool as it drains. The grid is responsible for calling
   // drained_callbacks_ once all pools have drained.
   void onDrainReceived();
+
+  // Returns true if HTTP/3 should be attempted because there is an alternate protocol
+  // that specifies HTTP/3 and HTTP/3 is not broken.
+  bool shouldAttemptHttp3();
 
   // Creates the next pool in the priority list, or absl::nullopt if all pools
   // have been created.
@@ -152,6 +190,9 @@ private:
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
+  Http3StatusTracker http3_status_tracker_;
+  // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
+  OptRef<AlternateProtocolsCacheImpl> alternate_protocols_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and

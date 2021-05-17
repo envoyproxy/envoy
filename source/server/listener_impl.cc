@@ -32,7 +32,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "common/quic/active_quic_listener.h"
@@ -316,13 +315,12 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-  if (socket_type == Network::Socket::Type::Datagram) {
-    return;
+  if (socket_type != Network::Socket::Type::Datagram) {
+    buildSocketOptions();
+    buildOriginalDstListenerFilter();
+    buildProxyProtocolListenerFilter();
+    buildTlsInspectorListenerFilter();
   }
-  buildSocketOptions();
-  buildOriginalDstListenerFilter();
-  buildProxyProtocolListenerFilter();
-  buildTlsInspectorListenerFilter();
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the

@@ -15,6 +15,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api",
+                                      "true");
     config_helper_.addFilter(R"EOF(
   name: composite
   typed_config:
@@ -62,7 +64,7 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
     waitForNextUpstreamRequest();
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   }
 
@@ -73,7 +75,7 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
                                                             {"match-header", "match"},
                                                             {":authority", "blah"}};
     auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
   }
 }

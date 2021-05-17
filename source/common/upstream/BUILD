@@ -92,6 +92,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/http/http3:conn_pool_lib",
+        "//source/common/http:conn_pool_grid",
     ]),
 )
 
@@ -257,7 +258,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -481,7 +481,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/network/common:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
     ],
 )
@@ -495,7 +494,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -592,7 +590,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters:well_known_names",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],

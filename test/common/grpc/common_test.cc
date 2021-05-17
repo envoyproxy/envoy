@@ -78,6 +78,9 @@ TEST(GrpcContextTest, GetGrpcTimeout) {
   Http::TestRequestHeaderMapImpl missing_unit{{"grpc-timeout", "123"}};
   EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(missing_unit));
 
+  Http::TestRequestHeaderMapImpl small_missing_unit{{"grpc-timeout", "1"}};
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(small_missing_unit));
+
   Http::TestRequestHeaderMapImpl illegal_unit{{"grpc-timeout", "123F"}};
   EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(illegal_unit));
 
@@ -102,8 +105,19 @@ TEST(GrpcContextTest, GetGrpcTimeout) {
   Http::TestRequestHeaderMapImpl unit_nanoseconds{{"grpc-timeout", "12345678n"}};
   EXPECT_EQ(std::chrono::milliseconds(13), Common::getGrpcTimeout(unit_nanoseconds));
 
-  // Max 8 digits and no leading whitespace or +- signs are not enforced on decode,
-  // so we don't test for them.
+  // Test max 8 digits to prevent millisecond overflow.
+  Http::TestRequestHeaderMapImpl value_overflow{{"grpc-timeout", "6666666666666H"}};
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(value_overflow));
+
+  // Reject negative values.
+  Http::TestRequestHeaderMapImpl value_negative{{"grpc-timeout", "-1S"}};
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(value_negative));
+
+  // Allow positive values marked with +.
+  Http::TestRequestHeaderMapImpl value_positive{{"grpc-timeout", "+1S"}};
+  EXPECT_EQ(std::chrono::milliseconds(1000), Common::getGrpcTimeout(value_positive));
+
+  // No leading whitespace are not enforced on decode so we don't test for them.
 }
 
 TEST(GrpcCommonTest, GrpcStatusDetailsBin) {

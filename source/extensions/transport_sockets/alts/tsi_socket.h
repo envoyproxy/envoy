@@ -74,6 +74,10 @@ public:
 
   // This API should be called only after ALTS handshake finishes successfully.
   size_t actualFrameSizeToUse() { return actual_frame_size_to_use_; }
+  // Set actual_frame_size_to_use_. Exposed for testing purpose.
+  void setActualFrameSizeToUse(size_t frame_size) { actual_frame_size_to_use_ = frame_size; }
+  // Set frame_overhead_size_. Exposed for testing purpose.
+  void setFrameOverheadSize(size_t overhead_size) { frame_overhead_size_ = overhead_size; }
 
 private:
   Network::PostIoAction doHandshake();
@@ -82,6 +86,8 @@ private:
 
   // Helper function to perform repeated read and unprotect operations.
   Network::IoResult repeatReadAndUnprotect(Buffer::Instance& buffer, Network::IoResult prev_result);
+  // Helper function to perform repeated protect and write operations.
+  Network::IoResult repeatProtectAndWrite(Buffer::Instance& buffer, bool end_stream);
   // Helper function to read from a raw socket and update status.
   Network::IoResult readFromRawSocket();
 
@@ -97,6 +103,11 @@ private:
   // actual_frame_size_to_use_ is the actual frame size used by
   // frame protector, which is the result of frame size negotiation.
   size_t actual_frame_size_to_use_{0};
+  // frame_overhead_size_ includes 4 bytes frame message type and 16 bytes tag length.
+  // It is consistent with gRPC ALTS zero copy frame protector implementation.
+  // The maximum size of data that can be protected for each frame is equal to
+  // actual_frame_size_to_use_ - frame_overhead_size_.
+  size_t frame_overhead_size_{20};
 
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
   std::unique_ptr<TsiTransportSocketCallbacks> tsi_callbacks_;
@@ -107,6 +118,8 @@ private:
   bool handshake_complete_{};
   bool end_stream_read_{};
   bool read_error_{};
+  bool write_buffer_contains_handshake_bytes_{};
+  uint64_t prev_bytes_to_drain_{};
 };
 
 /**

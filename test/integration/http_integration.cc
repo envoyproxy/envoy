@@ -327,8 +327,8 @@ void HttpIntegrationTest::initialize() {
 #ifdef ENVOY_ENABLE_QUIC
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
-  quic_transport_socket_factory_ =
-      IntegrationUtil::createQuicUpstreamTransportSocketFactory(*api_, san_to_match_);
+  quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
+      *api_, stats_store_, context_manager_, san_to_match_);
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
@@ -340,8 +340,17 @@ void HttpIntegrationTest::initialize() {
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
-  quic_connection_persistent_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, stats_store_, timeSystem(), server_addr);
+  auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr);
+  // Config IETF QUIC flow control window.
+  quic_connection_persistent_info->quic_config_
+      .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
+          Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  // Config Google QUIC flow control window.
+  quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
+
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -693,7 +702,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 
@@ -1144,7 +1153,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
     }
   } else {
@@ -1155,7 +1164,8 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 }
 
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
-                                                  uint32_t max_count) {
+                                                  uint32_t max_count,
+                                                  std::chrono::milliseconds timeout) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
@@ -1192,11 +1202,12 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
     }
   } else {
-    auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
+    auto response =
+        sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, timeout);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -1235,7 +1246,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
     } else {
       // Expect a stream reset when the size of the trailers is larger than the maximum
       // limit.
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
       EXPECT_FALSE(response->complete());
     }
@@ -1251,7 +1262,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
   // time-consuming asserts when using a large number of headers.
   setMaxRequestHeadersKb(96);
-  setMaxRequestHeadersCount(10005);
+  setMaxRequestHeadersCount(10010);
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1432,7 +1443,7 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForEndStream());
     codec_client_->close();
   }
 }
@@ -1477,7 +1488,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForEndStream());
       codec_client_->close();
     }
 

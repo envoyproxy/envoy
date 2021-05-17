@@ -8,3 +8,10 @@ envoy_package()
 envoy_py_library("tools.base.runner")
 
 envoy_py_library("tools.base.utils")
+
+envoy_py_library(
+    "tools.base.checker",
+    deps = [
+        ":runner",
+    ],
+)

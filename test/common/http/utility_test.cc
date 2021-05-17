@@ -14,8 +14,8 @@
 #include "common/network/address_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -409,16 +409,6 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
   EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                   .override_stream_error_on_invalid_http_message()
                   .value());
-
-  {
-    // With runtime flipped, override is ignored.
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.hcm_stream_error_on_invalid_message", "false"}});
-    EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
-                    .override_stream_error_on_invalid_http_message()
-                    .value());
-  }
 }
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
@@ -464,16 +454,16 @@ TEST(HttpUtility, getLastAddressFromXFF) {
         {"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
     ret = Utility::getLastAddressFromXFF(request_headers, 1);
     EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
     ret = Utility::getLastAddressFromXFF(request_headers, 2);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
     ret = Utility::getLastAddressFromXFF(request_headers, 3);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     const std::string first_address = "192.0.2.10";
@@ -486,64 +476,64 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     // No space on the left.
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(fourth_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // No space on either side.
     ret = Utility::getLastAddressFromXFF(request_headers, 1);
     EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // Exercise rtrim() and ltrim().
     ret = Utility::getLastAddressFromXFF(request_headers, 2);
     EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // No space trimming.
     ret = Utility::getLastAddressFromXFF(request_headers, 3);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // No address found.
     ret = Utility::getLastAddressFromXFF(request_headers, 4);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ","}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", "}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", bad"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers;
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     const std::string first_address = "34.0.0.1";
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
-    EXPECT_TRUE(ret.single_address_);
+    EXPECT_TRUE(ret.allow_trusted_address_checks_);
   }
 }
 
@@ -559,6 +549,18 @@ TEST(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
+TEST(HttpUtility, TestParseSetCookie) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"set-cookie", "somekey=somevalue; someotherkey=someothervalue"},
+      {"set-cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
+      {"set-cookie", "key2=value2; key3=value3"}};
+
+  std::string key{"token"};
+  std::string value = Utility::parseSetCookieValue(headers, key);
+  EXPECT_EQ(value, "abc123");
+}
+
 TEST(HttpUtility, TestParseCookieBadValues) {
   TestRequestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
                                    {"cookie", "token2=abc123;   "},
@@ -569,6 +571,18 @@ TEST(HttpUtility, TestParseCookieBadValues) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "token2"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token3"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token4"), "abc123");
+}
+
+TEST(HttpUtility, TestParseSetCookieBadValues) {
+  TestRequestHeaderMapImpl headers{{"set-cookie", "token1=abc123; = "},
+                                   {"set-cookie", "token2=abc123;   "},
+                                   {"set-cookie", "; token3=abc123;"},
+                                   {"set-cookie", "=; token4=\"abc123\""}};
+
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token1"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token2"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token3"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token4"), "abc123");
 }
 
 TEST(HttpUtility, TestParseCookieWithQuotes) {
@@ -582,6 +596,19 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "dquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "quoteddquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, TestParseSetCookieWithQuotes) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"set-cookie", "dquote=\"; quoteddquote=\"\"\""},
+      {"set-cookie", "leadingdquote=\"foobar;"},
+      {"set-cookie", "abc=def; token=\"abc123\"; Expires=Wed, 09 Jun 2021 10:18:14 GMT"}};
+
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "token"), "abc123");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "dquote"), "\"");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "quoteddquote"), "\"");
+  EXPECT_EQ(Utility::parseSetCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
 TEST(HttpUtility, TestMakeSetCookieValue) {

@@ -329,40 +329,43 @@ TEST_P(AdsIntegrationTest, ResendNodeOnStreamReset) {
   RELEASE_ASSERT(result, result.message());
   xds_stream_->startGrpcStream();
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {"cluster_0"},
-                                      {"cluster_0"}, {}, true));
+  // In SotW cluster_0 will be in the resource_names, but in delta-xDS
+  // resource_names_subscribe and resource_names_unsubscribe must be empty for
+  // a wildcard request (cluster_0 will appear in initial_resource_versions).
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {"cluster_0"}, {}, {}, true));
 }
 
-// Validate that xds can support a mix of v2 and v3 type url.
-TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true");
+// Verifies that upon stream reconnection:
+// - Non-wildcard requests contain all known resources.
+// - Wildcard requests contain all known resources in SotW, but no resources in delta-xDS.
+// Regression test for https://github.com/envoyproxy/envoy/issues/16063.
+TEST_P(AdsIntegrationTest, ResourceNamesOnStreamReset) {
   initialize();
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
 
-  // Send initial configuration.
-  // Discovery response with v3 type url.
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-          envoy::config::core::v3::ApiVersion::V3),
-      {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
-  // Discovery response with v2 type url.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
-  // Discovery response with v3 type url.
-  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      Config::getTypeUrl<envoy::config::listener::v3::Listener>(
-          envoy::config::core::v3::ApiVersion::V3),
-      {buildListener("listener_0", "route_config_0")},
-      {buildListener("listener_0", "route_config_0")}, {}, "1", false);
-  // Discovery response with v2 type url.
-  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
-      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
-  // Validate that we can process a request.
-  makeSingleRequest();
+  // A second CDS request should be sent so that the node is cleared in the cached request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+
+  xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+  AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  xds_stream_->startGrpcStream();
+
+  // In SotW cluster_0 will be in the resource_names, but in delta-xDS
+  // resource_names_subscribe and resource_names_unsubscribe must be empty for
+  // a wildcard request (cluster_0 will appear in initial_resource_versions).
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {"cluster_0"}, {}, {}, true));
 }
 
 // Validate that the request with duplicate listeners is rejected.

@@ -42,7 +42,10 @@ void MutationUtils::applyCommonHeaderResponse(const HeadersResponse& response,
 void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::HeaderMap& headers) {
   for (const auto& remove_header : mutation.remove_headers()) {
     if (Http::HeaderUtility::isRemovableHeader(remove_header)) {
+      ENVOY_LOG(trace, "Removing header {}", remove_header);
       headers.remove(LowerCaseString(remove_header));
+    } else {
+      ENVOY_LOG(debug, "Header {} is not removable", remove_header);
     }
   }
 
@@ -55,19 +58,25 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
       // filter. However, the router handles this same protobuf and uses "true"
       // as the default instead.
       const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
+      ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
       if (append) {
         headers.addCopy(LowerCaseString(sh.header().key()), sh.header().value());
       } else {
         headers.setCopy(LowerCaseString(sh.header().key()), sh.header().value());
       }
+    } else {
+      ENVOY_LOG(debug, "Header {} is not settable", sh.header().key());
     }
   }
 }
 
-void MutationUtils::applyCommonBodyResponse(const BodyResponse& response,
+void MutationUtils::applyCommonBodyResponse(const BodyResponse& response, Http::HeaderMap* headers,
                                             Buffer::Instance& buffer) {
   if (response.has_response()) {
     const auto& common_response = response.response();
+    if (headers != nullptr && common_response.has_header_mutation()) {
+      applyHeaderMutations(common_response.header_mutation(), *headers);
+    }
     if (common_response.has_body_mutation()) {
       applyBodyMutations(common_response.body_mutation(), buffer);
     }
