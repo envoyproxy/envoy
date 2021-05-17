@@ -19,6 +19,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -34,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -495,7 +496,36 @@ message HttpConnectionManager {
   // determining the origin client's IP address. The default is zero if this option
   // is not specified. See the documentation for
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
-  uint32 xff_num_trusted_hops = 19;
+  //
+  // .. note::
+  //    This field is deprecated and instead :ref:`original_ip_detection_extensions
+  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+  //    should be used to configure the :ref:`xff extension <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+  //    to configure IP detection using the :ref:`config_http_conn_man_headers_x-forwarded-for` header. To replace
+  //    this field use a config like the following:
+  //
+  // .. code-block:: yaml
+  //
+  //    original_ip_detection_extensions:
+  //      typed_config:
+  //        "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
+  //        xff_num_trusted_hops: 1
+  //
+  uint32 xff_num_trusted_hops = 19
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The configuration for the original IP detection extensions.
+  //
+  // When configured the extensions will be called along with the request headers
+  // and information about the downstream connection, such as the directly connected address.
+  // Each extension will then use these parameters to decide the request's effective remote address.
+  // If an extension fails to detect the original IP address and isn't configured to reject
+  // the request, the HCM will try the remaining extensions until one succeeds or rejects
+  // the request. If the request isn't rejected nor any extension succeeds, the HCM will
+  // fallback to using the remote address.
+  //
+  // [#extension-category: envoy.http.original_ip_detection]
+  repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 46;
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
