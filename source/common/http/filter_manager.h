@@ -829,7 +829,7 @@ public:
    */
   void onLocalReply(StreamFilterBase::LocalReplyData& data);
 
-  void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+  void sendLocalReply(Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details, bool retain_http_status_for_grpc = false);

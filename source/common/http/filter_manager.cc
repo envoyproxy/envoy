@@ -367,8 +367,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
     bool retain_http_status_for_grpc) {
-  parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details,
-                         retain_http_status_for_grpc);
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details, retain_http_status_for_grpc);
 }
 
 void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
@@ -833,9 +832,8 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = false;
 }
 
-// TODO(alyssawilk) update sendLocalReply interface.
 void FilterManager::sendLocalReply(
-    bool, Code code, absl::string_view body,
+    Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
     bool retain_http_status_for_grpc) {
@@ -1530,8 +1528,7 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details,
     bool retain_http_status_for_grpc) {
-  parent_.sendLocalReply(parent_.state_.is_grpc_request_, code, body, modify_headers, grpc_status,
-                         details, retain_http_status_for_grpc);
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details, retain_http_status_for_grpc);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
@@ -1549,8 +1546,6 @@ void ActiveStreamEncoderFilter::responseDataTooLarge() {
     // In this case, sendLocalReply will either send a response directly to the encoder, or
     // reset the stream.
     parent_.sendLocalReply(
-        parent_.filter_manager_callbacks_.requestHeaders() &&
-            Grpc::Common::isGrpcRequestHeaders(*parent_.filter_manager_callbacks_.requestHeaders()),
         Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
         nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }
