@@ -29,6 +29,8 @@ namespace Address {
  */
 StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
                                                      bool v6only = true);
+InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss, socklen_t len,
+                                                  bool v6only = true);
 
 Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
                                                             socklen_t ss_len, os_fd_t fd,
@@ -135,6 +137,7 @@ public:
 private:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
+   * Store the status code in passed in parameter instead of throwing.
    */
   explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr);
@@ -213,6 +216,7 @@ public:
 private:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
+   * Store the status code in passed in parameter instead of throwing.
    */
   Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
                const SocketInterface* sock_interface = nullptr);

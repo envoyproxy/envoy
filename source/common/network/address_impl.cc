@@ -77,6 +77,15 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,
+                                                           socklen_t ss_len, bool v6only) {
+  StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
+  if (!address.ok()) {
+    throw EnvoyException(address.status().ToString());
+  }
+  return *address;
+}
+
 Address::InstanceConstSharedPtr
 getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t fd, bool v6only) {
   // Set v6only to false so that mapped-v6 address can be normalize to v4

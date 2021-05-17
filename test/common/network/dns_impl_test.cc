@@ -697,7 +697,6 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   // If that flag needs to be set, or c-ares changes its handling this test will need to be updated
   // to create another condition where c-ares invokes onAresGetAddrInfoCallback with status ==
   // ARES_ECONNREFUSED.
-
   EXPECT_TRUE(peer_->isChannelDirty());
 
   server_->setRefused(false);

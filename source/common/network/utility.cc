@@ -129,19 +129,28 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                                      uint16_t port, bool v6only) {
-  Address::InstanceConstSharedPtr address;
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
-    return Address::InstanceFactory::createInstancePtrOrDie<Address::Ipv4Instance>(&sa4);
+    StatusOr<Address::InstanceConstSharedPtr> address =
+        Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4);
+    if (address.ok()) {
+      return *address;
+    }
+    return nullptr;
   }
   sockaddr_in6 sa6;
   memset(&sa6, 0, sizeof(sa6));
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port);
-    return Address::InstanceFactory::createInstancePtrOrDie<Address::Ipv6Instance>(sa6, v6only);
+    StatusOr<Address::InstanceConstSharedPtr> address =
+        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only);
+    if (address.ok()) {
+      return *address;
+    }
+    return nullptr;
   }
   return nullptr;
 }
@@ -180,7 +189,12 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     }
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port64);
-    return Address::InstanceFactory::createInstancePtrOrDie<Address::Ipv6Instance>(sa6, v6only);
+    StatusOr<Address::InstanceConstSharedPtr> address =
+        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only);
+    if (address.ok()) {
+      return *address;
+    }
+    return nullptr;
   }
   // Treat it as an IPv4 address followed by a port.
   const auto pos = ip_address.rfind(':');
@@ -200,7 +214,12 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   }
   sa4.sin_family = AF_INET;
   sa4.sin_port = htons(port64);
-  return Address::InstanceFactory::createInstancePtrOrDie<Address::Ipv4Instance>(&sa4);
+  StatusOr<Address::InstanceConstSharedPtr> address =
+      Address::InstanceFactory::createInstancePtrOrDie<Address::Ipv4Instance>(&sa4);
+  if (address.ok()) {
+    return *address;
+  }
+  return nullptr;
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
@@ -248,9 +267,8 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
         (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      ret = Address::getAddressFromSockAddrOrDie(
-          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6),
-          -1, true);
+      ret = Address::addressFromSockAddrOrThrow(
+          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
       if (!isLoopbackAddress(*ret)) {
         break;
       }

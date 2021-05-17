@@ -586,7 +586,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  return Address::getAddressFromSockAddrOrDie(ss, ss_len, -1, socket_v6only_);
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
@@ -611,7 +611,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  return Address::getAddressFromSockAddrOrDie(ss, ss_len, -1, true);
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
