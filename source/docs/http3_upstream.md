@@ -12,7 +12,7 @@ means that upstream HTTP/3 connection attempts might be blocked by the network a
 back to using HTTP/2. On such networks, the upstream connection code needs to
 track that HTTP/3 connects attempts are not succeeding and avoid making connections
 which are doomed to fail. On networks where HTTP/3 is working correctly, however, the
-Upstream connection code should avoid attempting HTTP/2 unnecessarily.
+upstream connection code should avoid attempting HTTP/2 unnecessarily.
 
 ### Components
 
