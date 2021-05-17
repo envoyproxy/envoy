@@ -180,7 +180,7 @@ void FuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
 }
 
 size_t FuzzUdpListenerCallbacks::numPacketsExpectedPerEventLoop() const {
-  return network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+  return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) { UdpFuzz udp_instance(buf, len); }
