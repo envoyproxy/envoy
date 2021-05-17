@@ -1,7 +1,5 @@
 FROM envoyproxy/envoy-dev:latest
 
-RUN apt-get update && apt-get -q install -y \
-    curl
 COPY ./front-envoy-jaeger.yaml /etc/front-envoy.yaml
 #
 # for discussion on jaeger binary compatibility, and the source of the file, see here:
