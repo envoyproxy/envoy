@@ -694,7 +694,6 @@ public:
   void createUpstreams() override {
     // This is for backend with ssl
     addFakeUpstream(createUpstreamSslContext(context_manager_, *api_, test_quic_),
-                    //                    FakeHttpConnection::Type::HTTP1);
                     upstreamProtocol());
     create_xds_upstream_ = true;
   }

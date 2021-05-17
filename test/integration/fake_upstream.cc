@@ -507,9 +507,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == FakeHttpConnection::Type::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
-  ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}",
-            localAddress()->ip()->addressAsString(), config.udp_fake_upstream_.has_value(),
-            FakeHttpConnection::typeToString(http_type_));
+  ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
+            config.udp_fake_upstream_.has_value(), FakeHttpConnection::typeToString(http_type_));
   if (config.udp_fake_upstream_.has_value() &&
       config.udp_fake_upstream_->max_rx_datagram_size_.has_value()) {
     listener_.udp_listener_config_.config_.mutable_downstream_socket_config()
