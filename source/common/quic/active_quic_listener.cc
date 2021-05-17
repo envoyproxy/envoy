@@ -39,7 +39,7 @@ ActiveQuicListener::ActiveQuicListener(
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    uint32_t packets_to_read_per_connection)
+    uint32_t packets_to_read_to_connection_count_ratio)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
@@ -48,7 +48,7 @@ ActiveQuicListener::ActiveQuicListener(
           &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       kernel_worker_routing_(kernel_worker_routing),
-      packets_to_read_per_connection_(packets_to_read_per_connection) {
+      packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio) {
   // This flag fix a QUICHE issue which may crash Envoy during connection close.
   SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   // Do not include 32-byte per-entry overhead while counting header size.
@@ -220,16 +220,16 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
 }
 
 size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
-  // Expect each session to read packets_to_read_per_connection_ number of packets in
+  // Expect each session to read packets_to_read_to_connection_count_ratio_ number of packets in
   // this read event.
-  return quic_dispatcher_->NumSessions() * packets_to_read_per_connection_;
+  return quic_dispatcher_->NumSessions() * packets_to_read_to_connection_count_ratio_;
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
     : concurrency_(concurrency), enabled_(config.enabled()),
-      packets_to_read_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, packets_to_read_per_connection, DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
+      packets_to_read_to_connection_count_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, packets_to_read_to_connection_count_ratio, DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
   uint64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -314,7 +314,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
 
   return std::make_unique<ActiveQuicListener>(
       worker_index, concurrency_, disptacher, parent, config, quic_config_, std::move(options),
-      kernel_worker_routing, enabled_, packets_to_read_per_connection_);
+      kernel_worker_routing, enabled_, packets_to_read_to_connection_count_ratio_);
 } // namespace Quic
 
 } // namespace Quic

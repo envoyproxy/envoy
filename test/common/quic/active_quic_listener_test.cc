@@ -267,7 +267,7 @@ protected:
     enabled:
       default_value: true
       runtime_key: quic.enabled
-    packets_to_read_per_connection: 50
+    packets_to_read_to_connection_count_ratio: 50
 )EOF",
                        connection_window_size_, stream_window_size_);
   }
