@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -304,9 +304,9 @@ message HttpConnectionManager {
     type.http.v3.PathTransformation http_filter_transformation = 2;
   }
 
-  reserved 27, 11;
+  reserved 27, 11, 19;
 
-  reserved "idle_timeout";
+  reserved "idle_timeout", "xff_num_trusted_hops";
 
   // Supplies the type of codec that the connection manager should use.
   CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -493,12 +493,18 @@ message HttpConnectionManager {
   google.protobuf.BoolValue use_remote_address = 14
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
-  // The number of additional ingress proxy hops from the right side of the
-  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
-  // determining the origin client's IP address. The default is zero if this option
-  // is not specified. See the documentation for
-  // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
-  uint32 xff_num_trusted_hops = 19;
+  // The configuration for the original IP detection extensions.
+  //
+  // When configured the extensions will be called along with the request headers
+  // and information about the downstream connection, such as the directly connected address.
+  // Each extension will then use these parameters to decide the request's effective remote address.
+  // If an extension fails to detect the original IP address and isn't configured to reject
+  // the request, the HCM will try the remaining extensions until one succeeds or rejects
+  // the request. If the request isn't rejected nor any extension succeeds, the HCM will
+  // fallback to using the remote address.
+  //
+  // [#extension-category: envoy.http.original_ip_detection]
+  repeated config.core.v4alpha.TypedExtensionConfig original_ip_detection_extensions = 46;
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
