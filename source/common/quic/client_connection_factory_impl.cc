@@ -25,7 +25,7 @@ getContext(Network::TransportSocketFactory& transport_socket_factory) {
 std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConfig() {
   auto context = getContext(transport_socket_factory_);
   // If the secrets haven't been loaded, there is no crypto config.
-  if (context.get() == nullptr) {
+  if (context == nullptr) {
     return nullptr;
   }
 
