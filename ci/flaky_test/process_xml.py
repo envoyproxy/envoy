@@ -102,9 +102,15 @@ def parse_and_print_test_suite_error(testsuite, log_path):
             # parsed into the XML metadata. Here we attempt to extract those names from the log by
             # finding the last test case to run. The expected format of that is:
             #     "[ RUN      ] <TestParams>/<TestSuite>.<TestCase>\n".
+
             last_test_fullname = test_output.split('[ RUN      ]')[-1].splitlines()[0]
-            last_testsuite = last_test_fullname.split('/')[1].split('.')[0]
-            last_testcase = last_test_fullname.split('.')[1]
+            last_test_fullname_splitted_on_dot = last_test_fullname.split('.')
+            if len(last_test_fullname_splitted_on_dot) == 2:
+                last_testcase = last_test_fullname_splitted_on_dot[1]
+                last_testsuite = last_test_fullname_splitted_on_dot[0].split('/')[-1]
+            else:
+                last_testcase = "Could not retrieve last test case"
+                last_testsuite = "Could not retrieve last test suite"
 
     if error_msg != "":
         return print_test_suite_error(
