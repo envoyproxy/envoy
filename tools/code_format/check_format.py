@@ -875,7 +875,7 @@ class FormatChecker:
         if self.is_in_subdir(file_path, 'source') and file_path.endswith('.cc') and \
           ('.counterFromString(' in line or '->counterFromString(' in line or \
             '.histogramFromString(' in line or '->histogramFromString(' in line or \
-            '.textReadoutFromString(' in line or or '->textReadoutFromString(' in line or \
+            '.textReadoutFromString(' in line or '->textReadoutFromString(' in line or \
             '.counterGroupFromString(' in line or '->counterGroupFromString(' in line or \
             '.gaugeFromString(' in line or '->gaugeFromString(' in line):
 

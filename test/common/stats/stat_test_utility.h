@@ -152,7 +152,8 @@ public:
                                    Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
-  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
+                                                 StatNameTagVectorOptConstRef tags,
                                                  size_t max_entries) override;
 
   // New APIs available for tests.

@@ -185,7 +185,8 @@ public:
   TextReadout& textReadoutFromString(const std::string& name) override {
     return default_scope_->textReadoutFromString(name);
   }
-  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
+                                                 StatNameTagVectorOptConstRef tags,
                                                  size_t max_entries) override {
     return default_scope_->counterGroupFromStatNameWithTags(name, tags, max_entries);
   }
@@ -360,8 +361,8 @@ private:
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                StatNameTagVectorOptConstRef tags,
-                                                size_t max_entries) override;
+                                                   StatNameTagVectorOptConstRef tags,
+                                                   size_t max_entries) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }

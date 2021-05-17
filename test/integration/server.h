@@ -114,7 +114,8 @@ public:
   }
 
   CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags, size_t max_entries) override {
+                                                 StatNameTagVectorOptConstRef tags,
+                                                 size_t max_entries) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counterGroupFromStatNameWithTags(name, tags, max_entries);
   }
@@ -392,7 +393,7 @@ public:
     return store_.textReadouts();
   }
 
-   std::vector<CounterGroupSharedPtr> counterGroups() const override {
+  std::vector<CounterGroupSharedPtr> counterGroups() const override {
     Thread::LockGuard lock(lock_);
     return store_.counterGroups();
   }

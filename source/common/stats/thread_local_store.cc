@@ -723,7 +723,7 @@ CounterGroup& ThreadLocalStoreImpl::ScopeImpl::counterGroupFromStatNameWithTags(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counter_groups_,
       central_cache_->rejected_stats_,
       [max_entries](Allocator& allocator, StatName name, StatName tag_extracted_name,
-         const StatNameTagVector& tags) -> CounterGroupSharedPtr {
+                    const StatNameTagVector& tags) -> CounterGroupSharedPtr {
         return allocator.makeCounterGroup(name, tag_extracted_name, tags, max_entries);
       },
       tls_cache, tls_rejected_stats, parent_.null_counter_group_);

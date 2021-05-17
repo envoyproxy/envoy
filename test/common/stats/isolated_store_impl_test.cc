@@ -227,16 +227,15 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
 
 struct TestStats {
   ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,
-                 GENERATE_TEXT_READOUT_STRUCT, GENERATE_COUNTER_GROUP_STRUCT, GENERATE_STATNAME_STRUCT)
+                 GENERATE_TEXT_READOUT_STRUCT, GENERATE_COUNTER_GROUP_STRUCT,
+                 GENERATE_STATNAME_STRUCT)
 };
 
 TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
-  TestStats test_stats{
-      ALL_TEST_STATS(POOL_COUNTER_PREFIX(*store_, "test."), POOL_GAUGE_PREFIX(*store_, "test."),
-                     POOL_HISTOGRAM_PREFIX(*store_, "test."),
-                     POOL_TEXT_READOUT_PREFIX(*store_, "test."),
-                     POOL_COUNTER_GROUP_PREFIX(*store_, "test."),
-                     GENERATE_STATNAME_STRUCT)};
+  TestStats test_stats{ALL_TEST_STATS(
+      POOL_COUNTER_PREFIX(*store_, "test."), POOL_GAUGE_PREFIX(*store_, "test."),
+      POOL_HISTOGRAM_PREFIX(*store_, "test."), POOL_TEXT_READOUT_PREFIX(*store_, "test."),
+      POOL_COUNTER_GROUP_PREFIX(*store_, "test."), GENERATE_STATNAME_STRUCT)};
 
   Counter& counter = test_stats.test_counter_;
   EXPECT_EQ("test.test_counter", counter.name());

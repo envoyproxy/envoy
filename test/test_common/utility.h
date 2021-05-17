@@ -292,7 +292,8 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::CounterGroupSharedPtr the counter group or nullptr if there is none.
    */
-  static Stats::CounterGroupSharedPtr findCounterGroup(Stats::Store& store, const std::string& name);
+  static Stats::CounterGroupSharedPtr findCounterGroup(Stats::Store& store,
+                                                       const std::string& name);
 
   /**
    * Wait for a counter group element to == a given value.
@@ -307,11 +308,10 @@ public:
    * AssertionFailure().
    */
   static AssertionResult
-  waitForCounterGroupEq(Stats::Store& store, const std::string& name, uint64_t value,
-                        size_t index,
-                   Event::TestTimeSystem& time_system,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
-                   Event::Dispatcher* dispatcher = nullptr);
+  waitForCounterGroupEq(Stats::Store& store, const std::string& name, uint64_t value, size_t index,
+                        Event::TestTimeSystem& time_system,
+                        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                        Event::Dispatcher* dispatcher = nullptr);
 
   /**
    * Wait for a counter group element to >= a given value.
@@ -325,10 +325,9 @@ public:
    * AssertionFailure().
    */
   static AssertionResult
-  waitForCounterGroupGe(Stats::Store& store, const std::string& name, uint64_t value,
-                        size_t index,
-                   Event::TestTimeSystem& time_system,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+  waitForCounterGroupGe(Stats::Store& store, const std::string& name, uint64_t value, size_t index,
+                        Event::TestTimeSystem& time_system,
+                        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS

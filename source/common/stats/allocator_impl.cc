@@ -262,12 +262,10 @@ private:
 class CounterGroupImpl : public StatsSharedImpl<CounterGroup> {
 public:
   CounterGroupImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-                          const StatNameTagVector& stat_name_tags, size_t max_entries)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags),
-        max_entries_(max_entries),
+                   const StatNameTagVector& stat_name_tags, size_t max_entries)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags), max_entries_(max_entries),
         values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)),
-        pending_values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)) {
-  }
+        pending_values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)) {}
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counter_groups_.erase(statName());
@@ -282,21 +280,11 @@ public:
     pending_values_[index] += amount;
     flags_ |= Flags::Used;
   }
-  void inc(size_t index) override {
-    add(index, 1);
-  }
-  uint64_t latch(size_t index) override {
-    return pending_values_[index].exchange(0);
-  }
-  void reset(size_t index) override {
-    values_[index] = 0;
-  }
-  uint64_t value(size_t index) const override {
-    return values_[index];
-  }
-  size_t maxEntries() const override {
-    return max_entries_;
-  }
+  void inc(size_t index) override { add(index, 1); }
+  uint64_t latch(size_t index) override { return pending_values_[index].exchange(0); }
+  void reset(size_t index) override { values_[index] = 0; }
+  uint64_t value(size_t index) const override { return values_[index]; }
+  size_t maxEntries() const override { return max_entries_; }
 
 private:
   const size_t max_entries_;
@@ -363,8 +351,8 @@ CounterGroupSharedPtr AllocatorImpl::makeCounterGroup(StatName name, StatName ta
   if (iter != counter_groups_.end()) {
     return CounterGroupSharedPtr(*iter);
   }
-  auto text_readout =
-      CounterGroupSharedPtr(new CounterGroupImpl(name, *this, tag_extracted_name, stat_name_tags, max_entries));
+  auto text_readout = CounterGroupSharedPtr(
+      new CounterGroupImpl(name, *this, tag_extracted_name, stat_name_tags, max_entries));
   counter_groups_.insert(text_readout.get());
   return text_readout;
 }

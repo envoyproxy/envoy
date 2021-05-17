@@ -38,12 +38,8 @@ MockTextReadout::~MockTextReadout() = default;
 
 MockCounterGroup::MockCounterGroup() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
-  ON_CALL(*this, value(_)).WillByDefault(Invoke([this](uint64_t index) {
-    return value_[index];
-  }));
-  ON_CALL(*this, latch(_)).WillByDefault(Invoke([this](uint64_t index) {
-    return latch_[index];
-  }));
+  ON_CALL(*this, value(_)).WillByDefault(Invoke([this](uint64_t index) { return value_[index]; }));
+  ON_CALL(*this, latch(_)).WillByDefault(Invoke([this](uint64_t index) { return latch_[index]; }));
 }
 MockCounterGroup::~MockCounterGroup() = default;
 

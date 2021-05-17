@@ -47,8 +47,8 @@ envoy_cc_library(
     hdrs = ["isolated_store_impl.h"],
     deps = [
         ":histogram_lib",
-        ":null_counter_lib",
         ":null_counter_group_lib",
+        ":null_counter_lib",
         ":null_gauge_lib",
         ":null_text_readout_lib",
         ":scope_prefixer_lib",
@@ -248,8 +248,8 @@ envoy_cc_library(
     deps = [
         ":allocator_lib",
         ":histogram_lib",
-        ":null_counter_lib",
         ":null_counter_group_lib",
+        ":null_counter_lib",
         ":null_gauge_lib",
         ":null_text_readout_lib",
         ":scope_prefixer_lib",

@@ -228,12 +228,13 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
 }
 
 AssertionResult TestUtility::waitForCounterGroupEq(Stats::Store& store, const std::string& name,
-                                                   size_t index,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
-                                              std::chrono::milliseconds timeout,
-                                              Event::Dispatcher* dispatcher) {
+                                                   size_t index, uint64_t value,
+                                                   Event::TestTimeSystem& time_system,
+                                                   std::chrono::milliseconds timeout,
+                                                   Event::Dispatcher* dispatcher) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounterGroup(store, name) == nullptr || findCounterGroup(store, name)->value(index) != value) {
+  while (findCounterGroup(store, name) == nullptr ||
+         findCounterGroup(store, name)->value(index) != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
@@ -246,11 +247,12 @@ AssertionResult TestUtility::waitForCounterGroupEq(Stats::Store& store, const st
 }
 
 AssertionResult TestUtility::waitForCounterGroupGe(Stats::Store& store, const std::string& name,
-                                                   size_t index,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
-                                              std::chrono::milliseconds timeout) {
+                                                   size_t index, uint64_t value,
+                                                   Event::TestTimeSystem& time_system,
+                                                   std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounterGroup(store, name) == nullptr || findCounterGroup(store, name)->value(index) < value) {
+  while (findCounterGroup(store, name) == nullptr ||
+         findCounterGroup(store, name)->value(index) < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);

@@ -61,7 +61,8 @@ CounterGroup& ScopePrefixer::counterGroupFromStatNameWithTags(const StatName& na
                                                               size_t max_entries) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.counterGroupFromStatNameWithTags(StatName(stat_name_storage.get()), tags, max_entries);
+  return scope_.counterGroupFromStatNameWithTags(StatName(stat_name_storage.get()), tags,
+                                                 max_entries);
 }
 
 CounterOptConstRef ScopePrefixer::findCounter(StatName name) const {

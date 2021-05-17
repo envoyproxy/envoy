@@ -173,8 +173,7 @@ public:
                                                  StatNameTagVectorOptConstRef tags,
                                                  size_t max_entries) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    CounterGroup& counter_group =
-        counter_groups_.get(joiner.nameWithTags(), max_entries);
+    CounterGroup& counter_group = counter_groups_.get(joiner.nameWithTags(), max_entries);
     return counter_group;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
@@ -195,7 +194,9 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override {
     return text_readouts_.iterate(fn);
   }
-  bool iterate(const IterateFn<CounterGroup>& fn) const override { return counter_groups_.iterate(fn); }
+  bool iterate(const IterateFn<CounterGroup>& fn) const override {
+    return counter_groups_.iterate(fn);
+  }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -213,7 +214,9 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override {
     return text_readouts_.toVector();
   }
-  std::vector<CounterGroupSharedPtr> counterGroups() const override { return counter_groups_.toVector(); }
+  std::vector<CounterGroupSharedPtr> counterGroups() const override {
+    return counter_groups_.toVector();
+  }
 
   Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());

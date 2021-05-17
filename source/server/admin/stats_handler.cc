@@ -115,8 +115,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   if (const auto format_value = Utility::formatParam(params)) {
     if (format_value.value() == "json") {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-      response.add(
-          statsAsJson(all_stats, all_counter_groups, text_readouts, server_.stats().histograms(), used_only, regex));
+      response.add(statsAsJson(all_stats, all_counter_groups, text_readouts,
+                               server_.stats().histograms(), used_only, regex));
     } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {

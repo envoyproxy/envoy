@@ -58,13 +58,12 @@ private:
 
   friend class AdminStatsTest;
 
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::map<std::string, std::vector<uint64_t>>& all_counter_groups,
-                                 const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only,
-                                 const absl::optional<std::regex> regex = absl::nullopt,
-                                 bool pretty_print = false);
+  static std::string
+  statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+              const std::map<std::string, std::vector<uint64_t>>& all_counter_groups,
+              const std::map<std::string, std::string>& text_readouts,
+              const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms, bool used_only,
+              const absl::optional<std::regex> regex = absl::nullopt, bool pretty_print = false);
 };
 
 } // namespace Server

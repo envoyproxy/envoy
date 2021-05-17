@@ -142,10 +142,9 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define MAKE_STAT_NAMES_STRUCT(StatNamesStruct, ALL_STATS)                                         \
   struct StatNamesStruct {                                                                         \
     explicit StatNamesStruct(Envoy::Stats::SymbolTable& symbol_table)                              \
-        : pool_(symbol_table)                                                                      \
-              ALL_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, \
-                        GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT) \
-                               {}                                                                  \
+        : pool_(symbol_table) ALL_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT,          \
+                                        GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT,          \
+                                        GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT) {}       \
     Envoy::Stats::StatNamePool pool_;                                                              \
     ALL_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT,     \
               GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)     \
@@ -163,12 +162,10 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
   struct StatsStruct {                                                                             \
     StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::Scope& scope,                     \
                 Envoy::Stats::StatName prefix = Envoy::Stats::StatName())                          \
-        : stat_names_(stat_names)                                                                  \
-              ALL_STATS(MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_,        \
-                        MAKE_STATS_STRUCT_HISTOGRAM_HELPER_,                                       \
-                        MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_,                                    \
-                        MAKE_STATS_STRUCT_COUNTER_GROUP_HELPER_,                                   \
-                        MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
+        : stat_names_(stat_names) ALL_STATS(                                                       \
+              MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_,                  \
+              MAKE_STATS_STRUCT_HISTOGRAM_HELPER_, MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_,         \
+              MAKE_STATS_STRUCT_COUNTER_GROUP_HELPER_, MAKE_STATS_STRUCT_STATNAME_HELPER_) {}      \
     const StatNamesStruct& stat_names_;                                                            \
     ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,           \
               GENERATE_TEXT_READOUT_STRUCT, GENERATE_COUNTER_GROUP_STRUCT,                         \

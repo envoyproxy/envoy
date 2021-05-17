@@ -222,12 +222,13 @@ CounterGroup& TestStore::counterGroupFromStatNameWithTags(const StatName& stat_n
   std::string name = symbolTable().toString(stat_name);
   CounterGroup*& counter_group_ref = counter_group_map_[name];
   if (counter_group_ref == nullptr) {
-    counter_group_ref = &IsolatedStoreImpl::counterGroupFromStatNameWithTags(stat_name, tags, max_entries);
+    counter_group_ref =
+        &IsolatedStoreImpl::counterGroupFromStatNameWithTags(stat_name, tags, max_entries);
   } else {
     // Ensures StatNames with the same string representation are specified
     // consistently using symbolic/dynamic components on every access.
     ASSERT(counter_group_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-                                                 "stat name specification");
+                                                       "stat name specification");
   }
   return *counter_group_ref;
 }

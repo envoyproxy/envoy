@@ -247,7 +247,7 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
  * @return A counter group named using the joined elements.
  */
 CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements, size_t max_entries,
-                                 StatNameTagVectorOptConstRef tags = absl::nullopt);
+                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
 
 /**
  * Creates a counterGroup from a vector of tokens which are used to create the
@@ -262,8 +262,9 @@ CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements,
  * @param tags optionally specified tags.
  * @return A counter group named using the joined elements.
  */
-CounterGroup& counterGroupFromStatNames(Scope& scope, const StatNameVec& elements, size_t max_entries,
-                                  StatNameTagVectorOptConstRef tags = absl::nullopt);
+CounterGroup& counterGroupFromStatNames(Scope& scope, const StatNameVec& elements,
+                                        size_t max_entries,
+                                        StatNameTagVectorOptConstRef tags = absl::nullopt);
 
 } // namespace Utility
 
