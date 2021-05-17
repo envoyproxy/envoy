@@ -287,6 +287,50 @@ public:
   static Stats::TextReadoutSharedPtr findTextReadout(Stats::Store& store, const std::string& name);
 
   /**
+   * Find a counter array in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::CounterArraySharedPtr the counter array or nullptr if there is none.
+   */
+  static Stats::CounterArraySharedPtr findCounterArray(Stats::Store& store, const std::string& name);
+
+  /**
+   * Wait for a counter array element to == a given value.
+   * @param store supplies the stats store.
+   * @param name supplies the name of the counter array to wait for.
+   * @param index supplies the index of the counter array element to wait for.
+   * @param value supplies the value of the counter.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
+   * @return AssertionSuccess() if the counter was == to the value within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult
+  waitForCounterArrayEq(Stats::Store& store, const std::string& name, uint64_t value,
+                        size_t index,
+                   Event::TestTimeSystem& time_system,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                   Event::Dispatcher* dispatcher = nullptr);
+
+  /**
+   * Wait for a counter array element to >= a given value.
+   * @param store supplies the stats store.
+   * @param name supplies the name of the counter array to wait for.
+   * @param index supplies the index of the counter array element to wait for.
+   * @param value supplies the value of the counter.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the counter was >= to the value within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult
+  waitForCounterArrayGe(Stats::Store& store, const std::string& name, uint64_t value,
+                        size_t index,
+                   Event::TestTimeSystem& time_system,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS
    * response testing.
    */

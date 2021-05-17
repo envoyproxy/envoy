@@ -39,7 +39,7 @@ void AllocatorImpl::debugPrint() {
 }
 #endif
 
-// Counter, Gauge and TextReadout inherit from RefcountInterface and
+// Counter, Gauge, TextReadout and CounterArray inherit from RefcountInterface and
 // Metric. MetricImpl takes care of most of the Metric API, but we need to cover
 // symbolTable() here, which we don't store directly, but get it via the alloc,
 // which we need in order to clean up the counter and gauge maps in that class
@@ -258,11 +258,53 @@ private:
   std::string value_ ABSL_GUARDED_BY(mutex_);
 };
 
+// An implementation of Stats::CounterArray.
+class CounterArrayImpl : public StatsSharedImpl<CounterArray> {
+public:
+  CounterArrayImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+                          const StatNameTagVector& stat_name_tags, size_t max_entries)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags),
+        values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)),
+        pending_values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)) {
+  }
+
+  void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+    const size_t count = alloc_.counter_arrays_.erase(statName());
+    ASSERT(count == 1);
+  }
+
+  // Stats::TextReadout
+  void add(size_t index, uint64_t amount) override {
+    // Note that a reader may see a new value but an old pending_increment_ or
+    // used(). From a system perspective this should be eventually consistent.
+    values_[index] += amount;
+    pending_values_[index] += amount;
+    flags_ |= Flags::Used;
+  }
+  void inc(size_t index) override {
+    add(index, 1);
+  }
+  uint64_t latch(size_t index) override {
+    return pending_values_[index].exchange(0);
+  }
+  void reset(size_t index) override {
+    values_[index] = 0;
+  }
+  uint64_t value(size_t index) const override {
+    return values_[index];
+  }
+
+private:
+  std::unique_ptr<std::atomic<uint64_t>[]> values_;
+  std::unique_ptr<std::atomic<uint64_t>[]> pending_values_;
+};
+
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
                                             const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
+  ASSERT(counter_arrays_.find(name) == counter_arrays_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
@@ -278,6 +320,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
+  ASSERT(counter_arrays_.find(name) == counter_arrays_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
@@ -293,6 +336,7 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(gauges_.find(name) == gauges_.end());
+  ASSERT(counter_arrays_.find(name) == counter_arrays_.end());
   auto iter = text_readouts_.find(name);
   if (iter != text_readouts_.end()) {
     return TextReadoutSharedPtr(*iter);
@@ -300,6 +344,23 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   auto text_readout =
       TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags));
   text_readouts_.insert(text_readout.get());
+  return text_readout;
+}
+
+CounterArraySharedPtr AllocatorImpl::makeCounterArray(StatName name, StatName tag_extracted_name,
+                                                      const StatNameTagVector& stat_name_tags,
+                                                      size_t max_entries) {
+  Thread::LockGuard lock(mutex_);
+  ASSERT(counters_.find(name) == counters_.end());
+  ASSERT(gauges_.find(name) == gauges_.end());
+  ASSERT(text_readouts_.find(name) == text_readouts_.end());
+  auto iter = counter_arrays_.find(name);
+  if (iter != counter_arrays_.end()) {
+    return CounterArraySharedPtr(*iter);
+  }
+  auto text_readout =
+      CounterArraySharedPtr(new CounterArrayImpl(name, *this, tag_extracted_name, stat_name_tags, max_entries));
+  counter_arrays_.insert(text_readout.get());
   return text_readout;
 }
 

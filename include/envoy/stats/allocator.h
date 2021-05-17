@@ -55,6 +55,18 @@ public:
    */
   virtual TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                                const StatNameTagVector& stat_name_tags) PURE;
+
+    /**
+   * @param name the full name of the stat.
+   * @param tag_extracted_name the name of the stat with tag-values stripped out.
+   * @param tags the tag values.
+   * @param max_entries the maximum number of entires in the array.
+   * @return CounterSharedPtr a counter.
+   */
+  virtual CounterArraySharedPtr makeCounterArray(StatName name, StatName tag_extracted_name,
+                                                 const StatNameTagVector& stat_name_tags, size_t max_entries) PURE;
+
+
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 

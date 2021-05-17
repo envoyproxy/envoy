@@ -48,6 +48,11 @@ public:
    * @return a list of all known histograms.
    */
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
+
+  /**
+   * @return a list of all known counter arrays.
+   */
+  virtual std::vector<CounterArraySharedPtr> counterArrays() const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

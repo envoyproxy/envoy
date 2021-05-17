@@ -190,5 +190,57 @@ public:
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
+/**
+ * An array of always incrementing counters with latching capability. Each increment is added
+ * both to a global counter as well as periodic counter. Calling latch() returns the periodic
+ * counter and clears it.
+ */
+class CounterArray : public Metric {
+public:
+  // Counter array type is used internally to disambiguate isolated store
+  // constructors. In the future we can extend it to specify text encoding or
+  // some such.
+  enum class Type {
+    Default, // No particular meaning.
+  };
+  ~CounterArray() override = default;
+
+  /**
+   * Adds the specified amount to the counter at the specified index.
+   * @param index The index of the counter to add.
+   * @param amount The value to add to the counter.
+   */
+  virtual void add(size_t index, uint64_t amount) PURE;
+
+  /**
+   * Increments the the counter at the specified index.
+   * @param index The index of the counter to increment.
+   */
+  virtual void inc(size_t index) PURE;
+
+  /**
+   * Returns the value of the periodic counter at the specified index, then resets
+   * that periodic counter.
+   * @param index The index of the counter.
+   * @return The valud of the counter at the specified index.
+   */
+  virtual uint64_t latch(size_t index) PURE;
+
+  /**
+   * Resets the the counter at the specified index.
+   * @param index The index of the counter to reset.
+   */
+  virtual void reset(size_t index) PURE;
+
+  /**
+   * Returns the value of the counter at the specified index.
+   * @param index The index of the counter..
+   * @return The valud of the counter at the specified index.
+   */
+  virtual uint64_t value(size_t index) const PURE;
+};
+
+using CounterArraySharedPtr = RefcountPtr<CounterArray>;
+
 } // namespace Stats
 } // namespace Envoy

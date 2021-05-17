@@ -10,6 +10,7 @@ binary program restarts. The metrics are tracked as:
    binary program restarts.
  * TextReadouts: Unicode strings. Unlike counters and gauges, text readout data
    is not retained across binary program restarts.
+ * CounterArrays: a group of counters.
 
 In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are passed from parent to child in an RPC protocol.
@@ -93,7 +94,7 @@ maintain data continuity as scopes are re-created during operation.
 
 Stat names are replicated in several places in various forms.
 
- * Held with the stat values, in `CounterImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
+ * Held with the stat values, in `CounterImpl`, `CounterArrayImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
    [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/allocator_impl.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.

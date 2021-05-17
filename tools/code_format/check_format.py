@@ -873,10 +873,12 @@ class FormatChecker:
                 "Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
         if self.is_in_subdir(file_path, 'source') and file_path.endswith('.cc') and \
-          ('.counterFromString(' in line or '.gaugeFromString(' in line or \
-            '.histogramFromString(' in line or '.textReadoutFromString(' in line or \
-            '->counterFromString(' in line or '->gaugeFromString(' in line or \
-            '->histogramFromString(' in line or '->textReadoutFromString(' in line):
+          ('.counterFromString(' in line or '->counterFromString(' in line or \
+            '.histogramFromString(' in line or '->histogramFromString(' in line or \
+            '.textReadoutFromString(' in line or or '->textReadoutFromString(' in line or \
+            '.counterArrayFromString(' in line or '->counterArrayFromString(' in line or \
+            '.gaugeFromString(' in line or '->gaugeFromString(' in line):
+
             report_error(
                 "Don't lookup stats by name at runtime; use StatName saved during construction")
 

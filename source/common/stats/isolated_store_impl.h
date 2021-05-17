@@ -30,12 +30,14 @@ public:
   using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
   using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
   using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
+  using CounterArrayAllocator = std::function<RefcountPtr<Base>(StatName name, size_t max_entries)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
   IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
   IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
   IsolatedStatsCache(TextReadoutAllocator alloc) : text_readout_alloc_(alloc) {}
+  IsolatedStatsCache(CounterArrayAllocator alloc) : counter_array_alloc_(alloc) {}
 
   Base& get(StatName name) {
     auto stat = stats_.find(name);
@@ -81,6 +83,17 @@ public:
     return *new_stat;
   }
 
+  Base& get(StatName name, size_t size) {
+    auto stat = stats_.find(name);
+    if (stat != stats_.end()) {
+      return *stat->second;
+    }
+
+    RefcountPtr<Base> new_stat = counter_array_alloc_(name, size);
+    stats_.emplace(new_stat->statName(), new_stat);
+    return *new_stat;
+  }
+
   std::vector<RefcountPtr<Base>> toVector() const {
     std::vector<RefcountPtr<Base>> vec;
     vec.reserve(stats_.size());
@@ -113,6 +126,7 @@ private:
 
   StatNameHashMap<RefcountPtr<Base>> stats_;
   CounterAllocator counter_alloc_;
+  CounterArrayAllocator counter_array_alloc_;
   GaugeAllocator gauge_alloc_;
   HistogramAllocator histogram_alloc_;
   TextReadoutAllocator text_readout_alloc_;
@@ -155,6 +169,14 @@ public:
         text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
     return text_readout;
   }
+  CounterArray& counterArrayFromStatNameWithTags(const StatName& name,
+                                                 StatNameTagVectorOptConstRef tags,
+                                                 size_t max_entries) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    CounterArray& counter_array =
+        counter_arrays_.get(joiner.nameWithTags(), max_entries);
+    return counter_array;
+  }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
   GaugeOptConstRef findGauge(StatName name) const override { return gauges_.find(name); }
   HistogramOptConstRef findHistogram(StatName name) const override {
@@ -163,6 +185,9 @@ public:
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     return text_readouts_.find(name);
   }
+  CounterArrayOptConstRef findCounterArray(StatName name) const override {
+    return counter_arrays_.find(name);
+  }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return counters_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return gauges_.iterate(fn); }
@@ -170,6 +195,7 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override {
     return text_readouts_.iterate(fn);
   }
+  bool iterate(const IterateFn<CounterArray>& fn) const override { return counter_arrays_.iterate(fn); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -187,6 +213,7 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override {
     return text_readouts_.toVector();
   }
+  std::vector<CounterArraySharedPtr> counterArrays() const override { return counter_arrays_.toVector(); }
 
   Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
@@ -204,6 +231,10 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
   }
+  CounterArray& counterArrayFromString(const std::string& name, size_t max_entries) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return counterArrayFromStatName(storage.statName(), max_entries);
+  }
 
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
@@ -214,6 +245,7 @@ private:
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
   IsolatedStatsCache<TextReadout> text_readouts_;
+  IsolatedStatsCache<CounterArray> counter_arrays_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
 };

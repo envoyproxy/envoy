@@ -105,6 +105,13 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     }
   }
 
+  std::map<std::string, std::vector<uint64_t>> all_counter_arrays;
+  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
+    if (shouldShowMetric(*counter, used_only, regex)) {
+      all_stats.emplace(counter->name(), counter->value());
+    }
+  }
+
   if (const auto format_value = Utility::formatParam(params)) {
     if (format_value.value() == "json") {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
