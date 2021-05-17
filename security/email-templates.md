@@ -217,7 +217,7 @@ Hello Envoy Community,
 
 The Envoy securitty team would like to announce a security advisory for a feature introduced in
 $ENVOYRELEASE. As this is a security advisory for a feature not considered production ready that may
-have been lablede as such, no fix is provided and the advisory is to not make use of this in a production
+have been labeled as such, no fix is provided and the advisory is to not make use of this in a production
 capacity until future hardening has been done.
 
 $DEFECTSSUMMARY
