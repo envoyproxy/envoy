@@ -1,7 +1,6 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"

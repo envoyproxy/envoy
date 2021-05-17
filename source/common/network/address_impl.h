@@ -70,18 +70,12 @@ public:
     }
     return instance;
   }
-
   template <typename InstanceType, typename... Args>
-  static StatusOr<InstanceType> createInstance(Args&&... args) {
-    absl::Status status;
-    if (!status.ok()) {
-      return status;
-    }
-    InstanceType instance(status, std::forward<Args>(args)...);
-    if (!status.ok()) {
-      return status;
-    }
-    return instance;
+  static InstanceConstPtr createInstancePtrOrDie(Args&&... args) {
+    StatusOr<InstanceConstPtr> error_or_address =
+        createInstancePtr<InstanceType>(std::forward<Args>(args)...);
+    RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
+    return move(*error_or_address);
   }
 };
 
@@ -166,18 +160,7 @@ private:
     std::string friendly_address_;
   };
 
-  void initHelper(const sockaddr_in* address) {
-    memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
-    ip_.ipv4_.address_ = *address;
-    ip_.friendly_address_ = sockaddrToString(*address);
-
-    // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
-    fmt::format_int port(ntohs(address->sin_port));
-    friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
-    friendly_name_.append(ip_.friendly_address_);
-    friendly_name_.push_back(':');
-    friendly_name_.append(port.data(), port.size());
-  }
+  void initHelper(const sockaddr_in* address);
 
   IpHelper ip_;
   friend class InstanceFactory;
@@ -264,6 +247,8 @@ private:
     std::string friendly_address_;
   };
 
+  void initHelper(const sockaddr_in6& address, bool v6only);
+
   IpHelper ip_;
   friend class InstanceFactory;
 };
@@ -307,8 +292,8 @@ private:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len,
-                        mode_t mode = 0, const SocketInterface* sock_interface = nullptr);
+  PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
+               const SocketInterface* sock_interface = nullptr);
 
   struct PipeHelper : public Pipe {
 
