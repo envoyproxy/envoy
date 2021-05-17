@@ -18,8 +18,8 @@ uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
         residual_micro_tokens_;
 
     if (new_fill_micro_tokens >= 1000000) {
-      cresidual_micro_tokens_ = new_fill_tokens % 1000000;
-      const uint64_t new_tokens = new_fill_tokens / 1000000;
+      residual_micro_tokens_ = new_fill_micro_tokens % 1000000;
+      const uint64_t new_tokens = new_fill_micro_tokens / 1000000;
       tokens_ = std::min(new_tokens + tokens_, max_tokens_);
       last_fill_ = time_now;
     }
