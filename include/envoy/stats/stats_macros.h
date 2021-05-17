@@ -73,7 +73,7 @@ namespace Envoy {
 #define GENERATE_GAUGE_STRUCT(NAME, MODE) Envoy::Stats::Gauge& NAME##_;
 #define GENERATE_HISTOGRAM_STRUCT(NAME, UNIT) Envoy::Stats::Histogram& NAME##_;
 #define GENERATE_TEXT_READOUT_STRUCT(NAME) Envoy::Stats::TextReadout& NAME##_;
-#define GENERATE_COUNTER_ARRAY_STRUCT(NAME) Envoy::Stats::CounterArray& NAME##_;
+#define GENERATE_COUNTER_ARRAY_STRUCT(NAME) Envoy::Stats::CounterGroup& NAME##_;
 
 #define FINISH_STAT_DECL_(X) #X)),
 #define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
@@ -93,7 +93,7 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gaugeFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
 #define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogramFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_UNIT_
 #define POOL_TEXT_READOUT_PREFIX(POOL, PREFIX) (POOL).textReadoutFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
-#define POOL_COUNTER_ARRAY_PREFIX(POOL, PREFIX) (POOL).counterArrayFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_COUNTER_ARRAY_PREFIX(POOL, PREFIX) (POOL).counterGroupFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
 #define POOL_STAT_NAME_PREFIX(POOL, PREFIX) (POOL).symbolTable().textReadoutFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
@@ -127,7 +127,7 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
   , NAME##_(Envoy::Stats::Utility::textReadoutFromStatNames(scope, {prefix, stat_names.NAME##_}))
 
 #define MAKE_STATS_STRUCT_COUNTER_ARRAY_HELPER_(NAME)                                              \
-  , NAME##_(Envoy::Stats::Utility::counterArrayFromStatNames(scope, {prefix, stat_names.NAME##_}))
+  , NAME##_(Envoy::Stats::Utility::counterGroupFromStatNames(scope, {prefix, stat_names.NAME##_}))
 
 #define MAKE_STATS_STRUCT_STATNAME_HELPER_(name)
 #define GENERATE_STATNAME_STRUCT(name)

@@ -25,7 +25,7 @@ using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
-using CounterArrayOptConstRef = absl::optional<std::reference_wrapper<const CounterArray>>;
+using CounterGroupOptConstRef = absl::optional<std::reference_wrapper<const CounterGroup>>;
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
@@ -180,34 +180,34 @@ public:
   virtual TextReadout& textReadoutFromString(const std::string& name) PURE;
 
   /**
-   * Creates a CounterArray from the stat name. Tag extraction will be performed on the name.
+   * Creates a CounterGroup from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
-   * @param max_entries The size of the array.
-   * @return a counter array within the scope's namespace with a particular value type.
+   * @param max_entries The size of the group.
+   * @return a counter group within the scope's namespace with a particular value type.
    */
-  CounterArray& counterArrayFromStatName(const StatName& name, size_t max_entries) {
-    return counterArrayFromStatNameWithTags(name, absl::nullopt, max_entries);
+  CounterGroup& counterGroupFromStatName(const StatName& name, size_t max_entries) {
+    return counterGroupFromStatNameWithTags(name, absl::nullopt, max_entries);
   }
 
   /**
-   * Creates a CounterArray from the stat name and tags. If tags are not provided, tag extraction
+   * Creates a CounterGroup from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param tags optionally specified tags.
-   * @param max_entries The size of the array.
-   * @return a counter array within the scope's namespace with a particular value type.
+   * @param max_entries The size of the group.
+   * @return a counter group within the scope's namespace with a particular value type.
    */
-  virtual CounterArray& counterArrayFromStatNameWithTags(const StatName& name,
+  virtual CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                          StatNameTagVectorOptConstRef tags,
                                                          size_t max_entries) PURE;
 
   /**
-   * TODO(#6667): this variant is deprecated: use counterArrayFromStatName.
+   * TODO(#6667): this variant is deprecated: use counterGroupFromStatName.
    * @param name The name, expressed as a string.
-   * @param max_entries The size of the array.
-   * @return a counter array within the scope's namespace with a particular value type.
+   * @param max_entries The size of the group.
+   * @return a counter group within the scope's namespace with a particular value type.
    */
-  virtual CounterArray& counterArrayFromString(const std::string& name, size_t max_entries) PURE;
+  virtual CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
@@ -238,7 +238,7 @@ public:
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a text readout within the scope's namespace, if it exists.
    */
-  virtual CounterArrayOptConstRef findCounterArray(StatName name) const PURE;
+  virtual CounterGroupOptConstRef findCounterGroup(StatName name) const PURE;
 
   /**
    * @return a reference to the symbol table.
@@ -288,15 +288,15 @@ public:
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
   /**
-   * Calls 'fn' for every counter array. Note that in the case of overlapping
+   * Calls 'fn' for every counter group. Note that in the case of overlapping
    * scopes, the implementation may call fn more than one time for each
-   * counter array. Iteration stops if `fn` returns false;
+   * counter group. Iteration stops if `fn` returns false;
    *
-   * @param fn Function to be run for every counter array, or until fn return false.
-   * @return false if fn(text_readout) return false during iteration, true if every counter array
+   * @param fn Function to be run for every counter group, or until fn return false.
+   * @return false if fn(text_readout) return false during iteration, true if every counter group
    *         was hit.
    */
-  virtual bool iterate(const IterateFn<CounterArray>& fn) const PURE;
+  virtual bool iterate(const IterateFn<CounterGroup>& fn) const PURE;
 };
 
 } // namespace Stats

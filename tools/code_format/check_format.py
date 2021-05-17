@@ -876,7 +876,7 @@ class FormatChecker:
           ('.counterFromString(' in line or '->counterFromString(' in line or \
             '.histogramFromString(' in line or '->histogramFromString(' in line or \
             '.textReadoutFromString(' in line or or '->textReadoutFromString(' in line or \
-            '.counterArrayFromString(' in line or '->counterArrayFromString(' in line or \
+            '.counterGroupFromString(' in line or '->counterGroupFromString(' in line or \
             '.gaugeFromString(' in line or '->gaugeFromString(' in line):
 
             report_error(

@@ -56,12 +56,12 @@ TextReadout& ScopePrefixer::textReadoutFromStatNameWithTags(const StatName& name
   return scope_.textReadoutFromStatNameWithTags(StatName(stat_name_storage.get()), tags);
 }
 
-CounterArray& ScopePrefixer::counterArrayFromStatNameWithTags(const StatName& name,
+CounterGroup& ScopePrefixer::counterGroupFromStatNameWithTags(const StatName& name,
                                                               StatNameTagVectorOptConstRef tags,
                                                               size_t max_entries) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.counterArrayFromStatNameWithTags(StatName(stat_name_storage.get()), tags, max_entries);
+  return scope_.counterGroupFromStatNameWithTags(StatName(stat_name_storage.get()), tags, max_entries);
 }
 
 CounterOptConstRef ScopePrefixer::findCounter(StatName name) const {
@@ -78,8 +78,8 @@ TextReadoutOptConstRef ScopePrefixer::findTextReadout(StatName name) const {
   return scope_.findTextReadout(name);
 }
 
-CounterArrayOptConstRef ScopePrefixer::findCounterArray(StatName name) const {
-  return scope_.findCounterArray(name);
+CounterGroupOptConstRef ScopePrefixer::findCounterGroup(StatName name) const {
+  return scope_.findCounterGroup(name);
 }
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {

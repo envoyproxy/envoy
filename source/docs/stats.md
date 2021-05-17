@@ -10,7 +10,7 @@ binary program restarts. The metrics are tracked as:
    binary program restarts.
  * TextReadouts: Unicode strings. Unlike counters and gauges, text readout data
    is not retained across binary program restarts.
- * CounterArrays: a group of counters.
+ * CounterGroups: a group of counters.
 
 In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are passed from parent to child in an RPC protocol.
@@ -94,7 +94,7 @@ maintain data continuity as scopes are re-created during operation.
 
 Stat names are replicated in several places in various forms.
 
- * Held with the stat values, in `CounterImpl`, `CounterArrayImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
+ * Held with the stat values, in `CounterImpl`, `CounterGroupImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
    [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/allocator_impl.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
@@ -122,7 +122,7 @@ number of keywords, cluster names, host names, and response codes, separated by
 `.`. For example `CLUSTER.upstream_cx_connect_attempts_exceeded`. There may be
 thousands of clusters, and roughly 100 stats per cluster. Thus, the number
 of combinations can be large. It is significantly more efficient to symbolize
-each `.`-delimited token and represent stats as arrays of symbols.
+each `.`-delimited token and represent stats as groups of symbols.
 
 The transformation between flattened string and symbolized form is CPU-intensive
 at scale. It requires parsing, encoding, and lookups in a shared map, which must
@@ -209,7 +209,7 @@ SymbolTable | | Abstract class providing an interface for symbol tables
 SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
 SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
 StatName | | Provides an API and a view into a StatName (dynamic or symbolized). Like absl::string_view, the backing store must be separately maintained.
-StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
+StatNameStorageBase | | Holds storage (an group of bytes) for a dynamic or symbolized StatName
 StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
 StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free().
 StatNameDynamicStorage | StatNameStorageBase | Holds StatName storage for a dynamic (not symbolized) StatName.

@@ -132,8 +132,8 @@ public:
     return histogramFromString(name, unit);
   }
   TextReadout& textReadout(const std::string& name) { return textReadoutFromString(name); }
-  CounterArray& counterArray(const std::string& name, size_t max_entries) {
-    return counterArrayFromString(name, max_entries);
+  CounterGroup& counterGroup(const std::string& name, size_t max_entries) {
+    return counterGroupFromString(name, max_entries);
   }
 
   // Override the Stats::Store methods for name-based lookup of stats, to use
@@ -145,25 +145,25 @@ public:
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  CounterArray& counterArrayFromString(const std::string& name, size_t max_entries) override;
+  CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override;
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
-  CounterArray& counterArrayFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                                  size_t max_entries) override;
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;
   GaugeOptConstRef findGaugeByString(const std::string& name) const;
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
-  CounterArrayOptConstRef findCounterArrayByString(const std::string& name) const;
+  CounterGroupOptConstRef findCounterGroupByString(const std::string& name) const;
 
 private:
   absl::flat_hash_map<std::string, Counter*> counter_map_;
-  absl::flat_hash_map<std::string, CounterArray*> counter_array_map_;
+  absl::flat_hash_map<std::string, CounterGroup*> counter_group_map_;
   absl::flat_hash_map<std::string, Gauge*> gauge_map_;
   absl::flat_hash_map<std::string, Histogram*> histogram_map_;
 };
@@ -201,7 +201,7 @@ private:
     }                                                                                              \
   } while (false)
 
-// Serializes a number into a uint8_t array, and check that it de-serializes to
+// Serializes a number into a uint8_t group, and check that it de-serializes to
 // the same number. The serialized number is also returned, which can be
 // checked in unit tests, but ignored in fuzz tests.
 std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);

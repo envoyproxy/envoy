@@ -50,9 +50,9 @@ public:
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 
   /**
-   * @return a list of all known counter arrays.
+   * @return a list of all known counter groups.
    */
-  virtual std::vector<CounterArraySharedPtr> counterArrays() const PURE;
+  virtual std::vector<CounterGroupSharedPtr> counterGroups() const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

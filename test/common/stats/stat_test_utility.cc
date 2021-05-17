@@ -208,28 +208,28 @@ Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
   return *histogram_ref;
 }
 
-CounterArray& TestStore::counterArrayFromString(const std::string& name, size_t max_entries) {
-  CounterArray*& counter_array_ref = counter_array_map_[name];
-  if (counter_array_ref == nullptr) {
-    counter_array_ref = &IsolatedStoreImpl::counterArrayFromString(name, max_entries);
+CounterGroup& TestStore::counterGroupFromString(const std::string& name, size_t max_entries) {
+  CounterGroup*& counter_group_ref = counter_group_map_[name];
+  if (counter_group_ref == nullptr) {
+    counter_group_ref = &IsolatedStoreImpl::counterGroupFromString(name, max_entries);
   }
-  return *counter_array_ref;
+  return *counter_group_ref;
 }
 
-CounterArray& TestStore::counterArrayFromStatNameWithTags(const StatName& stat_name,
+CounterGroup& TestStore::counterGroupFromStatNameWithTags(const StatName& stat_name,
                                                           StatNameTagVectorOptConstRef tags,
                                                           size_t max_entries) {
   std::string name = symbolTable().toString(stat_name);
-  CounterArray*& counter_array_ref = counter_array_map_[name];
-  if (counter_array_ref == nullptr) {
-    counter_array_ref = &IsolatedStoreImpl::counterArrayFromStatNameWithTags(stat_name, tags, max_entries);
+  CounterGroup*& counter_group_ref = counter_group_map_[name];
+  if (counter_group_ref == nullptr) {
+    counter_group_ref = &IsolatedStoreImpl::counterGroupFromStatNameWithTags(stat_name, tags, max_entries);
   } else {
     // Ensures StatNames with the same string representation are specified
     // consistently using symbolic/dynamic components on every access.
-    ASSERT(counter_array_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
+    ASSERT(counter_group_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
                                                  "stat name specification");
   }
-  return *counter_array_ref;
+  return *counter_group_ref;
 }
 
 template <class StatType>

@@ -191,19 +191,19 @@ public:
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
 /**
- * An array of always incrementing counters with latching capability. Each increment is added
+ * An group of always incrementing counters with latching capability. Each increment is added
  * both to a global counter as well as periodic counter. Calling latch() returns the periodic
  * counter and clears it.
  */
-class CounterArray : public Metric {
+class CounterGroup : public Metric {
 public:
-  // Counter array type is used internally to disambiguate isolated store
+  // Counter group type is used internally to disambiguate isolated store
   // constructors. In the future we can extend it to specify text encoding or
   // some such.
   enum class Type {
     Default, // No particular meaning.
   };
-  ~CounterArray() override = default;
+  ~CounterGroup() override = default;
 
   /**
    * Adds the specified amount to the counter at the specified index.
@@ -240,7 +240,7 @@ public:
   virtual uint64_t value(size_t index) const PURE;
 };
 
-using CounterArraySharedPtr = RefcountPtr<CounterArray>;
+using CounterGroupSharedPtr = RefcountPtr<CounterGroup>;
 
 } // namespace Stats
 } // namespace Envoy

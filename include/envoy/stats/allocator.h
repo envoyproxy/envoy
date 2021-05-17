@@ -60,10 +60,10 @@ public:
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the tag values.
-   * @param max_entries the maximum number of entires in the array.
+   * @param max_entries the maximum number of entires in the group.
    * @return CounterSharedPtr a counter.
    */
-  virtual CounterArraySharedPtr makeCounterArray(StatName name, StatName tag_extracted_name,
+  virtual CounterGroupSharedPtr makeCounterGroup(StatName name, StatName tag_extracted_name,
                                                  const StatNameTagVector& stat_name_tags, size_t max_entries) PURE;
 
 

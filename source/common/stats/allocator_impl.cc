@@ -39,7 +39,7 @@ void AllocatorImpl::debugPrint() {
 }
 #endif
 
-// Counter, Gauge, TextReadout and CounterArray inherit from RefcountInterface and
+// Counter, Gauge, TextReadout and CounterGroup inherit from RefcountInterface and
 // Metric. MetricImpl takes care of most of the Metric API, but we need to cover
 // symbolTable() here, which we don't store directly, but get it via the alloc,
 // which we need in order to clean up the counter and gauge maps in that class
@@ -258,10 +258,10 @@ private:
   std::string value_ ABSL_GUARDED_BY(mutex_);
 };
 
-// An implementation of Stats::CounterArray.
-class CounterArrayImpl : public StatsSharedImpl<CounterArray> {
+// An implementation of Stats::CounterGroup.
+class CounterGroupImpl : public StatsSharedImpl<CounterGroup> {
 public:
-  CounterArrayImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+  CounterGroupImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
                           const StatNameTagVector& stat_name_tags, size_t max_entries)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags),
         values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)),
@@ -269,7 +269,7 @@ public:
   }
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
-    const size_t count = alloc_.counter_arrays_.erase(statName());
+    const size_t count = alloc_.counter_groups_.erase(statName());
     ASSERT(count == 1);
   }
 
@@ -304,7 +304,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
-  ASSERT(counter_arrays_.find(name) == counter_arrays_.end());
+  ASSERT(counter_groups_.find(name) == counter_groups_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
@@ -320,7 +320,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
-  ASSERT(counter_arrays_.find(name) == counter_arrays_.end());
+  ASSERT(counter_groups_.find(name) == counter_groups_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
@@ -336,7 +336,7 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(gauges_.find(name) == gauges_.end());
-  ASSERT(counter_arrays_.find(name) == counter_arrays_.end());
+  ASSERT(counter_groups_.find(name) == counter_groups_.end());
   auto iter = text_readouts_.find(name);
   if (iter != text_readouts_.end()) {
     return TextReadoutSharedPtr(*iter);
@@ -347,20 +347,20 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   return text_readout;
 }
 
-CounterArraySharedPtr AllocatorImpl::makeCounterArray(StatName name, StatName tag_extracted_name,
+CounterGroupSharedPtr AllocatorImpl::makeCounterGroup(StatName name, StatName tag_extracted_name,
                                                       const StatNameTagVector& stat_name_tags,
                                                       size_t max_entries) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(gauges_.find(name) == gauges_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
-  auto iter = counter_arrays_.find(name);
-  if (iter != counter_arrays_.end()) {
-    return CounterArraySharedPtr(*iter);
+  auto iter = counter_groups_.find(name);
+  if (iter != counter_groups_.end()) {
+    return CounterGroupSharedPtr(*iter);
   }
   auto text_readout =
-      CounterArraySharedPtr(new CounterArrayImpl(name, *this, tag_extracted_name, stat_name_tags, max_entries));
-  counter_arrays_.insert(text_readout.get());
+      CounterGroupSharedPtr(new CounterGroupImpl(name, *this, tag_extracted_name, stat_name_tags, max_entries));
+  counter_groups_.insert(text_readout.get());
   return text_readout;
 }
 

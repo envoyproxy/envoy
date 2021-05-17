@@ -30,7 +30,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
       heap_allocator_(alloc.symbolTable()), null_counter_(alloc.symbolTable()),
       null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()),
-      null_text_readout_(alloc.symbolTable()), null_counter_array_(alloc.symbolTable()),
+      null_text_readout_(alloc.symbolTable()), null_counter_group_(alloc.symbolTable()),
       well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")) {
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
@@ -70,7 +70,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
     removeRejectedStats(scope->central_cache_->gauges_, deleted_gauges_);
     removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
     removeRejectedStats(scope->central_cache_->text_readouts_, deleted_text_readouts_);
-    removeRejectedStats(scope->central_cache_->counter_arrays_, deleted_counter_arrays_);
+    removeRejectedStats(scope->central_cache_->counter_groups_, deleted_counter_groups_);
   }
 
   // Remove any newly rejected histograms from histogram_set_.
@@ -175,15 +175,15 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   return ret;
 }
 
-std::vector<CounterArraySharedPtr> ThreadLocalStoreImpl::counterArrays() const {
+std::vector<CounterGroupSharedPtr> ThreadLocalStoreImpl::counterGroups() const {
   // Handle de-dup due to overlapping scopes.
-  std::vector<CounterArraySharedPtr> ret;
+  std::vector<CounterGroupSharedPtr> ret;
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& counter_array : scope->central_cache_->counter_arrays_) {
-      if (names.insert(counter_array.first).second) {
-        ret.push_back(counter_array.second);
+    for (auto& counter_group : scope->central_cache_->counter_groups_) {
+      if (names.insert(counter_group.first).second) {
+        ret.push_back(counter_group.second);
       }
     }
   }
@@ -691,10 +691,10 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
       tls_cache, tls_rejected_stats, parent_.null_text_readout_);
 }
 
-CounterArray& ThreadLocalStoreImpl::ScopeImpl::counterArrayFromStatNameWithTags(
+CounterGroup& ThreadLocalStoreImpl::ScopeImpl::counterGroupFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, size_t max_entries) {
   if (parent_.rejectsAll()) {
-    return parent_.null_counter_array_;
+    return parent_.null_counter_group_;
   }
 
   // Determine the final name based on the prefix and the passed name.
@@ -711,22 +711,22 @@ CounterArray& ThreadLocalStoreImpl::ScopeImpl::counterArrayFromStatNameWithTags(
 
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
-  StatRefMap<CounterArray>* tls_cache = nullptr;
+  StatRefMap<CounterGroup>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_cache_) {
     TlsCacheEntry& entry = parent_.tlsCache().insertScope(this->scope_id_);
-    tls_cache = &entry.counter_arrays_;
+    tls_cache = &entry.counter_groups_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
 
-  return safeMakeStat<CounterArray>(
-      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counter_arrays_,
+  return safeMakeStat<CounterGroup>(
+      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counter_groups_,
       central_cache_->rejected_stats_,
       [max_entries](Allocator& allocator, StatName name, StatName tag_extracted_name,
-         const StatNameTagVector& tags) -> CounterArraySharedPtr {
-        return allocator.makeCounterArray(name, tag_extracted_name, tags, max_entries);
+         const StatNameTagVector& tags) -> CounterGroupSharedPtr {
+        return allocator.makeCounterGroup(name, tag_extracted_name, tags, max_entries);
       },
-      tls_cache, tls_rejected_stats, parent_.null_counter_array_);
+      tls_cache, tls_rejected_stats, parent_.null_counter_group_);
 }
 
 CounterOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
@@ -751,8 +751,8 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
-CounterArrayOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounterArray(StatName name) const {
-  return findStatLockHeld<CounterArray>(name, central_cache_->counter_arrays_);
+CounterGroupOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounterGroup(StatName name) const {
+  return findStatLockHeld<CounterGroup>(name, central_cache_->counter_groups_);
 }
 
 Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id) {

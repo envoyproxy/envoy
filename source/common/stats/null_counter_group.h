@@ -8,14 +8,14 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * Null counter array implementation.
+ * Null counter group implementation.
  * No-ops on all calls and requires no underlying metric or data.
  */
-class NullCounterArrayImpl : public MetricImpl<CounterArray> {
+class NullCounterGroupImpl : public MetricImpl<CounterGroup> {
 public:
-  explicit NullCounterArrayImpl(SymbolTable& symbol_table)
-      : MetricImpl<CounterArray>(symbol_table), symbol_table_(symbol_table) {}
-  ~NullCounterArrayImpl() override {
+  explicit NullCounterGroupImpl(SymbolTable& symbol_table)
+      : MetricImpl<CounterGroup>(symbol_table), symbol_table_(symbol_table) {}
+  ~NullCounterGroupImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
     // will not be able to access the SymbolTable& to free the symbols. An RAII
     // alternative would be to store the SymbolTable reference in the

@@ -36,7 +36,7 @@ MockTextReadout::MockTextReadout() {
 }
 MockTextReadout::~MockTextReadout() = default;
 
-MockCounterArray::MockCounterArray() {
+MockCounterGroup::MockCounterGroup() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value(_)).WillByDefault(Invoke([this](uint64_t index) {
     return value_[index];
@@ -45,7 +45,7 @@ MockCounterArray::MockCounterArray() {
     return latch_[index];
   }));
 }
-MockCounterArray::~MockCounterArray() = default;
+MockCounterGroup::~MockCounterGroup() = default;
 
 MockHistogram::MockHistogram() {
   ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));

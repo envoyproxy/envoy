@@ -251,10 +251,10 @@ public:
   std::string value_;
 };
 
-class MockCounterArray : public MockStatWithRefcount<CounterArray> {
+class MockCounterGroup : public MockStatWithRefcount<CounterGroup> {
 public:
-  MockCounterArray();
-  ~MockCounterArray() override;
+  MockCounterGroup();
+  ~MockCounterGroup() override;
 
   MOCK_METHOD(void, add, (size_t index, uint64_t amount));
   MOCK_METHOD(void, inc, (size_t index));
