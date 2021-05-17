@@ -148,6 +148,10 @@ public:
       pathWithEscapedSlashesAction() const override {
     return path_with_escaped_slashes_action_;
   }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return ip_detection_extensions_;
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -213,6 +217,8 @@ public:
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
+
   const LocalReply::LocalReplyPtr local_reply_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
