@@ -32,6 +32,8 @@ class TestPauseFilterForQuic;
 
 namespace Quic {
 
+class QuicNetworkConnectionTest;
+
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
                                         public SendBufferMonitor {
@@ -170,6 +172,7 @@ protected:
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
+  friend class Envoy::Quic::QuicNetworkConnectionTest;
 
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
   void onSendBufferHighWatermark();

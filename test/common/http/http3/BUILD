@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,8 +11,9 @@ envoy_package()
 
 envoy_cc_test(
     name = "conn_pool_test",
-    srcs = ["conn_pool_test.cc"],
-    deps = [
+    srcs = envoy_select_enable_http3(["conn_pool_test.cc",]),
+    tags = ["nofips"],
+    deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",
         "//source/common/network:utility_lib",
@@ -27,5 +29,5 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:test_runtime_lib",
-    ],
+        ]),
 )
