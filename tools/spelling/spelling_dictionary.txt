@@ -34,6 +34,8 @@ HEXDIG
 HEXDIGIT
 OWS
 Preconnecting
+RTCP
+RTP
 STATNAME
 SkyWalking
 TIDs
@@ -1132,6 +1134,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks

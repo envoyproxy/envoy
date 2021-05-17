@@ -41,9 +41,9 @@ envoy_cc_test(
         "http_tracer_manager_impl_test.cc",
     ],
     deps = [
-        "//source/common/tracing:http_tracer_config_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:http_tracer_manager_lib",
+        "//source/common/tracing:tracer_config_lib",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/mocks/tracing:tracing_mocks",

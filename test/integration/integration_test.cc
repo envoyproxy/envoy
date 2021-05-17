@@ -368,6 +368,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
   config_helper_.addFilter(R"EOF(
 name: matcher
 typed_config:

@@ -30,7 +30,6 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "common/event/libevent_scheduler.h"
@@ -204,7 +203,7 @@ public:
     EXPECT_CALL(*read_filter_, onNewConnection()).WillOnce(Invoke([this]() {
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(
-          envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024,
+          envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100,
           envoy::config::core::v3::HttpProtocolOptions::ALLOW);
       EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().

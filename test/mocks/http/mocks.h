@@ -586,6 +586,11 @@ public:
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));
   MOCK_METHOD(const LocalReply::LocalReply&, localReply, (), (const));
+  MOCK_METHOD(envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager::PathWithEscapedSlashesAction,
+              pathWithEscapedSlashesAction, (), (const));
+  MOCK_METHOD(const std::vector<Http::OriginalIPDetectionSharedPtr>&, originalIpDetectionExtensions,
+              (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

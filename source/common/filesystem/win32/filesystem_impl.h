@@ -85,5 +85,8 @@ public:
   bool illegalPath(const std::string& path) override;
 };
 
+using FileImpl = FileImplWin32;
+using InstanceImpl = InstanceImplWin32;
+
 } // namespace Filesystem
 } // namespace Envoy

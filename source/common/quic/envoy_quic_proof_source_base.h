@@ -23,7 +23,6 @@
 
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
-#include "server/backtrace.h"
 #include "common/common/logger.h"
 
 namespace Envoy {

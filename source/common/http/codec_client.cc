@@ -193,7 +193,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
         quic_session, *this, host->cluster().http3CodecStats(), host->cluster().http3Options(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
     // Initialize the session after max request header size is changed in above http client
     // connection creation.
     quic_session.Initialize();
