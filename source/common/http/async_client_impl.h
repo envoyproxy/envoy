@@ -237,7 +237,8 @@ private:
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
-    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                    bool) const override {
       return {};
     }
     const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
