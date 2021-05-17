@@ -151,7 +151,9 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     frame_protector_ = std::make_unique<TsiFrameProtector>(frame_protector);
 
     handshake_complete_ = true;
-    callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    if (raw_write_buffer_.length() == 0) {
+      callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    }
   }
 
   if (read_error_ || (!handshake_complete_ && end_stream_read_)) {
@@ -166,7 +168,11 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
 
   // Try to write raw buffer when next call is done, even this is not in do[Read|Write] stack.
   if (raw_write_buffer_.length() > 0) {
-    return raw_buffer_socket_->doWrite(raw_write_buffer_, false).action_;
+    Network::IoResult result = raw_buffer_socket_->doWrite(raw_write_buffer_, false);
+    if (handshake_complete_) {
+      callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    }
+    return result.action_;
   }
 
   return Network::PostIoAction::KeepOpen;
