@@ -205,11 +205,12 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
 
   if (tls_.has_value()) {
-    ASSERT(tls_->isShutdown());
+    ASSERT(!tls_.has_value() || tls_->isShutdown());
   }
 
-  // We can't call runOnAllThreads here as global threading has already been shutdown.
-  // It is okay to simply clear the scopes and central cache entries to cleanup.
+  // We can't call runOnAllThreads here as global threading has already been shutdown. It is okay
+  // to simply clear the scopes and central cache entries here as they will be cleaned up during
+  // thread local data cleanup in InstanceImpl::shutdownThread().
   {
     Thread::LockGuard lock(lock_);
     scopes_to_cleanup_.clear();
@@ -284,9 +285,12 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    // Clear scopes in a batch. This greatly reduces the overhead when there are
-    // tens of thousands of scopes to clear in a short period. i.e.: VHDS updates with tens of
-    // thousands of VirtualHosts.
+    // Clear scopes in a batch. It's possible that many different scopes will be deleted at
+    // the same time, before the main thread gets a chance to run cleanScopesFromCaches. If a new
+    // scope is deleted before that post runs, we add it to our list of scopes to clear, and there
+    // is no need to issue another post. This greatly reduces the overhead when there are tens of
+    // thousands of scopes to clear in a short period. i.e.: VHDS updates with tens of thousands of
+    // VirtualHosts.
     bool need_post = scopes_to_cleanup_.empty();
     scopes_to_cleanup_.push_back(scope->scope_id_);
     central_cache_entries_to_cleanup_.push_back(scope->central_cache_);
@@ -373,9 +377,8 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
-    // Capture all the pending histograms in a local, clearing the list held in
-    // this. Once this occurs, if a new histogram is deleted, a new post will be
-    // required.
+    // Move the histograms pending cleanup into a local variable. Future histogram deletions will be
+    // batched until the next time this function is called.
     auto histograms = std::make_shared<std::vector<uint64_t>>();
     {
       Thread::LockGuard lock(hist_mutex_);

@@ -69,7 +69,7 @@ public:
     store_->addSink(sink_);
   }
 
-  ~StatsThreadLocalStoreTest() { tls_.shutdownGlobalThreading(); }
+  ~StatsThreadLocalStoreTest() override { tls_.shutdownGlobalThreading(); }
 
   void resetStoreWithAlloc(Allocator& alloc) {
     store_ = std::make_unique<ThreadLocalStoreImpl>(alloc);

@@ -196,7 +196,6 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   shutdownThreading();
-  ENVOY_LOG_MISC(error, "end of StatsAsJson");
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
