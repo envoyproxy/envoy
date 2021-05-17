@@ -1800,7 +1800,7 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
     EXPECT_EQ("second_reply", response->body());
   }
   // The filter will send a local reply when receiving headers and reset the
-  // stream onLocalReply.  The client will get a reset and no response even if
+  // stream onLocalReply. The client will get a reset and no response even if
   // dual local replies are on (from the prior request).
   {
     default_request_headers_.addCopy("reset", "yes");

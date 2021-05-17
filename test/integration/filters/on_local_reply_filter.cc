@@ -19,15 +19,15 @@ public:
     if (!request_headers.get(Http::LowerCaseString("dual-local-reply")).empty()) {
       dual_reply_ = true;
     }
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "original_reply", nullptr, absl::nullopt,
-                                       "original_reply");
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "original_reply", nullptr,
+                                       absl::nullopt, "original_reply");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     if (dual_reply_) {
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "second_reply", nullptr, absl::nullopt,
-                                         "second_reply");
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "second_reply", nullptr,
+                                         absl::nullopt, "second_reply");
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
