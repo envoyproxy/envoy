@@ -17,8 +17,8 @@ namespace Http3 {
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   void initialize() {
-    EXPECT_CALL(*mock_host, address()).WillRepeatedly(Return(test_address_));
-    EXPECT_CALL(*mock_host, transportSocketFactory()).WillRepeatedly(testing::ReturnRef(factory_));
+    EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
+    EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(factory_));
     new Event::MockSchedulableCallback(&dispatcher_);
     Network::ConnectionSocket::OptionsSharedPtr options;
     Network::TransportSocketOptionsSharedPtr transport_options;
@@ -26,10 +26,11 @@ public:
                              options, transport_options, state_, simTime());
   }
 
+  Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::MockHost* mock_host = new NiceMock<Upstream::MockHost>;
-  Upstream::HostSharedPtr host_{mock_host};
+  Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   Network::Address::InstanceConstSharedPtr test_address_ =
@@ -42,7 +43,7 @@ public:
 };
 
 TEST_F(Http3ConnPoolImplTest, CreationWithBufferLimits) {
-  EXPECT_CALL(mock_host->cluster_, perConnectionBufferLimitBytes);
+  EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
 }
 
