@@ -72,7 +72,8 @@ public:
    * kills any callbacks.
    */
   void destroy() { token_timer_.reset(); }
-
+  bool destroyed() { return token_timer_ == nullptr; }
+  
 private:
   friend class StreamRateLimiterTest;
   using TimerPtr = std::unique_ptr<Event::Timer>;
