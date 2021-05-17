@@ -1,7 +1,7 @@
 FROM debian:bullseye
 
 RUN apt-get update && apt-get install -y python3.9 python3-pip bash curl
-RUN python3.9 -m pip install -q flask flask-helper flask-compress
+RUN python3.9 -m pip install -q flask
 RUN mkdir -p /code/data
 RUN dd if=/dev/zero of="/code/data/file" bs=1024 count=102400 && \
     dd if=/dev/zero of="/code/data/file.json" bs=1024 count=102400

@@ -17,8 +17,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-service
-    volumes:
-      - ./service-envoy.yaml:/etc/service-envoy.yaml
     networks:
       - envoymesh
 

@@ -1,20 +1,17 @@
 from flask import Flask
-from flask.helpers import send_file
-from flask_compress import Compress
+from flask.helpers import send_from_directory
 
 app = Flask(__name__)
-app.config["COMPRESS_ALGORITHM"] = 'gzip'
-Compress(app)
 
 
 @app.route('/plain')
 def get_plain_file():
-    return send_file('data/file', conditional=True)
+    return send_from_directory("data", "file")
 
 
 @app.route('/json')
 def get_json_file():
-    return send_file('data/file.json', conditional=True)
+    return send_from_directory("data", "file.json")
 
 
 if __name__ == "__main__":
