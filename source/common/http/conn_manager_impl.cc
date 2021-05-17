@@ -965,14 +965,31 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   // Path sanitization should happen before any path access other than the above sanity check.
-  if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
-                                                    connection_manager_.config_)) {
+  const auto action =
+      ConnectionManagerUtility::maybeNormalizePath(*request_headers_, connection_manager_.config_);
+  // gRPC requests are rejected if Envoy is configured to redirect post-normalization. This is
+  // because gRPC clients do not support redirect.
+  if (action == ConnectionManagerUtility::NormalizePathAction::Reject ||
+      (action == ConnectionManagerUtility::NormalizePathAction::Redirect &&
+       Grpc::Common::hasGrpcContentType(*request_headers_))) {
+    connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
                    nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
+  } else if (action == ConnectionManagerUtility::NormalizePathAction::Redirect) {
+    connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
+    sendLocalReply(
+        false, Code::TemporaryRedirect, "",
+        [new_path = request_headers_->Path()->value().getStringView()](
+            Http::ResponseHeaderMap& response_headers) -> void {
+          response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+        },
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
+    return;
   }
 
+  ASSERT(action == ConnectionManagerUtility::NormalizePathAction::Continue);
   auto optional_port = ConnectionManagerUtility::maybeNormalizeHost(
       *request_headers_, connection_manager_.config_, localPort());
   if (optional_port.has_value() &&
@@ -985,9 +1002,22 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
-    filter_manager_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
+    const auto mutate_result = ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_);
+
+    // IP detection failed, reject the request.
+    if (mutate_result.reject_request.has_value()) {
+      const auto& reject_request_params = mutate_result.reject_request.value();
+      connection_manager_.stats_.named_.downstream_rq_rejected_via_ip_detection_.inc();
+      sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+                     reject_request_params.response_code, reject_request_params.body, nullptr,
+                     absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().OriginalIPDetectionFailed);
+      return;
+    }
+
+    filter_manager_.setDownstreamRemoteAddress(mutate_result.final_remote_address);
   }
   ASSERT(filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress() != nullptr);
 
