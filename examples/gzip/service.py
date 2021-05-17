@@ -4,12 +4,12 @@ from flask.helpers import send_from_directory
 app = Flask(__name__)
 
 
-@app.route('/plain')
+@app.route('/file.txt')
 def get_plain_file():
-    return send_from_directory("data", "file")
+    return send_from_directory("data", "file.txt")
 
 
-@app.route('/json')
+@app.route('/file.json')
 def get_json_file():
     return send_from_directory("data", "file.json")
 
