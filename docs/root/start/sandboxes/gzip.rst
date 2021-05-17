@@ -1,7 +1,7 @@
 .. _install_sandboxes_gzip:
 
 Gzip
-===========
+====
 
 .. sidebar:: Requirements
 
@@ -29,7 +29,7 @@ Change to the ``examples/gzip`` directory.
     gzip_gzip_1   /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8001->8001/tcp,:::8001->8001/tcp, 0.0.0.0:8002->8002/tcp,:::8002->8002/tcp
 
 Step 2: Test Envoy's stats capabilities
-*****************************************
+***************************************
 
 You can now send a request to get prometheus stat.
 
@@ -64,7 +64,7 @@ For listen port:
     envoy_server_initialization_time_ms_count{} 1
 
 Step 3: Test Envoy's compression capabilities for Envoy's stats
-************************************************
+***************************************************************
 
 Now let's add ``--compressed -w '%{size_download}\n'`` to demonstrate the compression abilities of Envoy:
 
@@ -107,7 +107,7 @@ For listen port:
 Notice that the number of data size here is just an example.
 
 Step 4: Test Envoy's compression capabilities for upstream
-************************************************
+**********************************************************
 
 Here we have two endpoints: ``/plain`` and ``/json``, only ``/json`` would be compressed.
 
