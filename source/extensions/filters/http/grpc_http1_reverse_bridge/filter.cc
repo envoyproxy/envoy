@@ -1,5 +1,6 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/enum_to_int.h"
@@ -25,6 +26,9 @@ struct RcDetailsValues {
   const std::string GrpcBridgeFailedTooSmall = "grpc_bridge_data_too_small";
   // The gRPC HTTP/1 bridge encountered an unsupported content type.
   const std::string GrpcBridgeFailedContentType = "grpc_bridge_content_type_wrong";
+  // The gRPC HTTP/1 bridge expected the upstream to set a header indicating
+  // the content length, but it did not.
+  const std::string GrpcBridgeFailedContentLength = "grpc_bridge_content_length_missing";
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
@@ -147,9 +151,30 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     headers.setContentType(content_type_);
 
     if (withhold_grpc_frames_) {
-      // Adjust content-length to account for the frame header that's added.
-      adjustContentLength(headers,
-                          [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
+      // If the upstream should set a header indicating the response size, use that.
+      if (response_size_header_) {
+        auto length_headers = headers.get(*response_size_header_);
+        if (!length_headers.empty() && absl::SimpleAtoi(length_headers[0]->value().getStringView(),
+                                                        &response_message_length_)) {
+          headers.setContentLength(response_message_length_ + Grpc::GRPC_FRAME_HEADER_SIZE);
+          adjustContentLength(headers, [this](auto) {
+            return response_message_length_ + Grpc::GRPC_FRAME_HEADER_SIZE;
+          });
+        } else {
+          // If the response from upstream does not specify the content length, stand in an error
+          // message.
+          decoder_callbacks_->sendLocalReply(
+              Http::Code::OK, "envoy reverse bridge: upstream did not set content length", nullptr,
+              Grpc::Status::WellKnownGrpcStatus::Unknown,
+              RcDetails::get().GrpcBridgeFailedContentLength);
+          return Http::FilterHeadersStatus::StopIteration;
+        }
+      } else {
+        // If we are buffering the response, adjust content-length to account for the frame header
+        // that's added.
+        adjustContentLength(headers,
+                            [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
+      }
     }
     // We can only insert trailers at the end of data, so keep track of this value
     // until then.
@@ -169,16 +194,26 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
     auto& trailers = encoder_callbacks_->addEncodedTrailers();
     trailers.setGrpcStatus(grpc_status_);
 
-    if (withhold_grpc_frames_) {
+    if (withhold_grpc_frames_ && !response_size_header_) {
       buffer.prepend(buffer_);
-      buildGrpcFrameHeader(buffer);
+      buildGrpcFrameHeader(buffer, buffer.length());
     }
 
     return Http::FilterDataStatus::Continue;
   }
 
-  // We only need to buffer if we're responsible for injecting the gRPC frame header.
   if (withhold_grpc_frames_) {
+    if (response_size_header_) {
+      // If we're getting the response size from an upstream header, we can stream the response. The
+      // first chunk of data we encode needs the gRPC frame header prepended.
+      if (!frame_header_added_) {
+        buildGrpcFrameHeader(buffer, response_message_length_);
+        frame_header_added_ = true;
+      }
+
+      return Http::FilterDataStatus::Continue;
+    }
+
     // Buffer the response in a mutable buffer: we need to determine the size of the response
     // and modify it later on.
     buffer_.move(buffer);
@@ -195,21 +230,21 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 
   trailers.setGrpcStatus(grpc_status_);
 
-  if (withhold_grpc_frames_) {
-    buildGrpcFrameHeader(buffer_);
+  if (withhold_grpc_frames_ && !response_size_header_) {
+    buildGrpcFrameHeader(buffer_, buffer_.length());
     encoder_callbacks_->addEncodedData(buffer_, false);
   }
 
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::buildGrpcFrameHeader(Buffer::Instance& buffer) {
+void Filter::buildGrpcFrameHeader(Buffer::Instance& buffer, uint32_t message_length) {
   // We do this even if the upstream failed: If the response returned non-200,
   // we'll respond with a grpc-status with an error, so clients will know that the request
   // was unsuccessful. Since we're guaranteed at this point to have a valid response
   // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
   // response body.
-  Grpc::Encoder().prependFrameHeader(Grpc::GRPC_FH_DEFAULT, buffer);
+  Grpc::Encoder().prependFrameHeader(Grpc::GRPC_FH_DEFAULT, buffer, message_length);
 }
 
 } // namespace GrpcHttp1ReverseBridge
