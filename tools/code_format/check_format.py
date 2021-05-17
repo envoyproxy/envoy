@@ -323,11 +323,15 @@ class FormatChecker:
     # look_path searches for the given executable in all directories in PATH
     # environment variable. If it cannot be found, empty string is returned.
     def look_path(self, executable):
+        if executable is None:
+            return ''
         return shutil.which(executable) or ''
 
     # path_exists checks whether the given path exists. This function assumes that
     # the path is absolute and evaluates environment variables.
     def path_exists(self, executable):
+        if executable is None:
+            return False
         return os.path.exists(os.path.expandvars(executable))
 
     # executable_by_others checks whether the given path has execute permission for

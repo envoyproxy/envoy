@@ -346,7 +346,7 @@ public:
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
   MOCK_METHOD(void, decodeComplete, ());
   MOCK_METHOD(void, sendLocalReply,
-              (bool is_grpc_request, Code code, absl::string_view body,
+              (Code code, absl::string_view body,
                const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
@@ -589,6 +589,8 @@ public:
   MOCK_METHOD(envoy::extensions::filters::network::http_connection_manager::v3::
                   HttpConnectionManager::PathWithEscapedSlashesAction,
               pathWithEscapedSlashesAction, (), (const));
+  MOCK_METHOD(const std::vector<Http::OriginalIPDetectionSharedPtr>&, originalIpDetectionExtensions,
+              (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
