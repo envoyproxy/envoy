@@ -74,13 +74,6 @@ public:
     }
     return instance;
   }
-  template <typename InstanceType, typename... Args>
-  static InstanceConstPtr createInstancePtrOrDie(Args&&... args) {
-    StatusOr<InstanceConstPtr> error_or_address =
-        createInstancePtr<InstanceType>(std::forward<Args>(args)...);
-    RELEASE_ASSERT(error_or_address.ok(), error_or_address.status().ToString());
-    return move(*error_or_address);
-  }
 };
 
 /**

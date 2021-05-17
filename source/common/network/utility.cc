@@ -215,7 +215,7 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   sa4.sin_family = AF_INET;
   sa4.sin_port = htons(port64);
   StatusOr<Address::InstanceConstSharedPtr> address =
-      Address::InstanceFactory::createInstancePtrOrDie<Address::Ipv4Instance>(&sa4);
+      Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4);
   if (address.ok()) {
     return *address;
   }
