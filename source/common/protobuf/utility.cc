@@ -741,7 +741,7 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
   return struct_obj;
 }
 
-std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
+std::string MessageUtil::codeEnumToString(ProtobufUtil::StatusCode code) {
   return ProtobufUtil::Status(code, "").ToString();
 }
 
@@ -1043,4 +1043,17 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .time_since_epoch()
           .count()));
 }
+
+absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
+}
+
+std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
+  return "type.googleapis.com/" + std::string(type);
+}
+
 } // namespace Envoy

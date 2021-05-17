@@ -27,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // updated at user-configured intervals.
 //
 // Additionally, if
-// :ref:`enable_redirection<envoy_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_redirection>`
+// :ref:`enable_redirection<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_redirection>`
 // is true, then moved and ask redirection errors from upstream servers will trigger a topology
 // refresh when they exceed a user-configured error threshold.
 //
