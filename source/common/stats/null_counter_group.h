@@ -28,6 +28,7 @@ public:
   uint64_t latch(size_t /*index*/) override { return 0; }
   void reset(size_t /*index*/) override {}
   uint64_t value(size_t /*index*/) const override { return 0; }
+  size_t maxEntries() const override { return 0; }
 
   // Metric
   bool used() const override { return false; }

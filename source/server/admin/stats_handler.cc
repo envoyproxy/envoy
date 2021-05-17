@@ -116,7 +116,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     if (format_value.value() == "json") {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
       response.add(
-          statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
+          statsAsJson(all_stats, all_counter_groups, text_readouts, server_.stats().histograms(), used_only, regex));
     } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
@@ -184,6 +184,7 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 
 std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                          const std::map<std::string, std::vector<uint64_t>>& all_counter_groups,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                           const bool used_only, const absl::optional<std::regex> regex,
@@ -197,6 +198,15 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(text_readout.first);
     (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
     stats_group.push_back(ValueUtil::structValue(stat_obj));
+  }
+  for (const auto& group : all_counter_groups) {
+    for (size_t i = 0; i < group.second.size(); ++i) {
+      ProtobufWkt::Struct stat_obj;
+      auto* stat_obj_fields = stat_obj.mutable_fields();
+      (*stat_obj_fields)["name"] = ValueUtil::stringValue(group.first);
+      (*stat_obj_fields)["value"] = ValueUtil::numberValue(group.second[i]);
+      stats_group.push_back(ValueUtil::structValue(stat_obj));
+    }
   }
   for (const auto& stat : all_stats) {
     ProtobufWkt::Struct stat_obj;

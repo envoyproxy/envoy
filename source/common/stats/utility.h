@@ -229,6 +229,42 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
  */
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+/**
+ * Creates a counter group from a vector of tokens which are used to create the
+ * name. The tokens can be specified as DynamicName or StatName. For
+ * tokens specified as DynamicName, a dynamic StatName will be created. See
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
+ * for more detail on why symbolic StatNames are preferred when possible.
+ *
+ * See also counterGroupFromStatNames, which is slightly faster but does not allow
+ * passing DynamicName(string)s as names.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param unit The unit of measurement.
+ * @param tags optionally specified tags.
+ * @return A counter group named using the joined elements.
+ */
+CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements, size_t max_entries,
+                                 StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+/**
+ * Creates a counterGroup from a vector of tokens which are used to create the
+ * name. The tokens must be of type StatName.
+ *
+ * See also counterGroupFromElements, which is slightly slower, but allows
+ * passing DynamicName(string)s as elements.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param elements The vector of mixed DynamicName and StatName
+ * @param unit The unit of measurement.
+ * @param tags optionally specified tags.
+ * @return A counter group named using the joined elements.
+ */
+CounterGroup& counterGroupFromStatNames(Scope& scope, const StatNameVec& elements, size_t max_entries,
+                                  StatNameTagVectorOptConstRef tags = absl::nullopt);
+
 } // namespace Utility
 
 /**

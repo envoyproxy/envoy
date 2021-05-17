@@ -19,7 +19,7 @@ namespace {
 
 ClusterCircuitBreakersStats clusterCircuitBreakersStats(Stats::Store& store) {
   return {
-      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, POOL_GAUGE(store), h, tr, GENERATE_STATNAME_STRUCT)};
+    ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, POOL_GAUGE(store), h, tr, POOL_GAUGE(counter_group), GENERATE_STATNAME_STRUCT)};
 }
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {

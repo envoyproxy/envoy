@@ -10,7 +10,7 @@ namespace Router {
 /**
  * All router filter stats. @see stats_macros.h
  */
-#define ALL_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                        \
+#define ALL_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, COUNTER_GROUP, STATNAME) \
   COUNTER(no_cluster)                                                                              \
   COUNTER(no_route)                                                                                \
   COUNTER(passthrough_internal_redirect_bad_location)                                              \

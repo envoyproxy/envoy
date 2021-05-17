@@ -264,6 +264,7 @@ public:
   CounterGroupImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
                           const StatNameTagVector& stat_name_tags, size_t max_entries)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags),
+        max_entries_(max_entries),
         values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)),
         pending_values_(std::make_unique<std::atomic<uint64_t>[]>(max_entries)) {
   }
@@ -293,8 +294,12 @@ public:
   uint64_t value(size_t index) const override {
     return values_[index];
   }
+  size_t maxEntries() const override {
+    return max_entries_;
+  }
 
 private:
+  const size_t max_entries_;
   std::unique_ptr<std::atomic<uint64_t>[]> values_;
   std::unique_ptr<std::atomic<uint64_t>[]> pending_values_;
 };

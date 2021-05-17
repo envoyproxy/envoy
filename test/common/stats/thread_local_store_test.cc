@@ -253,6 +253,13 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   TextReadout& t1 = store_->textReadoutFromString("t1");
   EXPECT_EQ(&t1, &store_->textReadoutFromString("t1"));
 
+  CounterGroup& cg1 = store_->counterGroupFromString("cg1", 2);
+  EXPECT_EQ(&cg1, &store_->counterGroupFromString("cg1", 2));
+  StatNameManagedStorage cg1_name("cg1", symbol_table_);
+  auto found_counter_group = store_->findCounterGroup(cg1_name.statName());
+  ASSERT_TRUE(found_counter_group.has_value());
+  EXPECT_EQ(&cg1, &found_counter_group->get());
+
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
@@ -267,6 +274,9 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(1UL, store_->textReadouts().size());
   EXPECT_EQ(&t1, store_->textReadouts().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->textReadouts().front().use_count());
+  EXPECT_EQ(1UL, store_->counterGroups().size());
+  EXPECT_EQ(&cg1, store_->counterGroups().front().get()); // front() ok when size()==1
+  EXPECT_EQ(2L, store_->counterGroups().front().use_count());
 
   store_->shutdownThreading();
 }
@@ -307,6 +317,13 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   TextReadout& t1 = store_->textReadoutFromString("t1");
   EXPECT_EQ(&t1, &store_->textReadoutFromString("t1"));
 
+  CounterGroup& cg1 = store_->counterGroupFromString("cg1", 2);
+  EXPECT_EQ(&cg1, &store_->counterGroupFromString("cg1", 2));
+  StatNameManagedStorage cg1_name("cg1", symbol_table_);
+  auto found_counter_group = store_->findCounterGroup(cg1_name.statName());
+  ASSERT_TRUE(found_counter_group.has_value());
+  EXPECT_EQ(&cg1, &found_counter_group->get());
+
   EXPECT_EQ(1UL, store_->counters().size());
 
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
@@ -317,6 +334,9 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->textReadouts().size());
   EXPECT_EQ(&t1, store_->textReadouts().front().get()); // front() ok when size()==1
   EXPECT_EQ(2UL, store_->textReadouts().front().use_count());
+  EXPECT_EQ(1UL, store_->counterGroups().size());
+  EXPECT_EQ(&cg1, store_->counterGroups().front().get()); // front() ok when size()==1
+  EXPECT_EQ(2L, store_->counterGroups().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -330,6 +350,9 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->textReadouts().size());
   EXPECT_EQ(&t1, store_->textReadouts().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->textReadouts().front().use_count());
+  EXPECT_EQ(1UL, store_->counterGroups().size());
+  EXPECT_EQ(&cg1, store_->counterGroups().front().get()); // front() ok when size()==1
+  EXPECT_EQ(2L, store_->counterGroups().front().use_count());
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -384,6 +407,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   TextReadout& t2 = scope1->textReadoutFromString("t2");
   EXPECT_EQ("t1", t1.name());
   EXPECT_EQ("scope1.t2", t2.name());
+
+  CounterGroup& cg1 = store_->counterGroupFromString("cg1", 2);
+  CounterGroup& cg2 = scope1->counterGroupFromString("cg2", 2);
+  EXPECT_EQ("cg1", cg1.name());
+  EXPECT_EQ("scope1.cg2", cg2.name());
 
   StatNameManagedStorage tag_key("a", symbol_table_);
   StatNameManagedStorage tag_value("b", symbol_table_);
@@ -443,6 +471,8 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   EXPECT_EQ(&text_readout, &scope2->textReadoutFromString("tr"));
   Histogram& histogram = scope1->histogramFromString("histogram", Histogram::Unit::Unspecified);
   EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
+  CounterGroup& counter_group = scope1->counterGroupFromString("cg", 2);
+  EXPECT_EQ(&counter_group, &scope2->counterGroupFromString("cg", 2));
 
   // The histogram was created in scope1, which can now be destroyed. But the
   // histogram is kept alive by scope2.
@@ -541,6 +571,9 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   TextReadout& t1 = scope2->textReadoutFromString("some_string");
   EXPECT_EQ("scope1.foo.some_string", t1.name());
 
+  CounterGroup& cg1 = scope2->counterGroupFromString("some_counter_group", 2);
+  EXPECT_EQ("scope1.foo.some_counter_group", cg1.name());
+
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -593,6 +626,19 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ("goodbye", t2.value());
   EXPECT_EQ(1UL, store_->textReadouts().size());
 
+  // Counter groups work just like gauges.
+  CounterGroup& cg1 = scope1->counterGroupFromString("cg", 2);
+  CounterGroup& cg2 = scope2->counterGroupFromString("cg", 2);
+  EXPECT_EQ(&t1, &t2);
+
+  cg1.inc(0);
+  EXPECT_EQ(1, cg1.value(0));
+  EXPECT_EQ(1, cg2.value(0));
+  cg2.inc(0);
+  EXPECT_EQ(2, cg1.value(0));
+  EXPECT_EQ(2, cg2.value(0));
+  EXPECT_EQ(1UL, store_->counterGroups().size());
+
   // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
   scope1.reset();
   c2.inc();
@@ -604,6 +650,9 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   t2.set("abc");
   EXPECT_EQ("abc", t2.value());
   EXPECT_EQ(1UL, store_->textReadouts().size());
+  cg2.inc(0);
+  EXPECT_EQ(3, cg2.value(0));
+  EXPECT_EQ(1UL, store_->counterGroups().size());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -649,6 +698,33 @@ TEST_F(StatsThreadLocalStoreTest, TextReadoutAllLengths) {
   // Can set back to empty
   t.set("");
   EXPECT_EQ("", t.value());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, CounterGroup) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  CounterGroup& g = store_->counterGroupFromString("g", 2);
+  EXPECT_EQ(0, g.value(0));
+  EXPECT_EQ(0, g.value(1));
+
+  g.inc(0);
+  EXPECT_EQ(1, g.value(0));
+  EXPECT_EQ(0, g.value(1));
+
+  g.inc(1);
+  EXPECT_EQ(1, g.value(0));
+  EXPECT_EQ(1, g.value(1));
+
+  g.add(0, 3);
+  EXPECT_EQ(4, g.value(0));
+  EXPECT_EQ(1, g.value(1));
+
+  EXPECT_EQ(4, g.latch(0));
+  EXPECT_EQ(0, g.latch(0));
+  EXPECT_EQ(4, g.value(0));
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -794,6 +870,16 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ("", noop_string.value());
   TextReadout& noop_string_2 = store_->textReadoutFromString("noop_string_2");
   EXPECT_EQ(&noop_string, &noop_string_2);
+
+  // CounterGroup
+  CounterGroup& noop_group = store_->counterGroupFromString("noop_counter_group", 2);
+  EXPECT_EQ(noop_group.name(), "");
+  EXPECT_EQ(0, noop_group.maxEntries());
+  EXPECT_EQ(0, noop_group.value(0));
+  noop_group.inc(0);
+  EXPECT_EQ(0, noop_group.value(0));
+  CounterGroup& noop_group_2 = store_->counterGroupFromString("noop_counter_group_2", 3);
+  EXPECT_EQ(&noop_group, &noop_group_2);
 
   // Histogram
   Histogram& noop_histogram =

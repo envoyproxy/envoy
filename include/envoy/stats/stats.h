@@ -222,7 +222,7 @@ public:
    * Returns the value of the periodic counter at the specified index, then resets
    * that periodic counter.
    * @param index The index of the counter.
-   * @return The valud of the counter at the specified index.
+   * @return The value of the counter at the specified index.
    */
   virtual uint64_t latch(size_t index) PURE;
 
@@ -234,10 +234,16 @@ public:
 
   /**
    * Returns the value of the counter at the specified index.
-   * @param index The index of the counter..
-   * @return The valud of the counter at the specified index.
+   * @param index The index of the counter.
+   * @return The value of the counter at the specified index.
    */
   virtual uint64_t value(size_t index) const PURE;
+
+  /**
+   * Returns the number of entries in the group.
+   * @return The number of entries in the group.
+   */
+  virtual size_t maxEntries() const PURE;
 };
 
 using CounterGroupSharedPtr = RefcountPtr<CounterGroup>;

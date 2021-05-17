@@ -73,11 +73,12 @@ namespace Envoy {
 #define GENERATE_GAUGE_STRUCT(NAME, MODE) Envoy::Stats::Gauge& NAME##_;
 #define GENERATE_HISTOGRAM_STRUCT(NAME, UNIT) Envoy::Stats::Histogram& NAME##_;
 #define GENERATE_TEXT_READOUT_STRUCT(NAME) Envoy::Stats::TextReadout& NAME##_;
-#define GENERATE_COUNTER_ARRAY_STRUCT(NAME) Envoy::Stats::CounterGroup& NAME##_;
+#define GENERATE_COUNTER_GROUP_STRUCT(NAME, MAX_ENTRIES) Envoy::Stats::CounterGroup& NAME##_;
 
 #define FINISH_STAT_DECL_(X) #X)),
 #define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
 #define FINISH_STAT_DECL_UNIT_(X, UNIT) #X), Envoy::Stats::Histogram::Unit::UNIT),
+#define FINISH_STAT_DECL_SIZE_(X, SIZE) #X), SIZE),
 
 static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_view token) {
   if (prefix.empty()) {
@@ -93,14 +94,14 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gaugeFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
 #define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogramFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_UNIT_
 #define POOL_TEXT_READOUT_PREFIX(POOL, PREFIX) (POOL).textReadoutFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
-#define POOL_COUNTER_ARRAY_PREFIX(POOL, PREFIX) (POOL).counterGroupFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_COUNTER_GROUP_PREFIX(POOL, PREFIX) (POOL).counterGroupFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_SIZE_
 #define POOL_STAT_NAME_PREFIX(POOL, PREFIX) (POOL).symbolTable().textReadoutFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")
 #define POOL_HISTOGRAM(POOL) POOL_HISTOGRAM_PREFIX(POOL, "")
 #define POOL_TEXT_READOUT(POOL) POOL_TEXT_READOUT_PREFIX(POOL, "")
-#define POOL_COUNTER_ARRAY(POOL) POOL_COUNTER_ARRAY_PREFIX(POOL, "")
+#define POOL_COUNTER_GROUP(POOL) POOL_COUNTER_GROUP_PREFIX(POOL, "")
 
 #define NULL_STAT_DECL_(X) std::string(#X)),
 #define NULL_STAT_DECL_IGNORE_MODE_(X, MODE) std::string(#X)),
@@ -126,8 +127,9 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_(NAME)                                               \
   , NAME##_(Envoy::Stats::Utility::textReadoutFromStatNames(scope, {prefix, stat_names.NAME##_}))
 
-#define MAKE_STATS_STRUCT_COUNTER_ARRAY_HELPER_(NAME)                                              \
-  , NAME##_(Envoy::Stats::Utility::counterGroupFromStatNames(scope, {prefix, stat_names.NAME##_}))
+#define MAKE_STATS_STRUCT_COUNTER_GROUP_HELPER_(NAME, MAX_ENTRIES)                                 \
+  , NAME##_(Envoy::Stats::Utility::counterGroupFromStatNames(scope, {prefix, stat_names.NAME##_},  \
+                                                             MAX_ENTRIES))
 
 #define MAKE_STATS_STRUCT_STATNAME_HELPER_(name)
 #define GENERATE_STATNAME_STRUCT(name)
@@ -142,10 +144,11 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
     explicit StatNamesStruct(Envoy::Stats::SymbolTable& symbol_table)                              \
         : pool_(symbol_table)                                                                      \
               ALL_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, \
-                        GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT) {}                       \
+                        GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT) \
+                               {}                                                                  \
     Envoy::Stats::StatNamePool pool_;                                                              \
     ALL_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT,     \
-              GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)                                \
+              GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)     \
   }
 
 /**
@@ -164,10 +167,12 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
               ALL_STATS(MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_,        \
                         MAKE_STATS_STRUCT_HISTOGRAM_HELPER_,                                       \
                         MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_,                                    \
+                        MAKE_STATS_STRUCT_COUNTER_GROUP_HELPER_,                                   \
                         MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
     const StatNamesStruct& stat_names_;                                                            \
     ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,           \
-              GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)                              \
+              GENERATE_TEXT_READOUT_STRUCT, GENERATE_COUNTER_GROUP_STRUCT,                         \
+              GENERATE_STATNAME_STRUCT)                                                            \
   }
 
 } // namespace Envoy

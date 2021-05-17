@@ -26,10 +26,11 @@ public:
 
   static std::string
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
+                     const std::map<std::string, std::vector<uint64_t>>& all_counter_groups,
                      std::map<std::string, std::string>& all_text_readouts,
                      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                      const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
-    return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, regex,
+    return StatsHandler::statsAsJson(all_stats, all_counter_groups, all_text_readouts, all_histograms, used_only, regex,
                                      true /*pretty_print*/);
   }
 
@@ -73,7 +74,8 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json = statsAsJsonHandler(all_stats, all_text_readouts, histograms, false);
+  std::map<std::string, std::vector<uint64_t>> all_counter_groups;
+  std::string actual_json = statsAsJsonHandler(all_stats, all_counter_groups, all_text_readouts, histograms, false);
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -216,8 +218,9 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
+  std::map<std::string, std::vector<uint64_t>> all_counter_groups;
   std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true);
+      statsAsJsonHandler(all_stats, all_counter_groups, all_text_readouts, store_->histograms(), true);
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
@@ -316,8 +319,9 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
+  std::map<std::string, std::vector<uint64_t>> all_counter_groups;
   std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), false,
+       statsAsJsonHandler(all_stats, all_counter_groups, all_text_readouts, store_->histograms(), false,
                          absl::optional<std::regex>{std::regex("[a-z]1")});
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
@@ -427,8 +431,9 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 
   std::map<std::string, uint64_t> all_stats;
   std::map<std::string, std::string> all_text_readouts;
+  std::map<std::string, std::vector<uint64_t>> all_counter_groups;
   std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true,
+      statsAsJsonHandler(all_stats, all_counter_groups, all_text_readouts, store_->histograms(), true,
                          absl::optional<std::regex>{std::regex("h[12]")});
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as

@@ -503,7 +503,7 @@ public:
 /**
  * All cluster stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
+#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, COUNTER_GROUPS, STATNAME)       \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
   COUNTER(bind_errors)                                                                             \
@@ -595,7 +595,7 @@ public:
  * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
  * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
-#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
+#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, COUNTER_GROUP, STATNAME) \
   COUNTER(upstream_rq_dropped)
 
 /**
@@ -607,7 +607,7 @@ public:
  * We also include stat-names in this structure that are used when composing
  * the circuit breaker names, depending on priority settings.
  */
-#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)      \
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, COUNTER_GROUP, STATNAME) \
   GAUGE(cx_open, Accumulate)                                                                       \
   GAUGE(cx_pool_open, Accumulate)                                                                  \
   GAUGE(rq_open, Accumulate)                                                                       \
@@ -625,7 +625,7 @@ public:
 /**
  * All stats tracking request/response headers and body sizes. Not used by default.
  */
-#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) \
+#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, COUNTER_GROUP, STATNAME) \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
   HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
@@ -634,7 +634,7 @@ public:
 /**
  * All stats around timeout budgets. Not used by default.
  */
-#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)        \
+#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, COUNTER_GROUP, STATNAME) \
   HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
   HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
 
@@ -666,7 +666,7 @@ MAKE_STATS_STRUCT(ClusterTimeoutBudgetStats, ClusterTimeoutBudgetStatNames,
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
  */
 struct ClusterCircuitBreakersStats {
-  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, GENERATE_GAUGE_STRUCT, h, tr, GENERATE_STATNAME_STRUCT)
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, GENERATE_GAUGE_STRUCT, h, tr, GENERATE_COUNTER_GROUP_STRUCT, GENERATE_STATNAME_STRUCT)
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;

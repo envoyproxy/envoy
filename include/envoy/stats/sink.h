@@ -42,6 +42,8 @@ public:
    */
   virtual const std::vector<std::reference_wrapper<const TextReadout>>& textReadouts() PURE;
 
+  // TODO(RyanTheOptimist): Add support for counter groups.
+
   /**
    * @return the time in UTC since epoch when the snapshot was created.
    */

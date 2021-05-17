@@ -463,7 +463,7 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 /**
  * All virtual cluster stats. @see stats_macro.h
  */
-#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, COUNTER_GROUP, STATNAME) \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
