@@ -33,7 +33,7 @@ namespace {
 class ReverseBridgeTest : public testing::Test {
 protected:
   void initialize(bool withhold_grpc_headers = true) {
-    filter_ = std::make_unique<Filter>("application/x-protobuf", withhold_grpc_headers);
+    filter_ = std::make_unique<Filter>("application/x-protobuf", withhold_grpc_headers, "");
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

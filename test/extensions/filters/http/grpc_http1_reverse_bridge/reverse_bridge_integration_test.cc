@@ -11,6 +11,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "fmt/printf.h"
 #include "gtest/gtest.h"
 
 using Envoy::Http::HeaderValueOf;
@@ -29,17 +30,21 @@ public:
   ReverseBridgeIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
-  void initialize() override {
+  void initialize() override { initialize(absl::nullopt); }
+
+  void initialize(const absl::optional<std::string> response_size_header) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
-    const std::string filter =
+    const std::string filter = fmt::sprintf(
         R"EOF(
 name: grpc_http1_reverse_bridge
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig
   content_type: application/x-protobuf
   withhold_grpc_frames: true
-            )EOF";
+  response_size_header: "%s"
+            )EOF",
+        response_size_header ? *response_size_header : "");
     config_helper_.addFilter(filter);
 
     auto vhost = config_helper_.createVirtualHost("disabled");
@@ -160,10 +165,11 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   EXPECT_TRUE(absl::EndsWith(response->body(), response_data.toString()));
 
   // Comparing strings embedded zero literals is hard. Use string literal and std::equal to avoid
-  // truncating the string when it's converted to const char *.
-  const auto expected_prefix = "\0\0\0\0\4"s;
+  // truncating the string when it's converted to const char *. Hex value 0x5 is 5, the message
+  // length.
+  const auto expected_prefix = "\0\0\0\0\x5"s;
   EXPECT_TRUE(
-      std::equal(response->body().begin(), response->body().begin() + 4, expected_prefix.begin()));
+      std::equal(response->body().begin(), response->body().begin() + 5, expected_prefix.begin()));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
   EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
@@ -197,6 +203,78 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
   EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
+
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Verifies that we stream the response instead of buffering it, using an upstream-provided header
+// to get the overall message length.
+TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+
+  initialize(absl::optional("custom-response-size-header"));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, "abcdef");
+
+  // Wait for upstream to finish the request.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Ensure that we stripped the length prefix and set the appropriate headers.
+  EXPECT_EQ("f", upstream_request_->body().toString());
+
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+
+  // Respond to the request.
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-protobuf");
+  // Trust the response size reported from the upstream. The content-length header won't be present
+  // on responses using chunked encoding, for a real-world example.
+  const uint32_t upstream_response_size = 10;
+  response_headers.addCopy(Http::LowerCaseString("custom-response-size-header"),
+                           std::to_string(upstream_response_size));
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  Buffer::OwnedImpl response_data_begin{"hello"};
+  upstream_request_->encodeData(response_data_begin, false);
+  // The downstream should be able to read this first piece of data before the stream ends.
+  response->waitForBodyData(5);
+
+  Buffer::OwnedImpl response_data_end{"world"};
+  upstream_request_->encodeData(response_data_end, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  response_data_begin.add(response_data_end);
+
+  // Ensure that we restored the content-type and that we added the length prefix.
+  EXPECT_EQ(upstream_response_size + 5, response->body().size());
+  EXPECT_TRUE(absl::EndsWith(response->body(), response_data_begin.toString()));
+
+  // Comparing strings embedded zero literals is hard. Use string literal and std::equal to avoid
+  // truncating the string when it's converted to const char *. Hex value 0xA is 10, the message
+  // length.
+  const auto expected_prefix = "\0\0\0\0\xA"s;
+  EXPECT_TRUE(
+      std::equal(response->body().begin(), response->body().begin() + 5, expected_prefix.begin()));
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
