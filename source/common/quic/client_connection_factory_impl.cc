@@ -38,7 +38,6 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
 
 namespace {
 // TODO(alyssawilk, danzh2010): This is mutable static info that is required for the QUICHE code.
-
 // This was preexisting but should either be removed or potentially moved inside
 // PersistentQuicInfoImpl.
 struct StaticInfo {
