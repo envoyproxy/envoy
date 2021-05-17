@@ -161,10 +161,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "alternate_protocols_cache",
-    srcs = ["alternate_protocols_cache.cc"],
-    hdrs = ["alternate_protocols_cache.h"],
+    srcs = ["alternate_protocols_cache_impl.cc"],
+    hdrs = ["alternate_protocols_cache_impl.h"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//include/envoy/http:alternate_protocols_cache_interface",
     ],
 )
 
@@ -187,6 +188,7 @@ envoy_cc_library(
         ":date_provider_lib",
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/http:original_ip_detection_interface",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/local_reply:local_reply_lib",

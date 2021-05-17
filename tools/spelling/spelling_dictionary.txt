@@ -1134,6 +1134,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks

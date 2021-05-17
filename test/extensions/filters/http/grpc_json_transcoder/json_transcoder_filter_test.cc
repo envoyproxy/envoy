@@ -30,7 +30,7 @@ using testing::Return;
 using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::util::MessageDifferencer;
-using Envoy::ProtobufUtil::error::Code;
+using Envoy::ProtobufUtil::StatusCode;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
@@ -270,9 +270,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
-  EXPECT_EQ(Code::INVALID_ARGUMENT, status.error_code());
+  EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"foo\" in the type \"google.protobuf.Empty\".",
-            status.error_message());
+            status.message());
   EXPECT_FALSE(transcoder);
 }
 
@@ -331,9 +331,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
-  EXPECT_EQ(Code::INVALID_ARGUMENT, status.error_code());
+  EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
-            status.error_message());
+            status.message());
   EXPECT_FALSE(transcoder);
 }
 

@@ -46,11 +46,7 @@ std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
 // Reads the contents of |filename| as a string into |contents|.
 // NOLINTNEXTLINE(readability-identifier-naming)
 void ReadFileContentsImpl(absl::string_view filename, std::string* contents) {
-#ifdef WIN32
-  Envoy::Filesystem::InstanceImplWin32 fs;
-#else
-  Envoy::Filesystem::InstanceImplPosix fs;
-#endif
+  Envoy::Filesystem::InstanceImpl fs;
   *contents = fs.fileReadToEnd(std::string(filename.data(), filename.size()));
 }
 

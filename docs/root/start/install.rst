@@ -159,6 +159,13 @@ The following commands will pull and show the Envoy version of current images.
          $ docker pull envoyproxy/|envoy_docker_image|
          $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
+   .. tab:: Envoy (distroless)
+
+      .. substitution-code-block:: console
+
+         $ docker pull envoyproxy/|envoy_distroless_docker_image|
+         $ docker run --rm envoyproxy/|envoy_distroless_docker_image| --version
+
    .. tab:: Get Envoy
 
       .. code-block:: console
@@ -201,6 +208,12 @@ The following table shows the available Docker images
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
+   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+     -
    * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
      - Release binary with symbols stripped on top of a **glibc** alpine base.
      - |DOCKER_IMAGE_TAG_NAME|
@@ -225,6 +238,12 @@ The following table shows the available Docker images
      -
      - latest
      - latest
+   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
+     -
+     -
+     - latest
+     -
    * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
      - Release binary with symbols stripped on top of a **glibc** alpine base.
      -

@@ -204,6 +204,16 @@ public:
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        KEEP_UNCHANGED;
+  }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return ip_detection_extensions_;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -249,6 +259,7 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
