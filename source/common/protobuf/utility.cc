@@ -1059,7 +1059,7 @@ std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
 void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
   auto& obj_fields = *obj.mutable_fields();
 
-  for (auto const& [key, val] : with.fields()) {
+  for (const auto& [key, val] : with.fields()) {
     auto& obj_key = obj_fields[key];
 
     // If the types are different, the last one wins.
@@ -1085,7 +1085,7 @@ void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& wit
     // For lists, append the new values.
     case ProtobufWkt::Value::kListValue: {
       auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
-      auto& vals = val.list_value().values();
+      const auto& vals = val.list_value().values();
       obj_key_vec.MergeFrom(vals);
       break;
     }

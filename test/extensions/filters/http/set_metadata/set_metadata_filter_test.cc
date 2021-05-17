@@ -27,12 +27,13 @@ class SetMetadataIntegrationTest : public testing::Test {
 public:
   SetMetadataIntegrationTest() {}
 
-  void runFilter(envoy::config::core::v3::Metadata& metadata, const std::string& yaml_config,
-                 Http::TestRequestHeaderMapImpl& headers) {
+  void runFilter(envoy::config::core::v3::Metadata& metadata, const std::string& yaml_config) {
     envoy::extensions::filters::http::set_metadata::v3::Config ext_config;
     TestUtility::loadFromYaml(yaml_config, ext_config);
     auto config = std::make_shared<Config>(ext_config);
     auto filter = std::make_shared<SetMetadataFilter>(config);
+
+    Http::TestRequestHeaderMapImpl headers;
 
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info;
@@ -41,25 +42,22 @@ public:
     EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(req_info));
     EXPECT_CALL(req_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers, true));
+    Buffer::OwnedImpl buffer;
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer, true));
     filter->onDestroy();
   }
 
-  void check_key_int(ProtobufWkt::Struct const& s, const char* key, int val) {
-    auto& fields = s.fields();
-    auto it = fields.find(key);
+  void checkKeyInt(ProtobufWkt::Struct const& s, const char* key, int val) {
+    const auto& fields = s.fields();
+    const auto it = fields.find(key);
     ASSERT_TRUE(it != fields.end());
-    auto& pbval = it->second;
+    const auto& pbval = it->second;
     ASSERT_EQ(pbval.kind_case(), ProtobufWkt::Value::kNumberValue);
     EXPECT_EQ(pbval.number_value(), val);
   }
 };
 
 TEST_F(SetMetadataIntegrationTest, TestTagsHeaders) {
-  Http::TestRequestHeaderMapImpl headers({
-      {":method", "GET"},
-      {":path", "/"},
-  });
-
   const std::string yaml_config = R"EOF(
     metadata_namespace: thenamespace
     value:
@@ -68,27 +66,22 @@ TEST_F(SetMetadataIntegrationTest, TestTagsHeaders) {
   )EOF";
 
   envoy::config::core::v3::Metadata metadata;
-  runFilter(metadata, yaml_config, headers);
+  runFilter(metadata, yaml_config);
 
   // Verify that `metadata` contains `{"thenamespace": {"tags": {"mytag0": 1}}}`
-  auto& filter_metadata = metadata.filter_metadata();
-  auto it_namespace = filter_metadata.find("thenamespace");
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_TRUE(it_namespace != filter_metadata.end());
-  auto& fields = it_namespace->second.fields();
-  auto it_tags = fields.find("tags");
+  const auto& fields = it_namespace->second.fields();
+  const auto it_tags = fields.find("tags");
   ASSERT_TRUE(it_tags != fields.end());
-  auto& tags = it_tags->second;
+  const auto& tags = it_tags->second;
   ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
-  check_key_int(tags.struct_value(), "mytag0", 1);
+  checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
 TEST_F(SetMetadataIntegrationTest, TestTagsHeadersUpdate) {
   envoy::config::core::v3::Metadata metadata;
-
-  Http::TestRequestHeaderMapImpl headers({
-      {":method", "GET"},
-      {":path", "/"},
-  });
 
   {
     const std::string yaml_config = R"EOF(
@@ -100,7 +93,7 @@ TEST_F(SetMetadataIntegrationTest, TestTagsHeadersUpdate) {
           mytag0: 1
     )EOF";
 
-    runFilter(metadata, yaml_config, headers);
+    runFilter(metadata, yaml_config);
   }
   {
     const std::string yaml_config = R"EOF(
@@ -112,38 +105,38 @@ TEST_F(SetMetadataIntegrationTest, TestTagsHeadersUpdate) {
           mytag1: 1
     )EOF";
 
-    runFilter(metadata, yaml_config, headers);
+    runFilter(metadata, yaml_config);
   }
 
   // Verify that `metadata` contains:
   // ``{"thenamespace": {number: 20, mylist: ["a","b"], "tags": {"mytag0": 1, "mytag1": 1}}}``
-  auto& filter_metadata = metadata.filter_metadata();
-  auto it_namespace = filter_metadata.find("thenamespace");
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto it_namespace = filter_metadata.find("thenamespace");
   ASSERT_TRUE(it_namespace != filter_metadata.end());
-  auto& namespace_ = it_namespace->second;
+  const auto& namespace_ = it_namespace->second;
 
-  check_key_int(namespace_, "mynumber", 20);
+  checkKeyInt(namespace_, "mynumber", 20);
 
-  auto& fields = namespace_.fields();
-  auto it_mylist = fields.find("mylist");
+  const auto& fields = namespace_.fields();
+  const auto it_mylist = fields.find("mylist");
   ASSERT_TRUE(it_mylist != fields.end());
-  auto& mylist = it_mylist->second;
+  const auto& mylist = it_mylist->second;
   ASSERT_EQ(mylist.kind_case(), ProtobufWkt::Value::kListValue);
-  auto& vals = mylist.list_value().values();
+  const auto& vals = mylist.list_value().values();
   ASSERT_EQ(vals.size(), 2);
   ASSERT_EQ(vals[0].kind_case(), ProtobufWkt::Value::kStringValue);
   EXPECT_EQ(vals[0].string_value(), "a");
   ASSERT_EQ(vals[1].kind_case(), ProtobufWkt::Value::kStringValue);
   EXPECT_EQ(vals[1].string_value(), "b");
 
-  auto it_tags = fields.find("tags");
+  const auto it_tags = fields.find("tags");
   ASSERT_TRUE(it_tags != fields.end());
-  auto& tags = it_tags->second;
+  const auto& tags = it_tags->second;
   ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
-  auto& tags_struct = tags.struct_value();
+  const auto& tags_struct = tags.struct_value();
 
-  check_key_int(tags_struct, "mytag0", 1);
-  check_key_int(tags_struct, "mytag1", 1);
+  checkKeyInt(tags_struct, "mytag0", 1);
+  checkKeyInt(tags_struct, "mytag1", 1);
 }
 
 } // namespace SetMetadataFilter

@@ -24,3 +24,16 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.http.set_metadata",
+    deps = [
+        "//source/extensions/filters/http/set_metadata:config",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
+    ],
+)

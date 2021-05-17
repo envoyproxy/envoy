@@ -25,7 +25,7 @@ SetMetadataFilter::SetMetadataFilter(const ConfigSharedPtr config) : config_(con
 SetMetadataFilter::~SetMetadataFilter() = default;
 
 Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  const auto metadata_namespace = config_->metadataNamespace();
+  const absl::string_view metadata_namespace = config_->metadataNamespace();
   auto& metadata = *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
   ProtobufWkt::Struct& org_fields = metadata[metadata_namespace];
   ProtobufWkt::Struct const& to_merge = config_->value();
