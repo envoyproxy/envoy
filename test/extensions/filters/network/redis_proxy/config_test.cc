@@ -89,7 +89,7 @@ settings:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -118,7 +118,7 @@ settings:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -139,7 +139,7 @@ settings:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -200,7 +200,7 @@ settings:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

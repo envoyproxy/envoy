@@ -226,6 +226,24 @@ public:
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
+   * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
+   *
+   * Similar to route(const Router::RouteCallback& cb), this route that is set will be
+   * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
+   * of the filter chain.
+   *
+   * NOTE: Passing nullptr in as the route parameter is equivalent to route resolution being
+   * attempted and failing to find a route. An example of when this happens is when
+   * RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers, const
+   * StreamInfo::StreamInfo& stream_info, uint64_t random_value) returns nullptr during a
+   * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
+   * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
+   * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
+   * absl::optional ptrs instead of null ptrs.
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
+
+  /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
    * view of clusterInfo after a route is picked/repicked.

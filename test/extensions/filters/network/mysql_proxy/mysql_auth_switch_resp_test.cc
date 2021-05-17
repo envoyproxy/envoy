@@ -24,11 +24,11 @@ TEST(MySQLAuthSwithRespTest, AuthSwithRespErrLengthResp) {
   switch_resp_encode.setAuthPluginResp(MySQLTestUtils::getAuthResp8());
   Buffer::OwnedImpl buffer;
   switch_resp_encode.encode(buffer);
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), 0);
   ClientSwitchResponse switch_resp_decode{};
-  switch_resp_decode.decode(buffer, AUTH_SWITH_RESP_SEQ, buffer.length() + 1);
-  EXPECT_EQ(switch_resp_decode.getAuthPluginResp(), "");
+  switch_resp_decode.decode(decode_data, AUTH_SWITH_RESP_SEQ, -1);
+  EXPECT_EQ(switch_resp_decode.getAuthPluginResp().size(), 0);
 }
-
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

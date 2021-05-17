@@ -70,7 +70,7 @@ protected:
     au->setResponseTrailers(std::move(trailers));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
     return response;
   }
@@ -84,7 +84,7 @@ protected:
         Http::TestResponseHeaderMapImpl({{":status", code}})));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
     return response;
   }

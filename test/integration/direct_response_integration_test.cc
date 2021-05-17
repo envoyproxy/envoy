@@ -39,7 +39,7 @@ public:
         {":authority", "host"},
     });
     auto response = std::move(encoder_decoder.second);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     EXPECT_EQ(body_size_bytes, response->body().size());

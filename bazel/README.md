@@ -54,22 +54,33 @@ for how to update or override dependencies.
     On Ubuntu, run the following:
     ```console
     sudo apt-get install \
-       libtool \
-       cmake \
-       automake \
        autoconf \
+       automake \
+       cmake \
+       curl \
+       libtool \
        make \
        ninja-build \
-       curl \
+       patch \
+       python3-pip \
        unzip \
-       virtualenv \
-       patch
+       virtualenv
     ```
 
     ### Fedora
     On Fedora (maybe also other red hat distros), run the following:
     ```console
-    dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
+    dnf install \
+        aspell-en \
+        cmake \
+        libatomic \
+        libstdc++ \
+        libstdc++-static \
+        libtool \
+        lld \
+        ninja-build \
+        patch \
+        python3-pip
     ```
 
     ### Linux
@@ -186,7 +197,7 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32.
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
 
     Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
     executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
@@ -254,6 +265,8 @@ On Linux, run:
 
 From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
 MSYS2 or Git bash), run:
+
+**Note: the command below executes the whole Windows CI and unlike Linux you are not able to set specific build targets. You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well as set environment variables to adjust your container build environment.**
 
 ```
 ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'

@@ -8,6 +8,8 @@
 FAILED=()
 CURRENT=""
 
+DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
+
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
 
@@ -33,16 +35,16 @@ trap exit 1 INT
 
 # TODO: move these to bazel
 CURRENT=glint
-./tools/code_format/glint.sh
+"${ENVOY_SRCDIR}"/tools/code_format/glint.sh
 
 CURRENT=shellcheck
-./tools/code_format/check_shellcheck_format.sh check
+"${ENVOY_SRCDIR}"/tools/code_format/check_shellcheck_format.sh check
 
 CURRENT=configs
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 
-CURRENT=flake8
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_flake8 "$(pwd)"
+CURRENT=python
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_check -- --diff-file="$DIFF_OUTPUT" --fix "$(pwd)"
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:" >&2

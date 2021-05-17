@@ -327,8 +327,8 @@ void HttpIntegrationTest::initialize() {
 #ifdef ENVOY_ENABLE_QUIC
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
-  quic_transport_socket_factory_ =
-      IntegrationUtil::createQuicUpstreamTransportSocketFactory(*api_, san_to_match_);
+  quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
+      *api_, stats_store_, context_manager_, san_to_match_);
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
@@ -340,8 +340,17 @@ void HttpIntegrationTest::initialize() {
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
-  quic_connection_persistent_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, stats_store_, timeSystem(), server_addr);
+  auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr);
+  // Config IETF QUIC flow control window.
+  quic_connection_persistent_info->quic_config_
+      .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
+          Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  // Config Google QUIC flow control window.
+  quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  quic_connection_persistent_info_ = std::move(quic_connection_persistent_info);
+
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -374,7 +383,7 @@ ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrail
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
     const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_size,
-    int upstream_index, std::chrono::milliseconds time) {
+    int upstream_index, std::chrono::milliseconds timeout) {
   ASSERT(codec_client_ != nullptr);
   // Send the request to Envoy.
   IntegrationStreamDecoderPtr response;
@@ -383,7 +392,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
   } else {
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
-  waitForNextUpstreamRequest(upstream_index, time);
+  waitForNextUpstreamRequest(upstream_index, timeout);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_size == 0);
   // Send any response data, with end_stream true.
@@ -391,7 +400,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     upstream_request_->encodeData(response_size, true);
   }
   // Wait for the response to be read by the codec client.
-  response->waitForEndStream();
+  RELEASE_ASSERT(response->waitForEndStream(timeout), "unexpected timeout");
   return response;
 }
 
@@ -506,7 +515,7 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header, bool set_content_length_header,
-    ConnectionCreationFunction* create_connection) {
+    ConnectionCreationFunction* create_connection, std::chrono::milliseconds timeout) {
   initialize();
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
@@ -521,8 +530,8 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   if (big_header) {
     request_headers.addCopy("big", std::string(4096, 'a'));
   }
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, request_size, response_headers, response_size);
+  auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                response_size, 0, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
@@ -660,7 +669,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -693,7 +702,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 
@@ -777,7 +786,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -825,7 +834,7 @@ void HttpIntegrationTest::testRetry() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
@@ -868,7 +877,7 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
@@ -911,7 +920,7 @@ void HttpIntegrationTest::testGrpcRetry() {
     upstream_request_->encodeTrailers(response_trailers);
   }
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
@@ -974,7 +983,7 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(12, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   ASSERT(response->continueHeaders() != nullptr);
   EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
@@ -1059,7 +1068,7 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
   }
   // Now send the rest of the response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   ASSERT(response->continueHeaders() != nullptr);
   EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
@@ -1094,7 +1103,7 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
@@ -1107,7 +1116,7 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(1024, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(512U, upstream_request_->bodyLength());
@@ -1144,7 +1153,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
     }
   } else {
@@ -1155,7 +1164,8 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 }
 
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
-                                                  uint32_t max_count) {
+                                                  uint32_t max_count,
+                                                  std::chrono::milliseconds timeout) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
@@ -1192,11 +1202,12 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
     }
   } else {
-    auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
+    auto response =
+        sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, timeout);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -1235,14 +1246,14 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
     } else {
       // Expect a stream reset when the size of the trailers is larger than the maximum
       // limit.
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForReset());
       codec_client_->close();
       EXPECT_FALSE(response->complete());
     }
   } else {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
   }
 }
@@ -1251,7 +1262,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
   // time-consuming asserts when using a large number of headers.
   setMaxRequestHeadersKb(96);
-  setMaxRequestHeadersCount(10005);
+  setMaxRequestHeadersCount(10010);
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1345,7 +1356,7 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(response_size, false);
   upstream_request_->encodeTrailers(response_trailers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
@@ -1391,7 +1402,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   // Wait for the response to be read by the codec client.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
@@ -1432,7 +1443,7 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
-    response->waitForReset();
+    ASSERT_TRUE(response->waitForEndStream());
     codec_client_->close();
   }
 }
@@ -1477,7 +1488,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
-      response->waitForReset();
+      ASSERT_TRUE(response->waitForEndStream());
       codec_client_->close();
     }
 

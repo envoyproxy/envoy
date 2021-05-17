@@ -69,7 +69,7 @@ using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
 class SkipActionFactory : public Matcher::ActionFactory {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&, const std::string&,
                                                  Server::Configuration::FactoryContext&) override {
     return []() { return std::make_unique<SkipAction>(); };
   }
@@ -133,6 +133,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   void resetStream() override;
   Router::RouteConstSharedPtr route() override;
   Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+  void setRoute(Router::RouteConstSharedPtr route) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
   void clearRouteCache() override;
   uint64_t streamId() const override;
@@ -511,6 +512,11 @@ public:
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
+   * Sets the current route.
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
+
+  /**
    * Clears the cached route.
    */
   virtual void clearRouteCache() PURE;
@@ -563,6 +569,11 @@ public:
    * Returns the tracked scope to use for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
+
+  /**
+   * Returns whether internal redirects with request bodies is enabled.
+   */
+  virtual bool enableInternalRedirectsWithBody() const PURE;
 };
 
 /**
@@ -900,6 +911,12 @@ public:
   const Network::Connection* connection() const { return &connection_; }
 
   uint64_t streamId() const { return stream_id_; }
+
+  Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
+
+  bool enableInternalRedirectsWithBody() const {
+    return filter_manager_callbacks_.enableInternalRedirectsWithBody();
+  }
 
 private:
   // Indicates which filter to start the iteration with.

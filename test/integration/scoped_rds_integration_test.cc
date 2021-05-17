@@ -301,7 +301,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=xyz-route"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
@@ -372,7 +372,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo-route"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
   // Add a new scope foo_scope4.
@@ -387,7 +387,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=xyz-route"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   // Get 404 because RDS hasn't pushed route configuration "foo_route4" yet.
   // But scope is found and the Router::NullConfigImpl is returned.
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
@@ -433,7 +433,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
@@ -468,6 +468,36 @@ key:
       456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
       /*cluster_0*/ 0);
   cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ScopedRdsIntegrationTest, RejectKeyConflictInDeltaUpdate) {
+  if (!isDelta()) {
+    return;
+  }
+  const std::string scope_route1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  // Delta SRDS update with key conflict, should be rejected.
+  const std::string scope_route2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  sendSrdsResponse({}, {scope_route2}, {}, "2");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                                 1);
+  sendSrdsResponse({}, {}, {"foo_scope1", "foo_scope2"}, "3");
 }
 
 // Verify SRDS works when reference via a xdstp:// collection locator.
@@ -608,7 +638,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=bar"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 }
@@ -658,7 +688,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 }
@@ -714,7 +744,7 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=bar"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 }

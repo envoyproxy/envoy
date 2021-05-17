@@ -107,7 +107,7 @@ struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
 // Factory for StringAction.
 class StringActionFactory : public ActionFactory {
 public:
-  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
+  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config, const std::string&,
                                         Server::Configuration::FactoryContext&) override {
     const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
     return [string]() { return std::make_unique<StringAction>(string.value()); };

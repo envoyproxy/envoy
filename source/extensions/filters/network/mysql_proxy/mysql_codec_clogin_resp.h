@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -39,12 +41,11 @@ public:
   AuthMoreMessage() : ClientLoginResponse(MYSQL_RESP_MORE) {}
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
   void encode(Buffer::Instance&) const override;
-
-  const std::string& getAuthMoreData() const { return more_plugin_data_; }
-  void setAuthMoreData(const std::string& data) { more_plugin_data_ = data; }
+  const std::vector<uint8_t>& getAuthMoreData() const { return more_plugin_data_; }
+  void setAuthMoreData(const std::vector<uint8_t>& data) { more_plugin_data_ = data; }
 
 private:
-  std::string more_plugin_data_;
+  std::vector<uint8_t> more_plugin_data_;
 };
 
 class AuthSwitchMessage : public ClientLoginResponse {
@@ -55,15 +56,15 @@ public:
   void encode(Buffer::Instance&) const override;
 
   bool isOldAuthSwitch() const { return is_old_auth_switch_; }
-  const std::string& getAuthPluginData() const { return auth_plugin_data_; }
+  const std::vector<uint8_t>& getAuthPluginData() const { return auth_plugin_data_; }
   const std::string& getAuthPluginName() const { return auth_plugin_name_; }
   void setIsOldAuthSwitch(bool old) { is_old_auth_switch_ = old; }
-  void setAuthPluginData(const std::string& data) { auth_plugin_data_ = data; }
+  void setAuthPluginData(const std::vector<uint8_t>& data) { auth_plugin_data_ = data; }
   void setAuthPluginName(const std::string& name) { auth_plugin_name_ = name; }
 
 private:
   bool is_old_auth_switch_{false};
-  std::string auth_plugin_data_;
+  std::vector<uint8_t> auth_plugin_data_;
   std::string auth_plugin_name_;
 };
 

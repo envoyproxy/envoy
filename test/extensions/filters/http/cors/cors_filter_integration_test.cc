@@ -98,7 +98,7 @@ protected:
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     compareHeaders(response->headers(), expected_response_headers);
   }

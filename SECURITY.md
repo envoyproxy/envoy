@@ -206,6 +206,13 @@ patches, understand exact mitigation steps, etc.
   the fix to user's environments; this can include links to external distributor documentation.
 - The Fix Lead will remove the Fix Team from the private security repo.
 
+The reporter of a vulnerability will be granted early access to fix patches upon
+request, prior to the general disclosure of patches to the Private Distributors
+List for the purpose of testing and internal vulnerability mitigation. They must
+accept the embargo policy below in order for this to occur. If the vulnerability
+reporter is also responsible for developing fix patches, they may make use of
+the patches internally in their organization at any point in the fix cycle.
+
 ### Retrospective
 
 These steps should be completed 1-3 days after the Release Date. The retrospective process

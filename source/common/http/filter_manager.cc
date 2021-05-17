@@ -9,7 +9,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -207,7 +206,10 @@ bool ActiveStreamFilterBase::commonHandleAfterTrailersCallback(FilterTrailersSta
     } else {
       ASSERT(headers_continued_);
     }
-  } else {
+  } else if (status == FilterTrailersStatus::StopIteration) {
+    if (canIterate()) {
+      iteration_state_ = IterationState::StopSingleIteration;
+    }
     return false;
   }
 
@@ -240,6 +242,10 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return route(nullp
 
 Router::RouteConstSharedPtr ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
   return parent_.filter_manager_callbacks_.route(cb);
+}
+
+void ActiveStreamFilterBase::setRoute(Router::RouteConstSharedPtr route) {
+  parent_.filter_manager_callbacks_.setRoute(std::move(route));
 }
 
 void ActiveStreamFilterBase::clearRouteCache() {
@@ -825,16 +831,14 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = false;
 }
 
+// TODO(alyssawilk) update sendLocalReply interface.
 void FilterManager::sendLocalReply(
-    bool old_was_grpc_request, Code code, absl::string_view body,
+    bool, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
-  bool is_grpc_request = old_was_grpc_request;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
-    is_grpc_request = state_.is_grpc_request_;
-  }
+  const bool is_grpc_request = state_.is_grpc_request_;
 
   stream_info_.setResponseCodeDetails(details);
 
@@ -887,9 +891,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_ &&
-                Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+            if (streamInfo().route_entry_) {
               streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
@@ -928,9 +930,7 @@ void FilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_ &&
-                Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+            if (streamInfo().route_entry_) {
               streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
@@ -1374,7 +1374,8 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
+  if (!complete() ||
+      (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
     return false;
   }
 

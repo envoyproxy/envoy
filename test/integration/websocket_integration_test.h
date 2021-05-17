@@ -40,7 +40,7 @@ protected:
   void waitForClientDisconnectOrReset(
       Http::StreamResetReason reason = Http::StreamResetReason::RemoteReset) {
     if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
-      response_->waitForReset();
+      ASSERT_TRUE(response_->waitForReset());
       ASSERT_EQ(reason, response_->resetReason());
     } else {
       ASSERT_TRUE(codec_client_->waitForDisconnect());

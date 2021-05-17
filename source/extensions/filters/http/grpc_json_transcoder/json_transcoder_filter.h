@@ -43,15 +43,15 @@ struct VariableBinding {
 
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
-  std::vector<const Protobuf::Field*> request_body_field_path;
-  std::vector<const Protobuf::Field*> response_body_field_path;
+  std::vector<const ProtobufWkt::Field*> request_body_field_path;
+  std::vector<const ProtobufWkt::Field*> response_body_field_path;
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
 using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
 
 void createHttpBodyEnvelope(Buffer::Instance& output,
-                            const std::vector<const Protobuf::Field*>& request_body_field_path,
+                            const std::vector<const ProtobufWkt::Field*>& request_body_field_path,
                             std::string content_type, uint64_t content_length);
 
 /**
@@ -123,7 +123,7 @@ private:
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
                                     const std::string& field_path_str,
-                                    std::vector<const Protobuf::Field*>* field_path,
+                                    std::vector<const ProtobufWkt::Field*>* field_path,
                                     bool* is_http_body);
   ProtobufUtil::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                         const google::api::HttpRule& http_rule,

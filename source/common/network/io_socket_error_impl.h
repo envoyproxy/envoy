@@ -9,8 +9,11 @@ namespace Network {
 
 class IoSocketError : public Api::IoError {
 public:
-  explicit IoSocketError(int sys_errno) : errno_(sys_errno) {}
-
+  explicit IoSocketError(int sys_errno)
+      : errno_(sys_errno), error_code_(errorCodeFromErrno(errno_)) {
+    ASSERT(error_code_ != IoErrorCode::Again,
+           "Didn't use getIoSocketEagainInstance() to generate `Again`.");
+  }
   ~IoSocketError() override = default;
 
   Api::IoError::IoErrorCode getErrorCode() const override;
@@ -30,7 +33,15 @@ public:
   static void deleteIoError(Api::IoError* err);
 
 private:
-  int errno_;
+  explicit IoSocketError(int sys_errno, Api::IoError::IoErrorCode error_code)
+      : errno_(sys_errno), error_code_(error_code) {}
+
+  static Api::IoError::IoErrorCode errorCodeFromErrno(int sys_errno);
+
+  static IoSocketError* getIoSocketInvalidAddressInstance();
+
+  const int errno_;
+  const Api::IoError::IoErrorCode error_code_;
 };
 
 } // namespace Network

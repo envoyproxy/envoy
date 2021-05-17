@@ -55,7 +55,7 @@ TEST_P(AlpnIntegrationTest, Http2) {
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
@@ -67,7 +67,7 @@ TEST_P(AlpnIntegrationTest, Http1) {
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
@@ -93,8 +93,8 @@ TEST_P(AlpnIntegrationTest, Mixed) {
   encoder1.encodeData(data, true);
   encoder2.encodeData(data, true);
 
-  response1->waitForEndStream();
-  response2->waitForEndStream();
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("200", response1->headers().Status()->value().getStringView());
   EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
 }

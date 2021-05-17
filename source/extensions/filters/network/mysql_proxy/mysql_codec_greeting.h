@@ -17,11 +17,13 @@ public:
   uint8_t getProtocol() const { return protocol_; }
   const std::string& getVersion() const { return version_; }
   uint32_t getThreadId() const { return thread_id_; }
-  const std::string& getAuthPluginData1() const { return auth_plugin_data1_; }
-  const std::string& getAuthPluginData2() const { return auth_plugin_data2_; }
-  std::string getAuthPluginData() const {
+  const std::vector<uint8_t>& getAuthPluginData1() const { return auth_plugin_data1_; }
+  const std::vector<uint8_t>& getAuthPluginData2() const { return auth_plugin_data2_; }
+  std::vector<uint8_t> getAuthPluginData() const {
     if ((server_cap_ & CLIENT_PLUGIN_AUTH) || (server_cap_ & CLIENT_SECURE_CONNECTION)) {
-      return auth_plugin_data1_ + auth_plugin_data2_;
+      auto res = auth_plugin_data1_;
+      res.insert(res.end(), auth_plugin_data2_.begin(), auth_plugin_data2_.end());
+      return res;
     }
     return auth_plugin_data1_;
   }
@@ -39,9 +41,9 @@ public:
   void setBaseServerCap(uint16_t base_server_cap);
   void setExtServerCap(uint16_t ext_server_cap);
   void setAuthPluginName(const std::string& name);
-  void setAuthPluginData(const std::string& salt);
-  void setAuthPluginData1(const std::string& name);
-  void setAuthPluginData2(const std::string& name);
+  void setAuthPluginData(const std::vector<uint8_t>& salt);
+  void setAuthPluginData1(const std::vector<uint8_t>& salt);
+  void setAuthPluginData2(const std::vector<uint8_t>& salt);
   void setServerCharset(uint8_t server_language);
   void setServerStatus(uint16_t server_status);
 
@@ -52,8 +54,8 @@ private:
   uint8_t protocol_{0};
   std::string version_;
   uint32_t thread_id_{0};
-  std::string auth_plugin_data1_;
-  std::string auth_plugin_data2_;
+  std::vector<uint8_t> auth_plugin_data1_;
+  std::vector<uint8_t> auth_plugin_data2_;
   uint32_t server_cap_{0};
   uint8_t server_charset_{0};
   uint16_t server_status_{0};

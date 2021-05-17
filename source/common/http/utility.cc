@@ -128,9 +128,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+  if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
   }
@@ -201,8 +199,13 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 } // namespace Utility
 } // namespace Http2
+
 namespace Http3 {
 namespace Utility {
+
+const uint32_t OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
+
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
@@ -211,9 +214,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions
     return options;
   }
   envoy::config::core::v3::Http3ProtocolOptions options_clone(options);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      hcm_stream_error_set) {
+  if (hcm_stream_error_set) {
     options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
   } else {
@@ -251,6 +252,46 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   // HTTP parser ensures that any [ has a closing ]
   ASSERT(absolute_url.length() >= offset + len);
   return true;
+}
+
+std::string parseCookie(const HeaderMap& headers, const std::string& key,
+                        const std::string& cookie) {
+
+  std::string ret;
+
+  headers.iterateReverse([&key, &ret, &cookie](const HeaderEntry& header) -> HeaderMap::Iterate {
+    // Find the cookie headers in the request (typically, there's only one).
+    if (header.key() == cookie) {
+
+      // Split the cookie header into individual cookies.
+      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+        // Find the key part of the cookie (i.e. the name of the cookie).
+        size_t first_non_space = s.find_first_not_of(' ');
+        size_t equals_index = s.find('=');
+        if (equals_index == absl::string_view::npos) {
+          // The cookie is malformed if it does not have an `=`. Continue
+          // checking other cookies in this header.
+          continue;
+        }
+        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+        // If the key matches, parse the value from the rest of the cookie string.
+        if (k == key) {
+          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
+
+          // Cookie values may be wrapped in double quotes.
+          // https://tools.ietf.org/html/rfc6265#section-4.1.1
+          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+            v = v.substr(1, v.size() - 2);
+          }
+          ret = std::string{v};
+          return HeaderMap::Iterate::Break;
+        }
+      }
+    }
+    return HeaderMap::Iterate::Continue;
+  });
+
+  return ret;
 }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
@@ -381,42 +422,11 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 }
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
+  return parseCookie(headers, key, Http::Headers::get().Cookie.get());
+}
 
-  std::string ret;
-
-  headers.iterateReverse([&key, &ret](const HeaderEntry& header) -> HeaderMap::Iterate {
-    // Find the cookie headers in the request (typically, there's only one).
-    if (header.key() == Http::Headers::get().Cookie.get()) {
-
-      // Split the cookie header into individual cookies.
-      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
-        // Find the key part of the cookie (i.e. the name of the cookie).
-        size_t first_non_space = s.find_first_not_of(" ");
-        size_t equals_index = s.find('=');
-        if (equals_index == absl::string_view::npos) {
-          // The cookie is malformed if it does not have an `=`. Continue
-          // checking other cookies in this header.
-          continue;
-        }
-        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-        // If the key matches, parse the value from the rest of the cookie string.
-        if (k == key) {
-          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
-
-          // Cookie values may be wrapped in double quotes.
-          // https://tools.ietf.org/html/rfc6265#section-4.1.1
-          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-            v = v.substr(1, v.size() - 2);
-          }
-          ret = std::string{v};
-          return HeaderMap::Iterate::Break;
-        }
-      }
-    }
-    return HeaderMap::Iterate::Continue;
-  });
-
-  return ret;
+std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const std::string& key) {
+  return parseCookie(headers, key, Http::Headers::get().SetCookie.get());
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,

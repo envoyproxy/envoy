@@ -299,6 +299,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
         "//source/common/protobuf",
+        "//source/extensions/http/original_ip_detection/xff:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -335,14 +336,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http2_integration_test",
+    name = "multiplexed_integration_test",
     srcs = [
-        "http2_integration_test.cc",
-        "http2_integration_test.h",
+        "multiplexed_integration_test.cc",
+        "multiplexed_integration_test.h",
     ],
     shard_count = 4,
     deps = [
-        ":http_integration_lib",
+        ":http_protocol_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
@@ -611,6 +612,7 @@ envoy_cc_test_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:metadata_interface",
         "//source/common/common:dump_state_utils",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -899,6 +901,7 @@ envoy_cc_test(
         "//test/integration/filters:process_context_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:set_route_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -1095,6 +1098,8 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:set_is_terminal_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_is_terminal_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:utility_lib",
@@ -1172,6 +1177,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
@@ -1542,13 +1548,17 @@ envoy_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/filters/http/health_check:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:address_restore_listener_filter_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -1687,7 +1697,7 @@ envoy_cc_test(
     size = "large",
     srcs = envoy_select_enable_http3(["quic_http_integration_test.cc"]),
     data = ["//test/config/integration/certs"],
-    shard_count = 8,
+    shard_count = 6,
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     # TODO(envoyproxy/windows-dev): Diagnose timeout, why opt build test under Windows GCP RBE
@@ -1712,10 +1722,25 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/injected_resource:config",
         "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/common/quic:test_utils_lib",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
     ]),
+)
+
+envoy_cc_test(
+    name = "original_ip_detection_integration_test",
+    srcs = [
+        "original_ip_detection_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/http/original_ip_detection/custom_header:config",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg_cc_proto",
+    ],
 )

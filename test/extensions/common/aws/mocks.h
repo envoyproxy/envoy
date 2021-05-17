@@ -24,8 +24,9 @@ public:
   ~MockSigner() override;
 
   MOCK_METHOD(void, sign, (Http::RequestMessage&, bool));
-  MOCK_METHOD(void, sign, (Http::RequestHeaderMap&));
   MOCK_METHOD(void, sign, (Http::RequestHeaderMap&, const std::string&));
+  MOCK_METHOD(void, signEmptyPayload, (Http::RequestHeaderMap&));
+  MOCK_METHOD(void, signUnsignedPayload, (Http::RequestHeaderMap&));
 };
 
 class MockMetadataFetcher {

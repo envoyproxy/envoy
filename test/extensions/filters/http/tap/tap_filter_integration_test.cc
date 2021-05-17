@@ -78,7 +78,7 @@ public:
       upstream_request_->encodeTrailers(*response_trailers);
     }
 
-    decoder->waitForEndStream();
+    ASSERT_TRUE(decoder->waitForEndStream());
   }
 
   void startAdminRequest(const std::string& admin_request_yaml) {

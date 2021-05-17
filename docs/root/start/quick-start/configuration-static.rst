@@ -42,7 +42,7 @@ All paths are matched and routed to the ``service_envoyproxy_io``
     :language: yaml
     :linenos:
     :lines: 1-34
-    :emphasize-lines: 3-32
+    :emphasize-lines: 3-31
 
 .. _start_quick_start_static_clusters:
 
@@ -54,6 +54,6 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
 
 .. literalinclude:: _include/envoy-demo.yaml
     :language: yaml
-    :lineno-start: 32
-    :lines: 32-53
-    :emphasize-lines: 3-22
+    :lineno-start: 29
+    :lines: 29-52
+    :emphasize-lines: 5-24

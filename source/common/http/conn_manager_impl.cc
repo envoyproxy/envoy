@@ -101,7 +101,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
-      time_source_(time_source) {}
+      time_source_(time_source),
+      enable_internal_redirects_with_body_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_redirects_with_body")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -963,22 +965,59 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   // Path sanitization should happen before any path access other than the above sanity check.
-  if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
-                                                    connection_manager_.config_)) {
+  const auto action =
+      ConnectionManagerUtility::maybeNormalizePath(*request_headers_, connection_manager_.config_);
+  // gRPC requests are rejected if Envoy is configured to redirect post-normalization. This is
+  // because gRPC clients do not support redirect.
+  if (action == ConnectionManagerUtility::NormalizePathAction::Reject ||
+      (action == ConnectionManagerUtility::NormalizePathAction::Redirect &&
+       Grpc::Common::hasGrpcContentType(*request_headers_))) {
+    connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
                    nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
+  } else if (action == ConnectionManagerUtility::NormalizePathAction::Redirect) {
+    connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
+    sendLocalReply(
+        false, Code::TemporaryRedirect, "",
+        [new_path = request_headers_->Path()->value().getStringView()](
+            Http::ResponseHeaderMap& response_headers) -> void {
+          response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+        },
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
+    return;
   }
 
-  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
-                                               localPort());
+  ASSERT(action == ConnectionManagerUtility::NormalizePathAction::Continue);
+  auto optional_port = ConnectionManagerUtility::maybeNormalizeHost(
+      *request_headers_, connection_manager_.config_, localPort());
+  if (optional_port.has_value() &&
+      requestWasConnect(request_headers_, connection_manager_.codec_->protocol())) {
+    filter_manager_.streamInfo().filterState()->setData(
+        Router::OriginalConnectPort::key(),
+        std::make_unique<Router::OriginalConnectPort>(optional_port.value()),
+        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+  }
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
-    filter_manager_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
+    const auto mutate_result = ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_);
+
+    // IP detection failed, reject the request.
+    if (mutate_result.reject_request.has_value()) {
+      const auto& reject_request_params = mutate_result.reject_request.value();
+      connection_manager_.stats_.named_.downstream_rq_rejected_via_ip_detection_.inc();
+      sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+                     reject_request_params.response_code, reject_request_params.body, nullptr,
+                     absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().OriginalIPDetectionFailed);
+      return;
+    }
+
+    filter_manager_.setDownstreamRemoteAddress(mutate_result.final_remote_address);
   }
   ASSERT(filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress() != nullptr);
 
@@ -1263,20 +1302,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
                                            stream_id_);
     }
   }
-  filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_ = std::move(route);
-  if (nullptr == filter_manager_.streamInfo().route_entry_) {
-    cached_cluster_info_ = nullptr;
-  } else {
-    Upstream::ThreadLocalCluster* local_cluster =
-        connection_manager_.cluster_manager_.getThreadLocalCluster(
-            filter_manager_.streamInfo().route_entry_->clusterName());
-    cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
-  }
 
-  filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
-  refreshCachedTracingCustomTags();
-  refreshDurationTimeout();
+  setRoute(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
@@ -1319,9 +1346,7 @@ absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
   // The BadRequest error code indicates there has been a messaging error.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
+  if (code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !response_encoder_->streamErrorOnInvalidHttpMessage()) {
     state_.saw_connection_close_ = true;
   }
@@ -1369,11 +1394,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_disable_keepalive_ref_.value())) {
     ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
-    if (connection_manager_.codec_->protocol() < Protocol::Http2 ||
-        Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2")) {
-      drain_connection_due_to_overload = true;
-    }
+    drain_connection_due_to_overload = true;
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
@@ -1590,6 +1611,31 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
   return cached_route_.value();
 }
 
+/**
+ * Sets the cached route to the RouteConstSharedPtr argument passed in. Handles setting the
+ * cached_route_/cached_cluster_info_ ActiveStream attributes, the FilterManager streamInfo, tracing
+ * tags, and timeouts.
+ *
+ * Declared as a StreamFilterCallbacks member function for filters to call directly, but also
+ * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
+ */
+void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+  filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
+  cached_route_ = std::move(route);
+  if (nullptr == filter_manager_.streamInfo().route_entry_) {
+    cached_cluster_info_ = nullptr;
+  } else {
+    Upstream::ThreadLocalCluster* local_cluster =
+        connection_manager_.cluster_manager_.getThreadLocalCluster(
+            filter_manager_.streamInfo().route_entry_->clusterName());
+    cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
+  }
+
+  filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
+  refreshCachedTracingCustomTags();
+  refreshDurationTimeout();
+}
+
 void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
@@ -1610,6 +1656,14 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   ResponseEncoder* response_encoder = response_encoder_;
   response_encoder_ = nullptr;
 
+  Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
+  const auto& buffered_request_data = filter_manager_.bufferedRequestData();
+  const bool proxy_body = connection_manager_.enable_internal_redirects_with_body_ &&
+                          buffered_request_data != nullptr && buffered_request_data->length() > 0;
+  if (proxy_body) {
+    request_data->move(*buffered_request_data);
+  }
+
   response_encoder->getStream().removeCallbacks(*this);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
@@ -1628,7 +1682,13 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
             filter_state->parent(), StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  new_stream.decodeHeaders(std::move(request_headers_), true);
+  new_stream.decodeHeaders(std::move(request_headers_), !proxy_body);
+  if (proxy_body) {
+    // This functionality is currently only used for internal redirects, which the router only
+    // allows if the full request has been read (end_stream = true) so we don't need to handle the
+    // case of upstream sending an early response mid-request.
+    new_stream.decodeData(*request_data, true);
+  }
 }
 
 Http1StreamEncoderOptionsOptRef ConnectionManagerImpl::ActiveStream::http1StreamEncoderOptions() {

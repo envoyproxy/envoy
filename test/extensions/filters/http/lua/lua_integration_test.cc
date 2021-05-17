@@ -175,7 +175,7 @@ public:
       upstream_request_->encodeData(response_data2, true);
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     if (enable_wrap_body) {
       EXPECT_EQ("2", response->headers()
@@ -378,7 +378,7 @@ typed_config:
   Buffer::OwnedImpl response_data2("bye");
   upstream_request_->encodeData(response_data2, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("7", response->headers()
                      .get(Http::LowerCaseString("response_body_size"))[0]
@@ -454,7 +454,7 @@ typed_config:
                      .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   cleanup();
 }
@@ -501,7 +501,7 @@ typed_config:
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   cleanup();
 
   EXPECT_TRUE(response->complete());
@@ -551,7 +551,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   cleanup();
 
@@ -585,7 +585,7 @@ typed_config:
 
   waitForNextUpstreamRequest(2);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   cleanup();
 
   EXPECT_TRUE(response->complete());
@@ -620,7 +620,7 @@ typed_config:
 
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
@@ -720,7 +720,7 @@ typed_config:
                         .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -860,7 +860,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
@@ -946,7 +946,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
