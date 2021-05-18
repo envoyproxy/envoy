@@ -1,10 +1,10 @@
 #pragma once
 
 #include "envoy/server/configuration.h"
+#include "envoy/server/factory_context.h"
 
 #include "common/router/context_impl.h"
 
-#include "envoy/server/factory_context.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "admin.h"
