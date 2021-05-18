@@ -53,6 +53,7 @@ public:
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
       : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address) : nullptr,
                          address) {
+    // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_->isOpen(), "");
       setPrebindSocketOptions();
@@ -70,8 +71,29 @@ public:
   Socket::Type socketType() const override { return T::type; }
 
 protected:
-  void setPrebindSocketOptions();
+  void setPrebindSocketOptions() {
+    // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as
+    // on Linux and later BSD socket stacks
+#ifndef WIN32
+    int on = 1;
+    auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+#endif
+  }
 };
+
+template <>
+inline void
+NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
+
+// UDP listen socket desires io handle regardless bind_to_port is true or false.
+template <>
+NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
+    const Address::InstanceConstSharedPtr& address,
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+
+template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
+template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>;
 
 using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
 using TcpListenSocketPtr = std::unique_ptr<TcpListenSocket>;
