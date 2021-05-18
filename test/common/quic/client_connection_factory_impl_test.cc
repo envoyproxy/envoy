@@ -42,6 +42,7 @@ TEST_F(QuicNetworkConnectionTest, BufferLimits) {
   client_connection->connect();
   ASSERT(session != nullptr);
   EXPECT_EQ(highWatermark(session), 45);
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
 } // namespace Quic
