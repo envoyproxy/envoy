@@ -11,26 +11,47 @@ namespace Upstream {
 // HttpPoolData returns information about a given pool as well as a function
 // to create streams on that pool.
 struct HttpPoolData {
-  using StreamCreationFunction = std::function<Envoy::Http::ConnectionPool::Cancellable*(
-      Http::ResponseDecoder& response_decoder, Envoy::Http::ConnectionPool::Callbacks& callbacks)>;
-  // Rather than returning the pool, httpConnPool supplies function to create a stream on the
-  // pool. This allows the ThreadLocalCluster to have its own logic, such as preconnect, ahead of
-  // stream creation.
-  StreamCreationFunction create_stream_;
-  // The host for the selected pool.
-  Upstream::HostDescriptionConstSharedPtr host_;
+  using OnNewStreamFn = std::function<void()>;
+
+  HttpPoolData(OnNewStreamFn on_new_stream, Http::ConnectionPool::Instance* pool)
+      : on_new_stream_(on_new_stream), pool_(pool) {}
+
+  Envoy::Http::ConnectionPool::Cancellable*
+  newStream(Http::ResponseDecoder& response_decoder,
+            Envoy::Http::ConnectionPool::Callbacks& callbacks) {
+    on_new_stream_();
+    return pool_->newStream(response_decoder, callbacks);
+  }
+
+  Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
+
+private:
+  friend class HttpPoolDataPeer;
+
+  OnNewStreamFn on_new_stream_;
+  Http::ConnectionPool::Instance* pool_;
 };
 
 // Tcp pool returns information about a given pool, as well as a function to
 // create connections on that pool.
 struct TcpPoolData {
-  using ConnectionCreationFunction = std::function<Envoy::Tcp::ConnectionPool::Cancellable*(
-      Envoy::Tcp::ConnectionPool::Callbacks& callbacks)>;
-  // As with HttpPoolData, tcpConnPool supplies a function for connection
-  // creation rather than allowing direct access to the pool.
-  ConnectionCreationFunction create_connection_;
-  // The host for the selected pool.
-  Upstream::HostDescriptionConstSharedPtr host_;
+  using OnNewConnectionFn = std::function<void()>;
+
+  TcpPoolData(OnNewConnectionFn on_new_connection, Tcp::ConnectionPool::Instance* pool)
+      : on_new_connection_(on_new_connection), pool_(pool) {}
+
+  Envoy::Tcp::ConnectionPool::Cancellable*
+  newConnection(Envoy::Tcp::ConnectionPool::Callbacks& callbacks) {
+    on_new_connection_();
+    return pool_->newConnection(callbacks);
+  }
+
+  Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
+
+private:
+  friend class TcpPoolDataPeer;
+  OnNewConnectionFn on_new_connection_;
+  Tcp::ConnectionPool::Instance* pool_;
 };
 
 /**
@@ -67,7 +88,8 @@ public:
    * @param priority the connection pool priority.
    * @param downstream_protocol the downstream protocol (if one exists) to use in protocol
    *        selection.
-   * @param context the optional load balancer context.
+   * @param context the optional load balancer context. Must continue to be
+   *        valid until newConnection is called on the pool (if it is to be called).
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
   virtual absl::optional<HttpPoolData>
@@ -80,7 +102,8 @@ public:
    * is used is the one defined on the cluster when it was created.
    *
    * @param priority the connection pool priority.
-   * @param context the optional load balancer context.
+   * @param context the optional load balancer context. Must continue to be
+   *        valid until newConnection is called on the pool (if it is to be called).
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
   virtual absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,

@@ -909,24 +909,20 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = connPool(priority, protocol, context, false);
-  if (ret == nullptr) {
+  auto pool = connPool(priority, protocol, context, false);
+  if (pool == nullptr) {
     return absl::nullopt;
   }
 
-  HttpPoolData data;
-  data.create_stream_ = [this, priority, protocol, context,
-                         ret](Http::ResponseDecoder& response_decoder,
-                              Envoy::Http::ConnectionPool::Callbacks& callbacks)
-      -> Envoy::Http::ConnectionPool::Cancellable* {
-    // Now that a new stream is being established, attempt to preconnect.
-    maybePreconnect(*this, parent_.cluster_manager_state_,
-                    [this, &priority, &protocol, &context]() {
-                      return connPool(priority, protocol, context, true);
-                    });
-    return ret->newStream(response_decoder, callbacks);
-  };
-  data.host_ = ret->host();
+  HttpPoolData data(
+      [this, priority, protocol, context]() -> void {
+        // Now that a new stream is being established, attempt to preconnect.
+        maybePreconnect(*this, parent_.cluster_manager_state_,
+                        [this, &priority, &protocol, &context]() {
+                          return connPool(priority, protocol, context, true);
+                        });
+      },
+      pool);
   return data;
 }
 
@@ -934,20 +930,18 @@ absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = tcpConnPool(priority, context, false);
-  if (ret == nullptr) {
+  auto pool = tcpConnPool(priority, context, false);
+  if (pool == nullptr) {
     return absl::nullopt;
   }
 
-  TcpPoolData data;
-  data.create_connection_ = [this, priority, context,
-                             ret](Envoy::Tcp::ConnectionPool::Callbacks& callbacks)
-      -> Envoy::Tcp::ConnectionPool::Cancellable* {
-    maybePreconnect(*this, parent_.cluster_manager_state_,
-                    [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
-    return ret->newConnection(callbacks);
-  };
-  data.host_ = ret->host();
+  TcpPoolData data(
+      [this, priority, context]() -> void {
+        maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
+          return tcpConnPool(priority, context, true);
+        });
+      },
+      pool);
   return data;
 }
 

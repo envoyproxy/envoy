@@ -165,7 +165,7 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   // valid connection handle. If newConnection fails inline it may result in attempting to
   // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
   // first call to newConnection will return null and the inner call will persist.
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.value().create_connection_(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.value().newConnection(*this);
   if (handle) {
     ASSERT(upstream_handle_ == nullptr);
     upstream_handle_ = handle;
@@ -215,7 +215,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
     upstream_ = std::make_unique<Http2Upstream>(upstream_callbacks_, config_);
   }
   Tcp::ConnectionPool::Cancellable* handle =
-      conn_pool_data_.value().create_stream_(upstream_->responseDecoder(), *this);
+      conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this);
   if (handle != nullptr) {
     upstream_handle_ = handle;
   }

@@ -30,7 +30,7 @@ public:
     ASSERT(pool_data.has_value());
 
     requests_.emplace_back(*this, data);
-    pool_data.value().create_connection_(requests_.back());
+    pool_data.value().newConnection(requests_.back());
 
     ASSERT(data.length() == 0);
     return Network::FilterStatus::StopIteration;

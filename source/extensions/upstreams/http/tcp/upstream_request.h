@@ -30,7 +30,7 @@ public:
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
-    upstream_handle_ = conn_pool_data_.value().create_connection_(*this);
+    upstream_handle_ = conn_pool_data_.value().newConnection(*this);
   }
 
   bool cancelAnyPendingStream() override {
@@ -42,7 +42,7 @@ public:
     return false;
   }
   Upstream::HostDescriptionConstSharedPtr host() const override {
-    return conn_pool_data_.value().host_;
+    return conn_pool_data_.value().host();
   }
 
   bool valid() { return conn_pool_data_.has_value(); }

@@ -42,7 +42,9 @@ public:
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
                    absl::optional<Envoy::Http::Protocol> protocol) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override { return pool_data_.value().host_; }
+  Upstream::HostDescriptionConstSharedPtr host() const override {
+    return pool_data_.value().host();
+  }
 
   bool valid() { return pool_data_.has_value(); }
 
