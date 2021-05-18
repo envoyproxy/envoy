@@ -18,6 +18,10 @@ public:
   ~MockDrainManager() override;
 
   // Network::DrainManager
+  MOCK_METHOD(DrainManagerSharedPtr, createChildManager,
+              (Event::Dispatcher&, envoy::config::listener::v3::Listener::DrainType), (override));
+  MOCK_METHOD(DrainManagerSharedPtr, createChildManager, (Event::Dispatcher&), (override));
+
   MOCK_METHOD(bool, drainClose, (), (const));
   MOCK_METHOD(Common::ThreadSafeCallbackHandlePtr, addOnDrainCloseCb,
               (Event::Dispatcher & dispatcher, DrainCloseCb cb), (const, override));
