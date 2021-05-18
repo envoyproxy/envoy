@@ -262,10 +262,10 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
 /* Handler for messages when decoder is in Init State. There are very few message types which
    are allowed in this state.
-   If the initial message has the correct syntax and  indicates that session should be in cleartext,
+   If the initial message has the correct syntax and  indicates that session should be in clear-text,
    the decoder will move to InSyncState. If the initial message has the correct syntax and indicates
    that session should be encrypted, the decoder stays in InitState, because the initial message
-   will be received again after transport socket negotiates SSL. If the message syntax is incorect,
+   will be received again after transport socket negotiates SSL. If the message syntax is incorrect,
    the decoder will move to OutOfSyncState, in which messages are not parsed.
 */
 Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool frontend) {
@@ -368,6 +368,11 @@ void DecoderImpl::processMessageBody(Buffer::Instance& data, const std::string& 
   data.drain(length);
 }
 
+/*
+  onDataInSync is called when decoder is on-track with decoding messages.
+  All previous messages has been decoded properly and decoder is able to find
+  message boundaries.
+*/
 Decoder::Result DecoderImpl::onDataInSync(Buffer::Instance& data, bool frontend) {
   ENVOY_LOG(trace, "postgres_proxy: decoding {} bytes", data.length());
 
@@ -383,18 +388,7 @@ Decoder::Result DecoderImpl::onDataInSync(Buffer::Instance& data, bool frontend)
   ENVOY_LOG(trace, "postgres_proxy: command is {}", command_);
 
   // The 1 byte message type and message length should be in the buffer
-  // Check if the entire message has been read.
-#if 0
-  // TODO - this must be enabled to wait until entire message has been read.
-  // First add test to verify that it returns NeedMoreData and then fix it.
-  std::string message;
-  if (data.length() < (message_len_ + (1))) {
-    ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
-              message_len_ + 1);
-    // Not enough data in the buffer.
-    return Decoder::NeedMoreData;
-  }
-#endif
+  // Find the message processor and validate the message syntax.
 
   MsgGroup& msg_processor = std::ref(frontend ? FE_messages_ : BE_messages_);
   frontend ? callbacks_->incMessagesFrontend() : callbacks_->incMessagesBackend();
@@ -422,6 +416,7 @@ Decoder::Result DecoderImpl::onDataInSync(Buffer::Instance& data, bool frontend)
   Message::ValidationResult validationResult = msgParser->validate(data, 5, message_len_ - 4);
 
   if (validationResult == Message::ValidationNeedMoreData) {
+    ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Not enough bytes in the buffer.");
     return Decoder::Result::NeedMoreData;
   }
 
@@ -440,7 +435,15 @@ Decoder::Result DecoderImpl::onDataInSync(Buffer::Instance& data, bool frontend)
 
   return Decoder::Result::ReadyForNext;
 }
-
+/*
+  onDataIgnore method is called when the decoder does not inspect passing
+  messages. This happens when the decoder detected encrypted packets or
+  when the decoder could not validate passing messages and lost track of
+  messages boundaries. In order not to interpret received values as message
+  lengths and not to start buffering large amount of data, the decoder
+  enters OutOfSync state and starts ignoring passing messages. Once the
+  decoder enters OutOfSyncState it cannot leave that state.
+*/
 Decoder::Result DecoderImpl::onDataIgnore(Buffer::Instance& data, bool) {
   data.drain(data.length());
   return Decoder::Result::ReadyForNext;

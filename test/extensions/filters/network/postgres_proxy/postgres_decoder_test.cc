@@ -197,7 +197,7 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageRandomData) {
     // Feed the buffer to the decoder. It should not crash.
     decoder_->onData(data_, true);
 
-    // Reset the buffer for the nect iteration.
+    // Reset the buffer for the next iteration.
     data_.drain(data_.length());
   }
 }
@@ -300,6 +300,24 @@ TEST_F(PostgresProxyDecoderTest, Unknown) {
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(data_.length(), 0);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+}
+
+// Test verifies that decoder goes into OutOfSyncState when
+// it encounters a message with wrong syntax.
+TEST_F(PostgresProxyDecoderTest, IncorrectMessages) {
+  decoder_->state(DecoderImpl::State::InSyncState);
+
+  // Create incorrect message. Message syntax is
+  // 1 byte type ('f'), 4 bytes of length and zero terminated string.
+  data_.add("f");
+  data_.writeBEInt<uint32_t>(8);
+  // Do not write terminating zero for the string.
+  data_.add("test");
+
+  // The decoder will indicate that is is ready for more data, but
+  // will enter OutOfSyncState.
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::OutOfSyncState);
 }
 
 // Test if each frontend command calls incMessagesFrontend() method.
@@ -593,6 +611,8 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
   // Add 4 bytes long code
   data_.writeBEInt<uint32_t>(GetParam());
+  // Decoder should indicate that it is ready for mode data and entered
+  // encrypted state.
   ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::EncryptedState);
   // ASSERT_TRUE(decoder_->encrypted());
@@ -633,7 +653,7 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
   ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::Stopped);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::InitState);
 
-  // Decoder should interpret the session as cleartext stream.
+  // Decoder should interpret the session as clear-text stream.
   ASSERT_FALSE(decoder_->encrypted());
 }
 
