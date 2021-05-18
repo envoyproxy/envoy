@@ -228,8 +228,9 @@ size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
     : concurrency_(concurrency), enabled_(config.enabled()),
-      packets_to_read_to_connection_count_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, packets_to_read_to_connection_count_ratio, DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
+      packets_to_read_to_connection_count_ratio_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
+                                          DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
   uint64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
