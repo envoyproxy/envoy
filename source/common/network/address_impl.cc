@@ -31,6 +31,19 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
   return sock_interface == nullptr ? &SocketInterfaceSingleton::get() : sock_interface;
 }
 
+void throwOnError(StatusOr<InstanceConstSharedPtr> address) {
+  ASSERT(Thread::MainThread::isMainThread());
+  if (!address.ok()) {
+    throw EnvoyException(address.status().ToString());
+  }
+}
+
+void throwOnError(absl::Status address) {
+  if (!address.ok()) {
+    throw EnvoyException(address.ToString());
+  }
+}
+
 } // namespace
 
 StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
@@ -80,9 +93,7 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
 Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,
                                                            socklen_t ss_len, bool v6only) {
   StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
-  if (!address.ok()) {
-    throw EnvoyException(address.status().ToString());
-  }
+  throwOnError(address);
   return *address;
 }
 
@@ -96,20 +107,17 @@ getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_
   // address and the socket is actually v6 only, the returned address will be
   // regarded as a v6 address from dual stack socket. However, this address is not going to be
   // used to create socket. Wrong knowledge of dual stack support won't hurt.
-  StatusOr<Address::InstanceConstSharedPtr> error_or_addr =
+  StatusOr<Address::InstanceConstSharedPtr> address =
       Address::addressFromSockAddr(ss, ss_len, v6only);
-  if (!error_or_addr.ok()) {
+  if (!address.ok()) {
     PANIC(fmt::format("Invalid address for fd: {}", fd));
   }
-  return *error_or_addr;
+  return *address;
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  absl::Status status = validateProtocolSupported();
-  if (!status.ok()) {
-    throw EnvoyException(status.ToString());
-  }
+  throwOnError(validateProtocolSupported());
   initHelper(address);
 }
 
@@ -119,10 +127,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, const SocketInterface* so
 Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  absl::Status status = validateProtocolSupported();
-  if (!status.ok()) {
-    throw EnvoyException(status.ToString());
-  }
+  throwOnError(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -137,10 +142,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
 
 Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  absl::Status status = validateProtocolSupported();
-  if (!status.ok()) {
-    throw EnvoyException(status.ToString());
-  }
+  throwOnError(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -233,10 +235,7 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  absl::Status status = validateProtocolSupported();
-  if (!status.ok()) {
-    throw EnvoyException(status.ToString());
-  }
+  throwOnError(validateProtocolSupported());
   initHelper(address, v6only);
 }
 
@@ -246,10 +245,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  absl::Status status = validateProtocolSupported();
-  if (!status.ok()) {
-    throw EnvoyException(status.ToString());
-  }
+  throwOnError(validateProtocolSupported());
   ip_.ipv6_.address_.sin6_family = AF_INET6;
   ip_.ipv6_.address_.sin6_port = htons(port);
   if (!address.empty()) {

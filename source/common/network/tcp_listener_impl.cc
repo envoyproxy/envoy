@@ -86,9 +86,9 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     const Address::InstanceConstSharedPtr remote_address =
         (remote_addr.ss_family == AF_UNIX)
             ? io_handle->peerAddress()
-            : Address::addressFromSockAddrOrThrow(remote_addr, remote_addr_len,
-                                                  local_address->ip()->version() ==
-                                                      Address::IpVersion::v6);
+            : Address::getAddressFromSockAddrOrDie(remote_addr, remote_addr_len, -1,
+                                                   local_address->ip()->version() ==
+                                                       Address::IpVersion::v6);
 
     cb_.onAccept(
         std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));

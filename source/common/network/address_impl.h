@@ -290,6 +290,7 @@ public:
 private:
   /**
    * Construct from an existing unix address.
+   * Store the status code in passed in parameter instead of throwing.
    */
   PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
                const SocketInterface* sock_interface = nullptr);

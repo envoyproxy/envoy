@@ -171,7 +171,10 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     if (!cancelled_) {
       // Use a raw try here because it is used in both main thread and filter.
       // Can not convert to use status code as there may be unexpected exceptions in server fuzz
-      // tests, which must be handled.
+      // tests, which must be handled. Potential exception may come from getAddressWithPort() or
+      // portFromTcpUrl().
+      // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
+      // exception in fuzz tests.
       try {
         callback_(resolution_status, std::move(address_list));
       } catch (const EnvoyException& e) {
