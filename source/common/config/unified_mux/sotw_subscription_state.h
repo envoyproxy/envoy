@@ -33,36 +33,18 @@ public:
 
   void markStreamFresh() override;
 
-  // message is expected to be a envoy::service::discovery::v3::DiscoveryResponse.
-  UpdateAck
-  handleResponse(const envoy::service::discovery::v3::DiscoveryResponse& response_proto) override;
-
-  void handleEstablishmentFailure() override;
-
-  // Returns the next gRPC request proto to be sent off to the server, based on this object's
-  // understanding of the current protocol state, and new resources that Envoy wants to request.
-  // Returns a new'd pointer, meant to be owned by the caller.
-  envoy::service::discovery::v3::DiscoveryRequest* getNextRequestAckless() override;
-  // The WithAck version first calls the ack-less version, then adds in the passed-in ack.
-  // Returns a new'd pointer, meant to be owned by the caller.
-  envoy::service::discovery::v3::DiscoveryRequest*
-  getNextRequestWithAck(const UpdateAck& ack) override;
-
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 
   SotwSubscriptionState(const SotwSubscriptionState&) = delete;
   SotwSubscriptionState& operator=(const SotwSubscriptionState&) = delete;
 
 private:
-  // Returns a new'd pointer, meant to be owned by the caller.
-  envoy::service::discovery::v3::DiscoveryRequest* getNextRequestInternal();
+  std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
+  getNextRequestInternal() override;
 
-  void handleGoodResponse(const envoy::service::discovery::v3::DiscoveryResponse& message);
-  void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
-
+  void handleGoodResponse(const envoy::service::discovery::v3::DiscoveryResponse& message) override;
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource,
                            const std::string& version);
-  void setResourceTtl(const envoy::service::discovery::v3::Resource& resource);
 
   // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.

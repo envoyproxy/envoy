@@ -34,31 +34,18 @@ public:
 
   void markStreamFresh() override { any_request_sent_yet_in_current_stream_ = false; }
 
-  UpdateAck handleResponse(
-      const envoy::service::discovery::v3::DeltaDiscoveryResponse& response_proto) override;
-
-  void handleEstablishmentFailure() override;
-
-  // Returns the next gRPC request proto to be sent off to the server, based on this object's
-  // understanding of the current protocol state, and new resources that Envoy wants to request.
-  // Returns a new'd pointer, meant to be owned by the caller.
-  envoy::service::discovery::v3::DeltaDiscoveryRequest* getNextRequestAckless() override;
-  // The WithAck version first calls the Ack-less version, then adds in the passed-in ack.
-  // Returns a new'd pointer, meant to be owned by the caller.
-  envoy::service::discovery::v3::DeltaDiscoveryRequest*
-  getNextRequestWithAck(const UpdateAck& ack) override;
-
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 
   DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
   DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 
 private:
-  // Returns a new'd pointer, meant to be owned by the caller.
-  envoy::service::discovery::v3::DeltaDiscoveryRequest* getNextRequestInternal();
+  std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>
+  getNextRequestInternal() override;
+
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) const;
-  void handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
-  void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
+  void
+  handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
   void addResourceState(const envoy::service::discovery::v3::Resource& resource);
 
   class ResourceState {
@@ -82,6 +69,11 @@ private:
   private:
     absl::optional<std::string> version_;
   };
+
+  // Not all xDS resources support heartbeats due to there being specific information encoded in
+  // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
+  // disable heartbeats for these resources (currently only VHDS).
+  const bool supports_heartbeats_;
 
   // Is the subscription is for a wildcard request.
   const bool wildcard_;

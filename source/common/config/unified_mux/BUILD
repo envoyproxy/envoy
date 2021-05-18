@@ -37,7 +37,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "subscription_state_lib",
-    #    srcs = ["subscription_state.cc"],
     hdrs = ["subscription_state.h"],
     deps = [
         "//include/envoy/config:subscription_interface",
@@ -46,6 +45,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:ttl_lib",
         "//source/common/config:update_ack_lib",
+        "//source/common/config:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )

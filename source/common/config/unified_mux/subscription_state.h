@@ -10,6 +10,7 @@
 
 #include "common/config/ttl.h"
 #include "common/config/update_ack.h"
+#include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
@@ -29,13 +30,10 @@ public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
                     std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher)
-      // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
-      // empty resources as updates.
-      : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
-        ttl_([this](const std::vector<std::string>& expired) { ttlExpiryCallback(expired); },
+      : ttl_([this](const std::vector<std::string>& expired) { ttlExpiryCallback(expired); },
              dispatcher, dispatcher.timeSource()),
         type_url_(std::move(type_url)), callbacks_(callbacks), dispatcher_(dispatcher) {
-    if (init_fetch_timeout.count() > 0 && !init_fetch_timeout_timer_) {
+    if (init_fetch_timeout.count() > 0) {
       init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
         ENVOY_LOG(warn, "config: initial fetch timed out for {}", type_url_);
         callbacks_.onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr);
@@ -59,21 +57,42 @@ public:
 
   virtual void markStreamFresh() PURE;
 
-  // Implementations expect either a DeltaDiscoveryResponse or DiscoveryResponse. The caller is
-  // expected to know which it should be providing.
-  virtual UpdateAck handleResponse(const RS& response_proto_ptr) PURE;
+  UpdateAck handleResponse(const RS& response) {
+    // We *always* copy the response's nonce into the next request, even if we're going to make that
+    // request a NACK by setting error_detail.
+    UpdateAck ack(response.nonce(), type_url());
+    ENVOY_LOG(debug, "Handling response for {}", type_url());
+    TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
+    END_TRY
+    catch (const EnvoyException& e) {
+      handleBadResponse(e, ack);
+    }
+    return ack;
+  }
 
-  virtual void handleEstablishmentFailure() PURE;
+  void handleEstablishmentFailure() {
+    ENVOY_LOG(debug, "SubscriptionState establishment failed for {}", type_url());
+    callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                     nullptr);
+  }
 
   // Returns the next gRPC request proto to be sent off to the server, based on this object's
   // understanding of the current protocol state, and new resources that Envoy wants to request.
-  // Returns a new'd pointer, meant to be owned by the caller, who is expected to know what type the
-  // pointer actually is.
-  virtual RQ* getNextRequestAckless() PURE;
+  std::unique_ptr<RQ> getNextRequestAckless() { return getNextRequestInternal(); }
+
   // The WithAck version first calls the ack-less version, then adds in the passed-in ack.
   // Returns a new'd pointer, meant to be owned by the caller, who is expected to know what type the
   // pointer actually is.
-  virtual RQ* getNextRequestWithAck(const UpdateAck& ack) PURE;
+  std::unique_ptr<RQ> getNextRequestWithAck(const UpdateAck& ack) {
+    auto request = getNextRequestInternal();
+    request->set_response_nonce(ack.nonce_);
+    ENVOY_LOG(debug, "ACK for {} will have nonce {}", type_url(), ack.nonce_);
+    if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
+      // Don't needlessly make the field present-but-empty if status is ok.
+      request->mutable_error_detail()->CopyFrom(ack.error_detail_);
+    }
+    return request;
+  }
 
   void disableInitFetchTimeoutTimer() {
     if (init_fetch_timeout_timer_) {
@@ -85,18 +104,35 @@ public:
   virtual void ttlExpiryCallback(const std::vector<std::string>& type_url) PURE;
 
 protected:
+  virtual std::unique_ptr<RQ> getNextRequestInternal() PURE;
+
+  void setResourceTtl(const envoy::service::discovery::v3::Resource& resource) {
+    if (resource.has_ttl()) {
+      ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
+               resource.name());
+    } else {
+      ttl_.clear(resource.name());
+    }
+  }
+
+  virtual void handleGoodResponse(const RS& message) PURE;
+  void handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
+    // Note that error_detail being set is what indicates that a (Delta)DiscoveryRequest is a NACK.
+    ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+    ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
+    ENVOY_LOG(warn, "Config for {} rejected: {}", type_url(), e.what());
+    callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+  }
+
   std::string type_url() const { return type_url_; }
   UntypedConfigUpdateCallbacks& callbacks() const { return callbacks_; }
 
-  // Not all xDS resources supports heartbeats due to there being specific information encoded in
-  // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
-  // disable heartbeats for these resources (currently only VHDS).
-  const bool supports_heartbeats_;
   TtlManager ttl_;
   const std::string type_url_;
   // callbacks_ is expected (outside of tests) to be a WatchMap.
   UntypedConfigUpdateCallbacks& callbacks_;
   Event::Dispatcher& dispatcher_;
+  // tracks initial configuration fetch timeout.
   Event::TimerPtr init_fetch_timeout_timer_;
   bool dynamic_context_changed_{};
 };

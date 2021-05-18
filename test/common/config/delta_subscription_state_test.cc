@@ -61,8 +61,7 @@ protected:
 
   std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest> getNextRequestAckless() {
     if (should_use_unified_) {
-      return std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>(
-          unified_state_->getNextRequestAckless());
+      return unified_state_->getNextRequestAckless();
     }
     return std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>(
         new envoy::service::discovery::v3::DeltaDiscoveryRequest(

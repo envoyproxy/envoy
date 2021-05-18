@@ -43,20 +43,6 @@ void SotwSubscriptionState::markStreamFresh() {
   clearDynamicContextChanged();
 }
 
-UpdateAck SotwSubscriptionState::handleResponse(
-    const envoy::service::discovery::v3::DiscoveryResponse& response) {
-  // We *always* copy the response's nonce into the next request, even if we're going to make that
-  // request a NACK by setting error_detail.
-  UpdateAck ack(response.nonce(), type_url());
-  ENVOY_LOG(debug, "Handling response for {}", type_url());
-  TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
-  END_TRY
-  catch (const EnvoyException& e) {
-    handleBadResponse(e, ack);
-  }
-  return ack;
-}
-
 void SotwSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DiscoveryResponse& message) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> non_heartbeat_resources;
@@ -99,22 +85,9 @@ void SotwSubscriptionState::handleGoodResponse(
             message.version_info(), message.resources().size());
 }
 
-void SotwSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
-  // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
-  ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
-  ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
-  ENVOY_LOG(warn, "gRPC state-of-the-world config for {} rejected: {}", type_url(), e.what());
-  callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
-}
-
-void SotwSubscriptionState::handleEstablishmentFailure() {
-  ENVOY_LOG(debug, "SotwSubscriptionState establishment failed for {}", type_url());
-  callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                   nullptr);
-}
-
-envoy::service::discovery::v3::DiscoveryRequest* SotwSubscriptionState::getNextRequestInternal() {
-  auto* request = new envoy::service::discovery::v3::DiscoveryRequest;
+std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
+SotwSubscriptionState::getNextRequestInternal() {
+  auto request = std::make_unique<envoy::service::discovery::v3::DiscoveryRequest>();
   request->set_type_url(type_url());
   std::copy(names_tracked_.begin(), names_tracked_.end(),
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names()));
@@ -129,32 +102,6 @@ envoy::service::discovery::v3::DiscoveryRequest* SotwSubscriptionState::getNextR
 
   update_pending_ = false;
   return request;
-}
-
-envoy::service::discovery::v3::DiscoveryRequest* SotwSubscriptionState::getNextRequestAckless() {
-  return getNextRequestInternal();
-}
-
-envoy::service::discovery::v3::DiscoveryRequest*
-SotwSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
-  auto* request = getNextRequestInternal();
-  request->set_response_nonce(ack.nonce_);
-  ENVOY_LOG(debug, "ACK for {} will have nonce {}", type_url(), ack.nonce_);
-  if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    // Don't needlessly make the field present-but-empty if status is ok.
-    request->mutable_error_detail()->CopyFrom(ack.error_detail_);
-  }
-  return request;
-}
-
-void SotwSubscriptionState::setResourceTtl(
-    const envoy::service::discovery::v3::Resource& resource) {
-  if (resource.has_ttl()) {
-    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
-             resource.name());
-  } else {
-    ttl_.clear(resource.name());
-  }
 }
 
 void SotwSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& expired) {

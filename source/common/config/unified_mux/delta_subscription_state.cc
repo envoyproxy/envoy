@@ -17,7 +17,9 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                std::chrono::milliseconds init_fetch_timeout,
                                                Event::Dispatcher& dispatcher, const bool wildcard)
     : SubscriptionState(std::move(type_url), watch_map, init_fetch_timeout, dispatcher),
-      wildcard_(wildcard) {}
+      // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
+      // empty resources as updates.
+      supports_heartbeats_(type_url_ != "envoy.config.route.v3.VirtualHost"), wildcard_(wildcard) {}
 
 DeltaSubscriptionState::~DeltaSubscriptionState() = default;
 
@@ -49,19 +51,6 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
 bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   return !names_added_.empty() || !names_removed_.empty() ||
          !any_request_sent_yet_in_current_stream_ || dynamicContextChanged();
-}
-
-UpdateAck DeltaSubscriptionState::handleResponse(
-    const envoy::service::discovery::v3::DeltaDiscoveryResponse& response) {
-  // We *always* copy the response's nonce into the next request, even if we're going to make that
-  // request a NACK by setting error_detail.
-  UpdateAck ack(response.nonce(), type_url());
-  TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
-  END_TRY
-  catch (const EnvoyException& e) {
-    handleBadResponse(e, ack);
-  }
-  return ack;
 }
 
 bool DeltaSubscriptionState::isHeartbeatResource(
@@ -137,22 +126,9 @@ void DeltaSubscriptionState::handleGoodResponse(
             message.resources().size(), message.removed_resources().size());
 }
 
-void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
-  // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
-  ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
-  ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
-  ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url(), e.what());
-  callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
-}
-
-void DeltaSubscriptionState::handleEstablishmentFailure() {
-  callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                   nullptr);
-}
-
-envoy::service::discovery::v3::DeltaDiscoveryRequest*
+std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>
 DeltaSubscriptionState::getNextRequestInternal() {
-  auto* request = new envoy::service::discovery::v3::DeltaDiscoveryRequest;
+  auto request = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryRequest>();
   request->set_type_url(type_url());
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
@@ -190,32 +166,9 @@ DeltaSubscriptionState::getNextRequestInternal() {
   return request;
 }
 
-envoy::service::discovery::v3::DeltaDiscoveryRequest*
-DeltaSubscriptionState::getNextRequestAckless() {
-  return getNextRequestInternal();
-}
-
-envoy::service::discovery::v3::DeltaDiscoveryRequest*
-DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
-  auto* request = getNextRequestInternal();
-  request->set_response_nonce(ack.nonce_);
-  ENVOY_LOG(debug, "ACK for {} will have nonce {}", type_url(), ack.nonce_);
-  if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    // Don't needlessly make the field present-but-empty if status is ok.
-    request->mutable_error_detail()->CopyFrom(ack.error_detail_);
-  }
-  return request;
-}
-
 void DeltaSubscriptionState::addResourceState(
     const envoy::service::discovery::v3::Resource& resource) {
-  if (resource.has_ttl()) {
-    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
-             resource.name());
-  } else {
-    ttl_.clear(resource.name());
-  }
-
+  setResourceTtl(resource);
   resource_state_[resource.name()] = ResourceState(resource.version());
 }
 
