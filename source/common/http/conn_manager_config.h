@@ -3,6 +3,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
@@ -57,6 +58,7 @@ namespace Http {
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_overload_close)                                                            \
   COUNTER(downstream_rq_redirected_with_normalized_path)                                           \
+  COUNTER(downstream_rq_rejected_via_ip_detection)                                                 \
   COUNTER(downstream_rq_response_before_rq_complete)                                               \
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_timeout)                                                                   \
@@ -477,6 +479,12 @@ public:
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const PURE;
 
+  /**
+   * @return vector of OriginalIPDetectionSharedPtr original IP detection extensions.
+   */
+  virtual const std::vector<OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const PURE;
+ 
   /**
    * @return if the HttpConnectionManager should remove trailing host dot from host/authority
    * header.

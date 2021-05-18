@@ -165,7 +165,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (payload_passthrough_) {
     setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
-    sigv4_signer_->sign(headers);
+    sigv4_signer_->signEmptyPayload(headers);
     return Http::FilterHeadersStatus::Continue;
   }
 
