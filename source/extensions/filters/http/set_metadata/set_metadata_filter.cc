@@ -28,7 +28,7 @@ Http::FilterHeadersStatus SetMetadataFilter::decodeHeaders(Http::RequestHeaderMa
   const absl::string_view metadata_namespace = config_->metadataNamespace();
   auto& metadata = *decoder_callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata();
   ProtobufWkt::Struct& org_fields = metadata[metadata_namespace];
-  ProtobufWkt::Struct const& to_merge = config_->value();
+  const ProtobufWkt::Struct& to_merge = config_->value();
 
   StructUtil::update(org_fields, to_merge);
 

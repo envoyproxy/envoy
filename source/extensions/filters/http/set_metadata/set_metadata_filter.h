@@ -23,7 +23,7 @@ public:
   Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config);
 
   absl::string_view metadataNamespace() const { return namespace_; }
-  ProtobufWkt::Struct const& value() { return value_; }
+  const ProtobufWkt::Struct& value() { return value_; }
 
 private:
   std::string namespace_;

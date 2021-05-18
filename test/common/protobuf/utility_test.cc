@@ -2020,8 +2020,8 @@ TEST(TypeUtilTest, TypeUrlHelperFunction) {
 
 class StructUtilTest : public ProtobufUtilityTest {
 protected:
-  ProtobufWkt::Struct updateSimpleStruct(ProtobufWkt::Value const& v0,
-                                         ProtobufWkt::Value const& v1) {
+  ProtobufWkt::Struct updateSimpleStruct(const ProtobufWkt::Value& v0,
+                                         const ProtobufWkt::Value& v1) {
     ProtobufWkt::Struct obj, with;
     (*obj.mutable_fields())["key"] = v0;
     (*with.mutable_fields())["key"] = v1;

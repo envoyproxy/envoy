@@ -47,7 +47,7 @@ public:
     filter->onDestroy();
   }
 
-  void checkKeyInt(ProtobufWkt::Struct const& s, const char* key, int val) {
+  void checkKeyInt(const ProtobufWkt::Struct& s, const char* key, int val) {
     const auto& fields = s.fields();
     const auto it = fields.find(key);
     ASSERT_TRUE(it != fields.end());
