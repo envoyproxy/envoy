@@ -11,6 +11,7 @@
 #include "common/common/random_generator.h"
 #include "common/http/header_map_impl.h"
 
+#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -1299,7 +1300,7 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
+    "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   initialize();
 
@@ -1329,7 +1330,7 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
+    "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   initialize();
 

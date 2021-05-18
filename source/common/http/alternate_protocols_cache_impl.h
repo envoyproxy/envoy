@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Http {
 
 // An implementation of AlternateProtocolsCache.
+// See: source/docs/http3_upstream.md
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache {
 public:
   explicit AlternateProtocolsCacheImpl(TimeSource& time_source);
