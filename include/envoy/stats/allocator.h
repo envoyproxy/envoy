@@ -57,7 +57,7 @@ public:
                                                const StatNameTagVector& stat_name_tags) PURE;
 
   /**
-   * @param name the full name of the stat.
+   * @param name the full name of the group.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the tag values.
    * @param max_entries the maximum number of entries in the group.

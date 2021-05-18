@@ -197,12 +197,6 @@ using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
  */
 class CounterGroup : public Metric {
 public:
-  // Counter group type is used internally to disambiguate isolated store
-  // constructors. In the future we can extend it to specify text encoding or
-  // some such.
-  enum class Type {
-    Default, // No particular meaning.
-  };
   ~CounterGroup() override = default;
 
   /**
