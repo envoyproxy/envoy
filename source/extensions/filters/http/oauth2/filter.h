@@ -49,38 +49,35 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
-      : api_(api), client_secret_provider_(std::move(client_secret_provider)),
-        token_secret_provider_(std::move(token_secret_provider)) {
-    readAndWatchSecret(client_secret_, *client_secret_provider_);
-    readAndWatchSecret(token_secret_, *token_secret_provider_);
-  }
+      : update_callback_client_(readAndWatchSecret(client_secret_, client_secret_provider, api)),
+        update_callback_token_(readAndWatchSecret(token_secret_, token_secret_provider, api)) {}
 
   const std::string& clientSecret() const override { return client_secret_; }
 
   const std::string& tokenSecret() const override { return token_secret_; }
 
 private:
-  void readAndWatchSecret(std::string& value,
-                          Secret::GenericSecretConfigProvider& secret_provider) {
-    const auto* secret = secret_provider.secret();
+  Envoy::Common::CallbackHandlePtr
+  readAndWatchSecret(std::string& value,
+                     Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api) {
+    const auto* secret = secret_provider->secret();
     if (secret != nullptr) {
-      value = Config::DataSource::read(secret->secret(), true, api_);
+      value = Config::DataSource::read(secret->secret(), true, api);
     }
 
-    update_callback_ = secret_provider.addUpdateCallback([&secret_provider, this, &value]() {
-      const auto* secret = secret_provider.secret();
+    return secret_provider->addUpdateCallback([secret_provider, &api, &value]() {
+      const auto* secret = secret_provider->secret();
       if (secret != nullptr) {
-        value = Config::DataSource::read(secret->secret(), true, api_);
+        value = Config::DataSource::read(secret->secret(), true, api);
       }
     });
   }
+
   std::string client_secret_;
   std::string token_secret_;
-  Api::Api& api_;
-  Envoy::Common::CallbackHandlePtr update_callback_;
 
-  Secret::GenericSecretConfigProviderSharedPtr client_secret_provider_;
-  Secret::GenericSecretConfigProviderSharedPtr token_secret_provider_;
+  Envoy::Common::CallbackHandlePtr update_callback_client_;
+  Envoy::Common::CallbackHandlePtr update_callback_token_;
 };
 
 /**
