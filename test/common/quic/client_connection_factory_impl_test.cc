@@ -47,31 +47,3 @@ TEST_F(QuicNetworkConnectionTest, BufferLimits) {
 
 } // namespace Quic
 } // namespace Envoy
-
-/*
-class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
-public:
-void initialize() {
-EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
-EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(factory_));
-new Event::MockSchedulableCallback(&dispatcher_);
-Network::ConnectionSocket::OptionsSharedPtr options;
-Network::TransportSocketOptionsSharedPtr transport_options;
-pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
-options, transport_options, state_, simTime());
-}
-
-Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
-
-std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
-NiceMock<Random::MockRandomGenerator> random_;
-Upstream::ClusterConnectivityState state_;
-Network::Address::InstanceConstSharedPtr test_address_ =
-Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
-NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
-Quic::QuicClientTransportSocketFactory factory_{
-std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
-context_};
-ConnectionPool::InstancePtr pool_;
-*/
