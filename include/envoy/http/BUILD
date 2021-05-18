@@ -111,6 +111,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_formatter_interface",
+        "//include/envoy/common:case_insensitive",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
     ],

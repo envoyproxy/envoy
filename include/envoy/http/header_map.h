@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/case_insensitive.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_formatter.h"
@@ -24,7 +25,7 @@ namespace Http {
 
 // Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
 // never contain embedded NULLs.
-static inline bool validHeaderString(absl::string_view s) {
+inline bool validHeaderString(absl::string_view s) {
   // If you modify this list of illegal embedded characters you will probably
   // want to change header_map_fuzz_impl_test at the same time.
   for (const char c : s) {
@@ -43,49 +44,9 @@ static inline bool validHeaderString(absl::string_view s) {
 }
 
 /**
- * Wrapper for a lower case string used in header operations to generally avoid needless case
- * insensitive compares.
+ * Wrapper for a lower case string used in header operations.
  */
-class LowerCaseString {
-public:
-  LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) {
-    ASSERT(valid());
-  }
-  LowerCaseString& operator=(LowerCaseString&& rhs) noexcept {
-    string_ = std::move(rhs.string_);
-    ASSERT(valid());
-    return *this;
-  }
-
-  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
-  LowerCaseString& operator=(const LowerCaseString& rhs) {
-    string_ = std::move(rhs.string_);
-    ASSERT(valid());
-    return *this;
-  }
-
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
-    ASSERT(valid());
-    lower();
-  }
-
-  const std::string& get() const { return string_; }
-  bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
-  bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
-  bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
-
-  friend std::ostream& operator<<(std::ostream& os, const LowerCaseString& lower_case_string) {
-    return os << lower_case_string.string_;
-  }
-
-private:
-  void lower() {
-    std::transform(string_.begin(), string_.end(), string_.begin(), absl::ascii_tolower);
-  }
-  bool valid() const { return validHeaderString(string_); }
-
-  std::string string_;
-};
+using LowerCaseString = Envoy::ValidatedLowerCaseStr<validHeaderString>;
 
 /**
  * Convenient type for a vector of lower case string and string pair.

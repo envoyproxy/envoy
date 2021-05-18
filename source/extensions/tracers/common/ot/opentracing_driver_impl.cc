@@ -29,7 +29,7 @@ public:
   // opentracing::HTTPHeadersWriter
   opentracing::expected<void> Set(opentracing::string_view key,
                                   opentracing::string_view value) const override {
-    Http::LowerCaseString lowercase_key{key};
+    Http::LowerCaseString lowercase_key{{key.data(), key.size()}};
     request_headers_.remove(lowercase_key);
     request_headers_.addCopy(std::move(lowercase_key), {value.data(), value.size()});
     return {};
@@ -50,7 +50,7 @@ public:
   // opentracing::HTTPHeadersReader
   opentracing::expected<opentracing::string_view>
   LookupKey(opentracing::string_view key) const override {
-    const auto entry = request_headers_.get(Http::LowerCaseString{key});
+    const auto entry = request_headers_.get(Http::LowerCaseString{{key.data(), key.size()}});
     if (!entry.empty()) {
       // This is an implicitly untrusted header, so only the first value is used.
       return opentracing::string_view{entry[0]->value().getStringView().data(),
