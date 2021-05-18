@@ -106,9 +106,8 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
     return;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!data) {
     ENVOY_LOG(warn, "No host available for cluster {}. Opaque: {}", cluster_name, opaque);
     active_message.onError("No host available");
     reset();
@@ -116,7 +115,8 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
   }
 
   upstream_request_ = std::make_unique<UpstreamRequest>(*this);
-  Tcp::ConnectionPool::Cancellable* cancellable = conn_pool->newConnection(*upstream_request_);
+  Tcp::ConnectionPool::Cancellable* cancellable =
+      data.value().create_connection_(*upstream_request_);
   if (cancellable) {
     handle_ = cancellable;
     ENVOY_LOG(trace, "No connection is available for now. Create a cancellable handle. Opaque: {}",

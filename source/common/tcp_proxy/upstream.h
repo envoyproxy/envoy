@@ -5,6 +5,7 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tcp/upstream.h"
 #include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/dump_state_utils.h"
@@ -21,7 +22,7 @@ public:
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
 
-  bool valid() const { return conn_pool_ != nullptr; }
+  bool valid() const { return conn_pool_data_.has_value(); }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -33,7 +34,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  Tcp::ConnectionPool::Instance* conn_pool_{};
+  absl::optional<Upstream::TcpPoolData> conn_pool_data_{};
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -53,7 +54,9 @@ public:
   ~HttpConnPool() override;
 
   // HTTP/3 upstreams are not supported at the moment.
-  bool valid() const { return conn_pool_ != nullptr && type_ <= Http::CodecClient::Type::HTTP2; }
+  bool valid() const {
+    return conn_pool_data_.has_value() && type_ <= Http::CodecClient::Type::HTTP2;
+  }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -98,7 +101,7 @@ private:
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfig config_;
   Http::CodecClient::Type type_;
-  Http::ConnectionPool::Instance* conn_pool_{};
+  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
