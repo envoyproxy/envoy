@@ -23,6 +23,8 @@ public:
   MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                std::vector<Http::Protocol>& protocol,
+               const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                   alternate_protocol_options,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                TimeSource& source, ClusterConnectivityState& state));
