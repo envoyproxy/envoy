@@ -1782,11 +1782,27 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The filter will send a local reply when receiving headers, the client
+  // should get a complete response.
   {
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
+    EXPECT_EQ("original_reply", response->body());
   }
+  // The filter will send a local reply when receiving headers, and interrupt
+  // that with a second reply sent from the encoder chain. The client will see
+  // the second response.
+  {
+    default_request_headers_.addCopy("dual-local-reply", "yes");
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("second_reply", response->body());
+  }
+  // The filter will send a local reply when receiving headers and reset the
+  // stream onLocalReply. The client will get a reset and no response even if
+  // dual local replies are on (from the prior request).
   {
     default_request_headers_.addCopy("reset", "yes");
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
