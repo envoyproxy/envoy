@@ -1,3 +1,6 @@
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.validate.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
@@ -26,7 +29,7 @@ namespace {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
-  GrpcHttp1BridgeFilterTest() : context_(*symbol_table_), filter_(context_) {
+  GrpcHttp1BridgeFilterTest() : context_(*symbol_table_), filter_(config_, context_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
@@ -36,6 +39,7 @@ public:
 
   ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
 
+  envoy::extensions::filters::http::grpc_http1_bridge::v3::Config config_;
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl context_;
   Http1BridgeFilter filter_;
@@ -245,7 +249,54 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "1"}, {"grpc-message", "foo"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ("503", response_headers.get_(":status"));
+  EXPECT_EQ("499", response_headers.get_(":status"));
+  EXPECT_EQ("0", response_headers.get_("content-length"));
+  EXPECT_EQ("1", response_headers.get_("grpc-status"));
+  EXPECT_EQ("foo", response_headers.get_("grpc-message"));
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/14872 testing trailers-only
+// responses. Test verifies 200 HTTP status code when configuration isn't enabled.
+TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatusTrailersOnlyResponse) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+
+  // gRPC responses may optimize and put would-be-trailers in the headers frame if there are no data
+  // frames. The gRPC spec refers to this a a "Trailers-Only" response.
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"grpc-status", "1"}, {"grpc-message", "foo"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("200", response_headers.get_(":status"));
+  EXPECT_EQ("0", response_headers.get_("content-length"));
+  EXPECT_EQ("1", response_headers.get_("grpc-status"));
+  EXPECT_EQ("foo", response_headers.get_("grpc-message"));
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/14872 testing trailers-only
+// responses. Test verifies 499 HTTP status code when configuration is enabled.
+TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatusTrailersOnlyResponseHTTPStatusEnabled) {
+  config_.set_enable_http_status_codes(true);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+
+  // gRPC responses may optimize and put would-be-trailers in the headers frame if there are no data
+  // frames. The gRPC spec refers to this a a "Trailers-Only" response.
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"grpc-status", "1"}, {"grpc-message", "foo"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("499", response_headers.get_(":status"));
   EXPECT_EQ("0", response_headers.get_("content-length"));
   EXPECT_EQ("1", response_headers.get_("grpc-status"));
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));

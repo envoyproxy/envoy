@@ -18,4 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.grpc_http1_bridge.v2.Config";
+
+  // If true, the filter sets the request's HTTP status code alongside the existing gRPC status code.
+  bool enable_http_status_codes = 1;
 }

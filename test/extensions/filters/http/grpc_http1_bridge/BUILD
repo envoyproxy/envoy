@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//test/test_common:global_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_http1_bridge/v3:pkg_cc_proto",
     ],
 )
 

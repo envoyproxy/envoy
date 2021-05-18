@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/grpc:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http/http1:codec_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_http1_bridge/v3:pkg_cc_proto",
     ],
 )
 

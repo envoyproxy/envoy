@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -15,7 +17,10 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  explicit Http1BridgeFilter(Grpc::Context& context) : context_(context) {}
+  explicit Http1BridgeFilter(
+      const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
+      Grpc::Context& context)
+      : proto_config_(proto_config), context_(context) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -58,6 +63,10 @@ public:
 private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
+  void doResponseTrailers(const Http::ResponseHeaderOrTrailerMap& trailers);
+  void updateGrpcStatusAndMessage(const Http::ResponseHeaderOrTrailerMap& trailers);
+  void updateHttpStatusAndContentLength(const Http::ResponseHeaderOrTrailerMap& trailers,
+                                        bool enable_http_status_codes);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
@@ -65,6 +74,7 @@ private:
   bool do_bridging_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
+  const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config_;
   Grpc::Context& context_;
 };
 
