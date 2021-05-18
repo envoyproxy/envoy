@@ -1064,7 +1064,7 @@ tls_certificate:
   // is incorrect.
   EXPECT_THROW_WITH_MESSAGE(
       Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_),
-      EnvoyException, "Failed to load incomplete certificate from <inline>, ");
+      EnvoyException, "Failed to load private key provider: test");
 }
 
 } // namespace

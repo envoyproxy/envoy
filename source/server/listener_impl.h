@@ -19,6 +19,7 @@
 #include "common/init/target_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
+#include "server/transport_socket_config_impl.h"
 
 #include "absl/base/call_once.h"
 
@@ -426,6 +427,8 @@ private:
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
+
+  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context_;
 };
 
 } // namespace Server
