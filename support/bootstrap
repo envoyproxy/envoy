@@ -52,11 +52,6 @@ if [ ! -e "${HOOKS_DIR}/prepare-commit-msg" ]; then
   ln -sf "${HOOKS_DIR_RELPATH}/hooks/prepare-commit-msg" "${HOOKS_DIR}/prepare-commit-msg"
 fi
 
-if [ ! -e "${HOOKS_DIR}/commit-msg" ]; then
-  echo "Installing hook 'commit-msg'"
-  ln -sf "${HOOKS_DIR_RELPATH}/hooks/commit-msg" "${HOOKS_DIR}/commit-msg"
-fi
-
 if [ ! -e "${HOOKS_DIR}/pre-push" ]; then
   echo "Installing hook 'pre-push'"
   ln -sf "${HOOKS_DIR_RELPATH}/hooks/pre-push" "${HOOKS_DIR}/pre-push"
