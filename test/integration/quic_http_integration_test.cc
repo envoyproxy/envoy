@@ -199,7 +199,7 @@ public:
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
       // The BPF filter and ActiveQuicListener::destination() look at the 1st word of connection id
-      // in the packet header. And currently all QUIC versions support 8 bytes connection id. So
+      // in the packet header. And currently all QUIC versions support >= 8 bytes connection id. So
       // create connections with the first 4 bytes of connection id different from each
       // other so they should be evenly distributed.
       designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
@@ -232,6 +232,24 @@ public:
       }
     }
     for (size_t i = 0; i < concurrency_; ++i) {
+      fake_upstream_connection_ = nullptr;
+      upstream_request_ = nullptr;
+      auto encoder_decoder =
+          codec_clients[i]->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}});
+      auto& request_encoder = encoder_decoder.first;
+      auto response = std::move(encoder_decoder.second);
+      codec_clients[i]->sendData(request_encoder, 0, true);
+      waitForNextUpstreamRequest();
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                       {"set-cookie", "foo"},
+                                                                       {"set-cookie", "bar"}},
+                                       true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+      EXPECT_TRUE(response->complete());
       codec_clients[i]->close();
     }
   }
@@ -400,7 +418,18 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
   testMultipleQuicConnections();
 }
 
-TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
+// Tests that the packets from a connection with CID longer than 8 bytes are routed to the same
+// worker.
+TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
+  concurrency_ = 8;
+  set_reuse_port_ = true;
+  initialize();
+  // Setup 9-byte CID for the next connection.
+  designated_connection_ids_.push_back(quic::test::TestConnectionIdNineBytesLong(2u));
+  testRouterHeaderOnlyRequestAndResponse();
+}
+
+TEST_P(QuicHttpIntegrationTest, PortMigration) {
   concurrency_ = 2;
   set_reuse_port_ = true;
   initialize();

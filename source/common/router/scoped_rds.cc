@@ -297,6 +297,8 @@ ScopedRdsConfigSubscription::removeScopes(
             std::move(rds_config_provider_helper_iter->second));
         route_provider_by_scope_.erase(rds_config_provider_helper_iter);
       }
+      ASSERT(scope_name_by_hash_.find(iter->second->scopeKey().hash()) !=
+             scope_name_by_hash_.end());
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
       removed_scope_names.push_back(scope_name);
@@ -453,9 +455,10 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
       exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
       return clean_removed_resources;
     }
-    const envoy::config::route::v3::ScopedRouteConfiguration& scoped_route_config =
+    envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         scope_config_inserted.first->second;
-    const uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
+    const uint64_t key_fingerprint =
+        ScopedRouteInfo(std::move(scoped_route_config), nullptr).scopeKey().hash();
     if (!scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
       exception_msg =
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
