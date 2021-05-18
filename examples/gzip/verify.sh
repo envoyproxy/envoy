@@ -11,13 +11,13 @@ run_log "Test service: localhost:8089/file.txt with compress"
 responds_with_header \
     "content-length" \
     http://localhost:8089/file.txt \
-    -H "Accept-Encoding: gzip"
+    -si -H "Accept-Encoding: gzip"
 
 run_log "Test service: localhost:8089/file.json with compress"
 responds_without_header \
     "content-length" \
     http://localhost:8089/file.json \
-    -H "Accept-Encoding: gzip"
+    -si -H "Accept-Encoding: gzip"
 
 run_log "Test service: localhost:8001/stats/prometheus without compress"
 responds_without_header \

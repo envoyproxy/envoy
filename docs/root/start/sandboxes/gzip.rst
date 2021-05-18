@@ -38,16 +38,14 @@ Let us try it:
 
 .. code-block:: console
 
-    $ curl -s --compressed -w '%{size_download}\n' localhost:8089/file.txt -o file.txt | tail -n 1
-    104857600
-    $ curl -s --compressed -w '%{size_download}\n' localhost:8089/file.json -o file.json | tail -n 1
-    101941
-    $ ls -sh plain
-    100M plain
-    $ ls -sh json
-    100M json
+    $ curl -si -H "Accept-Encoding: gzip" localhost:8089/file.txt -o file.txt
+    $ curl -si -H "Accept-Encoding: gzip" localhost:8089/file.json -o file.json
+    $ ls -sh file.txt
+    11M file.txt
+    $ $ ls -sh file.json
+    12K file.json
 
-Notice that the number of data size here is just an example.
+The size of `file.txt` is not 10M since `ls` rounds up.
 
 Step 3: Test Envoy's stats capabilities
 ***************************************
@@ -87,43 +85,39 @@ For listen port:
 Step 4: Test Envoy's compression capabilities for Envoy's stats
 ***************************************************************
 
-Now let's add ``--compressed -w '%{size_download}\n'`` to demonstrate the compression abilities of Envoy:
+Now let's demonstrate the compression abilities of Envoy:
 
 For original port:
 
 .. code-block:: console
 
-    $ curl --compressed -w '%{size_download}\n' localhost:8001/stats/prometheus | tail -n 1
-    67732
-    $ curl --compressed -i localhost:8001/stats/prometheus | head -n 10
+    $ curl -si -v -H "Accept-Encoding: gzip" localhost:8001/stats/prometheus -o /dev/null 2>&1 | grep -E "content-encoding|data"
+    { [43231 bytes data]
+
+    $ curl --head -H "Accept-Encoding: gzip" localhost:8001/stats/prometheus
     HTTP/1.1 200 OK
     content-type: text/plain; charset=UTF-8
     cache-control: no-cache, max-age=0
     x-content-type-options: nosniff
-    date: Wed, 12 May 2021 02:36:34 GMT
+    date: Tue, 18 May 2021 06:09:36 GMT
     server: envoy
     transfer-encoding: chunked
-
-    # TYPE envoy_cluster_assignment_stale counter
-    envoy_cluster_assignment_stale{envoy_cluster_name="gzip"} 0
 
 For listen port:
 
 .. code-block:: console
 
-    $ curl --compressed -w '%{size_download}\n' localhost:8002/stats/prometheus | tail -n 1
-    6552
-    $ curl --compressed -i localhost:8002/stats/prometheus | head -n 10
+    $ curl -si -v -H "Accept-Encoding: gzip" localhost:8002/stats/prometheus -o /dev/null 2>&1 | grep -E "content-encoding|data"
+    < content-encoding: gzip
+    { [7977 bytes data]
+
+    $ curl --head -H "Accept-Encoding: gzip" localhost:8002/stats/prometheus
     HTTP/1.1 200 OK
     content-type: text/plain; charset=UTF-8
     cache-control: no-cache, max-age=0
     x-content-type-options: nosniff
-    date: Wed, 12 May 2021 02:35:53 GMT
+    date: Tue, 18 May 2021 06:09:38 GMT
     server: envoy
-    x-envoy-upstream-service-time: 20
-    content-encoding: gzip
+    x-envoy-upstream-service-time: 8
     vary: Accept-Encoding
     transfer-encoding: chunked
-
-Notice that the number of data size here is just an example.
-
