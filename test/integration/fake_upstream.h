@@ -414,6 +414,17 @@ protected:
 class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeConnectionBase {
 public:
   enum class Type { HTTP1, HTTP2, HTTP3 };
+  static absl::string_view typeToString(Type type) {
+    switch (type) {
+    case Type::HTTP1:
+      return "http1";
+    case Type::HTTP2:
+      return "http2";
+    case Type::HTTP3:
+      return "http3";
+    }
+    return "invalid";
+  }
 
   FakeHttpConnection(FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection,
                      Type type, Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
