@@ -151,6 +151,12 @@ public:
     max_headers_count_ = max_headers_count;
   }
 
+  OptRef<const Network::Socket> socket() const override {
+    return network_connection_ == nullptr
+               ? OptRef<const Network::Socket>()
+               : OptRef<const Network::Socket>(*network_connection_->connectionSocket());
+  }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,

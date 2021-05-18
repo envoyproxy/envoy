@@ -75,6 +75,12 @@ public:
     headers_with_underscores_action_ = headers_with_underscores_action;
   }
 
+  OptRef<const Network::Socket> socket() const override {
+    return quic_connection_ == nullptr
+               ? OptRef<const Network::Socket>()
+               : OptRef<const Network::Socket>(*quic_connection_->connectionSocket());
+  }
+
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:

@@ -2950,6 +2950,58 @@ TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   connection->close(ConnectionCloseType::NoFlush);
 }
 
+// Validate the rtt for the connection socket
+TEST_P(ConnectionImplTest, RttBySocket) {
+#ifdef TCP_INFO
+  Network::ClientConnectionPtr upstream_connection_;
+
+  setUpBasicConnection();
+
+  client_connection_->connect();
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        client_connection_->close(ConnectionCloseType::NoFlush);
+      }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+
+        upstream_connection_ = dispatcher_->createClientConnection(
+            socket_->addressProvider().localAddress(), source_address_,
+            Network::Test::createRawBufferSocket(), server_connection_->socketOptions());
+      }));
+
+  struct tcp_info upstream_tcp_info;
+  int socketopt_response = -1;
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        socklen_t info_len = sizeof(upstream_tcp_info);
+        if (upstream_connection_->socket().has_value()) {
+          socketopt_response =
+              upstream_connection_->socket()
+                  ->getSocketOption(SOL_TCP, TCP_INFO, &upstream_tcp_info, &info_len)
+                  .rc_;
+        }
+        upstream_connection_->close(ConnectionCloseType::NoFlush);
+        dispatcher_->exit();
+      }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  ASSERT(socketopt_response == 0);
+  ASSERT(upstream_tcp_info.tcpi_rtt >= 0);
+#endif
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

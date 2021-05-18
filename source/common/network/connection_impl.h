@@ -128,6 +128,11 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  OptRef<const Network::Socket> socket() const override {
+    return socket_ == nullptr ? OptRef<const Network::Socket>()
+                              : OptRef<const Network::Socket>(*socket_);
+  }
+
 protected:
   // A convenience function which returns true if
   // 1) The read disable count is zero or

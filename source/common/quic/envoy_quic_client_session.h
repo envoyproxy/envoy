@@ -71,6 +71,12 @@ public:
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
+  OptRef<const Network::Socket> socket() const override {
+    return network_connection_ == nullptr
+               ? OptRef<const Network::Socket>()
+               : OptRef<const Network::Socket>(*network_connection_->connectionSocket());
+  }
+
 protected:
   // quic::QuicSpdyClientSession
   std::unique_ptr<quic::QuicSpdyClientStream> CreateClientStream() override;

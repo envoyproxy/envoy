@@ -326,6 +326,8 @@ public:
    *  returned.
    */
   virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
+
+  virtual OptRef<const Network::Socket> socket() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;
