@@ -47,7 +47,7 @@ Let us try it:
 
 The size of `file.txt` is not 10M since `ls` rounds up.
 
-Step 3: Test Envoy's stats capabilities
+Step 3: View Envoy's stats capabilities
 ***************************************
 
 You can now send a request to get prometheus stat.
