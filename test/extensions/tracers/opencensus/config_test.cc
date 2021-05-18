@@ -37,7 +37,7 @@ TEST(OpenCensusTracerConfigTest, InvalidStackdriverConfiguration) {
 
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message, context)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE((factory.createTracerDriver(*message, context)), EnvoyException,
                             "Opencensus stackdriver tracer only support GoogleGrpc.");
 }
 
@@ -60,7 +60,7 @@ TEST(OpenCensusTracerConfigTest, InvalidOcagentConfiguration) {
 
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message, context)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE((factory.createTracerDriver(*message, context)), EnvoyException,
                             "Opencensus ocagent tracer only supports GoogleGrpc.");
 }
 
@@ -77,7 +77,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
+  auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 
@@ -113,7 +113,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
+  auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
@@ -147,7 +147,7 @@ TEST(OpenCensusTracerConfigTest,
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
+  auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
@@ -188,7 +188,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 #ifdef ENVOY_GOOGLE_GRPC
-  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
+  auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
@@ -196,7 +196,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
       {32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
 #else
   EXPECT_THROW_WITH_MESSAGE(
-      (factory.createHttpTracer(*message, context)), EnvoyException,
+      (factory.createTracerDriver(*message, context)), EnvoyException,
       "Opencensus tracer: cannot handle ocagent google grpc service, google grpc is not built in.");
 #endif
 }
@@ -219,12 +219,12 @@ TEST(OpenCensusTracerConfigTest, ShouldCreateAtMostOneOpenCensusTracer) {
 
   auto message_one = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr tracer_one = factory.createHttpTracer(*message_one, context);
+  auto tracer_one = factory.createTracerDriver(*message_one, context);
   EXPECT_NE(nullptr, tracer_one);
 
   auto message_two = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr tracer_two = factory.createHttpTracer(*message_two, context);
+  auto tracer_two = factory.createTracerDriver(*message_two, context);
   // Verify that no new tracer has been created.
   EXPECT_EQ(tracer_two, tracer_one);
 }
@@ -242,13 +242,13 @@ TEST(OpenCensusTracerConfigTest, ShouldCacheFirstCreatedTracerUsingStrongReferen
 
   auto message_one = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  std::weak_ptr<Tracing::HttpTracer> tracer_one = factory.createHttpTracer(*message_one, context);
+  std::weak_ptr<Tracing::Driver> tracer_one = factory.createTracerDriver(*message_one, context);
   // Verify that tracer factory keeps a strong reference.
   EXPECT_NE(nullptr, tracer_one.lock());
 
   auto message_two = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr tracer_two = factory.createHttpTracer(*message_two, context);
+  auto tracer_two = factory.createTracerDriver(*message_two, context);
   EXPECT_NE(nullptr, tracer_two);
   // Verify that no new tracer has been created.
   EXPECT_EQ(tracer_two, tracer_one.lock());
@@ -273,7 +273,7 @@ TEST(OpenCensusTracerConfigTest, ShouldNotCacheInvalidConfiguration) {
 
   auto message_one = Config::Utility::translateToFactoryConfig(
       configuration_one.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message_one, context)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE((factory.createTracerDriver(*message_one, context)), EnvoyException,
                             "Opencensus ocagent tracer only supports GoogleGrpc.");
 
   const std::string yaml_two = R"EOF(
@@ -293,12 +293,12 @@ TEST(OpenCensusTracerConfigTest, ShouldNotCacheInvalidConfiguration) {
   auto message_two = Config::Utility::translateToFactoryConfig(
       configuration_two.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 #ifdef ENVOY_GOOGLE_GRPC
-  Tracing::HttpTracerSharedPtr tracer_two = factory.createHttpTracer(*message_two, context);
+  auto tracer_two = factory.createTracerDriver(*message_two, context);
   // Verify that a new tracer has been created despite an earlier failed attempt.
   EXPECT_NE(nullptr, tracer_two);
 #else
   EXPECT_THROW_WITH_MESSAGE(
-      (factory.createHttpTracer(*message_two, context)), EnvoyException,
+      (factory.createTracerDriver(*message_two, context)), EnvoyException,
       "Opencensus tracer: cannot handle ocagent google grpc service, google grpc is not built in.");
 #endif
 }
@@ -321,7 +321,7 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
 
   auto message_one = Config::Utility::translateToFactoryConfig(
       configuration_one.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr tracer_one = factory.createHttpTracer(*message_one, context);
+  auto tracer_one = factory.createTracerDriver(*message_one, context);
   EXPECT_NE(nullptr, tracer_one);
 
   const std::string yaml_two = R"EOF(
@@ -339,7 +339,7 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
   auto message_two = Config::Utility::translateToFactoryConfig(
       configuration_two.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   // Verify that OpenCensus is only configured once in a lifetime.
-  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message_two, context)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE((factory.createTracerDriver(*message_two, context)), EnvoyException,
                             "Opencensus has already been configured with a different config.");
 }
 
@@ -367,10 +367,10 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverGrpc) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 #ifdef ENVOY_GOOGLE_GRPC
-  Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
+  auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 #else
-  EXPECT_THROW_WITH_MESSAGE((factory.createHttpTracer(*message, context)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE((factory.createTracerDriver(*message, context)), EnvoyException,
                             "Opencensus tracer: cannot handle stackdriver google grpc service, "
                             "google grpc is not built in.");
 #endif
