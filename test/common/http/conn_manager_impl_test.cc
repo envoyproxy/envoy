@@ -1194,17 +1194,17 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Observe host header w/o trailing dot in host when trailing dot removal is configured
+// Observe host header w/o trailing dot in host when trailing dot removal is configured.
 TEST_F(HttpConnectionManagerImplTest, StripTrailingHostDot) {
   setup(false, "");
-  // Enable removal of host's trailing dot
+  // Enable removal of host's trailing dot.
   strip_trailing_host_dot_ = true;
   const std::string original_host = "host.";
   const std::string updated_host = "host";
   // Set up the codec.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->createCodec(fake_input);
-  // Create a new stream
+  // Create a new stream.
   decoder_ = &conn_manager_->newStream(response_encoder_);
   RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
       {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};

@@ -484,7 +484,7 @@ public:
    */
   virtual const std::vector<OriginalIPDetectionSharedPtr>&
   originalIpDetectionExtensions() const PURE;
- 
+
   /**
    * @return if the HttpConnectionManager should remove trailing host dot from host/authority
    * header.

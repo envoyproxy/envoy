@@ -229,7 +229,7 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
 
 void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
   auto host = headers.getHostValue();
-  // Find last dot and return if not found or take off end if last
+  // If the host ends in a period, remove it.
   auto dot_index = host.rfind('.');
   if (dot_index == std::string::npos) {
     return;
@@ -238,14 +238,12 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
     headers.setHost(host);
     return;
   }
-  // Check if the dot is just before a colon, which means it must be the port
-  // because although the host may contain a colon via an IPv6 bracketed
+  // If the dot is just before a colon, it must be preceding the port number.
+  // Because although the host may contain a colon via an IPv6 bracketed
   // address, and although that IPv6 address may also contain dots when
-  // embedding an address per RFC 4291 2.2.3, the dot will never directly
-  // precede the colon like it would in foo.com.:123
+  // embedding an address per RFC 4291 2.2.3. In this case the dot will never
+  // directly precede the colon like it would in foo.com.:123.
   if (host[dot_index + 1] == ':') {
-    // Does a memcpy internally, but since we only have access to a string_view
-    // anyways, this is acceptable compared to a string::erase of a copy
     headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
   }
 }

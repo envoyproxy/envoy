@@ -708,6 +708,8 @@ message HttpConnectionManager {
   // This affects the upstream host header.
   // Without setting this option, incoming requests with host `example.com.` will not match against
   // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
+  // When incoming requests with host/authority header has port part with host, on setting this option it removes trailing dot from host keeping port
+  // value as is (e.g. host value `example.com.:443` will be updated to `example.com:443`).
   bool strip_trailing_host_dot = 47;
 }
 
