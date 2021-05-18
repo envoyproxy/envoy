@@ -70,7 +70,7 @@ public:
 
   const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) override {
     // convert unique_ptr to shared_ptr
-    JwksConstSharedPtr shared_jwks(jwks.release());
+    JwksConstSharedPtr shared_jwks = std::move(jwks);
     tls_->jwks_ = shared_jwks;
     tls_->expire_ = time_source_.monotonicTime() +
                     JwksAsyncFetcher::getCacheDuration(jwt_provider_.remote_jwks());
@@ -87,7 +87,7 @@ private:
 
   // Set jwks shared_ptr to all threads.
   void setJwksToAllThreads(JwksConstPtr&& jwks) {
-    JwksConstSharedPtr shared_jwks(jwks.release());
+    JwksConstSharedPtr shared_jwks = std::move(jwks);
     tls_.runOnAllThreads([shared_jwks](OptRef<ThreadLocalCache> obj) {
       obj->jwks_ = shared_jwks;
       obj->expire_ = std::chrono::steady_clock::time_point::max();
