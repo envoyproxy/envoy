@@ -1857,7 +1857,7 @@ TEST_P(IntegrationTest, HeadResponse304WithoutTransferEncoding) {
   tcp_client->close();
 }
 
-// Verify content-length is preserved from upstream 304 Resposne
+// Verify content-length is preserved from upstream 304 Response
 TEST_P(IntegrationTest, Response304WithContentLength) {
   initialize();
   auto tcp_client = makeTcpConnection(lookupPort("http"));
