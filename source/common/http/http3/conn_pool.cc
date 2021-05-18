@@ -16,8 +16,8 @@ namespace Envoy {
 namespace Http {
 namespace Http3 {
 
-void setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
-                                    quic::QuicConfig& quic_config) {
+void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
+                                                       quic::QuicConfig& quic_config) {
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
   quic_config.set_max_time_before_crypto_handshake(crypto_timeout);
@@ -28,6 +28,29 @@ void setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
   Quic::configQuicInitialFlowControlWindow(cluster.http3Options().quic_protocol_options(),
                                            quic_config);
 }
+
+Http3ConnPoolImpl::Http3ConnPoolImpl(
+    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+    CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
+    TimeSource& time_source)
+    : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
+                            random_generator, state, client_fn, codec_fn, protocol) {
+  auto source_address = host_->cluster().sourceAddress();
+  if (!source_address.get()) {
+    auto host_address = host->address();
+    source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
+  }
+  Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
+  quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher, transport_socket_factory,
+                                                              time_source, source_address);
+  setQuicConfigFromClusterConfig(host_->cluster(), quic_info_->quic_config_);
+}
+
+// Make sure all connections are torn down before quic_info_ is deleted.
+Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,

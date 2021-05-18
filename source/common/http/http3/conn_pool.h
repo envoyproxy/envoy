@@ -19,9 +19,6 @@ namespace Http {
 namespace Http3 {
 class Http3ConnPoolImplTest;
 
-void setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
-                                    quic::QuicConfig& quic_config);
-
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
@@ -47,24 +44,16 @@ public:
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-                    TimeSource& time_source)
-      : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
-                              random_generator, state, client_fn, codec_fn, protocol) {
-    auto source_address = host_->cluster().sourceAddress();
-    if (!source_address.get()) {
-      auto host_address = host->address();
-      source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
-    }
-    Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
-    quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-        dispatcher, transport_socket_factory, time_source, source_address);
-    setQuicConfigFromClusterConfig(host_->cluster(), quic_info_->quic_config_);
-  }
+                    TimeSource& time_source);
+
+  ~Http3ConnPoolImpl() override;
+
+  // Set relevant fields in quic_config based on the cluster configuration
+  // supplied in cluster.
+  static void setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
+                                             quic::QuicConfig& quic_config);
 
   Quic::PersistentQuicInfoImpl& quicInfo() { return *quic_info_; }
-
-  // Make sure all connections are torn down before quic_info_ is deleted.
-  ~Http3ConnPoolImpl() override { destructAllConnections(); }
 
 private:
   // Store quic helpers which can be shared between connections and must live
