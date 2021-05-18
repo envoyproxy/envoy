@@ -116,7 +116,7 @@ public:
   }
 
 protected:
-  // fallback factory will update the context.
+  // fallback_factory_ will update the context.
   void onSecretUpdated() override {}
 
 private:

@@ -67,9 +67,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
-        if (dynamic_cast<Quic::QuicClientTransportSocketFactory*>(
-                &pool->host()->transportSocketFactory())
-                ->sslCtx() == nullptr) {
+        auto factory = &pool->host()->transportSocketFactory();
+        ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
+        if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
           return nullptr;
         }
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
