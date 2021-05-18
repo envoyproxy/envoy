@@ -40,6 +40,14 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#define DISABLE_UNDER_TSAN return
+#else
+#define DISABLE_UNDER_TSAN                                                                         \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 namespace Envoy {
 namespace Quic {
 
@@ -346,6 +354,7 @@ TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
+  DISABLE_UNDER_TSAN;
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
@@ -354,6 +363,7 @@ TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
+  DISABLE_UNDER_TSAN;
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024, /*response_size=*/1024,
@@ -361,6 +371,7 @@ TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
 }
 
 TEST_P(QuicHttpIntegrationTest, LargeFlowControlOnAndGiantBody) {
+  DISABLE_UNDER_TSAN;
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/128 * 1024,
                                  /*downstream_buffer_limit=*/128 * 1024);

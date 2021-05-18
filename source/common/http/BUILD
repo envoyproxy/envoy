@@ -161,11 +161,22 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "alternate_protocols_cache",
-    srcs = ["alternate_protocols_cache_impl.cc"],
-    hdrs = ["alternate_protocols_cache_impl.h"],
+    srcs = [
+        "alternate_protocols_cache_impl.cc",
+        "alternate_protocols_cache_manager_impl.cc",
+    ],
+    hdrs = [
+        "alternate_protocols_cache_impl.h",
+        "alternate_protocols_cache_manager_impl.h",
+    ],
     deps = [
         "//include/envoy/common:time_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:alternate_protocols_cache_interface",
+        "//include/envoy/singleton:manager_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:resource_manager_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
