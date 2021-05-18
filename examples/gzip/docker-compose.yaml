@@ -4,8 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-gzip
-    volumes:
-      - ./gzip-envoy.yaml:/etc/gzip-envoy.yaml
     networks:
       - envoymesh
     ports:
