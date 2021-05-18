@@ -193,9 +193,7 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
                           ? config.stat_prefix()
                           : Network::Address::resolveProtoAddress(config.address())->asString()))),
       validation_visitor_(validation_visitor),
-      drain_manager_(server.drainManager().createChildManager(server.dispatcher(), drain_type)) {
-  // TODO: Find all instances of creation and remove hte drain-manager
-}
+      drain_manager_(server.drainManager().createChildManager(server.dispatcher(), drain_type)) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
