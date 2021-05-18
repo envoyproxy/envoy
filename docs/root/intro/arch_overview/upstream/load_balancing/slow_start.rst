@@ -41,26 +41,44 @@ Endpoint exits slow start mode when:
   * It does not pass an active healcheck configured per cluster.
     Endpoint could further re-enter slow start, if it passes an active healtcheck and its creation time is within slow start window.
 
-Below is example of how requests would be distributed across endpoints with Round Robin Loadbalancer, slow start window of 10 seconds, no active healcheck, 0.5 time bias and 1.0 aggression.
-Endpoint E1 has statically configured initial weight of X and endpoint E2 weight of Y, the actual numerical values are of no significance for this example.
+Below is example of how requests would be distributed across endpoints in same priority with Round Robin Loadbalancer, slow start window of 60 seconds, no active healcheck, 0.5 time bias and 1.0 aggression.
+Endpoints E1 and E2 have statically configured initial weight of X, the actual numerical value is of no significance for this example.
 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
 | Timestamp   | Event              | E1 in slow | E2 in slow | E1 LB     | E2 LB    | LB decision |
 | in seconds  |                    | start      | start      | weight    | weight   |             |
 +=============+====================+============+============+===========+==========+=============+
-| 1           |  E1 create         |    YES     |     --     |   0.05X   |    --    |     --      |
+| 1           |  E1 create         |    YES     |     --     |   0.01X   |    --    |     --      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 11          |  E2 create         |     NO     |    YES     |    X      |   0.05Y  |     --      |
+| 20          |  Priority update   |    YES     |     --     |   0.33X   |    --    |     --      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 12          | LB select endpoint |     NO     |    YES     |    X      |   0.05Y  |     E1      |
+| 61          |  E2 create         |    NO      |    YES     |     X     |   0.01X  |     --      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 13          | LB select endpoint |     NO     |    YES     |    X      |   0.1Y   |     E1      |
+| 81          |  Priority update   |    NO      |    YES     |     X     |   0.16X  |     --      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 14          | LB select endpoint |     NO     |    YES     |    X      |   0.15Y  |     E1      |
+| 81          | LB select endpoint |    NO      |    YES     |     X     |   0.16X  |     E1      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 15          |LB select endpoint  |     NO     |    YES     |    X      |   0.2Y   |     E2      |
+| 81          | LB select endpoint |    NO      |    YES     |     X     |   0.16X  |     E1      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 22          | LB select endpoint |     NO     |     NO     |    X      |    Y     |     E1      |
+| 81          | LB select endpoint |    NO      |    YES     |     X     |   0.16X  |     E1      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-| 23          | LB select endpoint |     NO     |     NO     |    X      |    Y     |     E2      |
+| 81          |LB select endpoint  |    NO      |    YES     |     X     |   0.16X  |     E1      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 81          | LB select endpoint |    NO      |    YES     |     X     |   0.16X  |     E1      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 81          | LB select endpoint |    NO      |    YES     |     X     |   0.16X  |     E2      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 116         | Priority update    |    NO      |    YES     |     X     |   0.45X  |     E2      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 116         | LB select endpoint |    NO      |    YES     |     X     |   0.45X  |     E1      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 116         | LB select endpoint |    NO      |    YES     |     X     |   0.45X  |     E1      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 116         | LB select endpoint |    NO      |    YES     |     X     |   0.45X  |     E2      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 125         | Priority update    |    NO      |    NO      |     X     |     X    |     --      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 116         | LB select endpoint |    NO      |    NO      |     X     |     X    |     E1      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 116         | LB select endpoint |    NO      |    YES     |     X     |     X    |     E2      |
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
