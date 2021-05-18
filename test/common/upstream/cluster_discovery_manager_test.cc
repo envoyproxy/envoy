@@ -400,8 +400,8 @@ std::vector<ActionsParameter> all_actions = {
                      {"self", "previous", "next", "last", "new0"},
                      OtherActionsExecution::WithinFirstAction),
     // when processing foo, add new callback to foo, process foo then invoke other; expect the
-    // second processing to call only the new callback, then first processing to resume with the
-    // rest of the callbacks (the other callback is added to see the split between two processings)
+    // second process to call only the new callback, then first the process to resume with the rest
+    // of the callbacks (the other callback is added to see the split between two processes)
     ActionsParameter(
         {Action::ProcessFoo, Action::AddNewToFoo, Action::ProcessFoo, Action::InvokeOther},
         {"previous", "self", "new0", "other", "next", "last"},
