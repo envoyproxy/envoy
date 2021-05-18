@@ -1,8 +1,9 @@
 #include "drain_manager.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/server/drain_manager.h"
 
 #include <string>
+
+#include "envoy/event/dispatcher.h"
+#include "envoy/server/drain_manager.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
