@@ -186,7 +186,7 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageRandomData) {
   for (auto i = 0; i < 10000; i++) {
     decoder_->state(DecoderImpl::State::InSyncState);
     // Generate random length.
-    uint32_t len = rand() % 2048;
+    uint32_t len = rand() % 20000;
     // Now fill the buffer with random data.
     for (uint32_t j = 0; j < len; j++) {
       data_.writeBEInt<uint32_t>(rand() % 1024);

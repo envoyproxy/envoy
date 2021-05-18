@@ -218,6 +218,16 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   const auto msgParser = f();
   // Run the validation.
   message_len_ = data.peekBEInt<uint32_t>(0);
+// MAX_STARTUP_PACKET_LENGTH is defined in Postgres source code
+// as maximum size of initial packet.
+#define MAX_STARTUP_PACKET_LENGTH 10000
+  if (message_len_ > MAX_STARTUP_PACKET_LENGTH) {
+    // Message does not conform to the expected format. Move to out-of-sync state.
+    data.drain(data.length());
+    state_ = State::OutOfSyncState;
+    return Decoder::Result::ReadyForNext;
+  }
+
   Message::ValidationResult validationResult = msgParser->validate(data, 4, message_len_ - 4);
 
   if (validationResult == Message::ValidationNeedMoreData) {
