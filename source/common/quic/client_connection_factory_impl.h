@@ -32,6 +32,9 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // be updated with SDS.
   std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   quic::QuicConfig quic_config_;
+  // This arguably should not be shared across connections but as Envoy doesn't
+  // support push promise it's really moot point.
+  quic::QuicClientPushPromiseIndex push_promise_index_;
 };
 
 std::unique_ptr<Network::ClientConnection>
