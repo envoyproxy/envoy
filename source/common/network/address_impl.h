@@ -32,9 +32,18 @@ StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
 InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss, socklen_t len,
                                                   bool v6only = true);
 
-Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
-                                                            socklen_t ss_len, os_fd_t fd,
-                                                            bool v6only = true);
+/**
+ * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
+ * a Network::Address::Instance and return a pointer to it. Die on failure.
+ * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
+ * @param len length of the address (e.g. from accept, getsockname or getpeername). If len > 0,
+ *        it is used to validate the structure contents; else if len == 0, it is ignored.
+ * @param fd the file descriptor for the created address instance.
+ * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+ * @return InstanceConstSharedPtr the address.
+ */
+InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len,
+                                                   os_fd_t fd, bool v6only = true);
 
 /**
  * Base class for all address types.
