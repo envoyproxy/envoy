@@ -30,7 +30,7 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
 
   // The token bucket is configured with a max token count of the number of
   // bytes per second, and refills at the same rate, so that we have a per
-  // second limit which refills gradually in 1/fill_rate intervals.
+  // second limit which refills gradually in 1/fill_interval increments.
   token_bucket_ = std::make_shared<SharedTokenBucketImpl>(
       StreamRateLimiter::kiloBytesToBytes(limit_kbps_), time_source,
       StreamRateLimiter::kiloBytesToBytes(limit_kbps_));
