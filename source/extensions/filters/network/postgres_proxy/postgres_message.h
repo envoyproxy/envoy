@@ -9,17 +9,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-#if 0
-class BufferWithOffset {
-  public:
-BufferWithOffset(const Buffer::Instance& data, uint64_t offset) : data_(data), offset_(offset) {}
-private:
-    const Buffer::Instance& data_;
-  //Buffer::OwnedImpl frontend_buffer_;
-    const uint64_t offset_;
-};
-#endif
-
 /**
  * Postgres messages are described in official Postgres documentation:
  * https://www.postgresql.org/docs/current/protocol-message-formats.html
@@ -127,7 +116,7 @@ public:
                                      uint64_t&, uint64_t&);
 
 private:
-  // start and end are set by validate method.
+  // start_ and end_ are set by validate method.
   uint64_t start_;
   uint64_t end_;
   std::string value_;
@@ -339,7 +328,6 @@ public:
   Sequence<>() = default;
   std::string toString() const { return ""; }
   bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
-  // bool read(const Buffer::Instance&, const uint64_t) override { return true; }
   Message::ValidationResult validate(const Buffer::Instance&, const uint64_t, uint64_t&,
                                      uint64_t& left) {
     return left == 0 ? Message::ValidationOK : Message::ValidationFailed;

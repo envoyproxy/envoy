@@ -102,7 +102,6 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   // Some other attribute
   data_.add("attribute"); // 9 bytes
   data_.add(buf_, 1);
-  printf("!!! %lu\n", data_.length());
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
   data_.add("blah"); // 4 bytes
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
@@ -320,7 +319,7 @@ TEST_F(PostgresProxyDecoderTest, IncorrectMessages) {
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::OutOfSyncState);
 }
 
-// Test if each frontend command calls incMessagesFrontend() method.
+// Test if frontend command calls incMessagesFrontend() method.
 TEST_F(PostgresProxyFrontendDecoderTest, FrontendInc) {
   decoder_->state(DecoderImpl::State::InSyncState);
   EXPECT_CALL(callbacks_, incMessagesFrontend());
@@ -331,13 +330,6 @@ TEST_F(PostgresProxyFrontendDecoderTest, FrontendInc) {
   // Make sure that decoder releases memory used during message processing.
   ASSERT_TRUE(decoder_->getMessage().empty());
 }
-
-#if 0
-// Run the above test for each frontend message.
-INSTANTIATE_TEST_SUITE_P(FrontEndMessagesTests, PostgresProxyFrontendDecoderTest,
-                         ::testing::Values("B", "C", "d", "c", "f", "D", "E", "H", "F", "p", "P",
-                                           "p", "Q", "S", "X"));
-#endif
 
 // Test if X message triggers incRollback and sets proper state in transaction.
 TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
@@ -398,7 +390,7 @@ TEST_F(PostgresProxyFrontendDecoderTest, ParseMessage) {
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
-// Test if each backend command calls incMessagesBackend()) method.
+// Test if backend command calls incMessagesBackend()) method.
 TEST_F(PostgresProxyBackendDecoderTest, BackendInc) {
   EXPECT_CALL(callbacks_, incMessagesBackend());
   createPostgresMsg(data_, "I");
@@ -406,13 +398,6 @@ TEST_F(PostgresProxyBackendDecoderTest, BackendInc) {
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
-#if 0
-// Run the above test for each backend message.
-INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgresProxyBackendDecoderTest,
-                         ::testing::Values("R", "K", "2", "3", "C", "d", "c", "G", "H", "D", "I",
-                                           "E", "V", "v", "n", "N", "A", "t", "S", "1", "s", "Z",
-                                           "T"));
-#endif
 // Test parsing backend messages.
 // The parser should react only to the first word until the space.
 TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
@@ -448,17 +433,11 @@ TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
   data_.drain(data_.length());
 }
 
-#if 0
-INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgresProxyBackendStatementTest ,
-::testing::Values(std::make_pair(std::string("BEGIN 123"), true) /*;{"BEGIN 123", true}*/));
-#endif
-
 // Test Backend messages and make sure that they
 // trigger proper stats updates.
 TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->state(DecoderImpl::State::InSyncState);
   // C message
-  buf_[0] = 0;
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   createPostgresMsg(data_, "C", "BEGIN 123");
   ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);

@@ -12,9 +12,9 @@ void createPostgresMsg(Buffer::Instance& data, std::string type, std::string pay
   data.add(type);
   data.writeBEInt<uint32_t>(4 + (payload.empty() ? 0 : (payload.length() + 1)));
   if (!payload.empty()) {
-  data.add(payload);
-  data.writeBEInt<uint8_t>(0);
-}
+    data.add(payload);
+    data.writeBEInt<uint8_t>(0);
+  }
 }
 
 } // namespace PostgresProxy

@@ -1067,7 +1067,7 @@ TEST(PostgresMessage, NotEnoughData) {
   ASSERT_THAT(msg->validate(data, 0, 2), Message::ValidationFailed);
 }
 
-// Test check validating a properly formatted message
+// Test checks validating a properly formatted message
 // which starts at some offset in data buffer.
 TEST(PostgresMessage, ValidateFromOffset) {
   std::unique_ptr<Message> msg = createMsgBodyReader<Int32, String>();
