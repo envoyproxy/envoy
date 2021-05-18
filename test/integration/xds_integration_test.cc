@@ -417,8 +417,6 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  // test_server_->waitForCounterGe("http.config_test.downstream_cx_drain_close", 1);
-  std::this_thread::sleep_for(std::chrono::milliseconds{50});
 
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   expectResponseHeaderConnectionClose(*codec_client_default, true);
