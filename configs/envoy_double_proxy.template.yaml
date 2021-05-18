@@ -67,7 +67,8 @@
             name: envoy.tracers.lightstep
             typed_config:
               "@type": type.googleapis.com/envoy.config.trace.v3.LightstepConfig
-              access_token_file: "/etc/envoy/lightstep_access_token"
+              access_token:
+                filename: "/etc/envoy/lightstep_access_token"
               collector_cluster: lightstep_saas
         {% endif %}
         common_http_protocol_options:
@@ -211,7 +212,6 @@ layered_runtime:
     - name: admin
       admin_layer: {}
 admin:
-  access_log_path: "/var/log/envoy/admin_access.log"
   address:
     socket_address:
       protocol: TCP

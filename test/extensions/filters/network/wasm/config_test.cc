@@ -61,6 +61,12 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest,
                          Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -87,6 +93,12 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   const std::string code =
       GetParam() != "null"
           ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -154,7 +166,42 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
                             "Unable to create Wasm network filter test");
 }
 
+TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
+  if (GetParam() == "null") {
+    return;
+  }
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    GetParam(), R"EOF("
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
+  filter_config.wasmForTest()->fail(proxy_wasm::FailState::RuntimeError, "");
+  auto context = filter_config.createFilter();
+  EXPECT_EQ(context->wasm(), nullptr);
+  EXPECT_TRUE(context->isFailed());
+}
+
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -177,6 +224,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefault) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -204,6 +257,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -233,6 +292,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }

@@ -139,7 +139,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void ProxyFilter::onLoadDnsCacheComplete() {
+void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing", *decoder_callbacks_);
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();

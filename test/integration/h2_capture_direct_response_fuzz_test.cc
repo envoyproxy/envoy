@@ -6,7 +6,6 @@ namespace Envoy {
 
 void H2FuzzIntegrationTest::initialize() {
   const std::string body = "Response body";
-  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
   const std::string prefix("/");
   const Http::Code status(Http::Code::OK);
 
@@ -14,7 +13,7 @@ void H2FuzzIntegrationTest::initialize() {
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
   config_helper_.addConfigModifier(
-      [&file_path, &prefix](
+      [&body, &prefix](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
@@ -23,7 +22,9 @@ void H2FuzzIntegrationTest::initialize() {
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_match()->set_prefix(prefix);
         default_route->mutable_direct_response()->set_status(static_cast<uint32_t>(status));
-        default_route->mutable_direct_response()->mutable_body()->set_filename(file_path);
+        // Use inline bytes rather than a filename to avoid using a path that may look illegal to
+        // Envoy.
+        default_route->mutable_direct_response()->mutable_body()->set_inline_bytes(body);
         // adding headers to the default route
         auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_value("direct-response-enabled");

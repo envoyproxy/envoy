@@ -10,7 +10,7 @@ namespace Server {
 /**
  * The child half of hot restarting. Issues requests and commands to the parent.
  */
-class HotRestartingChild : HotRestartingBase, Logger::Loggable<Logger::Id::main> {
+class HotRestartingChild : HotRestartingBase {
 public:
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);

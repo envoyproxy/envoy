@@ -34,6 +34,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
+  ON_CALL(*this, isThreadSafe()).WillByDefault(Return(true));
 }
 
 MockDispatcher::~MockDispatcher() = default;
@@ -48,9 +49,6 @@ MockTimer::MockTimer() {
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }
 
-// Ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
-// createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
-// allocated and must not be deleted by it's creator.
 MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
   dispatcher_ = dispatcher;
   EXPECT_CALL(*dispatcher, createTimer_(_))

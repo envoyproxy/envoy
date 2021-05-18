@@ -37,6 +37,13 @@ TEST(HeaderStringTest, All) {
     EXPECT_TRUE(banana == banana);
   }
 
+  // Static LowerCaseString move assignment operator
+  {
+    LowerCaseString hello_string("HELLO");
+    LowerCaseString goodbye_string("GOODBYE");
+    hello_string = std::move(goodbye_string);
+    EXPECT_EQ("goodbye", hello_string.get());
+  }
   // Static std::string constructor
   {
     std::string static_string("HELLO");
@@ -741,6 +748,24 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
   ASSERT_EQ(set_cookie_value[1]->value().getStringView(), "bar");
 }
 
+TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
+    return;
+  }
+  TestRequestHeaderMapImpl headers;
+  const std::string foo("foo=1");
+  const std::string bar("bar=2");
+  const LowerCaseString& cookie = Http::Headers::get().Cookie;
+  headers.addReference(cookie, foo);
+  headers.appendCopy(cookie, bar);
+  EXPECT_EQ(1UL, headers.size());
+
+  const auto cookie_value = headers.get(LowerCaseString("cookie"));
+  ASSERT_EQ(cookie_value.size(), 1);
+  ASSERT_EQ(cookie_value[0]->value().getStringView(), "foo=1; bar=2");
+}
+
 TEST_P(HeaderMapImplTest, DoubleInlineSet) {
   TestRequestHeaderMapImpl headers;
   headers.setReferenceKey(Headers::get().ContentType, "blah");
@@ -769,55 +794,7 @@ TEST_P(HeaderMapImplTest, SetReferenceKey) {
   EXPECT_EQ("monde", headers.get(foo)[0]->value().getStringView());
 }
 
-TEST_P(HeaderMapImplTest, SetCopyOldBehavior) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http_set_copy_replace_all_headers", "false"}});
-
-  TestRequestHeaderMapImpl headers;
-  LowerCaseString foo("hello");
-  headers.setCopy(foo, "world");
-  EXPECT_EQ("world", headers.get(foo)[0]->value().getStringView());
-
-  // Overwrite value.
-  headers.setCopy(foo, "monde");
-  EXPECT_EQ("monde", headers.get(foo)[0]->value().getStringView());
-
-  // Add another foo header.
-  headers.addCopy(foo, "monde2");
-  EXPECT_EQ(headers.size(), 2);
-
-  // Only the first foo header is overridden.
-  headers.setCopy(foo, "override-monde");
-  EXPECT_EQ(headers.size(), 2);
-
-  HeaderAndValueCb cb;
-
-  InSequence seq;
-  EXPECT_CALL(cb, Call("hello", "override-monde"));
-  EXPECT_CALL(cb, Call("hello", "monde2"));
-  headers.iterate(cb.asIterateCb());
-
-  // Test setting an empty string and then overriding.
-  EXPECT_EQ(2UL, headers.remove(foo));
-  EXPECT_EQ(headers.size(), 0);
-  const std::string empty;
-  headers.setCopy(foo, empty);
-  EXPECT_EQ(headers.size(), 1);
-  headers.setCopy(foo, "not-empty");
-  EXPECT_EQ(headers.get(foo)[0]->value().getStringView(), "not-empty");
-
-  // Use setCopy with inline headers both indirectly and directly.
-  headers.clear();
-  EXPECT_EQ(headers.size(), 0);
-  headers.setCopy(Headers::get().Path, "/");
-  EXPECT_EQ(headers.size(), 1);
-  EXPECT_EQ(headers.getPathValue(), "/");
-  headers.setPath("/foo");
-  EXPECT_EQ(headers.size(), 1);
-  EXPECT_EQ(headers.getPathValue(), "/foo");
-}
-
-TEST_P(HeaderMapImplTest, SetCopyNewBehavior) {
+TEST_P(HeaderMapImplTest, SetCopy) {
   TestRequestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.setCopy(foo, "world");

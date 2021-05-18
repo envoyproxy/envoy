@@ -73,7 +73,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void ProxyFilter::onLoadDnsCacheComplete() {
+void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
   ENVOY_CONN_LOG(debug, "load DNS cache complete, continuing", read_callbacks_->connection());
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();

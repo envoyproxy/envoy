@@ -242,7 +242,7 @@ TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   acceptXdsConnection();
 
   // Upon reconnecting, the Envoy should tell us its current resource versions.
-  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) request;
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   result = xds_stream_->waitForGrpcMessage(*dispatcher_, request);
   RELEASE_ASSERT(result, result.message());
   const auto& initial_resource_versions = request.initial_resource_versions();

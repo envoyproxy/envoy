@@ -37,7 +37,7 @@ static_resources:
               match_subject_alt_names:
               - exact: proxy-postgres-frontend.example.com
             tls_certificates:
-              certificate_chain:
+            - certificate_chain:
                 filename: certs/servercert.pem
               private_key:
                 filename: certs/serverkey.pem
@@ -63,7 +63,7 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         common_tls_context:
           tls_certificates:
-            certificate_chain:
+          - certificate_chain:
               filename: certs/clientcert.pem
             private_key:
               filename: certs/clientkey.pem

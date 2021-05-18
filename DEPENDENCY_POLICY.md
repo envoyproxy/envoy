@@ -58,10 +58,10 @@ Dependency declarations must:
   be used if no CPE for the project is available in the CPE database. CPEs should be _versionless_
   with a `:*` suffix, since the version can be computed from `version`.
 
-When build or test code references Python modules, they should be imported via `pip3_import` in
+When build or test code references Python modules, they should be specified via `pip_install` in
 [bazel/repositories_extra.bzl](bazel/repositories_extra.bzl). Python modules should not be listed in
 `repository_locations.bzl` entries. `requirements.txt` files for Python dependencies must pin to
-exact versions, e.g. `PyYAML==5.3.1` and ideally also include a [SHA256
+exact versions, e.g. `PyYAML==5.4.1` and ideally also include a [SHA256
 checksum](https://davidwalsh.name/hashin).
 
 Pure developer tooling and documentation builds may reference Python via standalone

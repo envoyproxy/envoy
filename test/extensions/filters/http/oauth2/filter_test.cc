@@ -10,6 +10,7 @@
 #include "common/http/message_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/secret/secret_manager_impl.h"
 
 #include "extensions/filters/http/oauth2/filter.h"
 
@@ -109,6 +110,9 @@ public:
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
     p.add_auth_scopes("email");
+    p.add_resources("oauth2-resource");
+    p.add_resources("http://example.com");
+    p.add_resources("https://example.com");
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->set_exact_match("OPTIONS");
@@ -152,6 +156,81 @@ public:
   Event::SimulatedTimeSystem test_time_;
 };
 
+// Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret.
+TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
+  NiceMock<Server::MockConfigTracker> config_tracker;
+  Secret::SecretManagerImpl secret_manager{config_tracker};
+  envoy::config::core::v3::ConfigSource config_source;
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  Api::ApiPtr api = Api::createApiForTest();
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  Init::TargetHandlePtr init_handle;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(init_manager, add(_))
+      .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
+        init_handle = target.createHandle("test");
+      }));
+
+  auto client_secret_provider =
+      secret_manager.findOrCreateGenericSecretProvider(config_source, "client", secret_context);
+  auto client_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto token_secret_provider =
+      secret_manager.findOrCreateGenericSecretProvider(config_source, "token", secret_context);
+  auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+
+  SDSSecretReader secret_reader(client_secret_provider, token_secret_provider, *api);
+  EXPECT_TRUE(secret_reader.clientSecret().empty());
+  EXPECT_TRUE(secret_reader.tokenSecret().empty());
+
+  const std::string yaml_client = R"EOF(
+name: client
+generic_secret:
+  secret:
+    inline_string: "client_test"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml_client, typed_secret);
+  const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
+
+  client_callback->onConfigUpdate(decoded_resources_client.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test");
+  EXPECT_EQ(secret_reader.tokenSecret(), "");
+
+  const std::string yaml_token = R"EOF(
+name: token
+generic_secret:
+  secret:
+    inline_string: "token_test"
+)EOF";
+  TestUtility::loadFromYaml(yaml_token, typed_secret);
+  const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
+
+  token_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test");
+  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+
+  const std::string yaml_client_recheck = R"EOF(
+name: client
+generic_secret:
+  secret:
+    inline_string: "client_test_recheck"
+)EOF";
+  TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
+  const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
+
+  client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
+  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+}
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
   ON_CALL(factory_context_.cluster_manager_, clusters())
@@ -196,6 +275,9 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
 
   // Auth_scopes was not set, should return default value.
   EXPECT_EQ(test_config_->encodedAuthScopes(), TEST_DEFAULT_SCOPE);
+
+  // resource is optional
+  EXPECT_EQ(test_config_->encodedResourceQueryParams(), "");
 
   // Recreate the filter with current config and test if the scope was added
   // as a query parameter in response headers.
@@ -324,7 +406,9 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
            TEST_CLIENT_ID + "&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&response_type=code&"
            "redirect_uri=http%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+           "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"
+           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com"},
   };
 
   // explicitly tell the validator to fail the validation
@@ -415,10 +499,7 @@ TEST_F(OAuth2Test, CookieValidator) {
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
-  const auto expires_at_s =
-      std::chrono::duration_cast<std::chrono::seconds>(
-          test_time_.timeSystem().systemTime().time_since_epoch() + std::chrono::seconds(10))
-          .count();
+  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -637,7 +718,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
            "&response_type=code&"
            "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
            "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
-           "3Fname%3Dadmin%26level%3Dtrace"},
+           "3Fname%3Dadmin%26level%3Dtrace"
+           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com"},
   };
 
   // Fail the validation to trigger the OAuth flow.

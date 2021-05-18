@@ -26,6 +26,13 @@ using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
 namespace Network {
 
+struct Win32RedirectRecords {
+  // The size of the buffer is selected based on:
+  // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/sio-query-wfp-connection-redirect-records
+  uint8_t buf_[1024];
+  unsigned long buf_size_;
+};
+
 /**
  * IoHandle: an abstract interface for all I/O operations
  */
@@ -240,6 +247,13 @@ public:
   virtual Api::SysCallIntResult getOption(int level, int optname, void* optval,
                                           socklen_t* optlen) PURE;
 
+  /**
+   * @see MSDN WSAIoctl. Controls the mode of a socket.
+   */
+  virtual Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
+                                      unsigned long in_buffer_len, void* out_buffer,
+                                      unsigned long out_buffer_len,
+                                      unsigned long* bytes_returned) PURE;
   /**
    * Toggle blocking behavior
    * @param blocking flag to set/unset blocking state

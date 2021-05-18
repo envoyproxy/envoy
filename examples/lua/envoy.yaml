@@ -11,7 +11,7 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
-          codec_type: auto
+          codec_type: AUTO
           route_config:
             name: local_route
             virtual_hosts:
@@ -43,8 +43,8 @@ static_resources:
   clusters:
   - name: web_service
     connect_timeout: 0.25s
-    type: strict_dns # static
-    lb_policy: round_robin
+    type: STRICT_DNS # static
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: web_service
       endpoints:

@@ -11,4 +11,6 @@ PlatformImpl::PlatformImpl()
 
 PlatformImpl::~PlatformImpl() = default;
 
+bool PlatformImpl::enableCoreDump() { return false; }
+
 } // namespace Envoy

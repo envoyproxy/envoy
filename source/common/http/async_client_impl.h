@@ -229,10 +229,17 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
+    absl::optional<std::string>
+    currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+      return absl::optional<std::string>();
+    }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+      return {};
+    }
     const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
     const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
@@ -257,6 +264,7 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    bool usingNewTimeouts() const override { return false; }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
     absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
       return absl::nullopt;
@@ -353,6 +361,7 @@ private:
   Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  void setRoute(Router::RouteConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
@@ -419,6 +428,9 @@ private:
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
+  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
+    tracked_object_stack.add(*this);
+  }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
 

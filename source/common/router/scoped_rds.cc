@@ -16,6 +16,7 @@
 #include "common/config/api_version.h"
 #include "common/config/resource_name.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_resource.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 #include "common/router/rds_impl.h"
@@ -103,16 +104,25 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
           scoped_rds.scoped_rds_config_source().resource_api_version(),
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
+      factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
-      rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
-      route_config_provider_manager_(route_config_provider_manager) {
+      scope_key_builder_(scope_key_builder), rds_config_source_(std::move(rds_config_source)),
+      stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
   const auto resource_name = getResourceName();
-  subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-          *this, resource_decoder_, false);
+  if (scoped_rds.srds_resources_locator().empty()) {
+    subscription_ =
+        factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+            scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
+            *this, resource_decoder_, {});
+  } else {
+    const auto srds_resources_locator =
+        Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator());
+    subscription_ =
+        factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
+            srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
+            *this, resource_decoder_);
+  }
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -287,6 +297,8 @@ ScopedRdsConfigSubscription::removeScopes(
             std::move(rds_config_provider_helper_iter->second));
         route_provider_by_scope_.erase(rds_config_provider_helper_iter);
       }
+      ASSERT(scope_name_by_hash_.find(iter->second->scopeKey().hash()) !=
+             scope_name_by_hash_.end());
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
       removed_scope_names.push_back(scope_name);
@@ -382,7 +394,7 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::config::route::v3::ScopedRouteConfiguration(iter->second->configProto()),
       std::make_shared<ConfigImpl>(
-          rds_subscription.routeConfigUpdate()->routeConfiguration(), factory_context_,
+          rds_subscription.routeConfigUpdate()->protobufConfiguration(), factory_context_,
           factory_context_.messageValidationContext().dynamicValidationVisitor(), false));
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
@@ -443,9 +455,10 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
       exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
       return clean_removed_resources;
     }
-    const envoy::config::route::v3::ScopedRouteConfiguration& scoped_route_config =
+    envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         scope_config_inserted.first->second;
-    const uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
+    const uint64_t key_fingerprint =
+        ScopedRouteInfo(std::move(scoped_route_config), nullptr).scopeKey().hash();
     if (!scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
       exception_msg =
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",

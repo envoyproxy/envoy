@@ -79,8 +79,10 @@ public:
   using ServerConnectionImpl::getStream;
 
 protected:
-  // Overrides ServerConnectionImpl::onSettingsForTest().
-  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ServerConnectionImpl::onSettings().
+  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 class TestClientConnectionImpl : public TestCodecStatsProvider,
@@ -111,8 +113,8 @@ public:
   using ConnectionImpl::sendPendingFrames;
 
 protected:
-  // Overrides ClientConnectionImpl::onSettingsForTest().
-  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ClientConnectionImpl::onSettings().
+  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
 };
 
 } // namespace Http2

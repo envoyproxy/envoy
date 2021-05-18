@@ -177,6 +177,12 @@ public:
    * @return uint64_t the number of milliseconds since the epoch.
    */
   static uint64_t nowToMilliseconds(TimeSource& time_source);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number os seconds since the epoch.
+   */
+  static uint64_t nowToSeconds(TimeSource& time_source);
 };
 
 /**

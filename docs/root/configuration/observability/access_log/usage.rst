@@ -1,4 +1,4 @@
-.. _config_access_log:
+  .. _config_access_log:
 
 Access logging
 ==============
@@ -181,7 +181,7 @@ The following command operators are supported:
 
 %PROTOCOL%
   HTTP
-    Protocol. Currently either *HTTP/1.1* or *HTTP/2*.
+    Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
 
   TCP
     Not implemented ("-").
@@ -262,6 +262,15 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%REQUEST_TX_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the last byte sent upstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %RESPONSE_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the first byte read from the
@@ -294,6 +303,7 @@ The following command operators are supported:
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
+    * **NC**: Upstream cluster not found.
   HTTP only
     * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
@@ -310,6 +320,7 @@ The following command operators are supported:
       :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
+    * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached to max stream duration.
 
 %ROUTE_NAME%
@@ -319,7 +330,9 @@ The following command operators are supported:
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
 %UPSTREAM_CLUSTER%
-  Upstream cluster to which the upstream host belongs to.
+  Upstream cluster to which the upstream host belongs to. If runtime feature
+  ``envoy.reloadable_features.use_observable_cluster_name`` is enabled, then :ref:`alt_stat_name
+  <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
 
 %UPSTREAM_LOCAL_ADDRESS%
   Local address of the upstream connection. If the address is an IP address it includes both
@@ -611,3 +624,6 @@ The following command operators are supported:
 
 %LOCAL_REPLY_BODY%
   The body text for the requests rejected by the Envoy.
+
+%FILTER_CHAIN_NAME%
+  The network filter chain name of the downstream connection.

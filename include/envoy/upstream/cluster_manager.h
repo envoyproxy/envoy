@@ -12,6 +12,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -20,6 +21,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
@@ -78,29 +80,29 @@ struct ClusterConnectivityState {
   ~ClusterConnectivityState() {
     ASSERT(pending_streams_ == 0);
     ASSERT(active_streams_ == 0);
-    ASSERT(connecting_stream_capacity_ == 0);
+    ASSERT(connecting_and_connected_stream_capacity_ == 0);
   }
 
   template <class T> void checkAndDecrement(T& value, uint32_t delta) {
-    ASSERT(delta <= value);
+    ASSERT(std::numeric_limits<T>::min() + delta <= value);
     value -= delta;
   }
 
   template <class T> void checkAndIncrement(T& value, uint32_t delta) {
-    ASSERT(std::numeric_limits<T>::max() - value > delta);
+    ASSERT(std::numeric_limits<T>::max() - delta >= value);
     value += delta;
   }
 
-  void incrPendingStreams(uint32_t delta) { checkAndIncrement<uint32_t>(pending_streams_, delta); }
-  void decrPendingStreams(uint32_t delta) { checkAndDecrement<uint32_t>(pending_streams_, delta); }
-  void incrConnectingStreamCapacity(uint32_t delta) {
-    checkAndIncrement<uint64_t>(connecting_stream_capacity_, delta);
+  void incrPendingStreams(uint32_t delta) { checkAndIncrement(pending_streams_, delta); }
+  void decrPendingStreams(uint32_t delta) { checkAndDecrement(pending_streams_, delta); }
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    checkAndIncrement(connecting_and_connected_stream_capacity_, delta);
   }
-  void decrConnectingStreamCapacity(uint32_t delta) {
-    checkAndDecrement<uint64_t>(connecting_stream_capacity_, delta);
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    checkAndDecrement(connecting_and_connected_stream_capacity_, delta);
   }
-  void incrActiveStreams(uint32_t delta) { checkAndIncrement<uint32_t>(active_streams_, delta); }
-  void decrActiveStreams(uint32_t delta) { checkAndDecrement<uint32_t>(active_streams_, delta); }
+  void incrActiveStreams(uint32_t delta) { checkAndIncrement(active_streams_, delta); }
+  void decrActiveStreams(uint32_t delta) { checkAndDecrement(active_streams_, delta); }
 
   // Tracks the number of pending streams for this ClusterManager.
   uint32_t pending_streams_{};
@@ -111,7 +113,11 @@ struct ClusterConnectivityState {
   // For example, if an H2 connection is started with concurrent stream limit of 100, this
   // goes up by 100. If the connection is established and 2 streams are in use, it
   // would be reduced to 98 (as 2 of the 100 are not available).
-  uint64_t connecting_stream_capacity_{};
+  //
+  // Note that if more HTTP/2 streams have been established than are allowed by
+  // a late-received SETTINGS frame, this MAY BE NEGATIVE.
+  // Note this tracks the sum of multiple 32 bit stream capacities so must remain 64 bit.
+  int64_t connecting_and_connected_stream_capacity_{};
 };
 
 /**
@@ -354,9 +360,11 @@ public:
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
+                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                       alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   ClusterConnectivityState& state) PURE;
+                   TimeSource& time_source, ClusterConnectivityState& state) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
@@ -380,6 +388,7 @@ public:
    * Create a CDS API provider from configuration proto.
    */
   virtual CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                              const xds::core::v3::ResourceLocator* cds_resources_locator,
                               ClusterManager& cm) PURE;
 
   /**
@@ -413,6 +422,7 @@ public:
     ThreadLocal::SlotAllocator& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;
     Api::Api& api_;
+    const Server::Options& options_;
   };
 
   /**

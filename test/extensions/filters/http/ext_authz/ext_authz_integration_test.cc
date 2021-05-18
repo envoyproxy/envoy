@@ -222,7 +222,7 @@ public:
           upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}).empty());
     }
 
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
 
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
@@ -531,7 +531,7 @@ public:
                     .empty());
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ("200", response_->headers().getStatusValue());
 
@@ -777,7 +777,7 @@ body_format:
   };
   ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("401", response->headers().Status()->value().getStringView());
@@ -853,7 +853,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(response_size_, true);
 
-  response_->waitForEndStream();
+  ASSERT_TRUE(response_->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());

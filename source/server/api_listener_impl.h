@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <ostream>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -68,6 +69,7 @@ protected:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     Network::Connection& connection() override { return connection_; }
+    const Network::Socket& socket() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
     // Synthetic class that acts as a stub for the connection backing the
     // Network::ReadFilterCallbacks.
@@ -143,6 +145,8 @@ protected:
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
       bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
+      // ScopeTrackedObject
+      void dumpState(std::ostream&, int) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
       SyntheticReadCallbacks& parent_;
       Network::SocketAddressSetterSharedPtr address_provider_;

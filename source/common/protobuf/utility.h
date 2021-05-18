@@ -9,6 +9,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/hash.h"
+#include "common/common/stl_helpers.h"
 #include "common/common/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
@@ -144,6 +145,13 @@ public:
   MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
 };
 
+class TypeUtil {
+public:
+  static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
+
+  static std::string descriptorFullNameToTypeUrl(absl::string_view type);
+};
+
 class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<std::string>& source,
@@ -153,14 +161,8 @@ public:
 
   template <class ProtoType>
   static std::string debugString(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    if (source.empty()) {
-      return "[]";
-    }
-    return std::accumulate(std::next(source.begin()), source.end(), "[" + source[0].DebugString(),
-                           [](std::string debug_string, const Protobuf::Message& message) {
-                             return debug_string + ", " + message.DebugString();
-                           }) +
-           "]";
+    return accumulateToString<ProtoType>(
+        source, [](const Protobuf::Message& message) { return message.DebugString(); });
   }
 
   // Based on MessageUtil::hash() defined below.
@@ -330,6 +332,26 @@ public:
   static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
+   * Convert from google.protobuf.Any to bytes as std::string
+   * @param any source google.protobuf.Any message.
+   *
+   * @return std::string consists of bytes in the input message.
+   */
+  static std::string anyToBytes(const ProtobufWkt::Any& any) {
+    if (any.Is<ProtobufWkt::StringValue>()) {
+      ProtobufWkt::StringValue s;
+      MessageUtil::unpackTo(any, s);
+      return s.value();
+    }
+    if (any.Is<ProtobufWkt::BytesValue>()) {
+      Protobuf::BytesValue b;
+      MessageUtil::unpackTo(any, b);
+      return b.value();
+    }
+    return any.value();
+  };
+
+  /**
    * Convert from google.protobuf.Any to a typed message.
    * @param message source google.protobuf.Any message.
    *
@@ -488,7 +510,7 @@ public:
    *
    * @param code the protobuf error code
    */
-  static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+  static std::string codeEnumToString(ProtobufUtil::StatusCode code);
 
   /**
    * Modifies a message such that all sensitive data (that is, fields annotated as

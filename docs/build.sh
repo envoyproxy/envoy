@@ -15,9 +15,11 @@ fi
 
 # We need to set ENVOY_DOCS_VERSION_STRING and ENVOY_DOCS_RELEASE_LEVEL for Sphinx.
 # We also validate that the tag and version match at this point if needed.
+VERSION_NUMBER=$(cat VERSION)
+export DOCKER_IMAGE_TAG_NAME
+DOCKER_IMAGE_TAG_NAME=$(echo "$VERSION_NUMBER" | sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+.*/v\1-latest/')
 if [[ -n "${DOCS_TAG}" ]]; then
   # Check the git tag matches the version number in the VERSION file.
-  VERSION_NUMBER=$(cat VERSION)
   if [[ "v${VERSION_NUMBER}" != "${DOCS_TAG}" ]]; then
     echo "Given git tag does not match the VERSION file content:"
     echo "${DOCS_TAG} vs $(cat VERSION)"
@@ -33,15 +35,14 @@ if [[ -n "${DOCS_TAG}" ]]; then
   export ENVOY_BLOB_SHA="${DOCS_TAG}"
 else
   BUILD_SHA=$(git rev-parse HEAD)
-  VERSION_NUM=$(cat VERSION)
-  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
+  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUMBER}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
   export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
 
 SCRIPT_DIR="$(dirname "$0")"
 SRC_DIR="$(dirname "$SCRIPT_DIR")"
-API_DIR="${SRC_DIR}"/api
+ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
 CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
@@ -53,6 +54,8 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
+export ENVOY_SRCDIR
+
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 
@@ -61,7 +64,10 @@ pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 rm -rf bazel-bin/external/envoy_api_canonical
 
 EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+rm -rf "${EXTENSION_DB_PATH}"
+GENERATED_RST_DIR="$(realpath "${GENERATED_RST_DIR}")"
 export EXTENSION_DB_PATH
+export GENERATED_RST_DIR
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
@@ -71,17 +77,12 @@ BAZEL_BUILD_OPTIONS+=(
     "--action_env=ENVOY_BLOB_SHA"
     "--action_env=EXTENSION_DB_PATH")
 
-# Generate extension database. This maps from extension name to extension
-# metadata, based on the envoy_cc_extension() Bazel target attributes.
-./docs/generate_extension_db.py "${EXTENSION_DB_PATH}"
-
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
-mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
-./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
-PYTHONPATH=. ./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:generate_external_dep_rst
 
 function generate_api_rst() {
   local proto_target
@@ -93,9 +94,10 @@ function generate_api_rst() {
     tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst
 
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
-  # config.
+  # config. We only have v2 support here for version history anchors, which don't point at any empty
+  # configs.
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-    "${PWD}"/docs/empty_extensions.json "${PWD}/${GENERATED_RST_DIR}/api-${API_VERSION}"/config
+        "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts
   # are nested inside source package targets).
@@ -127,17 +129,8 @@ function generate_api_rst() {
   done
 }
 
-generate_api_rst v2
 generate_api_rst v3
 
-# Fixup anchors and references in v3 so they form a distinct namespace.
-# TODO(htuch): Do this in protodoc generation in the future.
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
-
-# xDS protocol spec.
-mkdir -p ${GENERATED_RST_DIR}/api-docs
-cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
 cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
@@ -149,14 +142,15 @@ copy_example_configs () {
 
 copy_example_configs
 
-rsync -rav  "${API_DIR}/diagrams" "${GENERATED_RST_DIR}/api-docs"
-
 rsync -av \
       "${SCRIPT_DIR}"/root/ \
       "${SCRIPT_DIR}"/conf.py \
       "${SCRIPT_DIR}"/redirects.txt \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
+
+# Merge generated redirects
+jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/")) | with_entries(.value |= sub("^envoy/";"api-v2/")) | to_entries[] | "\(.value)\t\t\(.key)"' docs/v2_mapping.json >> "${GENERATED_RST_DIR}"/redirects.txt
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment

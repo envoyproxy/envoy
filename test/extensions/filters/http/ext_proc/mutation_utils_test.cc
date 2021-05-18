@@ -11,6 +11,8 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
+using envoy::service::ext_proc::v3alpha::BodyMutation;
+
 using Http::LowerCaseString;
 
 TEST(MutationUtils, TestBuildHeaders) {
@@ -34,7 +36,7 @@ TEST(MutationUtils, TestBuildHeaders) {
                                           {"x-something-else", "yes"},
                                           {"x-reference", "Foo"},
                                           {"x-number", "9999"}};
-  EXPECT_TRUE(ExtProcTestUtility::headerProtosEqualIgnoreOrder(expected, proto_headers));
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 
 TEST(MutationUtils, TestApplyMutations) {
@@ -115,7 +117,63 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-envoy-strange-thing", "No"},
   };
 
-  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(headers, expected_headers));
+  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+}
+
+// Ensure that we actually replace the body
+TEST(MutationUtils, TestBodyMutationReplace) {
+  Buffer::OwnedImpl buf;
+  TestUtility::feedBufferWithRandomCharacters(buf, 100);
+  BodyMutation mut;
+  mut.set_body("We have replaced the value!");
+  MutationUtils::applyBodyMutations(mut, buf);
+  EXPECT_EQ("We have replaced the value!", buf.toString());
+}
+
+// If an empty string is included in the "body" field, we should
+// replace the body with nothing
+TEST(MutationUtils, TestBodyMutationReplaceEmpty) {
+  Buffer::OwnedImpl buf;
+  TestUtility::feedBufferWithRandomCharacters(buf, 100);
+  BodyMutation mut;
+  mut.set_body("");
+  MutationUtils::applyBodyMutations(mut, buf);
+  EXPECT_EQ(0, buf.length());
+}
+
+// Clear the buffer if the "clear_buffer" flag is set
+TEST(MutationUtils, TestBodyMutationClearYes) {
+  Buffer::OwnedImpl buf;
+  TestUtility::feedBufferWithRandomCharacters(buf, 100);
+  BodyMutation mut;
+  mut.set_clear_body(true);
+  MutationUtils::applyBodyMutations(mut, buf);
+  EXPECT_EQ(0, buf.length());
+}
+
+// Don't clear the buffer if the "clear_buffer" flag is set to false,
+// which is weird, but possible
+TEST(MutationUtils, TestBodyMutationClearNo) {
+  Buffer::OwnedImpl buf;
+  TestUtility::feedBufferWithRandomCharacters(buf, 100);
+  Buffer::OwnedImpl bufCopy;
+  bufCopy.add(buf);
+  BodyMutation mut;
+  mut.set_clear_body(false);
+  MutationUtils::applyBodyMutations(mut, buf);
+  EXPECT_TRUE(TestUtility::buffersEqual(buf, bufCopy));
+}
+
+// Nothing should happen if we don't set the proto oneof,
+// which is weird, but possible
+TEST(MutationUtils, TestBodyMutationNothing) {
+  Buffer::OwnedImpl buf;
+  TestUtility::feedBufferWithRandomCharacters(buf, 100);
+  Buffer::OwnedImpl bufCopy;
+  bufCopy.add(buf);
+  BodyMutation mut;
+  MutationUtils::applyBodyMutations(mut, buf);
+  EXPECT_TRUE(TestUtility::buffersEqual(buf, bufCopy));
 }
 
 } // namespace

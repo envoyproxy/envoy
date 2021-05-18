@@ -30,6 +30,7 @@ envoy_cc_extension(
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",
+        "//test/common/quic/integration:__subpackages__",
     ],
     security_posture = "data_plane_agnostic",
     status = "alpha",

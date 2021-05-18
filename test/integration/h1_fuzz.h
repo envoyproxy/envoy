@@ -17,6 +17,9 @@ public:
   void initialize() override;
   void replay(const test::integration::CaptureFuzzTestCase&, bool ignore_response);
   const std::chrono::milliseconds max_wait_ms_{10};
+
+private:
+  Filesystem::ScopedUseMemfiles use_memfiles_{true};
 };
 
 } // namespace Envoy

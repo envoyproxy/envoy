@@ -10,6 +10,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/header_formatter.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -50,7 +51,19 @@ public:
   LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) {
     ASSERT(valid());
   }
+  LowerCaseString& operator=(LowerCaseString&& rhs) noexcept {
+    string_ = std::move(rhs.string_);
+    ASSERT(valid());
+    return *this;
+  }
+
   LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
+  LowerCaseString& operator=(const LowerCaseString& rhs) {
+    string_ = std::move(rhs.string_);
+    ASSERT(valid());
+    return *this;
+  }
+
   explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
     ASSERT(valid());
     lower();
@@ -60,6 +73,10 @@ public:
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
   bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
   bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
+
+  friend std::ostream& operator<<(std::ostream& os, const LowerCaseString& lower_case_string) {
+    return os << lower_case_string.string_;
+  }
 
 private:
   void lower() {
@@ -643,9 +660,31 @@ public:
     headers.dumpState(os);
     return os;
   }
+
+  /**
+   * Return the optional stateful formatter attached to this header map.
+   *
+   * Filters can use the non-const version to process additional header keys during operation if
+   * they wish. The sequence of events would be to first add/modify the header map, and then call
+   * processKey(), similar to what is done when headers are received by the codec.
+   *
+   * TODO(mattklein123): The above sequence will not work for headers added via route (headers to
+   * add, etc.). We can potentially add direct processKey() calls in these places as a follow up.
+   */
+  virtual StatefulHeaderKeyFormatterOptConstRef formatter() const PURE;
+  virtual StatefulHeaderKeyFormatterOptRef formatter() PURE;
 };
 
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;
+
+/**
+ * Wraps a set of header modifications.
+ */
+struct HeaderTransforms {
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_append;
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_overwrite;
+  std::vector<Http::LowerCaseString> headers_to_remove;
+};
 
 /**
  * Registry for custom headers. Headers can be registered multiple times in independent
@@ -793,6 +832,7 @@ class RequestTrailerMap
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
 using RequestTrailerMapOptRef = OptRef<RequestTrailerMap>;
+using RequestTrailerMapOptConstRef = OptRef<const RequestTrailerMap>;
 
 // Base class for both response headers and trailers.
 class ResponseHeaderOrTrailerMap {

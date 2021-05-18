@@ -25,9 +25,20 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
       first_stream_request_(true), transport_api_version_(transport_api_version),
       dispatcher_(dispatcher),
-      enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {
+      dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
+          [this](absl::string_view resource_type_url) {
+            onDynamicContextUpdate(resource_type_url);
+          })) {
   Config::Utility::checkLocalInfo("ads", local_info);
+}
+
+void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
+  auto api_state = api_state_.find(resource_type_url);
+  if (api_state == api_state_.end()) {
+    return;
+  }
+  api_state->second->must_send_node_ = true;
+  queueDiscoveryRequest(resource_type_url);
 }
 
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
@@ -48,16 +59,15 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     }
   }
 
-  if (skip_subsequent_node_) {
-    if (first_stream_request_) {
-      // Node may have been cleared during a previous request.
-      request.mutable_node()->MergeFrom(local_info_.node());
-    } else {
-      request.clear_node();
-    }
+  if (api_state.must_send_node_ || !skip_subsequent_node_ || first_stream_request_) {
+    // Node may have been cleared during a previous request.
+    request.mutable_node()->CopyFrom(local_info_.node());
+    api_state.must_send_node_ = false;
+  } else {
+    request.clear_node();
   }
   VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
-  ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
+  ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;
 
@@ -70,7 +80,8 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoder& resource_decoder, const bool) {
+                                      OpaqueResourceDecoder& resource_decoder,
+                                      const SubscriptionOptions&) {
   auto watch =
       std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
   ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
@@ -84,9 +95,6 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
     apiStateFor(type_url).request_.mutable_node()->MergeFrom(local_info_.node());
     apiStateFor(type_url).subscribed_ = true;
     subscriptions_.emplace_back(type_url);
-    if (enable_type_url_downgrade_and_upgrade_) {
-      registerVersionedTypeUrl(type_url);
-    }
   }
 
   // This will send an updated request on each subscription.
@@ -124,36 +132,15 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
-void GrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
-  TypeUrlMap& type_url_map = typeUrlMap();
-  if (type_url_map.find(type_url) != type_url_map.end()) {
-    return;
-  }
-  // If type_url is v3, earlier_type_url will contain v2 type url.
-  const absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
-  // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
-  if (earlier_type_url.has_value()) {
-    type_url_map[earlier_type_url.value()] = type_url;
-    type_url_map[type_url] = earlier_type_url.value();
-  }
-}
-
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
-  std::string type_url = message->type_url();
+  const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
-  // If this type url is not watched(no subscriber or no watcher), try another version of type url.
-  if (enable_type_url_downgrade_and_upgrade_ && api_state_.count(type_url) == 0) {
-    registerVersionedTypeUrl(type_url);
-    TypeUrlMap& type_url_map = typeUrlMap();
-    if (type_url_map.find(type_url) != type_url_map.end()) {
-      type_url = type_url_map[type_url];
-    }
-  }
+
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
@@ -186,7 +173,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // the delta state. The proper fix for this is to converge these implementations,
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
     // We have to walk all watches (and need an efficient map as a result) to
@@ -203,10 +190,10 @@ void GrpcMuxImpl::onDiscoveryResponse(
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
       if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
-          message->type_url() != resource.type_url()) {
+          type_url != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
-                        resource.type_url(), message->type_url(), message->DebugString()));
+                        resource.type_url(), type_url, message->DebugString()));
       }
 
       auto decoded_resource =
@@ -251,7 +238,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // would do that tracking here.
     apiStateFor(type_url).request_.set_version_info(message->version_info());
     Memory::Utils::tryShrinkHeap();
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     for (auto watch : apiStateFor(type_url).watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
@@ -285,7 +274,7 @@ void GrpcMuxImpl::onEstablishmentFailure() {
   }
 }
 
-void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
+void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
   if (!grpc_stream_.grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
     return; // Drop this request; the reconnect will enqueue a new one.
@@ -296,11 +285,11 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
     api_state.pending_ = true;
     return; // Drop this request; the unpause will enqueue a new one.
   }
-  request_queue_->push(queue_item);
+  request_queue_->emplace(std::string(queue_item));
   drainRequests();
 }
 
-void GrpcMuxImpl::expiryCallback(const std::string& type_url,
+void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
                                  const std::vector<std::string>& expired) {
   // The TtlManager triggers a callback with a list of all the expired elements, which we need
   // to compare against the various watched resources to return the subset that each watch is
@@ -326,7 +315,7 @@ void GrpcMuxImpl::expiryCallback(const std::string& type_url,
   }
 }
 
-GrpcMuxImpl::ApiState& GrpcMuxImpl::apiStateFor(const std::string& type_url) {
+GrpcMuxImpl::ApiState& GrpcMuxImpl::apiStateFor(absl::string_view type_url) {
   auto itr = api_state_.find(type_url);
   if (itr == api_state_.end()) {
     api_state_.emplace(

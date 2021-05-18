@@ -1,13 +1,12 @@
 #pragma once
 
-#include <http_parser.h>
-
 #include <array>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
@@ -21,6 +20,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/http1/parser.h"
 #include "common/http/status.h"
 
 namespace Envoy {
@@ -76,9 +76,9 @@ public:
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
+  StreamEncoderImpl(ConnectionImpl& connection);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
-                         bool end_stream);
+                         bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
 
   static const std::string CRLF;
@@ -115,9 +115,9 @@ private:
    */
   void endEncode();
 
-  void encodeFormattedHeader(absl::string_view key, absl::string_view value);
+  void encodeFormattedHeader(absl::string_view key, absl::string_view value,
+                             HeaderKeyFormatterOptConstRef formatter);
 
-  const HeaderKeyFormatter* const header_key_formatter_;
   absl::string_view details_;
 };
 
@@ -126,9 +126,8 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                      bool stream_error_on_invalid_http_message)
-      : StreamEncoderImpl(connection, header_key_formatter),
+  ResponseEncoderImpl(ConnectionImpl& connection, bool stream_error_on_invalid_http_message)
+      : StreamEncoderImpl(connection),
         stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
 
   bool startedResponse() { return started_response_; }
@@ -152,8 +151,7 @@ private:
  */
 class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
 public:
-  RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-      : StreamEncoderImpl(connection, header_key_formatter) {}
+  RequestEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
   bool upgradeRequest() const { return upgrade_request_; }
   bool headRequest() const { return head_request_; }
   bool connectRequest() const { return connect_request_; }
@@ -175,6 +173,7 @@ private:
  */
 class ConnectionImpl : public virtual Connection,
                        protected Logger::Loggable<Logger::Id::http>,
+                       public ParserCallbacks,
                        public ScopeTrackedObject {
 public:
   /**
@@ -217,6 +216,9 @@ public:
   virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
+  HeaderKeyFormatterOptConstRef formatter() const {
+    return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
+  }
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& data) override;
@@ -227,7 +229,7 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
-  bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
+  bool sendStrict1xxAnd204Headers() { return send_strict_1xx_and_204_headers_; }
 
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
@@ -238,31 +240,15 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
-                 http_parser_type type, uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter);
-
-  // The following define special return values for http_parser callbacks. See:
-  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72
-  // These codes do not overlap with standard HTTP Status codes. They are only used for user
-  // callbacks.
-  enum class HttpParserCode {
-    // Callbacks other than on_headers_complete should return a non-zero int to indicate an error
-    // and
-    // halt execution.
-    Error = -1,
-    Success = 0,
-    // Returning '1' from on_headers_complete will tell http_parser that it should not expect a
-    // body.
-    NoBody = 1,
-    // Returning '2' from on_headers_complete will tell http_parser that it should not expect a body
-    // nor any further data on the connection.
-    NoBodyData = 2,
-  };
-  int setAndCheckCallbackStatus(Status&& status);
-  int setAndCheckCallbackStatusOr(Envoy::StatusOr<HttpParserCode>&& statusor);
+                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
 
   bool resetStreamCalled() { return reset_stream_called_; }
-  Status onMessageBeginBase();
+
+  // ParserCallbacks.
+  // This must be protected because it is called through ServerConnectionImpl::sendProtocolError.
+  Status onMessageBegin() override;
+  // Connection specific callback method.
+  virtual Status onMessageBeginBase() PURE;
 
   /**
    * Get memory used to represent HTTP headers or trailers currently being parsed.
@@ -272,8 +258,8 @@ protected:
   virtual uint32_t getHeadersSize();
 
   /**
-   * Called from onUrl, onHeaderField and onHeaderValue to verify that the headers do not exceed the
-   * configured max header size limit.
+   * Called from onUrl, onHeaderFields and onHeaderValue to verify that the headers do not exceed
+   * the configured max header size limit.
    * @return A codecProtocolError status if headers exceed the size limit.
    */
   Status checkMaxHeadersSize();
@@ -281,10 +267,10 @@ protected:
   Network::Connection& connection_;
   CodecStats& stats_;
   const Http1Settings codec_settings_;
-  http_parser parser_;
+  std::unique_ptr<Parser> parser_;
   Buffer::Instance* current_dispatching_buffer_{};
   Http::Code error_code_{Http::Code::BadRequest};
-  const HeaderKeyFormatterPtr header_key_formatter_;
+  const HeaderKeyFormatterConstPtr encode_only_header_key_formatter_;
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   bool processing_trailers_ : 1;
@@ -294,7 +280,8 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool strict_1xx_and_204_headers_ : 1;
+  const bool require_strict_1xx_and_204_headers_ : 1;
+  const bool send_strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
 
@@ -314,7 +301,7 @@ private:
 
   virtual HeaderMap& headersOrTrailers() PURE;
   virtual RequestOrResponseHeaderMap& requestOrResponseHeaders() PURE;
-  virtual void allocHeaders() PURE;
+  virtual void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) PURE;
   virtual void allocTrailers() PURE;
 
   /**
@@ -336,70 +323,30 @@ private:
   }
 
   /**
-   * An inner dispatch call that executes the dispatching logic. While exception removal is in
-   * migration (#10878), this function may either throw an exception or return an error status.
-   * Exceptions are caught and translated to their corresponding statuses in the outer level
-   * dispatch.
-   * TODO(#10878): Remove this when exception removal is complete.
-   */
-  Http::Status innerDispatch(Buffer::Instance& data);
-
-  /**
    * Dispatch a memory span.
    * @param slice supplies the start address.
    * @len supplies the length of the span.
    */
   Envoy::StatusOr<size_t> dispatchSlice(const char* slice, size_t len);
 
-  /**
-   * Called by the http_parser when body data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   */
-  void bufferBody(const char* data, size_t length);
+  // ParserCallbacks.
+  Status onHeaderField(const char* data, size_t length) override;
+  Status onHeaderValue(const char* data, size_t length) override;
+  Envoy::StatusOr<ParserStatus> onHeadersComplete() override;
+  void bufferBody(const char* data, size_t length) override;
+  StatusOr<ParserStatus> onMessageComplete() override;
+  int setAndCheckCallbackStatus(Http::Status&& status) override;
+  int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) override;
+
+  // Connection specific callback methods.
+  virtual Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
+  virtual ParserStatus onMessageCompleteBase() PURE;
+  void onChunkHeader(bool is_final_chunk) override;
 
   /**
    * Push the accumulated body through the filter pipeline.
    */
   void dispatchBufferedBody();
-
-  /**
-   * Called when a request/response is beginning. A base routine happens first then a virtual
-   * dispatch is invoked.
-   */
-  virtual Status onMessageBegin() PURE;
-
-  /**
-   * Called when URL data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   */
-  virtual Status onUrl(const char* data, size_t length) PURE;
-
-  /**
-   * Called when header field data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   * @return A status representing success.
-   */
-  Status onHeaderField(const char* data, size_t length);
-
-  /**
-   * Called when header value data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   * @return A status representing success.
-   */
-  Status onHeaderValue(const char* data, size_t length);
-
-  /**
-   * Called when headers are complete. A base routine happens first then a virtual dispatch is
-   * invoked. Note that this only applies to headers and NOT trailers. End of
-   * trailers are signaled via onMessageCompleteBase().
-   * @return An error status or a HttpParserCode.
-   */
-  Envoy::StatusOr<HttpParserCode> onHeadersCompleteBase();
-  virtual Envoy::StatusOr<HttpParserCode> onHeadersComplete() PURE;
 
   /**
    * Called to see if upgrade transition is allowed.
@@ -417,18 +364,6 @@ private:
    * @param data supplies the body data
    */
   virtual void onBody(Buffer::Instance& data) PURE;
-
-  /**
-   * Called when the request/response is complete.
-   * @return A status representing success.
-   */
-  Status onMessageCompleteBase();
-  virtual void onMessageComplete() PURE;
-
-  /**
-   * Called when accepting a chunk header.
-   */
-  void onChunkHeader(bool is_final_chunk);
 
   /**
    * @see onResetStreamBase().
@@ -464,8 +399,6 @@ private:
    */
   virtual void dumpAdditionalState(std::ostream& os, int indent_level) const PURE;
 
-  static http_parser_settings settings_;
-
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   // Used to accumulate the HTTP message body during the current dispatch call. The accumulated body
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
@@ -496,8 +429,8 @@ protected:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ServerConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-        : response_encoder_(connection, header_key_formatter,
+    ActiveRequest(ServerConnectionImpl& connection)
+        : response_encoder_(connection,
                             connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
     HeaderString request_url_;
@@ -507,7 +440,7 @@ protected:
   };
   absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
   // ConnectionImpl
-  void onMessageComplete() override;
+  ParserStatus onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.
   uint32_t getHeadersSize() override;
 
@@ -521,13 +454,14 @@ private:
    * @return Status representing success or failure. This will fail if there is an invalid url in
    * the request line.
    */
-  Status handlePath(RequestHeaderMap& headers, unsigned int method);
+  Status handlePath(RequestHeaderMap& headers, absl::string_view method);
 
+  // ParserCallbacks.
+  Status onUrl(const char* data, size_t length) override;
   // ConnectionImpl
   void onEncodeComplete() override;
-  Status onMessageBegin() override;
-  Status onUrl(const char* data, size_t length) override;
-  Envoy::StatusOr<HttpParserCode> onHeadersComplete() override;
+  Status onMessageBeginBase() override;
+  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -545,10 +479,12 @@ private:
   RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
     return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   }
-  void allocHeaders() override {
+  void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    headers_or_trailers_.emplace<RequestHeaderMapPtr>(RequestHeaderMapImpl::create());
+    auto headers = RequestHeaderMapImpl::create();
+    headers->setFormatter(std::move(formatter));
+    headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
@@ -595,9 +531,8 @@ public:
 
 private:
   struct PendingResponse {
-    PendingResponse(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                    ResponseDecoder* decoder)
-        : encoder_(connection, header_key_formatter), decoder_(decoder) {}
+    PendingResponse(ConnectionImpl& connection, ResponseDecoder* decoder)
+        : encoder_(connection), decoder_(decoder) {}
 
     RequestEncoderImpl encoder_;
     ResponseDecoder* decoder_;
@@ -605,15 +540,16 @@ private:
 
   bool cannotHaveBody();
 
+  // ParserCallbacks.
+  Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
-  Status onMessageBegin() override { return okStatus(); }
-  Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Envoy::StatusOr<HttpParserCode> onHeadersComplete() override;
+  Status onMessageBeginBase() override { return okStatus(); }
+  Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
-  void onMessageComplete() override;
+  ParserStatus onMessageCompleteBase() override;
   void onResetStream(StreamResetReason reason) override;
   Status sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
@@ -628,10 +564,12 @@ private:
   RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
     return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   }
-  void allocHeaders() override {
+  void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
+    auto headers = ResponseHeaderMapImpl::create();
+    headers->setFormatter(std::move(formatter));
+    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);

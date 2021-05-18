@@ -79,6 +79,7 @@ configure_make(
 envoy_cmake_external(
     name = "ares",
     cache_entries = {
+        "CARES_BUILD_TOOLS": "no",
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
         "CMAKE_CXX_COMPILER_FORCED": "on",
@@ -292,6 +293,7 @@ envoy_cmake_external(
             "libLLVMTextAPI.a",
         ],
     }),
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -340,6 +342,7 @@ envoy_cmake_external(
             "libWAVMUnwind.a",
         ],
     }),
+    tags = ["skip_on_windows"],
     deps = [":llvm"],
 )
 

@@ -19,7 +19,7 @@ Redis health checker is shown below:
   custom_health_check:
     name: envoy.health_checkers.redis
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
         key: foo
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`

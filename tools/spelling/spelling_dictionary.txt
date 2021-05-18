@@ -34,6 +34,8 @@ HEXDIG
 HEXDIGIT
 OWS
 Preconnecting
+RTCP
+RTP
 STATNAME
 SkyWalking
 TIDs
@@ -46,6 +48,7 @@ CHMOD
 CHLOS
 CHLOs
 CIDR
+CITT
 CLA
 CLI
 CMSG
@@ -69,6 +72,7 @@ CVE
 CX
 Cxx
 CYGWIN
+DCP
 DER
 DESC
 DFATAL
@@ -116,6 +120,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+guarddog
 GC
 GCC
 GCE
@@ -188,6 +193,7 @@ MD
 MERCHANTABILITY
 MGET
 MQ
+MSDN
 MSET
 MSVC
 MTLS
@@ -201,6 +207,7 @@ NBSP
 NDEBUG
 NEXTHDR
 NGHTTP
+NLOHMANN
 NOAUTH
 NOCHECKRESP
 NODELAY
@@ -268,6 +275,7 @@ RPC
 RSA
 RST
 RTDS
+RTOS
 RTTI
 RUNDIR
 RW
@@ -310,6 +318,7 @@ STL
 STRLEN
 STS
 SVG
+SVID
 Symbolizer
 TBD
 TCLAP
@@ -483,7 +492,7 @@ ci
 ciphersuite
 ciphersuites
 circllhist
-CITT
+clientcert
 cloneable
 cloneability
 cmd
@@ -516,6 +525,7 @@ coverity
 cplusplus
 cpuset
 creds
+cRLSign
 crypto
 cryptographic
 cryptographically
@@ -964,6 +974,7 @@ readonly
 readv
 realloc
 rebalanced
+rebalancer
 rebalancing
 rebuffer
 rebuilder
@@ -1123,6 +1134,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks
@@ -1158,6 +1170,7 @@ timeval
 tmp
 tmpfile
 tokenize
+tokenized
 tokenizes
 tokenizing
 toolchain

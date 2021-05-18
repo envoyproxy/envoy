@@ -51,13 +51,32 @@ public:
                              Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
 
   /**
-   * The expected max size of the packet to be read. If it's smaller than
-   * actually packets received, the payload will be truncated.
+   * Called whenever datagrams are dropped due to overflow or truncation.
+   * @param dropped supplies the number of dropped datagrams.
    */
-  virtual uint64_t maxPacketSize() const PURE;
+  virtual void onDatagramsDropped(uint32_t dropped) PURE;
+
+  /**
+   * The expected max size of the datagram to be read. If it's smaller than
+   * the size of datagrams received, they will be dropped.
+   */
+  virtual uint64_t maxDatagramSize() const PURE;
 };
 
-static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
+static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;
+static const uint64_t NUM_DATAGRAMS_PER_GRO_RECEIVE = 16;
+static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
+
+/**
+ * Wrapper which resolves UDP socket proto config with defaults.
+ */
+struct ResolvedUdpSocketConfig {
+  ResolvedUdpSocketConfig(const envoy::config::core::v3::UdpSocketConfig& config,
+                          bool prefer_gro_default);
+
+  uint64_t max_rx_datagram_size_;
+  bool prefer_gro_;
+};
 
 /**
  * Common network utility routines.
@@ -131,10 +150,22 @@ public:
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
-   * @return pointer to the Instance, or nullptr if unable to parse the address.
+   * @return pointer to the Instance.
+   * @throw EnvoyException in case of a malformed IP address.
    */
   static Address::InstanceConstSharedPtr
   parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+
+  /**
+   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
+   * not include a port number.
+   * @param ip_address string to be parsed as an internet address.
+   * @param port optional port to include in Instance created from ip_address, 0 by default.
+   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @return pointer to the Instance, or nullptr if unable to parse the address.
+   */
+  static Address::InstanceConstSharedPtr
+  parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws
@@ -324,13 +355,14 @@ public:
    * @param udp_packet_processor is the callback to receive the packet.
    * @param receive_time is the timestamp passed to udp_packet_processor for the
    * receive time of the packet.
+   * @param prefer_gro supplies whether to use GRO if the OS supports it.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel. If the
    * caller is not interested in it, nullptr can be passed in.
    */
   static Api::IoCallUint64Result readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time,
+                                                MonotonicTime receive_time, bool prefer_gro,
                                                 uint32_t* packets_dropped);
 
   /**
@@ -340,6 +372,7 @@ public:
    * @param local_address is the socket's local address used to populate port.
    * @param udp_packet_processor is the callback to receive the packets.
    * @param time_source is the time source used to generate the time stamp of the received packets.
+   * @param prefer_gro supplies whether to use GRO if the OS supports it.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel.
    *
    * TODO(mattklein123): Allow the number of packets read to be limited for fairness. Currently
@@ -352,7 +385,8 @@ public:
   static Api::IoErrorPtr readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, uint32_t& packets_dropped);
+                                               TimeSource& time_source, bool prefer_gro,
+                                               uint32_t& packets_dropped);
 
 private:
   static void throwWithMalformedIp(absl::string_view ip_address);

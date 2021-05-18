@@ -144,7 +144,6 @@ private:
     ~RdsRouteConfigProviderHelper() {
       // Only remove the rds update when the rds provider has been initialized.
       if (route_provider_) {
-        rds_update_callback_handle_->remove();
         parent_.stats_.active_scopes_.dec();
       }
       if (on_demand_) {
@@ -172,7 +171,7 @@ private:
     RdsRouteConfigProviderImplSharedPtr route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
-    Common::CallbackHandle* rds_update_callback_handle_;
+    Common::CallbackHandlePtr rds_update_callback_handle_;
     std::vector<std::function<void()>> on_demand_update_callbacks_;
   };
 
@@ -225,11 +224,12 @@ private:
   // For creating RDS subscriptions.
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
+  // Stats must outlive subscription.
+  Stats::ScopePtr scope_;
+  ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ScopeKeyBuilder scope_key_builder_;
-  Stats::ScopePtr scope_;
-  ScopedRdsStats stats_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;

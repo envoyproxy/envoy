@@ -12,8 +12,8 @@ ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIR
 
 # Setting environments for buildx tools
 config_env() {
-  # Qemu configurations
-  docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+  # Install QEMU emulators
+  docker run --rm --privileged tonistiigi/binfmt --install all
 
   # Remove older build instance
   docker buildx rm multi-builder || :
@@ -125,7 +125,7 @@ if is_windows; then
   BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-alpine" "-google-vrp")
+  BUILD_TYPES=("" "-debug" "-alpine" "-distroless" "-google-vrp")
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")

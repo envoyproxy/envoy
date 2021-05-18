@@ -2,7 +2,9 @@
 
 #include <chrono>
 #include <memory>
+#include <string>
 
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/http/filter.h"
@@ -14,6 +16,7 @@
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/ext_proc/client.h"
+#include "extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +30,8 @@ namespace ExternalProcessing {
   COUNTER(spurious_msgs_received)                                                                  \
   COUNTER(streams_closed)                                                                          \
   COUNTER(streams_failed)                                                                          \
-  COUNTER(failure_mode_allowed)
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(message_timeouts)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -36,15 +40,15 @@ struct ExtProcFilterStats {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& config,
-               const std::chrono::milliseconds grpc_timeout, Stats::Scope& scope,
+               const std::chrono::milliseconds message_timeout, Stats::Scope& scope,
                const std::string& stats_prefix)
-      : failure_mode_allow_(config.failure_mode_allow()), grpc_timeout_(grpc_timeout),
+      : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
-  const std::chrono::milliseconds& grpcTimeout() const { return grpc_timeout_; }
+  const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
@@ -61,7 +65,7 @@ private:
   }
 
   const bool failure_mode_allow_;
-  const std::chrono::milliseconds grpc_timeout_;
+  const std::chrono::milliseconds message_timeout_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
@@ -72,29 +76,37 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::PassThroughFilter,
                public ExternalProcessorCallbacks {
-  // The state of filter execution -- this is used to determine
-  // how to handle gRPC callbacks.
-  enum class FilterState {
-    // The filter is not waiting for anything, so any response on the
-    // gRPC stream is spurious and will result in the filter closing
-    // the stream.
-    IDLE,
-    // The filter is waiting for a "request_headers" or a "response_headers" message.
-    // Any other response on the gRPC stream will be treated as spurious.
-    HEADERS,
+  // The result of an attempt to open the stream
+  enum class StreamOpenState {
+    // The stream was opened successfully
+    Ok,
+    // The stream was not opened successfully and an error was delivered
+    // downstream -- processing should stop
+    Error,
+    // The stream was not opened successfully but processing should
+    // continue as if the stream was already closed.
+    IgnoreError,
   };
 
 public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        processing_mode_(config->processingMode()) {}
+        decoding_state_(*this, config->processingMode()),
+        encoding_state_(*this, config->processingMode()) {}
 
   void onDestroy() override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
+
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
   // ExternalProcessorCallbacks
 
@@ -105,47 +117,47 @@ public:
 
   void onGrpcClose() override;
 
-private:
-  void openStream();
-  void closeStream();
-  void cleanupState();
-  void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+  void onMessageTimeout();
 
-  bool
-  handleRequestHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
-  bool
-  handleResponseHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
-  void
-  handleImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+  void sendBufferedData(ProcessorState& state, bool end_stream) {
+    sendBodyChunk(state, *state.bufferedData(), end_stream);
+  }
+
+  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+
+private:
+  StreamOpenState openStream();
+
+  void cleanUpTimers();
+  void clearAsyncState();
+  void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
+
+  Http::FilterHeadersStatus onHeaders(ProcessorState& state, Http::HeaderMap& headers,
+                                      bool end_stream);
+  Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
+  Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
 
-  // The state of the request-processing, or "decoding" side of the filter.
-  // We maintain separate states for encoding and decoding since they may
-  // be interleaved.
-  FilterState request_state_ = FilterState::IDLE;
-
-  // The state of the response-processing side
-  FilterState response_state_ = FilterState::IDLE;
+  // The state of the filter on both the encoding and decoding side.
+  DecodingProcessorState decoding_state_;
+  EncodingProcessorState encoding_state_;
 
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
   ExternalProcessorStreamPtr stream_;
 
-  // Set to true when the stream has been closed and no more messages
-  // need to be sent to the processor. This happens when the processor
-  // has closed the stream, or when it has failed, or when the filter
-  // is destroyed.
+  // Set to true when no more messages need to be sent to the processor.
+  // This happens when the processor has closed the stream, or when it has
+  // failed.
   bool processing_complete_ = false;
 
-  Http::HeaderMap* request_headers_ = nullptr;
-  Http::HeaderMap* response_headers_ = nullptr;
-
-  // The processing mode. May be locally overridden by any response,
-  // So every instance of the filter has a copy.
-  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
+  // Set to true when an "immediate response" has been delivered. This helps us
+  // know what response to return from certain failures.
+  bool sent_immediate_response_ = false;
 };
 
 } // namespace ExternalProcessing

@@ -62,13 +62,13 @@ public:
 
     // Endpoint connections
     if (tls_hosts_) {
-      host_upstream_ =
-          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
-      host2_upstream_ =
-          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
+      host_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
+      host2_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
     } else {
-      host_upstream_ = createFakeUpstream(http_conn_type_);
-      host2_upstream_ = createFakeUpstream(http_conn_type_);
+      host_upstream_ = &addFakeUpstream(http_conn_type_);
+      host2_upstream_ = &addFakeUpstream(http_conn_type_);
     }
   }
 
@@ -79,6 +79,17 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = hds_fake_connection_->waitForNewStream(*dispatcher_, hds_stream_);
     RELEASE_ASSERT(result, result.message());
+  }
+
+  // Envoy sends health check messages to the endpoints of cluster2
+  void healthcheckEndpointsCluster2(std::string cluster2) {
+    ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
+    ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
+    ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
+
+    EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
+    EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
+    EXPECT_EQ(host2_stream_->headers().getHostValue(), cluster2);
   }
 
   // Envoy sends health check messages to the endpoints
@@ -92,13 +103,7 @@ public:
     EXPECT_EQ(host_stream_->headers().getHostValue(), "anna");
 
     if (!cluster2.empty()) {
-      ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
-      ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
-      ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
-
-      EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
-      EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
-      EXPECT_EQ(host2_stream_->headers().getHostValue(), cluster2);
+      healthcheckEndpointsCluster2(cluster2);
     }
   }
 
@@ -357,8 +362,9 @@ transport_socket_matches:
   FakeStreamPtr hds_stream_;
   FakeUpstream* hds_upstream_{};
   uint32_t hds_requests_{};
-  FakeUpstreamPtr host_upstream_{};
-  FakeUpstreamPtr host2_upstream_{};
+  // These two are owned by fake_upstreams_
+  FakeUpstream* host_upstream_{};
+  FakeUpstream* host2_upstream_{};
   FakeStreamPtr host_stream_;
   FakeStreamPtr host2_stream_;
   FakeHttpConnectionPtr host_fake_connection_;
@@ -1183,6 +1189,92 @@ TEST_P(HdsIntegrationTest, UpdateEndpoints) {
                                           envoy::config::core::v3::UNHEALTHY,
                                           host_upstream_->localAddress()));
 
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+// Tests Envoy HTTP health checking a custom healthy endpoint and reporting it is healthy
+TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpCustomPort) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  // Set custom health check port to host2
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_locality_endpoints(0)
+      ->mutable_endpoints(0)
+      ->mutable_health_check_config()
+      ->set_port_value(host2_upstream_->localAddress()->ip()->port());
+
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy doesn't sends a health check message to cluster
+  EXPECT_FALSE(host_upstream_->waitForHttpConnection(*dispatcher_, host_fake_connection_,
+                                                     std::chrono::milliseconds(500)));
+  // Envoy sends a health check message to cluster2
+  healthcheckEndpointsCluster2("anna");
+
+  // Endpoint responds to the health check
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  host2_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+// Tests Envoy HTTP health checking a single unhealthy endpoint and reporting that it is
+// indeed unhealthy to the server.
+TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttpCustomPort) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
+  initialize();
+
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  // Set custom health check port to host2
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_locality_endpoints(0)
+      ->mutable_endpoints(0)
+      ->mutable_health_check_config()
+      ->set_port_value(host2_upstream_->localAddress()->ip()->port());
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+
+  // Server asks for health checking
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy doesn't sends a health check message to cluster
+  EXPECT_FALSE(host_upstream_->waitForHttpConnection(*dispatcher_, host_fake_connection_,
+                                                     std::chrono::milliseconds(500)));
+  // Envoy sends a health check message to cluster2
+  healthcheckEndpointsCluster2("anna");
+
+  // Endpoint responds to the health check
+  // Make custom health check upstream return unhealthy
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
+  host2_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
+
+  // Clean up connections
   cleanupHostConnections();
   cleanupHdsConnection();
 }

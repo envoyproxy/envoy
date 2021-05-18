@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/safe_memcpy.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -145,19 +146,24 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
   }
+  case GEN_EMAIL: {
+    ASN1_STRING* str = general_name->d.rfc822Name;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
+  }
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
       sockaddr_in sin;
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
-      memcpy(&sin.sin_addr, general_name->d.ip->data, sizeof(sin.sin_addr));
+      safeMemcpyUnsafeSrc(&sin.sin_addr, general_name->d.ip->data);
       Network::Address::Ipv4Instance addr(&sin);
       san = addr.ip()->addressAsString();
     } else if (general_name->d.ip->length == 16) {
       sockaddr_in6 sin6;
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
-      memcpy(&sin6.sin6_addr, general_name->d.ip->data, sizeof(sin6.sin6_addr));
+      safeMemcpyUnsafeSrc(&sin6.sin6_addr, general_name->d.ip->data);
       Network::Address::Ipv6Instance addr(sin6);
       san = addr.ip()->addressAsString();
     }

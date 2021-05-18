@@ -173,6 +173,7 @@ envoy_cc_library(
         ":configuration_interface",
         ":drain_manager_interface",
         ":lifecycle_notifier_interface",
+        ":options_interface",
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
@@ -219,6 +220,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
     ],
 )
 
@@ -298,6 +300,7 @@ envoy_cc_library(
     name = "resource_monitor_config_interface",
     hdrs = ["resource_monitor_config.h"],
     deps = [
+        ":options_interface",
         ":resource_monitor_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -312,15 +315,6 @@ envoy_cc_library(
         ":filter_config_interface",
         "//include/envoy/config:typed_config_interface",
         "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
-    name = "active_udp_listener_config_interface",
-    hdrs = ["active_udp_listener_config.h"],
-    deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/network:connection_handler_interface",
     ],
 )
 
@@ -342,5 +336,14 @@ envoy_cc_library(
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/server:instance_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "platform_interface",
+    hdrs = ["platform.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )

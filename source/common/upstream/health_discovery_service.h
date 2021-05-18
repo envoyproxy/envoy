@@ -23,8 +23,6 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
@@ -57,7 +55,8 @@ public:
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+             const Server::Options& options);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -96,6 +95,7 @@ private:
   const envoy::config::core::v3::BindConfig& bind_config_;
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;
+  const Server::Options& options_;
   bool added_via_api_;
   bool initialized_ = false;
   uint64_t config_hash_;
@@ -155,7 +155,8 @@ public:
               AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
               const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
               Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+              const Server::Options& options);
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -227,6 +228,7 @@ private:
 
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
+  const Server::Options& options_;
 };
 
 using HdsDelegatePtr = std::unique_ptr<HdsDelegate>;

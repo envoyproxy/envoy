@@ -14,7 +14,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -35,7 +35,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              certificate_chain:
+            - certificate_chain:
                 filename: certs/domain1.crt.pem
               private_key:
                 filename: certs/domain1.key.pem
@@ -47,7 +47,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -68,7 +68,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              certificate_chain:
+            - certificate_chain:
                 filename: certs/domain2.crt.pem
               private_key:
                 filename: certs/domain2.key.pem
@@ -86,8 +86,8 @@ static_resources:
   clusters:
   - name: proxy-domain1
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: proxy-domain1
       endpoints:
@@ -100,8 +100,8 @@ static_resources:
 
   - name: proxy-domain2
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: proxy-domain2
       endpoints:
@@ -114,8 +114,8 @@ static_resources:
 
   - name: proxy-domain3
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: proxy-domain3
       endpoints:

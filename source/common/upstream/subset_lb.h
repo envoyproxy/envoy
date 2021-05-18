@@ -250,7 +250,7 @@ private:
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
-  Common::CallbackHandle* original_priority_set_callback_handle_;
+  Common::CallbackHandlePtr original_priority_set_callback_handle_;
 
   LbSubsetEntryPtr subset_any_;
   LbSubsetEntryPtr fallback_subset_;

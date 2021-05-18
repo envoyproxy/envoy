@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/dump_state_utils.h"
 #include "common/http/codec_client.h"
 #include "common/router/header_parser.h"
 
@@ -178,6 +179,9 @@ private:
     }
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(DecoderShim);
+    }
 
   private:
     HttpUpstream& parent_;

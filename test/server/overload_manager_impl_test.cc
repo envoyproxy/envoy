@@ -17,6 +17,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -120,9 +121,10 @@ public:
   TestOverloadManager(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
-                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                      const Server::MockOptions& options)
       : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
-                            api) {
+                            api, options) {
     EXPECT_CALL(*this, createScaledRangeTimerManager)
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(this, &TestOverloadManager::createDefaultScaledRangeTimerManager));
@@ -166,7 +168,8 @@ protected:
 
   std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
     return std::make_unique<TestOverloadManager>(dispatcher_, stats_, thread_local_,
-                                                 parseConfig(config), validation_visitor_, *api_);
+                                                 parseConfig(config), validation_visitor_, *api_,
+                                                 options_);
   }
 
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
@@ -184,6 +187,7 @@ protected:
   Event::TimerCb timer_cb_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
 };
 
 constexpr char kRegularStateConfig[] = R"YAML(

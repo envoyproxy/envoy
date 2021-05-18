@@ -51,7 +51,21 @@ const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
+  dest.headers_to_append.insert(dest.headers_to_append.end(), src.headers_to_append.begin(),
+                                src.headers_to_append.end());
+  dest.headers_to_overwrite.insert(dest.headers_to_overwrite.end(),
+                                   src.headers_to_overwrite.begin(),
+                                   src.headers_to_overwrite.end());
+  dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
+                                src.headers_to_remove.end());
+}
+
 } // namespace
+
+const std::string& OriginalConnectPort::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
+}
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
@@ -334,9 +348,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                          : ""),
       path_redirect_(route.redirect().path_redirect()),
       path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
-      enable_preserve_query_in_path_redirects_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.preserve_query_string_in_path_redirects")),
       https_redirect_(route.redirect().https_redirect()),
+      using_new_timeouts_(route.route().has_max_stream_duration()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
@@ -474,7 +487,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
   }
 
-  if (enable_preserve_query_in_path_redirects_ && path_redirect_has_query_ && strip_query_) {
+  if (path_redirect_has_query_ && strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
@@ -558,6 +571,16 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     request_headers_parser_->evaluateHeaders(headers, stream_info);
   }
 
+  // Restore the port if this was a CONNECT request.
+  // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as as HTTP/1.1 style
+  // CONNECT requests.
+  if (stream_info.filterState().hasData<OriginalConnectPort>(OriginalConnectPort::key()) &&
+      Http::HeaderUtility::getPortStart(headers.getHostValue()) == absl::string_view::npos) {
+    const OriginalConnectPort& original_port =
+        stream_info.filterState().getDataReadOnly<OriginalConnectPort>(OriginalConnectPort::key());
+    headers.setHost(absl::StrCat(headers.getHostValue(), ":", original_port.value()));
+  }
+
   if (!host_rewrite_.empty()) {
     headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
@@ -600,6 +623,29 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
   }
 }
 
+Http::HeaderTransforms
+RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+  Http::HeaderTransforms transforms;
+  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
+    // Append user-specified request headers from most to least specific: route-level headers,
+    // virtual host level headers and finally global connection manager level headers.
+    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(
+        transforms,
+        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+  } else {
+    // Most specific mutations (route-level) take precedence by being applied
+    // last: if a header is specified at all levels, the last one applied wins.
+    mergeTransforms(
+        transforms,
+        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+  }
+  return transforms;
+}
+
 absl::optional<RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& route_match) {
   absl::optional<RuntimeData> runtime;
@@ -638,43 +684,54 @@ RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
   return prefix_rewrite_redirect_;
 }
 
-// finalizePathHeaders does the "standard" path rewriting, meaning that it
+void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
+                                            absl::string_view matched_path,
+                                            bool insert_envoy_original_path) const {
+  absl::optional<std::string> new_path =
+      currentUrlPathAfterRewriteWithMatchedPath(headers, matched_path);
+  if (!new_path.has_value()) {
+    // There are no rewrites configured. Just return.
+    return;
+  }
+
+  if (insert_envoy_original_path) {
+    headers.setEnvoyOriginalPath(headers.getPathValue());
+  }
+
+  headers.setPath(new_path.value());
+}
+
+// currentUrlPathAfterRewriteWithMatchedPath does the "standard" path rewriting, meaning that it
 // handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
 // which can be specified. The "matched_path" argument applies only to the
 // prefix rewriting, and describes the portion of the path (excluding query
 // parameters) that should be replaced by the rewrite. A "regex_rewrite"
 // applies to the entire path (excluding query parameters), regardless of what
 // portion was matched.
-void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
-                                            absl::string_view matched_path,
-                                            bool insert_envoy_original_path) const {
+absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
+    const Http::RequestHeaderMap& headers, absl::string_view matched_path) const {
   absl::optional<std::string> container;
   const auto& rewrite = getPathRewrite(headers, container);
-  if (rewrite.empty() && regex_rewrite_ == nullptr) {
-    // There are no rewrites configured. Just return.
-    return;
+  if (!rewrite.empty() || regex_rewrite_ != nullptr) {
+    // TODO(perf): can we avoid the string copy for the common case?
+    std::string path(headers.getPathValue());
+
+    if (!rewrite.empty()) {
+      ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                             : absl::StartsWithIgnoreCase(path, matched_path));
+      return path.replace(0, matched_path.size(), rewrite);
+    }
+
+    if (regex_rewrite_ != nullptr) {
+      // Replace the entire path, but preserve the query parameters
+      auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+      return path.replace(0, just_path.size(),
+                          regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_));
+    }
   }
 
-  // TODO(perf): can we avoid the string copy for the common case?
-  std::string path(headers.getPathValue());
-  if (insert_envoy_original_path) {
-    headers.setEnvoyOriginalPath(path);
-  }
-
-  if (!rewrite.empty()) {
-    ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                           : absl::StartsWithIgnoreCase(path, matched_path));
-    headers.setPath(path.replace(0, matched_path.size(), rewrite));
-    return;
-  }
-
-  if (regex_rewrite_ != nullptr) {
-    // Replace the entire path, but preserve the query parameters
-    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
-    headers.setPath(path.replace(
-        0, just_path.size(), regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_)));
-    return;
-  }
+  // There are no rewrites configured.
+  return absl::optional<std::string>();
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHeaderMap& headers,
@@ -747,44 +804,30 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   }
 
   std::string final_path_value;
-  if (enable_preserve_query_in_path_redirects_) {
-    if (!path_redirect_.empty()) {
-      // The path_redirect query string, if any, takes precedence over the request's query string,
-      // and it will not be stripped regardless of `strip_query`.
-      if (path_redirect_has_query_) {
-        final_path = path_redirect_.c_str();
-      } else {
-        const absl::string_view current_path = headers.getPathValue();
-        const size_t path_end = current_path.find('?');
-        const bool current_path_has_query = path_end != absl::string_view::npos;
-        if (current_path_has_query) {
-          final_path_value = path_redirect_;
-          final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
-          final_path = final_path_value;
-        } else {
-          final_path = path_redirect_.c_str();
-        }
-      }
+  if (!path_redirect_.empty()) {
+    // The path_redirect query string, if any, takes precedence over the request's query string,
+    // and it will not be stripped regardless of `strip_query`.
+    if (path_redirect_has_query_) {
+      final_path = path_redirect_.c_str();
     } else {
-      final_path = headers.getPathValue();
-    }
-    if (!path_redirect_has_query_ && strip_query_) {
-      const size_t path_end = final_path.find('?');
-      if (path_end != absl::string_view::npos) {
-        final_path = final_path.substr(0, path_end);
+      const absl::string_view current_path = headers.getPathValue();
+      const size_t path_end = current_path.find('?');
+      const bool current_path_has_query = path_end != absl::string_view::npos;
+      if (current_path_has_query) {
+        final_path_value = path_redirect_;
+        final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
+        final_path = final_path_value;
+      } else {
+        final_path = path_redirect_.c_str();
       }
     }
   } else {
-    if (!path_redirect_.empty()) {
-      final_path = path_redirect_.c_str();
-    } else {
-      final_path = headers.getPathValue();
-      if (strip_query_) {
-        const size_t path_end = final_path.find("?");
-        if (path_end != absl::string_view::npos) {
-          final_path = final_path.substr(0, path_end);
-        }
-      }
+    final_path = headers.getPathValue();
+  }
+  if (!path_redirect_has_query_ && strip_query_) {
+    const size_t path_end = final_path.find('?');
+    if (path_end != absl::string_view::npos) {
+      final_path = final_path.substr(0, path_end);
     }
   }
 
@@ -1000,6 +1043,13 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
   }
 }
 
+Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
+    const StreamInfo::StreamInfo& stream_info) const {
+  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info);
+  mergeTransforms(transforms, DynamicRouteEntry::responseHeaderTransforms(stream_info));
+  return transforms;
+}
+
 const RouteSpecificFilterConfig*
 RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
   const auto cfg = per_filter_configs_.get(name);
@@ -1016,6 +1066,11 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
   finalizePathHeader(headers, prefix_, insert_envoy_original_path);
+}
+
+absl::optional<std::string>
+PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
 }
 
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
@@ -1038,6 +1093,11 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
   finalizePathHeader(headers, path_, insert_envoy_original_path);
+}
+
+absl::optional<std::string>
+PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_);
 }
 
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
@@ -1079,6 +1139,12 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
+absl::optional<std::string>
+RegexRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path);
+}
+
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
@@ -1101,6 +1167,12 @@ void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
   const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   finalizePathHeader(headers, path, insert_envoy_original_path);
+}
+
+absl::optional<std::string>
+ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path);
 }
 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
@@ -1498,6 +1570,18 @@ PerFilterConfigs::PerFilterConfigs(
         name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 
@@ -1510,6 +1594,18 @@ PerFilterConfigs::PerFilterConfigs(
                                                   it.second, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 }

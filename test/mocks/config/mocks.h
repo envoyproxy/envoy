@@ -8,6 +8,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/common/callback_impl.h"
 #include "common/config/config_provider_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -77,7 +78,7 @@ public:
   MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder, bool use_namespace_matching));
+               OpaqueResourceDecoder& resource_decoder, const SubscriptionOptions& options));
   MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -116,7 +117,7 @@ public:
   MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
               (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
                SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-               const bool use_prefix_matching));
+               const SubscriptionOptions& options));
 
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const std::string& type_url,
@@ -173,6 +174,17 @@ public:
   ~MockContextProvider() override;
 
   MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
+  MOCK_METHOD(const xds::core::v3::ContextParams&, dynamicContext,
+              (absl::string_view resource_type_url), (const));
+  MOCK_METHOD(void, setDynamicContextParam,
+              (absl::string_view resource_type_url, absl::string_view key,
+               absl::string_view value));
+  MOCK_METHOD(void, unsetDynamicContextParam,
+              (absl::string_view resource_type_url, absl::string_view key));
+  MOCK_METHOD(Common::CallbackHandlePtr, addDynamicContextUpdateCallback,
+              (UpdateNotificationCb callback), (const));
+
+  Common::CallbackManager<absl::string_view> update_cb_handler_;
 };
 
 } // namespace Config

@@ -51,6 +51,13 @@ public:
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
 
+  /*
+   * Same as evaluateHeaders, but returns the modifications that would have been made rather than
+   * modifying an existing HeaderMap.
+   * @param stream_info contains additional information about the request.
+   */
+  Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const;
+
 protected:
   HeaderParser() = default;
 

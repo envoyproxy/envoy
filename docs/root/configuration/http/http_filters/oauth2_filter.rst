@@ -32,8 +32,8 @@ The OAuth filter's flow involves:
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
 no matter what format that token is, if
 :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.forward_bearer_token>`
-is set to true the filter will send over a 
-cookie named `BearerToken` to the upstream. Additionally, the `Authorization` header will be populated
+is set to true the filter will send over a
+cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
 with the same value.
 
 .. attention::
@@ -76,6 +76,10 @@ The following is an example configuring the filter.
     - user
     - openid
     - email
+    # (Optional): set resource parameter for Authorization request
+    resources:
+    - oauth2-resource
+    - http://example.com
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
@@ -124,6 +128,10 @@ Below is a complete code example of how we employ the filter as one of
                 - user
                 - openid
                 - email
+                # (Optional): set resource parameter for Authorization request
+                resources:
+                - oauth2-resource
+                - http://example.com
           - name: envoy.router
           tracing: {}
           codec_type: "AUTO"
@@ -194,7 +202,7 @@ cached authentication (in the form of cookies).
 It is recommended to pair this filter with the :ref:`CSRF Filter <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
 to prevent malicious social engineering.
 
-The service must be served over HTTPS for this filter to work properly, as the cookies use `;secure`. Without https, your
+The service must be served over HTTPS for this filter to work properly, as the cookies use ``;secure``. Without https, your
 :ref:`authorization_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.authorization_endpoint>`
 provider will likely reject the incoming request, and your access cookies will not be cached to bypass future logins.
 
@@ -204,7 +212,7 @@ sending the user to the configured auth endpoint.
 
 :ref:`pass_through_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.pass_through_matcher>` provides
 an interface for users to provide specific header matching criteria such that, when applicable, the OAuth flow is entirely skipped.
-When this occurs, the `oauth_success` metric is still incremented.
+When this occurs, the ``oauth_success`` metric is still incremented.
 
 Generally, allowlisting is inadvisable from a security standpoint.
 

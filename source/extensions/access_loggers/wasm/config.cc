@@ -16,21 +16,15 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
-AccessLog::InstanceSharedPtr
-WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_config,
-                                              AccessLog::FilterPtr&& filter,
-                                              Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::CommonFactoryContext& context) {
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());
 
-  // Create a base WASM to verify that the code loads before setting/cloning the for the
-  // individual threads.
   auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config.config().name(), config.config().root_id(), config.config().vm_config().vm_id(),
-      config.config().vm_config().runtime(),
-      Common::Wasm::anyToBytes(config.config().configuration()), config.config().fail_open(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
+      config.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
       nullptr /* listener_metadata */);
 
   auto access_log = std::make_shared<WasmAccessLog>(plugin, nullptr, std::move(filter));
@@ -45,11 +39,10 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
     access_log->setTlsSlot(std::move(tls_slot));
   };
 
-  if (!Common::Wasm::createWasm(
-          config.config().vm_config(), config.config().capability_restriction_config(), plugin,
-          context.scope().createScope(""), context.clusterManager(), context.initManager(),
-          context.dispatcher(), context.api(), context.lifecycleNotifier(), remote_data_provider_,
-          std::move(callback))) {
+  if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
+                                context.initManager(), context.dispatcher(), context.api(),
+                                context.lifecycleNotifier(), remote_data_provider_,
+                                std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm access log {}", plugin->name_));
   }

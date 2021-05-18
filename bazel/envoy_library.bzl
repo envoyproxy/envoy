@@ -74,17 +74,21 @@ EXTENSION_CATEGORIES = [
     "envoy.compression.compressor",
     "envoy.compression.decompressor",
     "envoy.filters.http",
+    "envoy.filters.http.cache",
     "envoy.filters.listener",
     "envoy.filters.network",
     "envoy.filters.udp_listener",
-    "envoy.formatter",
     "envoy.grpc_credentials",
     "envoy.guarddog_actions",
     "envoy.health_checkers",
+    "envoy.http.stateful_header_formatters",
     "envoy.internal_redirect_predicates",
     "envoy.io_socket",
+    "envoy.http.original_ip_detection",
+    "envoy.matching.common_inputs",
+    "envoy.matching.input_matchers",
     "envoy.rate_limit_descriptors",
-    "envoy.resolvers",
+    "envoy.request_id",
     "envoy.resource_monitors",
     "envoy.retry_host_predicates",
     "envoy.retry_priorities",
@@ -93,6 +97,7 @@ EXTENSION_CATEGORIES = [
     "envoy.tracers",
     "envoy.transport_sockets.downstream",
     "envoy.transport_sockets.upstream",
+    "envoy.tls.cert_validator",
     "envoy.upstreams",
     "envoy.wasm.runtime",
     "DELIBERATELY_OMITTED",
@@ -216,6 +221,38 @@ def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
         hdrs = select({
             "@envoy//bazel:windows_x86_64": [],
             "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on POSIX excluding Linux
+def envoy_cc_posix_without_linux_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_posix",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "@envoy//bazel:linux": [],
+            "//conditions:default": srcs,
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "@envoy//bazel:linux": [],
+            "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on Linux
+def envoy_cc_linux_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_linux",
+        srcs = select({
+            "@envoy//bazel:linux": srcs,
+            "//conditions:default": [],
+        }),
+        hdrs = select({
+            "@envoy//bazel:linux": hdrs,
+            "//conditions:default": [],
         }),
         **kargs
     )

@@ -136,7 +136,8 @@ public:
   };
 
   StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine, Http::HeaderMap& headers,
-                      bool end_stream, Filter& filter, FilterCallbacks& callbacks);
+                      bool end_stream, Filter& filter, FilterCallbacks& callbacks,
+                      TimeSource& time_source);
 
   Http::FilterHeadersStatus start(int function_ref);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
@@ -167,7 +168,8 @@ public:
             {"connection", static_luaConnection},
             {"importPublicKey", static_luaImportPublicKey},
             {"verifySignature", static_luaVerifySignature},
-            {"base64Escape", static_luaBase64Escape}};
+            {"base64Escape", static_luaBase64Escape},
+            {"timestamp", static_luaTimestamp}};
   }
 
 private:
@@ -277,8 +279,18 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Escape);
 
+  /**
+   * Timestamp.
+   * @param1 (string) optional format (e.g. milliseconds_from_epoch, nanoseconds_from_epoch).
+   * Defaults to milliseconds_from_epoch.
+   * @return timestamp
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestamp);
+
   int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
   int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
+
+  int timestamp(int timestamp, absl::uint128 resolution);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -317,6 +329,7 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+  TimeSource& time_source_;
 
   // The inserted crypto object pointers will not be removed from this map.
   absl::flat_hash_map<std::string, Envoy::Common::Crypto::CryptoObjectPtr> public_key_storage_;
@@ -425,7 +438,8 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
  */
 class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::lua> {
 public:
-  Filter(FilterConfigConstSharedPtr config) : config_(config) {}
+  Filter(FilterConfigConstSharedPtr config, TimeSource& time_source)
+      : config_(config), time_source_(time_source) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
   void scriptError(const Filters::Common::Lua::LuaException& e);
@@ -537,6 +551,7 @@ private:
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
+  TimeSource& time_source_;
 
   // These coroutines used to be owned by the stream handles. After investigating #3570, it
   // became clear that there is a circular memory reference when a coroutine yields. Basically,

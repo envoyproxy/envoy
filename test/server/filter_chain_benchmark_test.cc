@@ -11,8 +11,6 @@
 
 #include "server/filter_chain_manager_impl.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 #include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -111,6 +109,10 @@ public:
     return {0, 0};
   }
   Api::SysCallIntResult setSocketOption(int, int, const void*, socklen_t) override {
+    return {0, 0};
+  }
+  Api::SysCallIntResult ioctl(unsigned long, void*, unsigned long, void*, unsigned long,
+                              unsigned long*) override {
     return {0, 0};
   }
   Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {

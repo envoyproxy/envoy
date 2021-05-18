@@ -19,7 +19,7 @@ class CustomClusterIntegrationTest : public testing::TestWithParam<Network::Addr
                                      public HttpIntegrationTest {
 public:
   CustomClusterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
     setUpstreamCount(1);

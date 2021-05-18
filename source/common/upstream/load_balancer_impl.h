@@ -7,6 +7,7 @@
 #include <set>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
@@ -157,6 +158,9 @@ protected:
   std::vector<bool> per_priority_panic_;
   // The total count of healthy hosts across all priority levels.
   uint32_t total_healthy_hosts_;
+
+private:
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
@@ -196,7 +200,6 @@ protected:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-  ~ZoneAwareLoadBalancerBase() override;
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
@@ -350,7 +353,8 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
   // Routing state broken out for each priority level in priority_set_.
   std::vector<PerPriorityStatePtr> per_priority_state_;
-  Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
+  Common::CallbackHandlePtr priority_update_cb_;
+  Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
 };
 
 /**
@@ -410,6 +414,7 @@ private:
 
   // Scheduler for each valid HostsSource.
   absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 /**

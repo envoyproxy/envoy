@@ -85,6 +85,20 @@ void IntegrationTestServer::waitUntilListenersReady() {
   ENVOY_LOG(info, "listener wait complete");
 }
 
+void IntegrationTestServer::setDynamicContextParam(absl::string_view resource_type_url,
+                                                   absl::string_view key, absl::string_view value) {
+  server().dispatcher().post([this, resource_type_url, key, value]() {
+    server().localInfo().contextProvider().setDynamicContextParam(resource_type_url, key, value);
+  });
+}
+
+void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_type_url,
+                                                     absl::string_view key) {
+  server().dispatcher().post([this, resource_type_url, key]() {
+    server().localInfo().contextProvider().unsetDynamicContextParam(resource_type_url, key);
+  });
+}
+
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
     bool deterministic, bool defer_listener_finalization, ProcessObjectOptRef process_object,
@@ -103,8 +117,8 @@ void IntegrationTestServer::start(
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
   // before workers starting or after server start. Any needed synchronization must occur in the
-  // routines. These steps are executed at this point in the code to allow server initialization to
-  // be dependent on them (e.g. control plane peers).
+  // routines. These steps are executed at this point in the code to allow server initialization
+  // to be dependent on them (e.g. control plane peers).
   if (on_server_init_function != nullptr) {
     on_server_init_function();
   }

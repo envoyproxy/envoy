@@ -56,6 +56,9 @@ using HandshakerSharedPtr = std::shared_ptr<Handshaker>;
 using HandshakerFactoryCb =
     std::function<HandshakerSharedPtr(bssl::UniquePtr<SSL>, int, HandshakeCallbacks*)>;
 
+// Callback for modifying an SSL_CTX.
+using SslCtxCb = std::function<void(SSL_CTX*)>;
+
 class HandshakerFactoryContext {
 public:
   virtual ~HandshakerFactoryContext() = default;
@@ -115,6 +118,14 @@ public:
    * capability.
    */
   virtual HandshakerCapabilities capabilities() const PURE;
+
+  /**
+   * Implementations should return a callback for configuring an SSL_CTX context
+   * before it is used to create any SSL objects. Providing
+   * |handshaker_factory_context| as an argument allows callsites to access the
+   * API and other factory context methods.
+   */
+  virtual SslCtxCb sslctxCb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
 };
 
 } // namespace Ssl

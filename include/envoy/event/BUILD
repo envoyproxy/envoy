@@ -14,10 +14,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dispatcher_thread_deletable",
+    hdrs = ["dispatcher_thread_deletable.h"],
+)
+
+envoy_cc_library(
     name = "dispatcher_interface",
     hdrs = ["dispatcher.h"],
     deps = [
         ":deferred_deletable",
+        ":dispatcher_thread_deletable",
         ":file_event_interface",
         ":scaled_timer",
         ":schedulable_cb_interface",
@@ -34,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/thread:thread_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

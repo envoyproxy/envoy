@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"

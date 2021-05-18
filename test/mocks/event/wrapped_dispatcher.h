@@ -71,9 +71,10 @@ public:
     return impl_.createListener(std::move(socket), cb, bind_to_port, backlog_size);
   }
 
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb) override {
-    return impl_.createUdpListener(std::move(socket), cb);
+  Network::UdpListenerPtr
+  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+                    const envoy::config::core::v3::UdpSocketConfig& config) override {
+    return impl_.createUdpListener(std::move(socket), cb, config);
   }
 
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }
@@ -101,6 +102,10 @@ public:
 
   void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
 
+  void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override {
+    impl_.deleteInDispatcherThread(std::move(deletable));
+  }
+
   void run(RunType type) override { impl_.run(type); }
 
   Buffer::WatermarkFactory& getWatermarkFactory() override { return impl_.getWatermarkFactory(); }
@@ -112,6 +117,8 @@ public:
     return impl_.popTrackedObject(expected_object);
   }
 
+  bool trackedObjectStackIsEmpty() const override { return impl_.trackedObjectStackIsEmpty(); }
+
   MonotonicTime approximateMonotonicTime() const override {
     return impl_.approximateMonotonicTime();
   }
@@ -119,6 +126,8 @@ public:
   void updateApproximateMonotonicTime() override { impl_.updateApproximateMonotonicTime(); }
 
   bool isThreadSafe() const override { return impl_.isThreadSafe(); }
+
+  void shutdown() override { impl_.shutdown(); }
 
 protected:
   Dispatcher& impl_;

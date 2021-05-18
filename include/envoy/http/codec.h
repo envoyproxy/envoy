@@ -7,10 +7,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/header_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/http/status.h"
 
@@ -25,10 +27,14 @@ namespace Http2 {
 struct CodecStats;
 }
 
+namespace Http3 {
+struct CodecStats;
+}
+
 // Legacy default value of 60K is safely under both codec default limits.
-static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
+static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
 // Default maximum number of headers.
-static const uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
+static constexpr uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
 
 const char MaxRequestHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_request_headers_count";
@@ -202,17 +208,21 @@ public:
 
   /**
    * Called if the codec needs to send a protocol error.
-   * @param is_grpc_request indicates if the request is a gRPC request
    * @param code supplies the HTTP error code to send.
    * @param body supplies an optional body to send with the local reply.
    * @param modify_headers supplies a way to edit headers before they are sent downstream.
    * @param grpc_status an optional gRPC status for gRPC requests
    * @param details details about the source of the error, for debug purposes
    */
-  virtual void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+  virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
+
+  /**
+   * @return StreamInfo::StreamInfo& the stream_info for this stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 /**
@@ -239,6 +249,16 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Dump the response decoder to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 };
 
 /**
@@ -260,7 +280,9 @@ enum class StreamResetReason {
   // The stream was reset because of a resource overflow.
   Overflow,
   // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR
-  ConnectError
+  ConnectError,
+  // Received payload did not conform to HTTP protocol.
+  ProtocolError
 };
 
 /**
@@ -360,6 +382,19 @@ public:
 };
 
 /**
+ * A class for sharing what HTTP/2 SETTINGS were received from the peer.
+ */
+class ReceivedSettings {
+public:
+  virtual ~ReceivedSettings() = default;
+
+  /**
+   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or absl::nullopt if it was not present.
+   */
+  virtual const absl::optional<uint32_t>& maxConcurrentStreams() const PURE;
+};
+
+/**
  * Connection level callbacks.
  */
 class ConnectionCallbacks {
@@ -370,6 +405,13 @@ public:
    * Fires when the remote indicates "go away." No new streams should be created.
    */
   virtual void onGoAway(GoAwayErrorCode error_code) PURE;
+
+  /**
+   * Fires when the peer settings frame is received from the peer.
+   * This may occur multiple times across the lifetime of the connection.
+   * @param ReceivedSettings the settings received from the peer.
+   */
+  virtual void onSettings(ReceivedSettings& settings) { UNREFERENCED_PARAMETER(settings); }
 };
 
 /**
@@ -401,15 +443,24 @@ struct Http1Settings {
     // Performs proper casing of header keys: the first and all alpha characters following a
     // non-alphanumeric character is capitalized.
     ProperCase,
+    // A stateful formatter extension has been configured.
+    StatefulFormatter,
   };
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
 
+  // Non-null IFF header_key_format_ is configured to StatefulFormatter.
+  StatefulHeaderKeyFormatterFactorySharedPtr stateful_header_key_formatter_;
+
   // Behaviour on invalid HTTP messaging:
   // - if true, the HTTP/1.1 connection is left open (where possible)
   // - if false, the HTTP/1.1 connection is terminated
   bool stream_error_on_invalid_http_message_{false};
+
+  // True if this is an edge Envoy (using downstream address, no trusted hops)
+  // and https:// URLs should be rejected over unencrypted connections.
+  bool validate_scheme_{false};
 };
 
 /**

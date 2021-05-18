@@ -12,6 +12,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/stream_info/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
@@ -63,7 +64,7 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -493,29 +494,26 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   {
-    Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
-    stream_info_.getRequestIDExtension()->setTraceStatus(forced_header, Http::TraceStatus::Forced);
+    stream_info_.setTraceReason(Tracing::Reason::ServiceForced);
     EXPECT_CALL(*file_, write(_));
-    log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl not_traceable{{"x-request-id", random.uuid()}};
+    stream_info_.setTraceReason(Tracing::Reason::NotTraceable);
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
-    stream_info_.getRequestIDExtension()->setTraceStatus(sampled_header,
-                                                         Http::TraceStatus::Sampled);
+    stream_info_.setTraceReason(Tracing::Reason::Sampling);
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   {
     const std::string yaml = R"EOF(
@@ -989,42 +987,19 @@ filter:
       - RFCF
       - NFCF
       - DT
+      - UPE
+      - NC
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x400000,
-                "A flag has been added. Fix this code.");
-
-  const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
-      StreamInfo::ResponseFlag::FailedLocalHealthCheck,
-      StreamInfo::ResponseFlag::NoHealthyUpstream,
-      StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-      StreamInfo::ResponseFlag::LocalReset,
-      StreamInfo::ResponseFlag::UpstreamRemoteReset,
-      StreamInfo::ResponseFlag::UpstreamConnectionFailure,
-      StreamInfo::ResponseFlag::UpstreamConnectionTermination,
-      StreamInfo::ResponseFlag::UpstreamOverflow,
-      StreamInfo::ResponseFlag::NoRouteFound,
-      StreamInfo::ResponseFlag::DelayInjected,
-      StreamInfo::ResponseFlag::FaultInjected,
-      StreamInfo::ResponseFlag::RateLimited,
-      StreamInfo::ResponseFlag::UnauthorizedExternalService,
-      StreamInfo::ResponseFlag::RateLimitServiceError,
-      StreamInfo::ResponseFlag::DownstreamConnectionTermination,
-      StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded,
-      StreamInfo::ResponseFlag::StreamIdleTimeout,
-      StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders,
-      StreamInfo::ResponseFlag::DownstreamProtocolError,
-      StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
-      StreamInfo::ResponseFlag::ResponseFromCacheFilter,
-      StreamInfo::ResponseFlag::NoFilterConfigFound,
-      StreamInfo::ResponseFlag::DurationTimeout};
-
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto response_flag : all_response_flags) {
+  for (const auto& [flag_string, response_flag] :
+       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
+    UNREFERENCED_PARAMETER(flag_string);
+
     TestStreamInfo stream_info;
     stream_info.setResponseFlag(response_flag);
     EXPECT_CALL(*file_, write(_));
@@ -1044,21 +1019,8 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-      ProtoValidationException,
-      "Proto constraint validation failed (AccessLogValidationError.Filter: [\"embedded message "
-      "failed validation\"] | caused by AccessLogFilterValidationError.ResponseFlagFilter: "
-      "[\"embedded message failed validation\"] | caused by "
-      "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
-      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
-      "\"accesslog\"\nfilter {\n "
-      " "
-      "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
-      "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
-      "\"/dev/null\"\n  "
-      "}\n}\n");
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          ProtoValidationException, "Proto constraint validation failed");
 }
 
 TEST_F(AccessLogImplTest, ValidateTypedConfig) {
@@ -1073,21 +1035,47 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-      ProtoValidationException,
-      "Proto constraint validation failed (AccessLogValidationError.Filter: [\"embedded message "
-      "failed validation\"] | caused by AccessLogFilterValidationError.ResponseFlagFilter: "
-      "[\"embedded message failed validation\"] | caused by "
-      "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
-      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
-      "\"accesslog\"\nfilter {\n "
-      " "
-      "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
-      "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
-      "\"/dev/null\"\n  "
-      "}\n}\n");
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          ProtoValidationException, "Proto constraint validation failed");
+}
+
+TEST_F(AccessLogImplTest, Stdout) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_, createAccessLog(_))
+      .WillOnce(Invoke(
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
+
+            return file_;
+          }));
+  EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
+}
+
+TEST_F(AccessLogImplTest, Stderr) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StderrAccessLog
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_, createAccessLog(_))
+      .WillOnce(Invoke(
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
+            return file_;
+          }));
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 
 TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {
@@ -1216,11 +1204,11 @@ typed_config:
       {"PERMISSION_DENIED", 403}, {"UNAVAILABLE", 429}, {"UNIMPLEMENTED", 404},
       {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 
-  for (const auto& pair : statusMapping) {
-    stream_info_.response_code_ = pair.second;
+  for (const auto& [response_string, response_code] : statusMapping) {
+    stream_info_.response_code_ = response_code;
 
     const InstanceSharedPtr log = AccessLogFactory::fromProto(
-        parseAccessLogFromV3Yaml(fmt::format(yaml_template, pair.first)), context_);
+        parseAccessLogFromV3Yaml(fmt::format(yaml_template, response_string)), context_);
 
     EXPECT_CALL(*file_, write(_));
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);

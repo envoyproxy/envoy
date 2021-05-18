@@ -114,7 +114,6 @@ public:
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;
-using UdpPacketWriterFactoryOptRef = absl::optional<std::reference_wrapper<UdpPacketWriterFactory>>;
 
 } // namespace Network
 } // namespace Envoy

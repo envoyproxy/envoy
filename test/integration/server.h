@@ -373,11 +373,14 @@ public:
   void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
-  void mergeHistograms(PostMergeCb) override {}
+  void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }
+
+  void runMergeCallback() { merge_cb_(); }
 
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
+  PostMergeCb merge_cb_;
 };
 
 } // namespace Stats
@@ -413,6 +416,10 @@ public:
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
+
+  void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
+                              absl::string_view value);
+  void unsetDynamicContextParam(absl::string_view resource_type_url, absl::string_view key);
 
   Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {

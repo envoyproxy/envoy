@@ -49,6 +49,10 @@ public:
     inner_.decodeMetadata(std::move(metadata_map));
   }
 
+  void dumpState(std::ostream& os, int indent_level) const override {
+    inner_.dumpState(os, indent_level);
+  }
+
 protected:
   ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner) {}
 

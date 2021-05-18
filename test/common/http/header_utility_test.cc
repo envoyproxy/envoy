@@ -34,6 +34,25 @@ public:
   TestRequestHeaderMapImpl headers_;
 };
 
+TEST_F(HeaderUtilityTest, HasHost) {
+  const std::vector<std::pair<std::string, bool>> host_headers{
+      {"localhost", false},      // w/o port part
+      {"localhost:443", true},   // name w/ port
+      {"", false},               // empty
+      {":443", true},            // just port
+      {"192.168.1.1", false},    // ipv4
+      {"192.168.1.1:443", true}, // ipv4 w/ port
+      {"[fc00::1]:443", true},   // ipv6 w/ port
+      {"[fc00::1]", false},      // ipv6
+  };
+
+  for (const auto& host_pair : host_headers) {
+    EXPECT_EQ(HeaderUtility::getPortStart(host_pair.first) != absl::string_view::npos,
+              host_pair.second)
+        << host_pair.first;
+  }
+}
+
 // Port's part from host header get removed
 TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   const std::vector<std::pair<std::string, std::string>> host_headers{
@@ -69,8 +88,22 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   }
 }
 
-// Port's part from host header won't be removed if method is "connect"
 TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost:443", "localhost"},
+  };
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first, true);
+    HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
+// Port's part from host header won't be removed if method is "connect"
+TEST_F(HeaderUtilityTest, RemovePortsFromHostConnectLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.strip_port_from_connect", "false"}});
   const std::vector<std::pair<std::string, std::string>> host_headers{
       {"localhost:443", "localhost:443"},
   };
@@ -286,19 +319,6 @@ name: match-header
 exact_match: a,b
   )EOF"));
   // Make sure that an exact match on "a,b" does in fact work.
-  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
-
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http_match_on_all_headers", "false"}});
-  // Flipping runtime to false should make "a,b" no longer match because we will match on the first
-  // header only.
-  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
-
-  header_data[0] = std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(R"EOF(
-name: match-header
-exact_match: a
-  )EOF"));
-  // With runtime off, exact match on "a" should pass.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
 }
 
@@ -651,6 +671,18 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
 }
 
+TEST(HeaderIsValidTest, ShouldHaveNoBody) {
+  const std::vector<std::string> methods{{"CONNECT"}, {"GET"}, {"DELETE"}, {"TRACE"}, {"HEAD"}};
+
+  for (const auto& method : methods) {
+    TestRequestHeaderMapImpl headers{{":method", method}};
+    EXPECT_TRUE(HeaderUtility::requestShouldHaveNoBody(headers));
+  }
+
+  TestRequestHeaderMapImpl post{{":method", "POST"}};
+  EXPECT_FALSE(HeaderUtility::requestShouldHaveNoBody(post));
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestRequestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestRequestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};
@@ -708,6 +740,53 @@ TEST(RequiredHeaders, IsModifiableHeader) {
   EXPECT_TRUE(HeaderUtility::isModifiableHeader(""));
   EXPECT_TRUE(HeaderUtility::isModifiableHeader("hostname"));
   EXPECT_TRUE(HeaderUtility::isModifiableHeader("Content-Type"));
+}
+
+TEST(ValidateHeaders, HeaderNameWithUnderscores) {
+  Stats::MockCounter dropped;
+  Stats::MockCounter rejected;
+  EXPECT_CALL(dropped, inc());
+  EXPECT_CALL(rejected, inc()).Times(0u);
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::DROP,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header_with_underscore", envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER,
+                dropped, rejected));
+
+  EXPECT_CALL(dropped, inc()).Times(0u);
+  EXPECT_CALL(rejected, inc());
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header_with_underscore",
+                envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST, dropped, rejected));
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header_with_underscore", envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+                dropped, rejected));
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
+            HeaderUtility::checkHeaderNameForUnderscores(
+                "header", envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST, dropped,
+                rejected));
+}
+
+TEST(ValidateHeaders, ContentLength) {
+  bool should_close_connection;
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
+            HeaderUtility::validateContentLength("1,1", true, should_close_connection));
+  EXPECT_FALSE(should_close_connection);
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("1,2", true, should_close_connection));
+  EXPECT_FALSE(should_close_connection);
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("1,2", false, should_close_connection));
+  EXPECT_TRUE(should_close_connection);
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("-1", false, should_close_connection));
+  EXPECT_TRUE(should_close_connection);
 }
 
 } // namespace Http

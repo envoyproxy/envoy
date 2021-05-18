@@ -22,7 +22,7 @@
 #include "common/runtime/runtime_features.h"
 #include "common/stats/utility.h"
 
-#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
@@ -78,8 +78,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()) {
 
-  cert_validator_ = std::make_unique<DefaultCertValidator>(config.certificateValidationContext(),
-                                                           stats_, time_source_);
+  auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
+  auto cert_validator_factory =
+      Registry::FactoryRegistry<CertValidatorFactory>::getFactory(cert_validator_name);
+
+  if (!cert_validator_factory) {
+    throw EnvoyException(
+        absl::StrCat("Failed to get certificate validator factory for ", cert_validator_name));
+  }
+
+  cert_validator_ = cert_validator_factory->createCertValidator(
+      config.certificateValidationContext(), stats_, time_source_);
+
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -166,9 +176,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       if (ctx.cert_chain_ == nullptr ||
           !SSL_CTX_use_certificate(ctx.ssl_ctx_.get(), ctx.cert_chain_.get())) {
         while (uint64_t err = ERR_get_error()) {
-          ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err, ERR_lib_error_string(err),
-                         ERR_func_error_string(err), ERR_GET_REASON(err),
-                         ERR_reason_error_string(err));
+          ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
+                         absl::NullSafeStringView(ERR_lib_error_string(err)),
+                         absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
+                         absl::NullSafeStringView(ERR_reason_error_string(err)));
         }
         throw EnvoyException(
             absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
@@ -332,6 +343,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   for (TlsContext& tls_context : tls_contexts_) {
     for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
       stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
+    }
+  }
+
+  // As late as possible, run the custom SSL_CTX configuration callback on each
+  // SSL_CTX, if set.
+  if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
+    for (TlsContext& ctx : tls_contexts_) {
+      sslctx_cb(ctx.ssl_ctx_.get());
     }
   }
 
@@ -1094,6 +1113,12 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
     break;
   }
 
+  // Apply the selected context. This must be done before OCSP stapling below
+  // since applying the context can remove the previously-set OCSP response.
+  // This will only return NULL if memory allocation fails.
+  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx->ssl_ctx_.get()) != nullptr,
+                 "");
+
   if (client_ocsp_capable) {
     stats_.ocsp_staple_requests_.inc();
   }
@@ -1118,8 +1143,6 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
     break;
   }
 
-  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx->ssl_ctx_.get()) != nullptr,
-                 "");
   return ssl_select_cert_success;
 }
 

@@ -128,6 +128,7 @@ envoy_cc_test_library(
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -320,4 +321,12 @@ envoy_basic_cc_library(
     name = "test_version_linkstamp",
     srcs = ["test_version_linkstamp.cc"],
     alwayslink = 1,
+)
+
+envoy_cc_test_library(
+    name = "delegating_route_utility_lib",
+    srcs = ["delegating_route_utility.h"],
+    deps = [
+        "//source/common/router:delegating_route_lib",
+    ],
 )

@@ -23,6 +23,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "file_access_log_lib",
+    srcs = ["file_access_log_impl.cc"],
+    hdrs = ["file_access_log_impl.h"],
+    # The file based access logger is core code.
+    visibility = ["//visibility:public"],
+    deps = [
+        ":access_log_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "stream_access_log_common_impl_lib",
+    hdrs = ["stream_access_log_common_impl.h"],
+    deps = [
+        ":access_log_base",
+        "//source/common/config:config_provider_lib",
+        "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/protobuf",
+        "//source/extensions/access_loggers/common:file_access_log_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_access_logger",
     hdrs = ["grpc_access_logger.h"],
     deps = [

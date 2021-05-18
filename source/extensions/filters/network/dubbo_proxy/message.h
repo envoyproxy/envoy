@@ -89,23 +89,18 @@ enum class RpcResponseType : uint8_t {
 
 class Context {
 public:
-  using AttachmentMap = absl::node_hash_map<std::string, std::string>;
+  virtual ~Context() = default;
 
-  bool hasAttachments() const { return !attachments_.empty(); }
-  const AttachmentMap& attachments() const { return attachments_; }
-
-  Buffer::Instance& messageOriginData() { return message_origin_buffer_; }
+  Buffer::Instance& originMessage() { return origin_message_; }
   size_t messageSize() const { return headerSize() + bodySize(); }
 
-  virtual size_t bodySize() const PURE;
   virtual size_t headerSize() const PURE;
+  virtual size_t bodySize() const PURE;
+
+  virtual bool isHeartbeat() const PURE;
 
 protected:
-  Context() = default;
-  virtual ~Context() { attachments_.clear(); }
-
-  AttachmentMap attachments_;
-  Buffer::OwnedImpl message_origin_buffer_;
+  Buffer::OwnedImpl origin_message_;
 };
 
 using ContextSharedPtr = std::shared_ptr<Context>;
@@ -135,6 +130,7 @@ using RpcInvocationSharedPtr = std::shared_ptr<RpcInvocation>;
 class RpcResult {
 public:
   virtual ~RpcResult() = default;
+
   virtual bool hasException() const PURE;
 };
 
