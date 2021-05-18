@@ -1695,11 +1695,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_http_integration_test",
     size = "large",
-    srcs = select({
-        "//bazel:coverage_build": [],
-        "//bazel:disable_http3": [],
-        "//conditions:default": ["quic_http_integration_test.cc"],
-    }),
+    srcs = envoy_select_enable_http3(["quic_http_integration_test.cc"]),
     data = ["//test/config/integration/certs"],
     shard_count = 6,
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
