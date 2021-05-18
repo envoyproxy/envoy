@@ -19,6 +19,7 @@
 #include "envoy/network/listener.h"
 #include "server/connection_handler_impl.h"
 #include "server/active_listener_base.h"
+#include "common/quic/envoy_quic_crypto_stream_factory.h"
 
 namespace Envoy {
 namespace Quic {
@@ -53,7 +54,8 @@ public:
                       Network::ListenerConfig& listener_config,
                       Server::ListenerStats& listener_stats,
                       Server::PerHandlerListenerStats& per_worker_stats,
-                      Event::Dispatcher& dispatcher, Network::Socket& listen_socket);
+                      Event::Dispatcher& dispatcher, Network::Socket& listen_socket,
+                      EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -81,6 +83,7 @@ private:
   Server::PerHandlerListenerStats& per_worker_stats_;
   Event::Dispatcher& dispatcher_;
   Network::Socket& listen_socket_;
+  EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory_;
 };
 
 } // namespace Quic

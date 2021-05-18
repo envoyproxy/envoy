@@ -25,17 +25,17 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled, EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config, std::move(options), kernel_worker_routing, enabled) {}
+                         quic_config, std::move(options), kernel_worker_routing, enabled, crypto_server_stream_factory) {}
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
@@ -43,7 +43,8 @@ ActiveQuicListener::ActiveQuicListener(
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      kernel_worker_routing_(kernel_worker_routing) {
+      kernel_worker_routing_(kernel_worker_routing),
+      crypto_server_stream_factory_(crypto_server_stream_factory) {
   // This flag fix a QUICHE issue which may crash Envoy during connection close.
   SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   // Do not include 32-byte per-entry overhead while counting header size.
@@ -81,7 +82,7 @@ ActiveQuicListener::ActiveQuicListener(
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_);
+      per_worker_stats_, dispatcher, listen_socket_, crypto_server_stream_factory_);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -233,6 +234,15 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
   configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
+
+  if (!config.has_crypto_stream()) {
+    // If not specified, use the quic crypto stream created by QUICHE.
+   envoy::config::listener::v3::QuicCryptoStream* crypto_stream = config.mutable_crypto_stream();
+   crypto_stream->set_name("quic.quiche_crypto_server_stream");
+   envoy::extensions::quic::v3::CryptoServerStreamConfig crypto_stream_config;
+   crypto_stream->mutable_typed_config()->PackFrom(crypto_stream_config);
+  }
+  crypto_server_stream_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactory>(config.crypto_stream());
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
@@ -301,8 +311,8 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
 
   return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
                                               config, quic_config_, std::move(options),
-                                              kernel_worker_routing, enabled_);
-} // namespace Quic
+                                              kernel_worker_routing, enabled_, crypto_server_stream_factory_);
+}
 
 } // namespace Quic
 } // namespace Envoy

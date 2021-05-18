@@ -14,12 +14,13 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit)
+    uint32_t send_buffer_limit, EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
-      quic_connection_(std::move(connection)) {}
+      quic_connection_(std::move(connection)),
+      crypto_server_stream_factory_(crypto_server_stream_factory) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -34,7 +35,7 @@ std::unique_ptr<quic::QuicCryptoServerStreamBase>
 EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
-  return CreateCryptoServerStream(crypto_config, compressed_certs_cache, this, stream_helper());
+  return crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(crypto_config, compressed_certs_cache, this, stream_helper());
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {

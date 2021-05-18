@@ -28,13 +28,13 @@ public:
                      Network::UdpConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled, EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory);
 
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
                      Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled, EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory);
 
   ~ActiveQuicListener() override;
 
@@ -73,6 +73,7 @@ private:
   // The number of runs of the event loop in which at least one CHLO was buffered.
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
+  EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -93,6 +94,7 @@ public:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
+  EnvoyQuicCryptoServerStreamFactory crypto_server_stream_factory_;
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
   absl::once_flag install_bpf_once_;

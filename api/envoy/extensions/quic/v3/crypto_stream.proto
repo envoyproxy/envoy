@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package envoy.extensions.quic.v3;
+
+// [#protodoc-title: QUIC server crypto stream config]
+
+// Configuration specific to the QUIC server crypto stream.
+message CryptoServerStreamConfig {}
