@@ -48,6 +48,8 @@ As of November 2019 after [#8859](https://github.com/envoyproxy/envoy/pull/8859)
 To override the C++ standard library in your build, set environment variable `ENVOY_STDLIB` to `libstdc++` or `libc++` and
 run `./ci/do_ci.sh` as described below.
 
+Support Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) from 11.0.1 or higher.
+
 # Building and running tests as a developer
 
 The `./ci/run_envoy_docker.sh` script can be used to set up a Docker container on Linux and Windows
