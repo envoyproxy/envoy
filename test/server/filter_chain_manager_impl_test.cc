@@ -137,7 +137,7 @@ public:
       std::make_shared<Network::MockFilterChain>()};
 
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
-  NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
+  NiceMock<Server::Configuration::MockDrainableFactoryContext> parent_context_;
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_,
@@ -228,6 +228,14 @@ TEST_F(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
 }
 
 TEST_F(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependentDrainClose) {
+  // keep track of the number of drains initiated in the drain-tree
+  int drain_starts_seen = 0;
+  parent_context_.drain_manager_.applyChildSetup([&](MockDrainManager& manager) {
+    EXPECT_CALL(manager, _startDrainSequence(_)).WillRepeatedly(Invoke([&](auto) {
+      drain_starts_seen++;
+    }));
+  });
+
   std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
   for (int i = 0; i < 3; i++) {
     envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
@@ -254,6 +262,7 @@ TEST_F(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   auto* context_impl_0 = dynamic_cast<PerFilterChainFactoryContextImpl*>(context0.get());
   context_impl_0->startDraining();
 
+  EXPECT_EQ(1, drain_starts_seen);
   EXPECT_TRUE(context0->drainDecision().drainClose());
   EXPECT_FALSE(context1->drainDecision().drainClose());
 }

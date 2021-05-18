@@ -44,6 +44,12 @@ MockFactoryContext::MockFactoryContext()
 
 MockFactoryContext::~MockFactoryContext() = default;
 
+MockDrainableFactoryContext::MockDrainableFactoryContext() : MockFactoryContext() {
+  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
+}
+
+MockDrainableFactoryContext::~MockDrainableFactoryContext() = default;
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
