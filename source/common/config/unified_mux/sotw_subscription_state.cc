@@ -81,14 +81,14 @@ void SotwSubscriptionState::handleGoodResponse(
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();
-  ENVOY_LOG(debug, "Config update for {} (version {}) accepted with {} resources", type_url(),
+  ENVOY_LOG(debug, "Config update for {} (version {}) accepted with {} resources", typeUrl(),
             message.version_info(), message.resources().size());
 }
 
 std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
 SotwSubscriptionState::getNextRequestInternal() {
   auto request = std::make_unique<envoy::service::discovery::v3::DiscoveryRequest>();
-  request->set_type_url(type_url());
+  request->set_type_url(typeUrl());
   std::copy(names_tracked_.begin(), names_tracked_.end(),
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names()));
   if (last_good_version_info_.has_value()) {

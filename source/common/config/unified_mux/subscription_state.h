@@ -60,8 +60,8 @@ public:
   UpdateAck handleResponse(const RS& response) {
     // We *always* copy the response's nonce into the next request, even if we're going to make that
     // request a NACK by setting error_detail.
-    UpdateAck ack(response.nonce(), type_url());
-    ENVOY_LOG(debug, "Handling response for {}", type_url());
+    UpdateAck ack(response.nonce(), typeUrl());
+    ENVOY_LOG(debug, "Handling response for {}", typeUrl());
     TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
     END_TRY
     catch (const EnvoyException& e) {
@@ -71,7 +71,7 @@ public:
   }
 
   void handleEstablishmentFailure() {
-    ENVOY_LOG(debug, "SubscriptionState establishment failed for {}", type_url());
+    ENVOY_LOG(debug, "SubscriptionState establishment failed for {}", typeUrl());
     callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                      nullptr);
   }
@@ -86,7 +86,7 @@ public:
   std::unique_ptr<RQ> getNextRequestWithAck(const UpdateAck& ack) {
     auto request = getNextRequestInternal();
     request->set_response_nonce(ack.nonce_);
-    ENVOY_LOG(debug, "ACK for {} will have nonce {}", type_url(), ack.nonce_);
+    ENVOY_LOG(debug, "ACK for {} will have nonce {}", typeUrl(), ack.nonce_);
     if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
       // Don't needlessly make the field present-but-empty if status is ok.
       request->mutable_error_detail()->CopyFrom(ack.error_detail_);
@@ -120,11 +120,11 @@ protected:
     // Note that error_detail being set is what indicates that a (Delta)DiscoveryRequest is a NACK.
     ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
-    ENVOY_LOG(warn, "Config for {} rejected: {}", type_url(), e.what());
+    ENVOY_LOG(warn, "Config for {} rejected: {}", typeUrl(), e.what());
     callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 
-  std::string type_url() const { return type_url_; }
+  std::string typeUrl() const { return type_url_; }
   UntypedConfigUpdateCallbacks& callbacks() const { return callbacks_; }
 
   TtlManager ttl_;

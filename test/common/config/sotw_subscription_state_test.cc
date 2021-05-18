@@ -31,8 +31,7 @@ protected:
 
   std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
   getNextDiscoveryRequestAckless() {
-    return std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>(
-        state_.getNextRequestAckless());
+    return state_.getNextRequestAckless();
   }
 
   UpdateAck deliverDiscoveryResponse(const std::vector<std::string>& resource_names,

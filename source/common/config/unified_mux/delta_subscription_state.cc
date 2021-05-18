@@ -122,14 +122,14 @@ void DeltaSubscriptionState::handleGoodResponse(
       resource_state_[resource_name] = ResourceState::waitingForServer();
     }
   }
-  ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url(),
+  ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", typeUrl(),
             message.resources().size(), message.removed_resources().size());
 }
 
 std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>
 DeltaSubscriptionState::getNextRequestInternal() {
   auto request = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryRequest>();
-  request->set_type_url(type_url());
+  request->set_type_url(typeUrl());
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".

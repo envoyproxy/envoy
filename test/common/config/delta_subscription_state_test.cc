@@ -63,9 +63,8 @@ protected:
     if (should_use_unified_) {
       return unified_state_->getNextRequestAckless();
     }
-    return std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>(
-        new envoy::service::discovery::v3::DeltaDiscoveryRequest(
-            legacy_state_->getNextRequestAckless()));
+    return std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryRequest>(
+        legacy_state_->getNextRequestAckless());
   }
 
   UpdateAck
