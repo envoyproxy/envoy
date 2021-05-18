@@ -744,9 +744,9 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
   ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
 
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call")).Times(1);
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(1);
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success")).Times(1);
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply"));
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
 
   initializeRouter();
   startRequest(MessageType::Call);
