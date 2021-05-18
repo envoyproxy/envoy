@@ -5020,6 +5020,11 @@ public:
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
   }
+
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Any&) const override {
+    return nullptr;
+  }
 };
 
 TEST_F(RouteMatcherTest, WeightedClusters) {

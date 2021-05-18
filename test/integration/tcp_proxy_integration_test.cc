@@ -1320,7 +1320,7 @@ public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
       Network::TransportSocketFactoryPtr factory =
-          upstream_tls_ ? createUpstreamTlsContext()
+          upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
                         : Network::Test::createRawBufferSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
