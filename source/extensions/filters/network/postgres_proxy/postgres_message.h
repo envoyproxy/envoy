@@ -215,7 +215,6 @@ public:
         auto item = std::make_unique<T>();
         Message::ValidationResult result = item->validate(data, start_offset, pos, left);
         if (Message::ValidationOK != result) {
-
           pos = orig_pos;
           left = orig_left;
           value_.clear();
@@ -338,7 +337,7 @@ public:
 
 template <typename... Types> class MessageImpl : public Message, public Sequence<Types...> {
 public:
-  virtual ~MessageImpl() = default;
+  ~MessageImpl() override = default;
   bool read(const Buffer::Instance& data, const uint64_t length) override {
     // Do not call read unless validation was successful.
     ASSERT(validation_result_ == ValidationOK);

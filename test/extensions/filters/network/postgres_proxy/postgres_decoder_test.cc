@@ -182,7 +182,7 @@ TEST_F(PostgresProxyDecoderTest, InvalidStartupMessage) {
 // Test that decoder does not crash when it receives
 // random data in InitState.
 TEST_F(PostgresProxyDecoderTest, StartupMessageRandomData) {
-  srand(time(NULL));
+  srand(time(nullptr));
   for (auto i = 0; i < 10000; i++) {
     decoder_->state(DecoderImpl::State::InSyncState);
     // Generate random length.

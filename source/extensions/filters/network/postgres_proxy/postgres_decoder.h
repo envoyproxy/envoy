@@ -96,8 +96,6 @@ public:
 protected:
   State state_{State::InitState};
 
-  using onDataFunc = std::function<Result(Buffer::Instance&, bool)>;
-
   Result onDataInit(Buffer::Instance& data, bool frontend);
   Result onDataInSync(Buffer::Instance& data, bool frontend);
   Result onDataIgnore(Buffer::Instance& data, bool frontend);
