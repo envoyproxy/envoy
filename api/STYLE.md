@@ -35,8 +35,9 @@ In addition, the following conventions should be followed:
   should be hidden from the Envoy documentation.
 
 * Use a `[#alpha:]` annotation in comments for messages that are considered alpha
-  and are not subject to the threat model. This differs from the work-in-progress/alpha tagging
-  of extensions described below in that it can be applied to configuration within the core API.
+  and are not subject to the threat model. This is similar to the work-in-progress/alpha tagging
+  of extensions described below, but allows tagging messages that are used as part of the core API
+  as alpha without having to break it into its own file.
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 
