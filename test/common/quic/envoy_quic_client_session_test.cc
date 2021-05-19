@@ -80,7 +80,7 @@ public:
                              const quic::ParsedQuicVersionVector& supported_versions,
                              std::unique_ptr<EnvoyQuicClientConnection> connection,
                              const quic::QuicServerId& server_id,
-                             quic::QuicCryptoClientConfig* crypto_config,
+                             std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
                              quic::QuicClientPushPromiseIndex* push_promise_index,
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
       : EnvoyQuicClientSession(config, supported_versions, std::move(connection), server_id,
@@ -109,10 +109,11 @@ public:
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
             quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr))),
-        crypto_config_(quic::test::crypto_test_utils::ProofVerifierForTesting()),
+        crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
+            quic::test::crypto_test_utils::ProofVerifierForTesting())),
         envoy_quic_session_(quic_config_, quic_version_,
                             std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-                            quic::QuicServerId("example.com", 443, false), &crypto_config_, nullptr,
+                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
@@ -173,7 +174,7 @@ protected:
   Network::Address::InstanceConstSharedPtr self_addr_;
   TestEnvoyQuicClientConnection* quic_connection_;
   quic::QuicConfig quic_config_;
-  quic::QuicCryptoClientConfig crypto_config_;
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   TestEnvoyQuicClientSession envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;

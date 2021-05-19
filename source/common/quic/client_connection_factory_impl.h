@@ -22,15 +22,25 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
                          TimeSource& time_source,
                          Network::Address::InstanceConstSharedPtr server_addr);
 
+  // Returns the most recent crypto config from transport_socket_factory_;
+  std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
+
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
-  // server-id and server address can change over the lifetime of Envoy but will be consistent for a
+  // server-id can change over the lifetime of Envoy but will be consistent for a
   // given connection pool.
   quic::QuicServerId server_id_;
-  quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
-  // TODO(danzh) move this into client transport socket factory so that it can
-  // be updated with SDS.
-  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  // Latch the transport socket factory, to get the latest crypto config and the
+  // time source to create it.
+  Network::TransportSocketFactory& transport_socket_factory_;
+  TimeSource& time_source_;
+  // Latch the latest crypto config, to determine if it has updated since last
+  // checked.
+  Envoy::Ssl::ClientContextSharedPtr client_context_;
+  // If client context changes, client config will be updated as well.
+  std::shared_ptr<quic::QuicCryptoClientConfig> client_config_;
+  const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
+  // TODO(alyssawilk) actually set this up properly.
   quic::QuicConfig quic_config_;
 };
 
