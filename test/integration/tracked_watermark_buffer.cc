@@ -152,6 +152,7 @@ void TrackedWatermarkBufferFactory::removeDanglingAccounts() {
 
     // Remove all "dangling" accounts.
     if (accounts_it->first.use_count() == 1) {
+      ASSERT(accounts_it->second.empty());
       account_infos_.erase(accounts_it);
     }
 
@@ -159,11 +160,11 @@ void TrackedWatermarkBufferFactory::removeDanglingAccounts() {
   }
 }
 
-void TrackedWatermarkBufferFactory::setExpectedAccountBalance(uint64_t byte_size,
+void TrackedWatermarkBufferFactory::setExpectedAccountBalance(uint64_t byte_size_per_account,
                                                               uint32_t num_accounts) {
   absl::MutexLock lock(&mutex_);
   ASSERT(!expected_balances_.has_value());
-  expected_balances_.emplace(byte_size, num_accounts);
+  expected_balances_.emplace(byte_size_per_account, num_accounts);
 }
 
 bool TrackedWatermarkBufferFactory::waitForExpectedAccountBalanceWithTimeout(
@@ -189,20 +190,19 @@ void TrackedWatermarkBufferFactory::checkIfExpectedBalancesMet() {
   }
 
   removeDanglingAccounts();
-  if (account_infos_.size() < expected_balances_->num_accounts_) {
-    return;
-  }
 
-  // This is thread safe since this function should run on the only Envoy worker
-  // thread.
-  for (auto& acc : account_infos_) {
-    if (static_cast<Buffer::BufferMemoryAccountImpl*>(acc.first.get())->balance() <
-        expected_balances_->balance_per_account_) {
-      return;
+  if (account_infos_.size() == expected_balances_->num_accounts_) {
+    // This is thread safe since this function should run on the only Envoy worker
+    // thread.
+    for (auto& acc : account_infos_) {
+      if (static_cast<Buffer::BufferMemoryAccountImpl*>(acc.first.get())->balance() <
+          expected_balances_->balance_per_account_) {
+        return;
+      }
     }
-  }
 
-  expected_balances_met_.Notify();
+    expected_balances_met_.Notify();
+  }
 }
 
 } // namespace Buffer

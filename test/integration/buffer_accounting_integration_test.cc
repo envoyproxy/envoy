@@ -36,51 +36,6 @@ class HttpBufferWatermarksTest
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
-  struct BufferParams {
-    const uint32_t connection_watermark;
-    const uint32_t downstream_h2_stream_window;
-    const uint32_t downstream_h2_conn_window;
-    const uint32_t upstream_h2_stream_window;
-    const uint32_t upstream_h2_conn_window;
-  };
-
-  // Configures the buffers with the given parameters.
-  void initializeWithBufferConfig(const BufferParams& buffer_params, uint32_t num_responses) {
-    config_helper_.setBufferLimits(buffer_params.connection_watermark,
-                                   buffer_params.connection_watermark);
-
-    config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          auto* h2_options = hcm.mutable_http2_protocol_options();
-          h2_options->mutable_max_concurrent_streams()->set_value(num_responses);
-          h2_options->mutable_initial_stream_window_size()->set_value(
-              buffer_params.downstream_h2_stream_window);
-          h2_options->mutable_initial_connection_window_size()->set_value(
-              buffer_params.downstream_h2_conn_window);
-        });
-
-    config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          ConfigHelper::HttpProtocolOptions protocol_options;
-          auto* upstream_h2_options =
-              protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-          upstream_h2_options->mutable_max_concurrent_streams()->set_value(100);
-          upstream_h2_options->mutable_initial_stream_window_size()->set_value(
-              buffer_params.upstream_h2_stream_window);
-          upstream_h2_options->mutable_initial_connection_window_size()->set_value(
-              buffer_params.upstream_h2_conn_window);
-          for (auto& cluster_config : *bootstrap.mutable_static_resources()->mutable_clusters()) {
-            ConfigHelper::setProtocolOptions(cluster_config, protocol_options);
-          }
-        });
-
-    autonomous_upstream_ = true;
-    autonomous_allow_incomplete_streams_ = true;
-
-    initialize();
-  }
-
   std::vector<IntegrationStreamDecoderPtr>
   sendRequests(uint32_t num_responses, uint32_t request_body_size, uint32_t response_body_size) {
     std::vector<IntegrationStreamDecoderPtr> responses;
@@ -199,18 +154,13 @@ TEST_P(HttpBufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
 
 TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   const int num_requests = 5;
-  const uint32_t connection_watermark = 32768;
-  const uint32_t downstream_h2_stream_window = 512 * 1024;
-  const uint32_t downstream_h2_conn_window = 64 * 1024;
-  const uint32_t upstream_h2_stream_window = 64 * 1024;
-  const uint32_t upstream_h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
   const uint32_t request_body_size = 4096;
   const uint32_t response_body_size = 4096;
 
-  initializeWithBufferConfig({connection_watermark, downstream_h2_stream_window,
-                              downstream_h2_conn_window, upstream_h2_stream_window,
-                              upstream_h2_conn_window},
-                             num_requests);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
   buffer_factory_->setExpectedAccountBalance(request_body_size, num_requests);
 
   // Makes us have Envoy's writes to upstream return EAGAIN
@@ -239,18 +189,13 @@ TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
 
 TEST_P(HttpBufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   const int num_requests = 5;
-  const uint32_t connection_watermark = 32768;
-  const uint32_t downstream_h2_stream_window = 512 * 1024;
-  const uint32_t downstream_h2_conn_window = 64 * 1024;
-  const uint32_t upstream_h2_stream_window = 64 * 1024;
-  const uint32_t upstream_h2_conn_window = 1024 * 1024 * 1024; // Effectively unlimited
   const uint32_t request_body_size = 4096;
   const uint32_t response_body_size = 16384;
 
-  initializeWithBufferConfig({connection_watermark, downstream_h2_stream_window,
-                              downstream_h2_conn_window, upstream_h2_stream_window,
-                              upstream_h2_conn_window},
-                             num_requests);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
   buffer_factory_->setExpectedAccountBalance(response_body_size, num_requests);
   writev_matcher_->setSourcePort(lookupPort("http"));
   codec_client_ = makeHttpConnection(lookupPort("http"));

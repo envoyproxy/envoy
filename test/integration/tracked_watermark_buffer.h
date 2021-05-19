@@ -99,7 +99,7 @@ public:
   //
   // The Envoy worker thread will notify the test thread once the condition is
   // met.
-  void setExpectedAccountBalance(uint64_t byte_size, uint32_t num_accounts);
+  void setExpectedAccountBalance(uint64_t byte_size_per_account, uint32_t num_accounts);
   bool waitForExpectedAccountBalanceWithTimeout(
       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 

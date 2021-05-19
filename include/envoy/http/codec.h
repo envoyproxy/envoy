@@ -383,8 +383,6 @@ public:
 
   /**
    * Sets the account for this stream, propagating it to all of its buffers.
-   * This should only be called on client streams since server streams create
-   * their own account.
    * @param the account to assign this stream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
