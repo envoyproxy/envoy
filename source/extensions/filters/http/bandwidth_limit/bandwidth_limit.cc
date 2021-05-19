@@ -180,7 +180,7 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
 
 const FilterConfig* BandwidthLimiter::getConfig() const {
   const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
-      "envoy.filters.http.mir_bandwidth_limit", decoder_callbacks_->route());
+      "envoy.filters.http.bandwidth_limit", decoder_callbacks_->route());
   if (config) {
     return config;
   }
