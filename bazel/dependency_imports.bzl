@@ -14,6 +14,7 @@ load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
 load("@thrift_pip3//:requirements.bzl", thrift_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@com_github_grpc_grpc//bazel:grpc_python_deps.bzl", "grpc_python_deps")
 
 # go version for rules_go
 GO_VERSION = "1.15.5"
@@ -29,6 +30,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     upb_bazel_version_repository(name = "upb_bazel_version")
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
+    grpc_python_deps()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",
