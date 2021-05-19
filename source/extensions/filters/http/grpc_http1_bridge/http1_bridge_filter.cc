@@ -96,7 +96,8 @@ void Http1BridgeFilter::updateHttpStatusAndContentLength(
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
   if (grpc_status_header) {
     uint64_t grpc_status_code;
-    if (enable_http_status_codes && (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
+    if (enable_http_status_codes &&
+        (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
          grpc_status_code != 0)) {
       response_headers_->setStatus(Grpc::Utility::grpcToHttpStatus(grpc_status_code));
     }
