@@ -352,6 +352,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/server:connection_handler_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/v3:pkg_cc_proto",
     ],
 )
 

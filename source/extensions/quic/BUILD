@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "envoy_quic_crypto_server_stream_factory",
+    name = "envoy_quic_crypto_server_stream_lib",
     srcs = ["envoy_quic_crypto_server_stream.cc"],
     hdrs = ["envoy_quic_crypto_server_stream.h"],
     category = "quic.server.crypto_stream",

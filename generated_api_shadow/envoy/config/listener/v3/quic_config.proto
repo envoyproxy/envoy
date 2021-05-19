@@ -5,10 +5,12 @@ package envoy.config.listener.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/protocol.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "QuicConfigProto";
@@ -17,7 +19,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC listener config]
 
+message QuicCryptoStream {
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  google.protobuf.Any typed_config = 2;
+}
+
 // Configuration specific to the UDP QUIC listener.
+// [#next-free-field: 6]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -35,4 +44,6 @@ message QuicProtocolOptions {
   // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
   // to enabled.
   core.v3.RuntimeFeatureFlag enabled = 4;
+
+  QuicCryptoStream crypto_stream = 5;
 }

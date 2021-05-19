@@ -17,6 +17,8 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/envoy_quic_packet_writer.h"
 #include "common/quic/envoy_quic_utils.h"
+#include "envoy/extensions/quic/v3/crypto_stream.pb.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -235,14 +237,16 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
   configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
 
+  envoy::config::listener::v3::QuicCryptoStream crypto_stream;
   if (!config.has_crypto_stream()) {
     // If not specified, use the quic crypto stream created by QUICHE.
-   envoy::config::listener::v3::QuicCryptoStream* crypto_stream = config.mutable_crypto_stream();
-   crypto_stream->set_name("quic.quiche_crypto_server_stream");
+   crypto_stream.set_name("quic.quiche_crypto_server_stream");
    envoy::extensions::quic::v3::CryptoServerStreamConfig crypto_stream_config;
-   crypto_stream->mutable_typed_config()->PackFrom(crypto_stream_config);
+   crypto_stream.mutable_typed_config()->PackFrom(crypto_stream_config);
+  } else {
+   crypto_stream = config.crypto_stream();
   }
-  crypto_server_stream_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactory>(config.crypto_stream());
+  crypto_server_stream_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactory>(crypto_stream);
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
@@ -309,9 +313,10 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
   }
 #endif
 
+  ASSERT(crypto_server_stream_factory_.has_value());
   return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
                                               config, quic_config_, std::move(options),
-                                              kernel_worker_routing, enabled_, crypto_server_stream_factory_);
+                                              kernel_worker_routing, enabled_, crypto_server_stream_factory_.value());
 }
 
 } // namespace Quic
