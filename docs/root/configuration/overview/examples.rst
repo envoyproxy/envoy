@@ -303,8 +303,8 @@ The management server could respond to EDS requests with:
               address: 127.0.0.2
               port_value: 1234
 
-
-~~~~~~~~~~~~~~
+Special YAML usage
+~~~~~~~~~~~~~~~~~~
 
 When loading YAML configuration, the Envoy loader will interpret nodes tagged with !ignore specially,
 and omit them from them entirely from the native configuration tree. Ordinarily, the YAML stream
