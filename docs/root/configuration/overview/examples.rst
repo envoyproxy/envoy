@@ -322,7 +322,7 @@ See the following example:
 
   dynamic_sockets: !ignore
     - &admin_address { address: 127.0.0.1, port_value: 9901 }
-    - &listener_address { address: 127.0.0.1, port_value 10000 }
+    - &listener_address { address: 127.0.0.1, port_value: 10000 }
     - &lb_address { address: 127.0.0.1, port_value: 1234 }
 
   admin:
