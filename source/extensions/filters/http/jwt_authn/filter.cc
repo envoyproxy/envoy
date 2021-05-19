@@ -16,8 +16,8 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 namespace {
-const absl::string_view InvalidTokenErrorString = "invalid_token";
-const uint32_t MaximumUriLength = 256;
+constexpr absl::string_view InvalidTokenErrorString = "invalid_token";
+constexpr uint32_t MaximumUriLength = 256;
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_method_handle(Http::CustomHeaders::get().AccessControlRequestMethod);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
