@@ -610,16 +610,18 @@ protected:
   }
   void createUpstreams() override {
     ASSERT_EQ(upstreamProtocol(), FakeHttpConnection::Type::HTTP3);
+    ASSERT_EQ(fake_upstreams_count_, 1);
+    ASSERT_FALSE(autonomous_upstream_);
+
     if (use_http2_) {
-      // Generally we always want to set these fields via accessors, which
-      // changes both the upstreams and Envoy's configuration at the same time.
-      // In this particular case, we want to change the upstreams without
-      // touching config, so edit the raw members directly.
-      upstream_config_.udp_fake_upstream_ = absl::nullopt;
-      upstream_config_.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+      auto config = configWithType(FakeHttpConnection::Type::HTTP2);
+      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), FakeHttpConnection::Type::HTTP2);
+    } else {
+      auto config = configWithType(FakeHttpConnection::Type::HTTP3);
+      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), FakeHttpConnection::Type::HTTP3);
     }
-    Http2UpstreamIntegrationTest::createUpstreams();
-    upstream_config_.upstream_protocol_ = FakeHttpConnection::Type::HTTP3;
   }
 
   bool use_http2_{false};
