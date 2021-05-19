@@ -1,6 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_grpc_library")
 load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
@@ -13,6 +14,7 @@ load(
 )
 
 _PY_PROTO_SUFFIX = "_py_proto"
+_PY_GRPC_SUFFIX = "_py_grpc"
 _CC_PROTO_SUFFIX = "_cc_proto"
 _CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
@@ -106,6 +108,14 @@ def _api_cc_grpc_library(name, proto, deps = []):
         visibility = ["//visibility:public"],
     )
 
+def _api_py_grpc_library(name, proto, deps = []):
+    py_grpc_library(
+        name = name,
+        srcs = [proto],
+        deps = deps,
+        visibility = ["//visibility:public"],
+    )
+
 def api_cc_py_proto_library(
         name,
         visibility = ["//visibility:private"],
@@ -141,6 +151,10 @@ def api_cc_py_proto_library(
         cc_grpc_name = name + _CC_GRPC_SUFFIX
         cc_proto_deps = [cc_proto_library_name] + [_cc_proto_mapping(dep) for dep in deps]
         _api_cc_grpc_library(name = cc_grpc_name, proto = relative_name, deps = cc_proto_deps)
+
+        py_grpc_name = name + _PY_GRPC_SUFFIX
+        py_proto_deps = [name + _PY_PROTO_SUFFIX]
+        _api_py_grpc_library(name = py_grpc_name, proto = relative_name, deps = py_proto_deps)
 
 def api_cc_test(name, **kwargs):
     cc_test(
