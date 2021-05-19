@@ -56,7 +56,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
-    "envoy.reloadable_features.always_apply_route_header_rules",
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_preconnect",
@@ -66,18 +65,18 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
+    "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
     "envoy.reloadable_features.hash_multiple_header_values",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
-    "envoy.reloadable_features.http_match_on_all_headers",
-    "envoy.reloadable_features.http_set_copy_replace_all_headers",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http_upstream_wait_connect_response",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
+    "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
@@ -85,6 +84,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.return_502_for_upstream_protocol_errors",
     "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
+    "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
@@ -107,15 +107,12 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
     "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
-    // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
-    // v2 url is removed from codebase.
-    "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
-    // TODO(alyssawilk) flip true after the release.
-    "envoy.reloadable_features.new_tcp_connection_pool",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
+    "envoy.reloadable_features.experimental_matching_api",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

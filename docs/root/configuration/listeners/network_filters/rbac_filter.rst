@@ -11,8 +11,8 @@ This filter also supports policy in both enforcement and shadow modes. Shadow mo
 users, it is used to test that a new set of policies work before rolling out to production.
 
 When a request is denied, the :ref:`CONNECTION_TERMINATION_DETAILS<config_access_log_format_connection_termination_details>`
-will include the name of the matched policy that caused the deny in the format of `rbac_access_denied_matched_policy[policy_name]`
-(policy_name will be `none` if no policy matched), this helps to distinguish the deny from Envoy
+will include the name of the matched policy that caused the deny in the format of ``rbac_access_denied_matched_policy[policy_name]``
+(policy_name will be ``none`` if no policy matched), this helps to distinguish the deny from Envoy
 RBAC filter and the upstream backend.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>`
@@ -23,7 +23,7 @@ Statistics
 
 The RBAC network filter outputs statistics in the *<stat_prefix>.rbac.* namespace.
 
-For the shadow rule statistics `shadow_allowed` and `shadow_denied`, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.shadow_rules_stat_prefix>`
+For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.shadow_rules_stat_prefix>`
 can be used to add an extra prefix to output the statistics in the *<stat_prefix>.rbac.<shadow_rules_stat_prefix>.* namespace.
 
 .. csv-table::
@@ -44,7 +44,7 @@ Dynamic Metadata
 
 The RBAC filter emits the following dynamic metadata.
 
-For the shadow rules dynamic metadata `shadow_effective_policy_id` and `shadow_engine_result`, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.shadow_rules_stat_prefix>`
+For the shadow rules dynamic metadata ``shadow_effective_policy_id`` and ``shadow_engine_result``, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.shadow_rules_stat_prefix>`
 can be used to add an extra prefix to the corresponding dynamic metadata key.
 
 .. csv-table::
@@ -52,5 +52,5 @@ can be used to add an extra prefix to the corresponding dynamic metadata key.
   :widths: 1, 1, 2
 
   shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
-  shadow_engine_result, string, The engine result for the shadow rules (i.e. either `allowed` or `denied`).
+  shadow_engine_result, string, The engine result for the shadow rules (i.e. either ``allowed`` or ``denied``).
   access_log_hint, boolean, Whether the request should be logged. This metadata is shared and set under the key namespace 'envoy.common' (See :ref:`Shared Dynamic Metadata<shared_dynamic_metadata>`).

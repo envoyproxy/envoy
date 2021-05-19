@@ -346,7 +346,8 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(shared_connection_.connection()), *this, stats,
-        fake_upstream.http3Options(), max_request_headers_kb, headers_with_underscores_action);
+        fake_upstream.http3Options(), max_request_headers_kb, max_request_headers_count,
+        headers_with_underscores_action);
 #else
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
@@ -447,18 +448,17 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
-                   config) {
-  ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
-}
+                   config) {}
 
 static Network::SocketPtr
 makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
   return std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
 }
 
-static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
-  return makeTcpListenSocket(Network::Utility::parseInternetAddress(
-      Network::Test::getLoopbackAddressString(version), port));
+static Network::Address::InstanceConstSharedPtr makeAddress(uint32_t port,
+                                                            Network::Address::IpVersion version) {
+  return Network::Utility::parseInternetAddress(Network::Test::getLoopbackAddressString(version),
+                                                port);
 }
 
 static Network::SocketPtr
@@ -478,44 +478,22 @@ makeListenSocket(const FakeUpstreamConfig& config,
                                                 : makeTcpListenSocket(address));
 }
 
-FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                           const FakeUpstreamConfig& config)
-    : FakeUpstream(Network::Test::createRawBufferSocketFactory(), makeListenSocket(config, address),
-                   config) {
-  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
-            address->ip()->addressAsString(), address->ip()->port(),
-            Network::Test::addressVersionAsString(address->ip()->version()),
-            config.udp_fake_upstream_.has_value());
-}
-
 FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   makeTcpListenSocket(port, version), config) {
-  ASSERT(!config.udp_fake_upstream_.has_value());
-  ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
-            localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
-}
+                   makeListenSocket(config, makeAddress(port, version)), config) {}
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            const Network::Address::InstanceConstSharedPtr& address,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory), makeListenSocket(config, address), config) {
-  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
-            address->ip()->addressAsString(), address->ip()->port(),
-            Network::Test::addressVersionAsString(address->ip()->version()),
-            config.udp_fake_upstream_.has_value());
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
-    : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version),
-                   config) {
-  ASSERT(!config.udp_fake_upstream_.has_value());
-  ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
-            localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
-}
+    : FakeUpstream(std::move(transport_socket_factory),
+                   makeListenSocket(config, makeAddress(port, version)), config) {}
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
@@ -529,6 +507,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == FakeHttpConnection::Type::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
+  ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
+            config.udp_fake_upstream_.has_value(), FakeHttpConnection::typeToString(http_type_));
   if (config.udp_fake_upstream_.has_value() &&
       config.udp_fake_upstream_->max_rx_datagram_size_.has_value()) {
     listener_.udp_listener_config_.config_.mutable_downstream_socket_config()
@@ -589,6 +569,7 @@ void FakeUpstream::threadRoutine() {
   {
     absl::MutexLock lock(&lock_);
     new_connections_.clear();
+    quic_connections_.clear();
     consumed_connections_.clear();
   }
 }

@@ -43,7 +43,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
+  auto xray_tracer = factory.createTracerDriver(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 
@@ -78,7 +78,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
+  auto xray_tracer = factory.createTracerDriver(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 
@@ -104,7 +104,7 @@ TEST(XRayTracerConfigTest, ProtocolNotUDPThrows) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  ASSERT_THROW(factory.createHttpTracer(*message, context), EnvoyException);
+  ASSERT_THROW(factory.createTracerDriver(*message, context), EnvoyException);
 }
 
 TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
@@ -129,7 +129,7 @@ TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  ASSERT_THROW(factory.createHttpTracer(*message, context), EnvoyException);
+  ASSERT_THROW(factory.createTracerDriver(*message, context), EnvoyException);
 }
 
 TEST(XRayTracerConfigTest, XRayHttpTracerWithSegmentFieldsTypedConfig) {
@@ -162,7 +162,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithSegmentFieldsTypedConfig) {
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
+  auto xray_tracer = factory.createTracerDriver(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 

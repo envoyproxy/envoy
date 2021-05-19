@@ -1,15 +1,17 @@
 #include "common/http/filter_manager.h"
 
+#include <functional>
+
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracked_object_stack.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -52,6 +54,14 @@ void ActiveStreamFilterBase::commonContinue() {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
     return;
+  }
+
+  // Set ScopeTrackerScopeState if there's no existing crash context.
+  ScopeTrackedObjectStack encapsulated_object;
+  absl::optional<ScopeTrackerScopeState> state;
+  if (parent_.dispatcher_.trackedObjectStackIsEmpty()) {
+    restoreContextOnContinue(encapsulated_object);
+    state.emplace(&encapsulated_object, parent_.dispatcher_);
   }
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
@@ -207,7 +217,10 @@ bool ActiveStreamFilterBase::commonHandleAfterTrailersCallback(FilterTrailersSta
     } else {
       ASSERT(headers_continued_);
     }
-  } else {
+  } else if (status == FilterTrailersStatus::StopIteration) {
+    if (canIterate()) {
+      iteration_state_ = IterationState::StopSingleIteration;
+    }
     return false;
   }
 
@@ -226,6 +239,11 @@ Tracing::Span& ActiveStreamFilterBase::activeSpan() {
 
 const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
+}
+
+void ActiveStreamFilterBase::restoreContextOnContinue(
+    ScopeTrackedObjectStack& tracked_object_stack) {
+  parent_.contextOnContinue(tracked_object_stack);
 }
 
 Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
@@ -364,7 +382,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details);
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
@@ -829,9 +847,8 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = false;
 }
 
-// TODO(alyssawilk) update sendLocalReply interface.
 void FilterManager::sendLocalReply(
-    bool, Code code, absl::string_view body,
+    Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ASSERT(!state_.under_on_local_reply_);
@@ -889,9 +906,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_ &&
-                Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+            if (streamInfo().route_entry_) {
               streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
@@ -930,9 +945,7 @@ void FilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_ &&
-                Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+            if (streamInfo().route_entry_) {
               streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
@@ -1303,6 +1316,11 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
   }
 }
 
+void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
+  tracked_object_stack.add(connection_);
+  tracked_object_stack.add(filter_manager_callbacks_.scope());
+}
+
 bool FilterManager::createFilterChain() {
   if (state_.created_filter_chain_) {
     return false;
@@ -1524,8 +1542,7 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(parent_.state_.is_grpc_request_, code, body, modify_headers, grpc_status,
-                         details);
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
@@ -1543,8 +1560,6 @@ void ActiveStreamEncoderFilter::responseDataTooLarge() {
     // In this case, sendLocalReply will either send a response directly to the encoder, or
     // reset the stream.
     parent_.sendLocalReply(
-        parent_.filter_manager_callbacks_.requestHeaders() &&
-            Grpc::Common::isGrpcRequestHeaders(*parent_.filter_manager_callbacks_.requestHeaders()),
         Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
         nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }

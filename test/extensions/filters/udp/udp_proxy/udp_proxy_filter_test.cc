@@ -796,6 +796,61 @@ cluster: fake_cluster
   test_sessions_[0].recvDataFromUpstream("world");
 }
 
+// Make sure hash policy with key is created.
+TEST_F(UdpProxyFilterTest, HashPolicyWithKey) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policies:
+- key: "key"
+  )EOF");
+
+  EXPECT_NE(nullptr, config_->hashPolicy());
+}
+
+// Make sure validation fails if key is an empty string.
+TEST_F(UdpProxyFilterTest, ValidateHashPolicyWithKey) {
+  InSequence s;
+  auto config = R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policies:
+- key: ""
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setup(config), EnvoyException,
+                          "caused by HashPolicyValidationError\\.Key");
+}
+
+// Expect correct hash is created if hash_policy with key is mentioned.
+TEST_F(UdpProxyFilterTest, HashWithKey) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policies:
+- key: "key"
+  )EOF");
+
+  auto host = createHost(upstream_address_);
+  auto generated_hash = HashUtil::xxHash64("key");
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([host, generated_hash](
+                           Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        auto hash = context->computeHashKey();
+        EXPECT_TRUE(hash.has_value());
+        EXPECT_EQ(generated_hash, hash.value());
+        return host;
+      }));
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  test_sessions_[0].recvDataFromUpstream("world");
+}
+
 } // namespace
 } // namespace UdpProxy
 } // namespace UdpFilters
