@@ -11,6 +11,8 @@ option java_outer_classname = "ResolverProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#protodoc-title: Resolver]
+
 // DNS resolver configuration which includes the underlying dns resolver addresses and options
 message DnsResolver {
   // A list of dns resolver addresses
