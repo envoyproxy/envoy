@@ -82,7 +82,34 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   return output;
 }
 
+// When single_host_per_subset is set to be true, only expect 1 subset selector and 1 key inside the
+// selector.
+bool validateLbSubsetConfig(const envoy::config::bootstrap::v3::Bootstrap& input) {
+  for (auto& cluster : input.static_resources().clusters()) {
+    bool use_single_host_per_subset = 0;
+    int subset_selectors = 0;
+    for (auto& subset_selector : cluster.lb_subset_config().subset_selectors()) {
+      subset_selectors++;
+      if (subset_selector.single_host_per_subset()) {
+        use_single_host_per_subset = true;
+        if (subset_selector.keys().size() != 1) {
+          return false;
+        }
+      }
+    }
+    if (use_single_host_per_subset && subset_selectors != 1) {
+      return false;
+    }
+  }
+  return true;
+}
+
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
+
+  if (!validateLbSubsetConfig(input)) {
+    return;
+  }
+
   testing::NiceMock<MockOptions> options;
   DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
