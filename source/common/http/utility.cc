@@ -752,8 +752,8 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-const std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
-                                            const uint32_t max_path_length) {
+std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
+                                      const uint32_t max_path_length) {
   if (!request_headers.Path()) {
     return "";
   }
