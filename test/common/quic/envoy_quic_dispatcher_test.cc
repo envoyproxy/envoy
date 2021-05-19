@@ -34,6 +34,7 @@
 #include "common/quic/envoy_quic_alarm_factory.h"
 #include "common/quic/envoy_quic_utils.h"
 #include "extensions/transport_sockets/well_known_names.h"
+#include "extensions/quic/envoy_quic_crypto_server_stream.h"
 #include "server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -83,7 +84,8 @@ public:
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_),
+            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_,
+            crypto_stream_factory_),
         connection_id_(quic::test::TestConnectionId(1)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
@@ -254,6 +256,7 @@ protected:
   Server::ListenerStats listener_stats_;
   Server::PerHandlerListenerStats per_worker_stats_;
   Server::ConnectionHandlerImpl connection_handler_;
+  RealEnvoyQuicCryptoServerStreamFactory crypto_stream_factory_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
   const quic::QuicConnectionId connection_id_;
 };

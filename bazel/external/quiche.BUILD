@@ -2080,7 +2080,7 @@ envoy_cc_library(
     external_deps = ["ssl"],
     repository = "@envoy",
     tags = ["nofips"],
-     visibility = ["//visibility:public"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_crypto_hkdf_lib",
         ":quic_core_data_lib",

@@ -35,7 +35,8 @@ std::unique_ptr<quic::QuicCryptoServerStreamBase>
 EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
-  return crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(crypto_config, compressed_certs_cache, this, stream_helper());
+  return crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(
+      crypto_config, compressed_certs_cache, this, stream_helper());
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {

@@ -27,17 +27,20 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled, EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
+    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config, std::move(options), kernel_worker_routing, enabled, crypto_server_stream_factory) {}
+                         quic_config, std::move(options), kernel_worker_routing, enabled,
+                         crypto_server_stream_factory) {}
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
@@ -240,13 +243,14 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   envoy::config::listener::v3::QuicCryptoStream crypto_stream;
   if (!config.has_crypto_stream()) {
     // If not specified, use the quic crypto stream created by QUICHE.
-   crypto_stream.set_name("quic.quiche_crypto_server_stream");
-   envoy::extensions::quic::v3::CryptoServerStreamConfig crypto_stream_config;
-   crypto_stream.mutable_typed_config()->PackFrom(crypto_stream_config);
+    crypto_stream.set_name("quic.quiche_crypto_server_stream");
+    envoy::extensions::quic::v3::CryptoServerStreamConfig crypto_stream_config;
+    crypto_stream.mutable_typed_config()->PackFrom(crypto_stream_config);
   } else {
-   crypto_stream = config.crypto_stream();
+    crypto_stream = config.crypto_stream();
   }
-  crypto_server_stream_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactory>(crypto_stream);
+  crypto_server_stream_factory_ =
+      Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactory>(crypto_stream);
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
@@ -314,9 +318,9 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
 #endif
 
   ASSERT(crypto_server_stream_factory_.has_value());
-  return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
-                                              config, quic_config_, std::move(options),
-                                              kernel_worker_routing, enabled_, crypto_server_stream_factory_.value());
+  return std::make_unique<ActiveQuicListener>(
+      worker_index, concurrency_, disptacher, parent, config, quic_config_, std::move(options),
+      kernel_worker_routing, enabled_, crypto_server_stream_factory_.value());
 }
 
 } // namespace Quic

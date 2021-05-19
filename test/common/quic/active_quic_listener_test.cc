@@ -43,6 +43,7 @@
 #include "common/quic/platform/envoy_quic_clock.h"
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/udp_gso_batch_writer.h"
+#include "extensions/quic/envoy_quic_crypto_server_stream.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -267,6 +268,10 @@ protected:
     enabled:
       default_value: true
       runtime_key: quic.enabled
+    crypto_stream:
+      name: "envoy.quic.quiche_crypto_server_stream"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.v3.CryptoServerStreamConfig
 )EOF",
                        connection_window_size_, stream_window_size_);
   }
@@ -323,13 +328,14 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
   quic_listener_.reset();
-  EXPECT_THROW_WITH_REGEX(
-      (void)std::make_unique<ActiveQuicListener>(
-          0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
-          options, false,
-          ActiveQuicListenerFactoryPeer::runtimeEnabled(
-              static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),
-      Network::CreateListenerException, "Failed to apply socket options.");
+  RealEnvoyQuicCryptoServerStreamFactory crypto_stream_factory;
+  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
+                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
+                              listener_config_, quic_config_, options, false,
+                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
+                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
+                              crypto_stream_factory),
+                          Network::CreateListenerException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {

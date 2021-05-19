@@ -184,6 +184,7 @@ envoy_cc_test(
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
+        "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
         "//source/server:configuration_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
@@ -208,6 +209,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_dispatcher_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
+        "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
         "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
@@ -293,17 +295,5 @@ envoy_cc_test_library(
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
         "@com_googlesource_quiche//:quic_test_tools_first_flight_lib",
         "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "envoy_quic_no_handshake_crypto_server_stream_lib",
-    srcs = ["envoy_quic_no_handshake_crypto_server_stream.cc"],
-    hdrs = ["envoy_quic_no_handshake_crypto_server_stream.h"],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
-        "@com_googlesource_quiche//:quic_core_crypto_encryption_lib",
-        "@com_googlesource_quiche//:quic_core_session_lib",
     ],
 )
