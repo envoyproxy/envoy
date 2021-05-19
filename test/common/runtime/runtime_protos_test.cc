@@ -33,6 +33,8 @@ default_value: 99
   TestUtility::loadFromYamlAndValidate(yaml, uint32_proto);
   UInt32 test_uint32(uint32_proto, runtime_);
 
+  EXPECT_EQ("foo.bar", test_uint32.runtimeKey());
+
   EXPECT_CALL(runtime_.snapshot_, getInteger("foo.bar", 99));
   EXPECT_EQ(99, test_uint32.value());
 
