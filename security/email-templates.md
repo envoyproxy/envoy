@@ -207,7 +207,7 @@ Thanks,
 $PERSON (on behalf of the Envoy security team and maintainers)
 ```
 
-## Security Advisory
+## Security Advisory (for feature accidentally marked as production)
 ```
 Subject: Security advisory
 To: envoy-security-announce@googlegroups.com
@@ -217,8 +217,8 @@ Hello Envoy Community,
 
 The Envoy securitty team would like to announce a security advisory for a feature introduced in
 $ENVOYRELEASE. As this is a security advisory for a feature not considered production ready that may
-have been labeled as such, no fix is provided and the advisory is to not make use of this in a production
-capacity until future hardening has been done.
+have been labeled as such, no fix is provided and the advice is to not make use of this feature in
+a production capacity until future hardening has been done.
 
 $DEFECTSSUMMARY
 
@@ -226,14 +226,6 @@ $DEFECTSSUMMARY
 vulnerable in practice. -->
 
 The CVSS score for this is [$CVSSSTRING]($CVSSURL).
-
-**How do I mitigate the vulnerability?**
-
-<!--
-[This is an optional section. Remove if there are no mitigations.]
--->
-
-Avoid the use of feature XYZ in Envoy configuration.
 
 **Thank you**
 
