@@ -6,6 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/options.h"
+#include "envoy/server/overload/proactive_resource_monitor.h"
 #include "envoy/server/resource_monitor.h"
 
 #include "common/protobuf/protobuf.h"

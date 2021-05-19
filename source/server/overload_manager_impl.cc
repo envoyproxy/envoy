@@ -26,9 +26,10 @@ namespace Server {
  */
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
-  explicit ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table)
+  explicit ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table, std::unique_ptr<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>>& reactive_resources)
       : action_symbol_table_(action_symbol_table),
-        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())) {}
+        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
+        reactive_resources_(reactive_resources) {}
 
   const OverloadActionState& getState(const std::string& action) override {
     if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
@@ -41,10 +42,39 @@ public:
     actions_[action.index()] = state;
   }
 
+  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment) {
+      const auto reactive_resource = reactive_resources_->find(resource_name);
+  if (reactive_resource != reactive_resources_->end()) {
+    if (reactive_resource->second.tryAllocateResource(increment)) {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    ENVOY_LOG_MISC(warn, " {Failed to allocate unknown reactive resource }");
+    return false;
+  }
+  }
+
+  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement) {
+      const auto reactive_resource = reactive_resources_->find(resource_name);
+  if (reactive_resource != reactive_resources_->end()) {
+    if (reactive_resource->second.tryDeallocateResource(decrement)) {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown reactive resource }");
+    return false;
+  }
+  }
+
 private:
   static const OverloadActionState always_inactive_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;
   std::vector<OverloadActionState> actions_;
+  std::unique_ptr<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>> reactive_resources_;
 };
 
 const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
@@ -266,7 +296,8 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          Api::Api& api, const Server::Options& options)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator),
       refresh_interval_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
+          reactive_resources_(std::make_unique<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
                                                            validation_visitor);
   // We should hide impl details from users, for them there should be no distinction between
@@ -289,7 +320,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
       auto monitor = factory.createReactiveResourceMonitor(*config, context);
 
-      auto result = reactive_resources_.try_emplace(
+      auto result = reactive_resources_->try_emplace(
           reactive_resource_it->second, name,
           std::make_unique<Server::ActiveConnectionsResourceMonitor>(1), stats_scope);
       if (!result.second) {
@@ -356,7 +387,7 @@ void OverloadManagerImpl::start() {
   started_ = true;
 
   tls_.set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_);
+    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_, std::move(reactive_resources_));
   });
 
   if (resources_.empty()) {
@@ -406,36 +437,6 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
   action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(symbol),
                                std::forward_as_tuple(dispatcher, callback));
   return true;
-}
-
-bool OverloadManagerImpl::tryAllocateResource(OverloadReactiveResourceName resource_name,
-                                              uint64_t increment) {
-  const auto reactive_resource = reactive_resources_.find(resource_name);
-  if (reactive_resource != reactive_resources_.end()) {
-    if (reactive_resource->second.tryAllocateResource(increment)) {
-      return true;
-    } else {
-      return false;
-    }
-  } else {
-    ENVOY_LOG(warn, " {Failed to allocate unknown reactive resource }");
-    return false;
-  }
-}
-
-bool OverloadManagerImpl::tryDeallocateResource(OverloadReactiveResourceName resource_name,
-                                                uint64_t decrement) {
-  const auto reactive_resource = reactive_resources_.find(resource_name);
-  if (reactive_resource != reactive_resources_.end()) {
-    if (reactive_resource->second.tryDeallocateResource(decrement)) {
-      return true;
-    } else {
-      return false;
-    }
-  } else {
-    ENVOY_LOG(warn, " {Failed to deallocate unknown reactive resource }");
-    return false;
-  }
 }
 
 ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() { return *tls_; }

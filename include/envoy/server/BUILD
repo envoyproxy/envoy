@@ -302,6 +302,7 @@ envoy_cc_library(
     deps = [
         ":options_interface",
         ":resource_monitor_interface",
+        "//include/envoy/server/overload:proactive_resource_monitor",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/protobuf:message_validator_interface",

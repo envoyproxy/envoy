@@ -124,9 +124,6 @@ public:
   // about overload state changes.
   void stop();
 
-  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment);
-  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement);
-
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
   virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
@@ -157,21 +154,6 @@ private:
     Stats::Counter& skipped_updates_counter_;
   };
 
-  class ReactiveResource {
-  public:
-    ReactiveResource(const std::string& name, ReactiveResourceMonitorPtr monitor,
-                     Stats::Scope& stats_scope);
-
-    bool tryAllocateResource(uint64_t increment);
-    bool tryDeallocateResource(uint64_t decrement);
-    uint64_t currentResourceUsage();
-
-  private:
-    const std::string name_;
-    ReactiveResourceMonitorPtr monitor_;
-    Stats::Counter& failed_updates_counter_;
-  };
-
   struct ActionCallback {
     ActionCallback(Event::Dispatcher& dispatcher, OverloadActionCb callback)
         : dispatcher_(dispatcher), callback_(callback) {}
@@ -191,7 +173,7 @@ private:
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
-  absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource> reactive_resources_;
+  std::shared_ptr<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>> reactive_resources_;
 
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 

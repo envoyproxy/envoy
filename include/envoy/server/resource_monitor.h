@@ -72,52 +72,7 @@ public:
   virtual void updateResourceUsage(ResourceUpdateCallbacks& callbacks) PURE;
 };
 
-class ReactiveResourceMonitor {
-public:
-  ReactiveResourceMonitor() = default;
-  virtual ~ReactiveResourceMonitor() = default;
-  virtual bool tryAllocateResource(uint64_t increment) PURE;
-  virtual bool tryDeallocateResource(uint64_t decrement) PURE;
-  virtual uint64_t currentResourceUsage() const PURE;
-  virtual uint64_t maxResourceUsage() const PURE;
-};
-
 using ResourceMonitorPtr = std::unique_ptr<ResourceMonitor>;
-
-using ReactiveResourceMonitorPtr = std::unique_ptr<ReactiveResourceMonitor>;
-
-// Example of reactive resource monitor. To be removed.
-class ActiveConnectionsResourceMonitor : public ReactiveResourceMonitor {
-public:
-  ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
-      : max_(max_active_conns), current_(0){};
-
-  bool tryAllocateResource(uint64_t increment) {
-    uint64_t new_val = (current_ += increment);
-    if (new_val >= max_) {
-      current_ -= increment;
-      return false;
-    }
-    return true;
-  }
-
-  bool tryDeallocateResource(uint64_t decrement) {
-    ASSERT(decrement <= current_.load());
-    // Guard against race condition.
-    if (decrement <= current_.load()) {
-      current_ -= decrement;
-      return true;
-    }
-    return false;
-  }
-
-  uint64_t currentResourceUsage() const { return current_.load(); }
-  uint64_t maxResourceUsage() const { return max_; };
-
-protected:
-  uint64_t max_;
-  std::atomic<uint64_t> current_;
-};
 
 } // namespace Server
 } // namespace Envoy

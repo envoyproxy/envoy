@@ -5,12 +5,33 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
+#include "envoy/server/overload/proactive_resource_monitor.h"
 #include "envoy/thread_local/thread_local_object.h"
 
-#include "common/common/interval_value.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 namespace Envoy {
 namespace Server {
+
+  enum class OverloadReactiveResourceName {
+  GlobalDownstreamMaxConnections,
+};
+
+class OverloadReactiveResourceNameValues {
+public:
+  // Overload action to stop accepting new HTTP requests.
+  const std::string GlobalDownstreamMaxConnections =
+      "envoy.resource_monitors.global_downstream_max_connections";
+
+  std::set<std::string> reactive_resource_names_{GlobalDownstreamMaxConnections};
+
+  absl::flat_hash_map<std::string, OverloadReactiveResourceName> reactive_action_name_to_resource_ =
+      {{GlobalDownstreamMaxConnections,
+        OverloadReactiveResourceName::GlobalDownstreamMaxConnections}};
+};
+
+
+using OverloadReactiveResourceNames = ConstSingleton<OverloadReactiveResourceNameValues>;  
 
 /**
  * Tracks the state of an overload action. The state is a number between 0 and 1 that represents the
@@ -46,6 +67,10 @@ class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
+
+  virtual bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment) PURE;
+
+  virtual bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement) PURE;
 };
 
 } // namespace Server
