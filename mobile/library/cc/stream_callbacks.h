@@ -9,9 +9,13 @@
 #include "library/common/types/c_types.h"
 #include "response_headers.h"
 #include "response_trailers.h"
+#include "stream.h"
 
 namespace Envoy {
 namespace Platform {
+
+class Stream;
+using StreamSharedPtr = std::shared_ptr<Stream>;
 
 using OnHeadersCallback = std::function<void(ResponseHeadersSharedPtr headers, bool end_stream)>;
 using OnDataCallback = std::function<void(envoy_data data, bool end_stream)>;
@@ -20,7 +24,7 @@ using OnErrorCallback = std::function<void(EnvoyErrorSharedPtr error)>;
 using OnCompleteCallback = std::function<void()>;
 using OnCancelCallback = std::function<void()>;
 
-struct StreamCallbacks {
+struct StreamCallbacks : public std::enable_shared_from_this<StreamCallbacks> {
   absl::optional<OnHeadersCallback> on_headers;
   absl::optional<OnDataCallback> on_data;
   absl::optional<OnTrailersCallback> on_trailers;
