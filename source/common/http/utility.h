@@ -386,7 +386,7 @@ const std::string& getProtocolString(const Protocol p);
  * @param request headers from the original request
  * @param length to truncate the constructed URI's path
  */
-const std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
+std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
                                    const uint32_t max_path_length);
 
 /**
