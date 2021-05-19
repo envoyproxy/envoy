@@ -20,8 +20,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Auth information of MySQL.
 message AuthInfo {
+  // Name of SQL account which client want to login.
   config.core.v3.DataSource username = 1 [(udpa.annotations.sensitive) = true];
 
+  // Password of SQL account which client want to login.
   config.core.v3.DataSource password = 2 [(udpa.annotations.sensitive) = true];
 }
 
@@ -81,8 +83,7 @@ message MySQLProxy {
   //   If `database_routes` is not set, MySQL proxy works as a transport proxy, and must not be put at last in filter chain.
   DatabaseRoutes database_routes = 3;
 
-  // [#not-implemented-hide:] Downstream client username/password.
-  // * If the username/password is not match, then ER_ACCESS_DENIED_ERROR will return;
+  // [#not-implemented-hide:] Downstream client username/password. Authenticate MySQL client connections locally by forcing downstream clients connect with this username/password. If the username/password is not match, then ER_ACCESS_DENIED_ERROR will return;
   AuthInfo downstream_auth_info = 4;
 }
 
