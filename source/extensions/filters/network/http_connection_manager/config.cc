@@ -608,16 +608,22 @@ void HttpConnectionManagerConfig::processFilter(
   }
 
   // Now see if there is a factory that will accept the config.
-  auto& factory =
+  auto* factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
+          proto_config, proto_config.is_optional());
+  // null pointer returned only when the filter is optional, then skip all the processes.
+  if (factory == nullptr) {
+    ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}",
+              proto_config.name());
+    return;
+  }
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.messageValidationVisitor(), factory);
+      proto_config, context_.messageValidationVisitor(), *factory);
   Http::FilterFactoryCb callback =
-      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  dependency_manager.registerFilter(factory.name(), *factory.dependencies());
-  bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
-  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+      factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  dependency_manager.registerFilter(factory->name(), *factory->dependencies());
+  bool is_terminal = factory->isTerminalFilterByProto(*message, context_);
+  Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
       callback, proto_config.name());
