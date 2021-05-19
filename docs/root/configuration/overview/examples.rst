@@ -306,10 +306,10 @@ The management server could respond to EDS requests with:
 Special YAML usage
 ~~~~~~~~~~~~~~~~~~
 
-When loading YAML configuration, the Envoy loader will interpret nodes tagged with !ignore specially,
-and omit them from them entirely from the native configuration tree. Ordinarily, the YAML stream
-must adhere strictly to the proto schemas defined for Envoy configuration. This allows content to be
-declared that is explicitly handled as a non-represented type.
+When loading YAML configuration, the Envoy loader will interpret nodes tagged with !ignore
+specially, and omit them entirely from the native configuration tree. Ordinarily, the YAML stream
+must adhere strictly to the proto schemas defined for Envoy configuration. This allows content to
+be declared that is explicitly handled as a non-represented type.
 
 One potential use for this mechanism is to avoid extra interpolation or pre-processing overhead when
 dynamically generating YAML configuration for Envoy. Dynamic YAML anchors may be provided at the head
