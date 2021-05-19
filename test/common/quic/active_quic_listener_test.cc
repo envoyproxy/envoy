@@ -155,7 +155,7 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1);
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, nullptr);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -323,13 +323,13 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
   quic_listener_.reset();
-  EXPECT_THROW_WITH_REGEX(
-      (void)std::make_unique<ActiveQuicListener>(
-          0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
-          options, false,
-          ActiveQuicListenerFactoryPeer::runtimeEnabled(
-              static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),
-      Network::CreateListenerException, "Failed to apply socket options.");
+  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
+                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
+                              listener_config_, quic_config_, options, false,
+                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
+                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
+                              nullptr),
+                          Network::CreateListenerException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {

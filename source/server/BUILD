@@ -421,6 +421,7 @@ envoy_cc_library(
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
+        "//source/common/quic:quic_stats_lib",
     ]),
 )
 
@@ -531,7 +532,9 @@ envoy_cc_library(
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_stats_lib",
+    ]),
 )
 
 envoy_cc_library(

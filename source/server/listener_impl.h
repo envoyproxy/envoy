@@ -17,6 +17,7 @@
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
+#include "common/quic/quic_stats.h"
 
 #include "server/filter_chain_manager_impl.h"
 
@@ -227,7 +228,8 @@ public:
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, uint32_t concurrency);
+               bool workers_started, uint64_t hash, uint32_t concurrency,
+               Quic::QuicStats* quic_stats);
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -358,7 +360,7 @@ private:
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               uint32_t concurrency);
+               uint32_t concurrency, Quic::QuicStats* quic_stats);
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
@@ -423,6 +425,8 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+
+  Quic::QuicStats* quic_stats_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

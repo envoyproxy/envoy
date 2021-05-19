@@ -741,7 +741,7 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1);
+            envoy::config::listener::v3::QuicProtocolOptions(), 1, nullptr);
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif

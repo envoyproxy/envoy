@@ -176,7 +176,8 @@ private:
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory, bool enable_dispatcher_stats);
+                      WorkerFactory& worker_factory, bool enable_dispatcher_stats,
+                      Quic::QuicStats* quic_stats);
 
   void onListenerWarmed(ListenerImpl& listener);
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
@@ -316,6 +317,7 @@ private:
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
+  Quic::QuicStats* quic_stats_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

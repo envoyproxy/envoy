@@ -23,7 +23,7 @@ class ApiListenerTest : public testing::Test {
 protected:
   ApiListenerTest()
       : listener_manager_(std::make_unique<ListenerManagerImpl>(server_, listener_factory_,
-                                                                worker_factory_, false)) {}
+                                                                worker_factory_, false, nullptr)) {}
 
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;

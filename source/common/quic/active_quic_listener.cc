@@ -25,17 +25,19 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    QuicStats* quic_stats)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config, std::move(options), kernel_worker_routing, enabled) {}
+                         quic_config, std::move(options), kernel_worker_routing, enabled,
+                         quic_stats) {}
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStats* quic_stats)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
@@ -81,7 +83,7 @@ ActiveQuicListener::ActiveQuicListener(
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_);
+      per_worker_stats_, dispatcher, listen_socket_, quic_stats);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -215,8 +217,9 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
-    const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
-    : concurrency_(concurrency), enabled_(config.enabled()) {
+    const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
+    QuicStats* quic_stats)
+    : concurrency_(concurrency), enabled_(config.enabled()), quic_stats_(quic_stats) {
   uint64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -301,7 +304,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
 
   return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
                                               config, quic_config_, std::move(options),
-                                              kernel_worker_routing, enabled_);
+                                              kernel_worker_routing, enabled_, quic_stats_);
 } // namespace Quic
 
 } // namespace Quic

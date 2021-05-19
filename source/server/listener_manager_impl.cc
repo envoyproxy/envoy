@@ -251,12 +251,12 @@ DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& drain
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory,
-                                         bool enable_dispatcher_stats)
+                                         bool enable_dispatcher_stats, Quic::QuicStats* quic_stats)
     : server_(server), factory_(listener_factory),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })),
-      enable_dispatcher_stats_(enable_dispatcher_stats) {
+      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stats_(quic_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
@@ -430,9 +430,9 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_in_place_updated_.inc();
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
-    new_listener =
-        std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
-                                       workers_started_, hash, server_.options().concurrency());
+    new_listener = std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
+                                                  workers_started_, hash,
+                                                  server_.options().concurrency(), quic_stats_);
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
