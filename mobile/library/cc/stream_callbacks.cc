@@ -10,7 +10,7 @@ namespace Platform {
 namespace {
 
 void* c_on_headers(envoy_headers headers, bool end_stream, void* context) {
-  auto stream_callbacks = static_cast<StreamCallbacks*>(context);
+  auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_headers.has_value()) {
     auto raw_headers = envoyHeadersAsRawHeaderMap(headers);
     ResponseHeadersBuilder builder;
@@ -27,7 +27,7 @@ void* c_on_headers(envoy_headers headers, bool end_stream, void* context) {
 }
 
 void* c_on_data(envoy_data data, bool end_stream, void* context) {
-  auto stream_callbacks = static_cast<StreamCallbacks*>(context);
+  auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_data.has_value()) {
     auto on_data = stream_callbacks->on_data.value();
     on_data(data, end_stream);
@@ -36,7 +36,7 @@ void* c_on_data(envoy_data data, bool end_stream, void* context) {
 }
 
 void* c_on_trailers(envoy_headers metadata, void* context) {
-  auto stream_callbacks = static_cast<StreamCallbacks*>(context);
+  auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_trailers.has_value()) {
     auto raw_headers = envoyHeadersAsRawHeaderMap(metadata);
     ResponseTrailersBuilder builder;
@@ -50,7 +50,8 @@ void* c_on_trailers(envoy_headers metadata, void* context) {
 }
 
 void* c_on_error(envoy_error raw_error, void* context) {
-  auto stream_callbacks = static_cast<StreamCallbacks*>(context);
+  auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
+  auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_error.has_value()) {
     EnvoyErrorSharedPtr error = std::make_shared<EnvoyError>();
     error->error_code = raw_error.error_code;
@@ -61,25 +62,30 @@ void* c_on_error(envoy_error raw_error, void* context) {
     auto on_error = stream_callbacks->on_error.value();
     on_error(error);
   }
-  return context;
+  delete stream_callbacks_ptr;
+  return nullptr;
 }
 
 void* c_on_complete(void* context) {
-  auto stream_callbacks = static_cast<StreamCallbacks*>(context);
+  auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
+  auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_complete.has_value()) {
     auto on_complete = stream_callbacks->on_complete.value();
     on_complete();
   }
-  return context;
+  delete stream_callbacks_ptr;
+  return nullptr;
 }
 
 void* c_on_cancel(void* context) {
-  auto stream_callbacks = static_cast<StreamCallbacks*>(context);
+  auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
+  auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_cancel.has_value()) {
     auto on_cancel = stream_callbacks->on_cancel.value();
     on_cancel();
   }
-  return context;
+  delete stream_callbacks_ptr;
+  return nullptr;
 }
 
 } // namespace
@@ -93,7 +99,7 @@ envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
       .on_error = &c_on_error,
       .on_complete = &c_on_complete,
       .on_cancel = &c_on_cancel,
-      .context = this,
+      .context = new StreamCallbacksSharedPtr(this->shared_from_this()),
   };
 }
 

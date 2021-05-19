@@ -4,6 +4,7 @@
 #include <string>
 
 #include "engine.h"
+#include "engine_callbacks.h"
 #include "log_level.h"
 
 namespace Envoy {

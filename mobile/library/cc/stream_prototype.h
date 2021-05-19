@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "engine.h"
 #include "envoy_error.h"
 #include "library/common/types/c_types.h"
 #include "response_headers.h"
@@ -12,9 +13,12 @@
 namespace Envoy {
 namespace Platform {
 
+class Engine;
+using EngineSharedPtr = std::shared_ptr<Engine>;
+
 class StreamPrototype {
 public:
-  StreamPrototype(envoy_engine_t engine);
+  StreamPrototype(EngineSharedPtr engine);
 
   StreamSharedPtr start();
 
@@ -26,7 +30,7 @@ public:
   StreamPrototype& setOnCancel(OnCancelCallback closure);
 
 private:
-  envoy_engine_t engine_;
+  EngineSharedPtr engine_;
   StreamCallbacksSharedPtr callbacks_;
 };
 

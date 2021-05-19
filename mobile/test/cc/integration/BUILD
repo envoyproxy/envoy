@@ -12,3 +12,12 @@ envoy_cc_test(
         "//library/cc:envoy_engine_cc_lib_no_stamp",
     ],
 )
+
+envoy_cc_test(
+    name = "lifetimes_test",
+    srcs = ["lifetimes_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "//library/cc:envoy_engine_cc_lib_no_stamp",
+    ],
+)

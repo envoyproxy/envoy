@@ -44,7 +44,7 @@ PYBIND11_MODULE(envoy_engine, m) {
   py::class_<Engine, EngineSharedPtr>(m, "Engine")
       .def("stream_client", &Engine::streamClient)
       .def("pulse_client", &Engine::pulseClient)
-      .def("terminate", &Engine::terminate);
+      .def("terminate", &Engine::terminate, py::call_guard<py::gil_scoped_release>());
 
   py::class_<EngineBuilder, EngineBuilderSharedPtr>(m, "EngineBuilder")
       .def(py::init<std::string>())

@@ -2,19 +2,26 @@
 
 #include <memory>
 
+#include "engine.h"
 #include "stream_prototype.h"
 
 namespace Envoy {
 namespace Platform {
 
+class Engine;
+using EngineSharedPtr = std::shared_ptr<Engine>;
+
+class StreamPrototype;
+using StreamPrototypeSharedPtr = std::shared_ptr<StreamPrototype>;
+
 class StreamClient {
 public:
-  StreamClient(envoy_engine_t engine);
+  StreamClient(EngineSharedPtr engine);
 
   StreamPrototypeSharedPtr newStreamPrototype();
 
 private:
-  envoy_engine_t engine_;
+  EngineSharedPtr engine_;
 };
 
 using StreamClientSharedPtr = std::shared_ptr<StreamClient>;
