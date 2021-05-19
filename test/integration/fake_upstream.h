@@ -99,7 +99,7 @@ public:
     return encoder_.http1StreamEncoderOptions();
   }
   void
-  sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
+  sendLocalReply(Http::Code code, absl::string_view body,
                  const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
                  const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view /*details*/) override {
@@ -119,7 +119,7 @@ public:
              [&](Buffer::Instance& data, bool end_stream) -> void {
                encoder_.encodeData(data, end_stream);
              }}),
-        Http::Utility::LocalReplyData({is_grpc_request, code, body, grpc_status, is_head_request}));
+        Http::Utility::LocalReplyData({false, code, body, grpc_status, is_head_request}));
   }
 
   ABSL_MUST_USE_RESULT
@@ -414,6 +414,17 @@ protected:
 class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeConnectionBase {
 public:
   enum class Type { HTTP1, HTTP2, HTTP3 };
+  static absl::string_view typeToString(Type type) {
+    switch (type) {
+    case Type::HTTP1:
+      return "http1";
+    case Type::HTTP2:
+      return "http2";
+    case Type::HTTP3:
+      return "http3";
+    }
+    return "invalid";
+  }
 
   FakeHttpConnection(FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection,
                      Type type, Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
@@ -662,6 +673,8 @@ public:
 
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
   const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
+
+  Event::DispatcherPtr& dispatcher() { return dispatcher_; }
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;

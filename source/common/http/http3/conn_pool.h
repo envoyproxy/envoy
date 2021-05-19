@@ -10,6 +10,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/client_connection_factory_impl.h"
 #include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_transport_socket_factory.h"
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif
