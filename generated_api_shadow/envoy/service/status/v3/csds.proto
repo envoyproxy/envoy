@@ -171,6 +171,8 @@ message ClientConfig {
   repeated PerXdsConfig xds_config = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
+  // Represents generic xDS config and the exact config structure depends on
+  // the type URL (like Cluster if it is CDS)
   repeated GenericXdsConfig generic_xds_configs = 3;
 }
 

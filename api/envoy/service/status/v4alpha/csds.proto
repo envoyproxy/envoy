@@ -165,6 +165,8 @@ message ClientConfig {
   // Node for a particular client.
   config.core.v4alpha.Node node = 1;
 
+  // Represents generic xDS config and the exact config structure depends on
+  // the type URL (like Cluster if it is CDS)
   repeated GenericXdsConfig generic_xds_configs = 3;
 }
 
