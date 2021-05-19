@@ -32,11 +32,10 @@ public:
   }
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-      setUpstreamProtocol(protocols_[i]);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext();
-      auto endpoint = upstream_address_fn_(i);
       auto config = upstreamConfig();
       config.upstream_protocol_ = protocols_[i];
+      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
                                                           autonomous_allow_incomplete_streams_));
     }

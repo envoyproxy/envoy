@@ -663,15 +663,6 @@ TEST_F(DispatcherImplTest, ShouldDumpNothingIfNoTrackedObjects) {
   EXPECT_EQ(ostream.contents(), "");
 }
 
-class MessageTrackedObject : public ScopeTrackedObject {
-public:
-  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
-  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
-
-private:
-  absl::string_view sv_;
-};
-
 TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
@@ -700,6 +691,35 @@ TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
 
   // Check the dump includes and registered objects in a FILO order.
   EXPECT_EQ(ostream.contents(), "thirdsecondfirst");
+}
+
+TEST_F(DispatcherImplTest, TracksIfTrackedObjectStackEmpty) {
+  // Post on the dispatcher thread.
+  dispatcher_->post([this]() {
+    Thread::LockGuard lock(mu_);
+
+    // Initially should be empty
+    ASSERT_TRUE(dispatcher_->trackedObjectStackIsEmpty());
+
+    // Add Tracked Object
+    {
+      MessageTrackedObject first{"first"};
+      ScopeTrackerScopeState first_state{&first, *dispatcher_};
+
+      EXPECT_FALSE(dispatcher_->trackedObjectStackIsEmpty());
+    }
+
+    // Should be empty now
+    EXPECT_TRUE(dispatcher_->trackedObjectStackIsEmpty());
+
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
 }
 
 class TestFatalAction : public Server::Configuration::FatalAction {
