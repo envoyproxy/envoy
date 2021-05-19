@@ -537,11 +537,10 @@ TEST_P(ProtocolIntegrationTest, Retry) {
         TestUtility::findCounter(stats, "cluster.cluster_0.upstream_rq_tx_reset");
     ASSERT_NE(nullptr, counter);
     EXPECT_EQ(1L, counter->value());
-  } else {
-    Stats::CounterSharedPtr counter =
-        TestUtility::findCounter(stats, "cluster.cluster_0.http1.dropped_headers_with_underscores");
-    EXPECT_NE(nullptr, counter);
   }
+  EXPECT_NE(nullptr,
+            test_server_->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(),
+                                               ".dropped_headers_with_underscores")));
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
