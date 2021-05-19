@@ -1740,6 +1740,33 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
                           "Didn't find a registered implementation for type");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnknownHttpFilterWithException) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.unknown
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnknownOptionalHttpFilterWithIgnore) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.unknown
+    is_optional: true
+  )EOF";
+
+  createHttpConnectionManagerConfig(yaml_string);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
