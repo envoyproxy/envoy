@@ -19,8 +19,25 @@ getContext(Network::TransportSocketFactory& transport_socket_factory) {
   auto* quic_socket_factory =
       dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
   ASSERT(quic_socket_factory != nullptr);
-  ASSERT(quic_socket_factory->sslCtx() != nullptr);
   return quic_socket_factory->sslCtx();
+}
+
+std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConfig() {
+  auto context = getContext(transport_socket_factory_);
+  // If the secrets haven't been loaded, there is no crypto config.
+  if (context == nullptr) {
+    return nullptr;
+  }
+
+  // If the secret has been updated, update the proof source.
+  if (context.get() != client_context_.get()) {
+    client_context_ = context;
+    client_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
+        std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory_)),
+        std::make_unique<EnvoyQuicSessionCache>((time_source_)));
+  }
+  // Return the latest client config.
+  return client_config_;
 }
 
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
@@ -29,9 +46,7 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
-      crypto_config_(std::make_unique<quic::QuicCryptoClientConfig>(
-          std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory)),
-          std::make_unique<EnvoyQuicSessionCache>(time_source))) {
+      transport_socket_factory_(transport_socket_factory), time_source_(time_source) {
   quiche::FlagRegistry::getInstance();
 }
 
@@ -53,6 +68,10 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   // This flag fix a QUICHE issue which may crash Envoy during connection close.
   SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
+  auto config = info_impl->cryptoConfig();
+  if (config == nullptr) {
+    return nullptr; // no secrets available yet.
+  }
 
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
@@ -66,8 +85,8 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   // send_buffer_limit instead of using 0.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
-      info_impl->server_id_, info_impl->crypto_config_.get(), &static_info.push_promise_index_,
-      dispatcher, /*send_buffer_limit=*/0);
+      info_impl->server_id_, std::move(config), &static_info.push_promise_index_, dispatcher,
+      /*send_buffer_limit=*/0);
   return ret;
 }
 

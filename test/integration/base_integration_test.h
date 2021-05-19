@@ -307,17 +307,24 @@ public:
                                                  *dispatcher_, std::move(transport_socket));
   }
 
-  // Add a fake upstream bound to INADDR_ANY and there is no specified port.
-  FakeUpstream& addFakeUpstream(FakeHttpConnection::Type type) {
+  FakeUpstreamConfig configWithType(FakeHttpConnection::Type type) const {
     FakeUpstreamConfig config = upstream_config_;
     config.upstream_protocol_ = type;
+    if (type != FakeHttpConnection::Type::HTTP3) {
+      config.udp_fake_upstream_ = absl::nullopt;
+    }
+    return config;
+  }
+
+  FakeUpstream& addFakeUpstream(FakeHttpConnection::Type type) {
+    auto config = configWithType(type);
     fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(0, version_, config));
     return *fake_upstreams_.back();
   }
+
   FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                                 FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
+    auto config = configWithType(type);
     fake_upstreams_.emplace_back(
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
     return *fake_upstreams_.back();
@@ -394,7 +401,8 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
+  Network::TransportSocketFactoryPtr
+  createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 
@@ -437,8 +445,6 @@ protected:
   bool v2_bootstrap_{false};
 
 private:
-  friend class MixedUpstreamIntegrationTest;
-
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.

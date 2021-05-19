@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
-#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
@@ -16,18 +15,15 @@ namespace Zipkin {
 
 ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase("envoy.tracers.zipkin") {}
 
-Tracing::HttpTracerSharedPtr ZipkinTracerFactory::createHttpTracerTyped(
+Tracing::DriverSharedPtr ZipkinTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::ZipkinConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
-  Tracing::DriverPtr zipkin_driver = std::make_unique<Zipkin::Driver>(
+  return std::make_shared<Zipkin::Driver>(
       proto_config, context.serverFactoryContext().clusterManager(),
       context.serverFactoryContext().scope(), context.serverFactoryContext().threadLocal(),
       context.serverFactoryContext().runtime(), context.serverFactoryContext().localInfo(),
       context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());
-
-  return std::make_shared<Tracing::HttpTracerImpl>(std::move(zipkin_driver),
-                                                   context.serverFactoryContext().localInfo());
 }
 
 /**
