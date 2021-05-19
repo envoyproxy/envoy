@@ -1751,7 +1751,6 @@ filter_chains:
   listener_foo->drain_manager_->drain_sequence_completion_();
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
-  // validate drain cascading through manager-tree
   server_.drain_manager_.startDrainSequence([] {});
   EXPECT_CALL(*filter_chain_drain_manager, drainClose());
   EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
