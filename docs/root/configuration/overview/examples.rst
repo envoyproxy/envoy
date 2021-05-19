@@ -302,3 +302,64 @@ The management server could respond to EDS requests with:
             socket_address:
               address: 127.0.0.2
               port_value: 1234
+
+
+~~~~~~~~~~~~~~
+
+When loading YAML configuration, the Envoy loader will interpret nodes tagged with !ignore specially,
+and omit them from them entirely from the native configuration tree. Ordinarily, the YAML stream
+must adhere strictly to the proto schemas defined for Envoy configuration. This allows content to be
+declared that is explicitly handled as a non-represented type.
+
+One potential use for this mechanism is to avoid extra interpolation or pre-processing overhead when
+dynamically generating YAML configuration for Envoy. Dynamic YAML anchors may be provided at the head
+of the stream, followed by a "template" that aliases those values.
+
+See the following example:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
+
+  dynamic_sockets: !ignore
+    - &admin_address { address: 127.0.0.1, port_value: 9901 }
+    - &listener_address { address: 127.0.0.1, port_value 10000 }
+    - &lb_address { address: 127.0.0.1, port_value: 1234 }
+
+  admin:
+    address:
+      socket_address: *admin_address
+
+  static_resources:
+    listeners:
+    - name: listener_0
+      address:
+        socket_address: *listener_address
+      filter_chains:
+      - filters:
+        - name: envoy.filters.network.http_connection_manager
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            stat_prefix: ingress_http
+            codec_type: AUTO
+            route_config:
+              name: local_route
+              virtual_hosts:
+              - name: local_service
+                domains: ["*"]
+                routes:
+                - match: { prefix: "/" }
+                  route: { cluster: some_service }
+            http_filters:
+            - name: envoy.filters.http.router
+    clusters:
+    - name: some_service
+      connect_timeout: 0.25s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: some_service
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address: *lb_address
