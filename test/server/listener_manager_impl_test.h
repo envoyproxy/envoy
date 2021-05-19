@@ -40,7 +40,7 @@ class ListenerHandle {
 public:
   ListenerHandle(bool need_local_drain_manager = true) {
     if (need_local_drain_manager) {
-      drain_manager_ = new MockDrainManager();
+      drain_manager_ = std::make_shared<NiceMock<MockDrainManager>>();
       EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0);
     }
   }
@@ -49,7 +49,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
 
   Init::ExpectableTargetImpl target_;
-  MockDrainManager* drain_manager_{};
+  std::shared_ptr<NiceMock<MockDrainManager>> drain_manager_{};
   Configuration::FactoryContext* context_{};
 };
 
@@ -126,7 +126,10 @@ protected:
       EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor()).Times(0);
     }
     auto raw_listener = new ListenerHandle();
-    EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
+    // TODO: Determine if we need/can inject the drain-manager here
+    // EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
+    //     .WillOnce(Return(raw_listener->drain_manager_));
+    EXPECT_CALL(server_.drain_manager_, createChildManager(_, drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(

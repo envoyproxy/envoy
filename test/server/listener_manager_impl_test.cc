@@ -123,7 +123,7 @@ public:
                                ListenerHandle* old_listener_handle) {
     EXPECT_CALL(*worker_, addListener(_, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _));
-    EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
+    EXPECT_CALL(*old_listener_handle->drain_manager_, _startDrainSequence(_));
 
     EXPECT_TRUE(manager_->addOrUpdateListener(new_listener_proto, "", true));
 
@@ -139,7 +139,7 @@ public:
 
     EXPECT_CALL(*worker_, stopListener(_, _));
     EXPECT_CALL(*listener_factory_.socket_, close());
-    EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
+    EXPECT_CALL(*listener_handle->drain_manager_, _startDrainSequence(_));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
 
     EXPECT_CALL(*worker_, removeListener(_, _));
@@ -1135,7 +1135,7 @@ dynamic_listeners:
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion(true);
@@ -1407,7 +1407,7 @@ filter_chains:
             ASSERT_TRUE(completion != nullptr);
             stop_completion = std::move(completion);
           }));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -1462,7 +1462,7 @@ filter_chains:
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -1726,25 +1726,34 @@ filter_chains:
   worker_->callAddCompletion(true);
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
+  // grab the child-manager created for the per-filter-chain-factory-context-impl
+  EXPECT_EQ(1, listener_foo->drain_manager_->children_.size());
+  auto drain_manager = listener_foo->drain_manager_->children_[0].lock();
+  EXPECT_NE(nullptr, drain_manager);
+  auto filter_chain_drain_manager = static_cast<MockDrainManager*>(drain_manager.get());
+
+  EXPECT_CALL(*filter_chain_drain_manager, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose()).Times(0);
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  // validate draining flows through drain-tree
+  EXPECT_CALL(*filter_chain_drain_manager, _startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(*filter_chain_drain_manager, drainClose()).WillOnce(Return(true));
   EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
+  // vaildate drain cascading through manager-tree
+  server_.drain_manager_.startDrainSequence([] {});
+  EXPECT_CALL(*filter_chain_drain_manager, drainClose());
   EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -1821,7 +1830,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 2, 1, 2, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2068,7 +2077,7 @@ filter_chains:
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
 
   EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   worker_->callAddCompletion(false);
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2105,7 +2114,7 @@ filter_chains:
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", false));
 
   EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   worker_->callAddCompletion(false);
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -4692,7 +4701,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 1, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -5004,7 +5013,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZe
   new_listener_proto.clear_filter_chains();
   EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
-  EXPECT_CALL(listener_factory_, createDrainManager_(_));
+  EXPECT_CALL(server_.drain_manager_, createChildManager(_, _));
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener_proto, "", true),
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': no filter chains specified");
