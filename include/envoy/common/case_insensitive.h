@@ -17,17 +17,11 @@ class LowerCaseStrBase {
 public:
   explicit LowerCaseStrBase(absl::string_view new_string) : string_(new_string) { lower(); }
 
-  LowerCaseStrBase(LowerCaseStrBase&& rhs) noexcept : string_(std::move(rhs.string_)) {}
-  LowerCaseStrBase& operator=(LowerCaseStrBase&& rhs) noexcept {
-    string_ = std::move(rhs.string_);
-    return *this;
-  }
+  LowerCaseStrBase(LowerCaseStrBase&&) = default;
+  LowerCaseStrBase& operator=(LowerCaseStrBase&&) = default;
 
-  LowerCaseStrBase(const LowerCaseStrBase& rhs) : string_(rhs.string_) {}
-  LowerCaseStrBase& operator=(const LowerCaseStrBase& rhs) {
-    string_ = rhs.string_;
-    return *this;
-  }
+  LowerCaseStrBase(const LowerCaseStrBase&) = default;
+  LowerCaseStrBase& operator=(const LowerCaseStrBase&) = default;
 
   const std::string& get() const { return string_; }
   std::string& get() { return string_; }
