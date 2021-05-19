@@ -219,7 +219,7 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   }
 
   initialize(state);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockDrainableFactoryContext> factory_context;
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
@@ -243,7 +243,7 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     sockets.push_back(std::move(*MockConnectionSocket::createMockConnectionSocket(
         10000 + i, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111)));
   }
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockDrainableFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager{
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
       init_manager_};
