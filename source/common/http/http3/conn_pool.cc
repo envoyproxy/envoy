@@ -15,6 +15,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/client_connection_factory_impl.h"
 #include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_transport_socket_factory.h"
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif
@@ -64,7 +65,13 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [](HttpConnPoolImplBase* pool) {
+      [](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+        // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
+        auto factory = &pool->host()->transportSocketFactory();
+        ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
+        if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
+          return nullptr;
+        }
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
         Upstream::Host::CreateConnectionData data{};
         data.host_description_ = pool->host();
