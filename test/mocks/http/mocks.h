@@ -107,6 +107,7 @@ public:
   MOCK_METHOD(void, onLocalReply, (Code code));
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(bool, enableInternalRedirectsWithBody, (), (const));
 
   ResponseHeaderMapPtr continue_headers_;
@@ -213,6 +214,7 @@ public:
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
@@ -305,6 +307,7 @@ public:
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, setEncoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
+  MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
