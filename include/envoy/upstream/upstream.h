@@ -986,6 +986,12 @@ public:
   upstreamHttpProtocolOptions() const PURE;
 
   /**
+   * @return alternate protocols cache options for upstream connections.
+   */
+  virtual const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const PURE;
+
+  /**
    * @return the Http1 Codec Stats.
    */
   virtual Http::Http1::CodecStats& http1CodecStats() const PURE;
