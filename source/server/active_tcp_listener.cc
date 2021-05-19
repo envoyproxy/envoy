@@ -123,6 +123,9 @@ void ActiveTcpSocket::unlink() {
   }
   // Emit logs if a connection is not established.
   if (!connected_) {
+    // Only HCM and tcp proxy filter will populate the server name into stream info.
+    // So the stream info will have no server name at this point.
+    stream_info_->setRequestedServerName(socket_->requestedServerName());
     emitLogs(*listener_.config_, *stream_info_);
   }
   listener_.parent_.dispatcher().deferredDelete(std::move(removed));
@@ -259,6 +262,10 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
     // If active_socket is about to be destructed, emit logs if a connection is not created.
     if (!active_socket->connected_) {
       if (active_socket->stream_info_ != nullptr) {
+        // Only HCM and tcp proxy filter will populate the server name into stream info.
+        // So the stream info will have no server name at this point.
+        active_socket->stream_info_->setRequestedServerName(
+            active_socket->socket().requestedServerName());
         emitLogs(*config_, *active_socket->stream_info_);
       } else {
         // If the active_socket is not connected, this socket is not promoted to active connection.
@@ -292,6 +299,9 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    // Only HCM and tcp proxy filter will populate the server name into stream info.
+    // So the stream info will have no server name at this point.
+    stream_info->setRequestedServerName(socket->requestedServerName());
     emitLogs(*config_, *stream_info);
     socket->close();
     return;
