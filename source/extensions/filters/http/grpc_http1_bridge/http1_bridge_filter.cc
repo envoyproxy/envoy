@@ -6,6 +6,7 @@
 
 #include "envoy/http/codes.h"
 
+#include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -49,6 +50,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
   }
 
   response_headers_ = &headers;
+  ASSERT(response_headers_);
   if (end_stream) {
     // We may still need to set an http status and content length based on gRPC trailers
     // present in the response headers. This is known as a gRPC trailers-only response.
@@ -94,9 +96,8 @@ void Http1BridgeFilter::updateHttpStatusAndContentLength(
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
   if (grpc_status_header) {
     uint64_t grpc_status_code;
-    if ((!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
-         grpc_status_code != 0) &&
-        enable_http_status_codes) {
+    if (enable_http_status_codes && (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
+         grpc_status_code != 0)) {
       response_headers_->setStatus(Grpc::Utility::grpcToHttpStatus(grpc_status_code));
     }
   }
@@ -126,7 +127,7 @@ void Http1BridgeFilter::updateGrpcStatusAndMessage(
 // as well as gRPC status and message headers.
 void Http1BridgeFilter::doResponseTrailers(const Http::ResponseHeaderOrTrailerMap& trailers) {
   // First we need to set an HTTP status based on the gRPC status in `trailers`.
-  // We also set content length based on whether there exists an encoding buffer.
+  // We also set content length to an encoding buffer's size if it exists and to zero otherwise.
   updateHttpStatusAndContentLength(trailers, true);
 
   // Finally we set the grpc status and message headers based on `trailers`.
