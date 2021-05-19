@@ -59,9 +59,10 @@ class TestConfigImpl : public ConfigImpl {
 public:
   TestConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                  Server::Configuration::ServerFactoryContext& factory_context,
-                 bool validate_clusters_default)
-      : ConfigImpl(config, factory_context, ProtobufMessage::getNullValidationVisitor(),
-                   validate_clusters_default),
+                 bool validate_clusters_default,
+                 const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters())
+      : ConfigImpl(config, optional_http_filters, factory_context,
+                   ProtobufMessage::getNullValidationVisitor(), validate_clusters_default),
         config_(config) {}
 
   void setupRouteConfig(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
@@ -7856,8 +7857,11 @@ public:
         << "config value does not match expected for source: " << source;
   }
 
-  void checkNoPerFilterConfig(const std::string& yaml) {
-    const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  void
+  checkNoPerFilterConfig(const std::string& yaml,
+                         const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters()) {
+    const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                                optional_http_filters);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     const auto* route_entry = route->routeEntry();
@@ -8098,6 +8102,26 @@ virtual_hosts:
       "The filter test.default.filter doesn't support virtual host-specific configurations");
 }
 
+TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      test.default.filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          seconds: 123
+)EOF";
+
+  OptionalHttpFilters optional_http_filters = {"test.default.filter"};
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, optional_http_filters);
+}
+
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerRoute) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -8117,6 +8141,108 @@ virtual_hosts:
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException,
       "The filter test.default.filter doesn't support virtual host-specific configurations");
+}
+
+TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.default.filter:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              seconds: 123
+)EOF";
+
+  OptionalHttpFilters optional_http_filters = {"test.default.filter"};
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  checkNoPerFilterConfig(yaml, optional_http_filters);
+}
+
+TEST_F(PerFilterConfigsTest, PerVirtualHostWithUnknownFilter) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          seconds: 123
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+}
+
+TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    typed_per_filter_config:
+      filter.unknown:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          seconds: 123
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  OptionalHttpFilters optional_http_filters;
+  optional_http_filters.insert("filter.unknown");
+  checkNoPerFilterConfig(yaml, optional_http_filters);
+}
+
+TEST_F(PerFilterConfigsTest, PerRouteWithUnknownFilter) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              seconds: 123
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "Didn't find a registered implementation for name: 'filter.unknown'");
+}
+
+TEST_F(PerFilterConfigsTest, PerRouteWithOptionalUnknownFilter) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.Struct
+            value:
+              seconds: 123
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  OptionalHttpFilters optional_http_filters;
+  optional_http_filters.insert("filter.unknown");
+  checkNoPerFilterConfig(yaml, optional_http_filters);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(RouteLocalConfig)) {
