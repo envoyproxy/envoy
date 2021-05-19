@@ -387,7 +387,7 @@ const std::string& getProtocolString(const Protocol p);
  * @param length to truncate the constructed URI's path
  */
 std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
-                                   uint32_t max_path_length);
+                             uint32_t max_path_length);
 
 /**
  * Extract host and path from a URI. The host may contain port.
