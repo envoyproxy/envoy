@@ -26,6 +26,14 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
   config.connectionBalancer().registerHandler(*this);
 }
 
+ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
+                                     Network::ListenerPtr&& listener,
+                                     Network::ListenerConfig& config)
+    : ActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
+      tcp_conn_handler_(parent) {
+  config.connectionBalancer().registerHandler(*this);
+}
+
 ActiveTcpListener::~ActiveTcpListener() {
   is_deleting_ = true;
   config_->connectionBalancer().unregisterHandler(*this);
@@ -103,9 +111,10 @@ void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
 //     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
 //     // prevent further redirection.
 //     // Leave the new listener to decide whether to execute re-balance.
-//     // Note also that we must account for the number of connections properly across both listeners.
-//     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
-//     listener_.decNumConnections();
+//     // Note also that we must account for the number of connections properly across both
+//     listeners.
+//     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting
+//     better. listener_.decNumConnections();
 //     new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
 //   } else {
 //     // Set default transport protocol if none of the listener filters did it.
@@ -115,8 +124,8 @@ void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
 //     // TODO(lambdai): add integration test
 //     // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
 //     // Erase accept filter states because accept filters may not get the opportunity to clean up.
-//     // Particularly the assigned events need to reset before assigning new events in the follow up.
-//     accept_filters_.clear();
+//     // Particularly the assigned events need to reset before assigning new events in the follow
+//     up. accept_filters_.clear();
 //     // Create a new connection on this listener.
 //     listener_.newConnection(std::move(socket_), std::move(stream_info_));
 //   }

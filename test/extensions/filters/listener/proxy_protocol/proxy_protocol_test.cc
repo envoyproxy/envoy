@@ -90,6 +90,9 @@ public:
   Network::UdpListenerConfigOptRef udpListenerConfig() override {
     return Network::UdpListenerConfigOptRef();
   }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override {
+    return Network::InternalListenerConfigOptRef();
+  }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }

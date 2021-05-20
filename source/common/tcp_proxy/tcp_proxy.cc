@@ -589,7 +589,8 @@ Network::FilterStatus Filter::onNewConnection() {
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
-  ENVOY_LOG(debug, "lambdai: tcp proxy filter on downstream event {}, upstream_ = {}", static_cast<int>(event), static_cast<void*>(upstream_.get()));
+  ENVOY_LOG(debug, "lambdai: tcp proxy filter on downstream event {}, upstream_ = {}",
+            static_cast<int>(event), static_cast<void*>(upstream_.get()));
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&

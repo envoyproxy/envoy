@@ -132,7 +132,6 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
-        "//source/common/network:udp_default_writer_config",
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
@@ -141,8 +140,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -159,7 +156,6 @@ envoy_cc_test(
         "//source/common/network:addr_family_aware_socket_option_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
-        "//source/common/network:udp_default_writer_config",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",

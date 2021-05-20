@@ -7,9 +7,9 @@
 #include "common/common/linked_object.h"
 #include "common/stream_info/stream_info_impl.h"
 
-#include "server/active_stream_socket.h"
 #include "server/active_listener_base.h"
 #include "server/active_stream_socket.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -35,6 +35,8 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 Logger::Loggable<Logger::Id::conn_handler> {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config);
+  ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
+                    Network::ListenerConfig& config);
   ~ActiveTcpListener() override;
   bool listenerConnectionLimitReached() const {
     // TODO(tonya11en): Delegate enforcement of per-listener connection limits to overload

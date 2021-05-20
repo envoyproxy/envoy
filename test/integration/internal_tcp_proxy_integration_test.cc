@@ -539,7 +539,7 @@ TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
 TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
   const uint32_t size = 1 * 1024 * 1024;
-  //config_helper_.setBufferLimits(size / 2, size / 2);
+  // config_helper_.setBufferLimits(size / 2, size / 2);
   initialize();
 
   std::string data(size, 'a');
@@ -555,18 +555,17 @@ TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
 
   ASSERT_TRUE(tcp_client->write(data, true, true, std::chrono::milliseconds(30000)));
   FANCY_LOG(debug, "lambdai: waiting for upstream_flush_active");
-  //test_server_->waitForGaugeGe("tcp.tcp_stats.upstream_flush_active", 1);
-  //FANCY_LOG(debug, "lambdai: waited for upstream_flush_active = 1");
+  // test_server_->waitForGaugeGe("tcp.tcp_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  //tcp_client->waitForDisconnect(true);
+  // tcp_client->waitForDisconnect(true);
   FANCY_LOG(debug, "client disconnected");
   // Double because two tcp proxy are chained.
-  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(),
-            chained_number_);
-  FANCY_LOG(debug, "flush total == {} ", test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value());
+  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), chained_number_);
+  FANCY_LOG(debug, "flush total == {} ",
+            test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value());
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 0);
 }
 
