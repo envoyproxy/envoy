@@ -52,7 +52,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/network/common/utility.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -742,7 +741,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, connect_timeout, 5000))),
       per_upstream_preconnect_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
@@ -898,12 +897,11 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      transport_socket.set_name("envoy.transport_sockets.tls");
       transport_socket.mutable_typed_config()->PackFrom(
           config.hidden_envoy_deprecated_tls_context());
     } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     }
   }
 

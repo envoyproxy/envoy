@@ -214,6 +214,7 @@ envoy_cc_test(
     ],
     shard_count = 3,
     deps = [
+        ":ip_detection_extensions_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
@@ -238,6 +239,7 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
+        ":ip_detection_extensions_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
@@ -451,12 +453,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_test",
-    srcs = ["alternate_protocols_test.cc"],
+    name = "alternate_protocols_cache_impl_test",
+    srcs = ["alternate_protocols_cache_impl_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:alternate_protocols",
+        "//source/common/http:alternate_protocols_cache",
         "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "alternate_protocols_cache_manager_test",
+    srcs = ["alternate_protocols_cache_manager_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols_cache",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
@@ -478,5 +493,15 @@ envoy_cc_fuzz_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:path_utility_lib",
         "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "ip_detection_extensions_lib",
+    srcs = ["ip_detection_extensions.cc"],
+    hdrs = ["ip_detection_extensions.h"],
+    deps = [
+        "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
+        "//source/extensions/http/original_ip_detection/xff:xff_lib",
     ],
 )
