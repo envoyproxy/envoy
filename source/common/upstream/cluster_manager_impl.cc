@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -1409,6 +1410,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     hash_key.push_back(uint8_t(protocol));
   }
 
+  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
     // Inherit socket options from downstream connection, if set.
@@ -1445,7 +1448,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
-            !upstream_options->empty() ? upstream_options : nullptr,
+            alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.parent_.time_source_, parent_.cluster_manager_state_);
       });
@@ -1515,19 +1518,25 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     std::vector<Http::Protocol>& protocols,
+    const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+        alternate_protocol_options,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
     ClusterConnectivityState& state) {
   if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
+    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache;
+    if (alternate_protocol_options.has_value()) {
+      alternate_protocols_cache =
+          alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
+    }
 #ifdef ENVOY_ENABLE_QUIC
     // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
-    auto alternate_protocols = makeOptRefFromPtr<Http::AlternateProtocolsCacheImpl>(nullptr);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state, source, alternate_protocols, std::chrono::milliseconds(300), coptions);
+        state, source, alternate_protocols_cache, std::chrono::milliseconds(300), coptions);
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;

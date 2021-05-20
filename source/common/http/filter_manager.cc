@@ -1,9 +1,12 @@
 #include "common/http/filter_manager.h"
 
+#include <functional>
+
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracked_object_stack.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -51,6 +54,14 @@ void ActiveStreamFilterBase::commonContinue() {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
     return;
+  }
+
+  // Set ScopeTrackerScopeState if there's no existing crash context.
+  ScopeTrackedObjectStack encapsulated_object;
+  absl::optional<ScopeTrackerScopeState> state;
+  if (parent_.dispatcher_.trackedObjectStackIsEmpty()) {
+    restoreContextOnContinue(encapsulated_object);
+    state.emplace(&encapsulated_object, parent_.dispatcher_);
   }
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
@@ -228,6 +239,11 @@ Tracing::Span& ActiveStreamFilterBase::activeSpan() {
 
 const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
+}
+
+void ActiveStreamFilterBase::restoreContextOnContinue(
+    ScopeTrackedObjectStack& tracked_object_stack) {
+  parent_.contextOnContinue(tracked_object_stack);
 }
 
 Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
@@ -1298,6 +1314,11 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
   if (buffered_response_data_) {
     buffered_response_data_->setWatermarks(buffer_limit_);
   }
+}
+
+void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
+  tracked_object_stack.add(connection_);
+  tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
 bool FilterManager::createFilterChain() {
