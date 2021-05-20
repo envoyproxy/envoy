@@ -300,6 +300,7 @@ envoy_cc_test(
     srcs = ["token_bucket_impl_test.cc"],
     deps = [
         "//source/common/common:token_bucket_impl_lib",
+        "//source/common/common:token_bucket_original_impl_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],

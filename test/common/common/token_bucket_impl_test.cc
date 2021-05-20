@@ -1,6 +1,7 @@
 #include <chrono>
 
 #include "common/common/token_bucket_impl.h"
+#include "common/common/token_bucket_original_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 
@@ -11,6 +12,7 @@ namespace Envoy {
 class TokenBucketImplTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
+  Event::SimulatedTimeSystem original_time_system_;
 };
 
 // Verifies TokenBucket initialization.
@@ -108,6 +110,54 @@ TEST_F(TokenBucketImplTest, ConsumeAndNextToken) {
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
   EXPECT_EQ(time_to_next_token.count(), 0);
   EXPECT_EQ(time_to_next_token, token_bucket.nextTokenAvailable());
+}
+
+TEST_F(TokenBucketImplTest, OptimizeConsume) {
+  TokenBucketImpl token_bucket{1000, time_system_, 500};
+  TokenBucketOriginalImpl original_token_bucket{1000, original_time_system_, 500};
+
+  auto IsImproved = [](uint64_t optimize_access_nums, uint64_t original_access_nums) {
+    return optimize_access_nums <= original_access_nums;
+  };
+
+  auto TestConsume = [](auto&& token_bucket, uint64_t consume_tokens) -> uint64_t {
+    // 测试时间间隔,默认为秒
+    uint64_t time_span{100000};
+    uint64_t access_nums{0};
+
+    uint64_t elapsed_time{0};
+    while (elapsed_time++ <= time_span) {
+      if (token_bucket.consume(consume_tokens, false)) {
+        ++access_nums;
+      }
+    }
+
+    return access_nums;
+  };
+
+  {
+    uint64_t access_nums = TestConsume(token_bucket, 400);
+    uint64_t original_access_nums = TestConsume(original_token_bucket, 400);
+    EXPECT_EQ(access_nums, original_access_nums);
+  }
+
+  {
+    uint64_t access_nums = TestConsume(token_bucket, 600);
+    uint64_t original_access_nums = TestConsume(original_token_bucket, 600);
+    EXPECT_TRUE(IsImproved(access_nums, original_access_nums));
+  }
+
+  {
+    uint64_t access_nums = TestConsume(token_bucket, 800);
+    uint64_t original_access_nums = TestConsume(original_token_bucket, 800);
+    EXPECT_TRUE(IsImproved(access_nums, original_access_nums));
+  }
+
+  {
+    uint64_t access_nums = TestConsume(token_bucket, 1000);
+    uint64_t original_access_nums = TestConsume(original_token_bucket, 1000);
+    EXPECT_TRUE(IsImproved(access_nums, original_access_nums));
+  }
 }
 
 } // namespace Envoy
