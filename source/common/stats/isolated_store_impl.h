@@ -131,6 +131,7 @@ public:
     return counter;
   }
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {

@@ -5,6 +5,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/options.h"
 #include "envoy/server/resource_monitor.h"
 
 #include "common/protobuf/protobuf.h"
@@ -22,6 +23,11 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return Server::Options& the command-line options that Envoy was started with.
+   */
+  virtual const Options& options() PURE;
 
   /**
    * @return reference to the Api object

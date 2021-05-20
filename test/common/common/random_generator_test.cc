@@ -1,5 +1,6 @@
 #include <numeric>
 
+#include "common/common/interval_value.h"
 #include "common/common/random_generator.h"
 
 #include "gmock/gmock.h"
@@ -70,15 +71,13 @@ TEST(UUID, SanityCheckOfUniqueness) {
 TEST(Random, Bernoilli) {
   Random::RandomGeneratorImpl random;
 
-  EXPECT_FALSE(random.bernoulli(0));
-  EXPECT_FALSE(random.bernoulli(-1));
-  EXPECT_TRUE(random.bernoulli(1));
-  EXPECT_TRUE(random.bernoulli(2));
+  EXPECT_FALSE(random.bernoulli(UnitFloat(0.0f)));
+  EXPECT_TRUE(random.bernoulli(UnitFloat(1.0f)));
 
   int true_count = 0;
   static const auto num_rolls = 100000;
   for (size_t i = 0; i < num_rolls; ++i) {
-    if (random.bernoulli(0.4)) {
+    if (random.bernoulli(UnitFloat(0.4f))) {
       ++true_count;
     }
   }

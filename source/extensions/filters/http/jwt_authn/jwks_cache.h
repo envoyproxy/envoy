@@ -4,6 +4,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "jwt_verify_lib/jwks.h"
 
@@ -63,12 +64,13 @@ public:
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
   virtual JwksData* findByIssuer(const std::string& issuer) PURE;
 
+  // Lookup provider cache map.
   virtual JwksData* findByProvider(const std::string& provider) PURE;
 
   // Factory function to create an instance.
   static JwksCachePtr
   create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-         TimeSource& time_source, Api::Api& api);
+         TimeSource& time_source, Api::Api& api, ThreadLocal::SlotAllocator& tls);
 };
 
 } // namespace JwtAuthn

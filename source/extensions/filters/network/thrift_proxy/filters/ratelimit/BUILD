@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/ratelimit:stat_names_lib",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:pass_through_filter_lib",
+        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
         "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_interface",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3:pkg_cc_proto",
     ],
@@ -31,6 +32,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.thrift_proxy.filters",
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "alpha",
     deps = [

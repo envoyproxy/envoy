@@ -36,6 +36,14 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
   return *result;
 }
 
+bool VersionInfo::sslFipsCompliant() {
+#ifdef ENVOY_SSL_FIPS
+  return true;
+#else
+  return false;
+#endif
+}
+
 const std::string& VersionInfo::buildType() {
 #ifdef NDEBUG
   static const std::string release_type = "RELEASE";

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -15,17 +15,17 @@ namespace RedisHealthChecker {
 
 namespace {
 
-static const envoy::config::health_checker::redis::v2::Redis
+static const envoy::extensions::health_checkers::redis::v3::Redis
 getRedisHealthCheckConfig(const envoy::config::core::v3::HealthCheck& health_check_config,
                           ProtobufMessage::ValidationVisitor& validation_visitor) {
   ProtobufTypes::MessagePtr config =
-      ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
+      ProtobufTypes::MessagePtr{new envoy::extensions::health_checkers::redis::v3::Redis()};
   Envoy::Config::Utility::translateOpaqueConfig(
       health_check_config.custom_health_check().typed_config(),
       health_check_config.custom_health_check().hidden_envoy_deprecated_config(),
       validation_visitor, *config);
-  return MessageUtil::downcastAndValidate<const envoy::config::health_checker::redis::v2::Redis&>(
-      *config, validation_visitor);
+  return MessageUtil::downcastAndValidate<
+      const envoy::extensions::health_checkers::redis::v3::Redis&>(*config, validation_visitor);
 }
 
 } // namespace

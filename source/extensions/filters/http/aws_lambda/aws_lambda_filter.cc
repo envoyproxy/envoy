@@ -165,7 +165,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (payload_passthrough_) {
     setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
-    sigv4_signer_->sign(headers);
+    sigv4_signer_->signEmptyPayload(headers);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -310,7 +310,7 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
   }
 
   MessageUtil::validate(json_req, ProtobufMessage::getStrictValidationVisitor());
-  const std::string json_data = MessageUtil::getJsonStringFromMessage(
+  const std::string json_data = MessageUtil::getJsonStringFromMessageOrError(
       json_req, false /* pretty_print  */, true /* always_print_primitive_fields */);
   out.add(json_data);
 }

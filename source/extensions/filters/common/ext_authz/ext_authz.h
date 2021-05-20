@@ -74,6 +74,10 @@ struct Response {
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the request to the upstream server.
   Http::HeaderVector headers_to_add;
+  // A set of HTTP headers returned by the authorization server, will be optionally added
+  // (using "addCopy") to the response sent back to the downstream client on OK auth
+  // responses.
+  Http::HeaderVector response_headers_to_add;
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
   std::vector<Envoy::Http::LowerCaseString> headers_to_remove;

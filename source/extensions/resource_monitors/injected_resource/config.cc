@@ -1,7 +1,7 @@
 #include "extensions/resource_monitors/injected_resource/config.h"
 
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.validate.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -14,7 +14,7 @@ namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
 
 Server::ResourceMonitorPtr InjectedResourceMonitorFactory::createResourceMonitorFromProtoTyped(
-    const envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig&
+    const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
         config,
     Server::Configuration::ResourceMonitorFactoryContext& context) {
   return std::make_unique<InjectedResourceMonitor>(config, context);

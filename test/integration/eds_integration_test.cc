@@ -182,8 +182,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
 
   // We need to do a bunch of work to get a hold of second hc connection.
   FakeHttpConnectionPtr fake_upstream_connection;
-  auto result = fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, fake_upstream_connection, TestUtility::DefaultTimeout, max_request_headers_kb_);
+  auto result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection);
   RELEASE_ASSERT(result, result.message());
 
   FakeStreamPtr upstream_request;
@@ -349,7 +348,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
                            .prioritySet();
 
   // Keep track of how many times we're seeing a member update callback.
-  priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
     // We should see both hosts present in the member update callback.
     EXPECT_EQ(2, hosts_added.size());
     member_update_count++;

@@ -21,7 +21,26 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.ext_proc]
 
 // The External Processing filter allows an external service to act on HTTP traffic in a flexible way.
-// It communicates with an external gRPC service that can use it to do a variety of things
+
+// **Current Implementation Status:**
+// The filter will send the "request_headers" and "response_headers" messages by default.
+// In addition, if the "processing mode" is set , the "request_body" and "response_body"
+// messages will be sent if the corresponding fields of the "processing_mode" are
+// set to BUFFERED, and trailers will be sent if the corresponding fields are set
+// to SEND. The other body processing modes are not
+// implemented yet. The filter will also respond to "immediate_response" messages
+// at any point in the stream.
+
+// As designed, the filter supports up to six different processing steps, which are in the
+// process of being implemented:
+// * Request headers: IMPLEMENTED
+// * Request body: Only BUFFERED mode is implemented
+// * Request trailers: IMPLEMENTED
+// * Response headers: IMPLEMENTED
+// * Response body: Only BUFFERED mode is implemented
+// * Response trailers: IMPLEMENTED
+
+// The filter communicates with an external gRPC service that can use it to do a variety of things
 // with the request and response:
 //
 // * Access and modify the HTTP headers on the request, response, or both
@@ -39,6 +58,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Whether it receives the message body at all, in separate chunks, or as a single buffer
 // * Whether subsequent HTTP requests are transmitted synchronously or whether they are
 //   sent asynchronously.
+// * To modify request or response trailers if they already exist
+// * To add request or response trailers where they are not present
 //
 // All of this together allows a server to process the filter traffic in fairly
 // sophisticated ways. For example:
@@ -63,7 +84,6 @@ message ExternalProcessor {
   // The filter supports both the "Envoy" and "Google" gRPC clients.
   config.core.v3.GrpcService grpc_service = 1;
 
-  // [#not-implemented-hide:]
   // By default, if the gRPC stream cannot be established, or if it is closed
   // prematurely with an error, the filter will fail. Specifically, if the
   // response headers have not yet been delivered, then it will return a 500
@@ -73,7 +93,6 @@ message ExternalProcessor {
   // or could not be opened, processing continues without error.
   bool failure_mode_allow = 2;
 
-  // [#not-implemented-hide:]
   // Specifies default options for how HTTP headers, trailers, and bodies are
   // sent. See ProcessingMode for details.
   ProcessingMode processing_mode = 3;
@@ -102,13 +121,13 @@ message ExternalProcessor {
   // for the list of supported attributes and their types.
   repeated string response_attributes = 6;
 
-  // [#not-implemented-hide:]
   // Specifies the timeout for each individual message sent on the stream and
   // when the filter is running in synchronous mode. Whenever
   // the proxy sends a message on the stream that requires a response, it will
   // reset this timer, and will stop processing and return an error (subject
-  // to the processing mode) if the timer expires. There is no timeout when
-  // the filter is running in asynchronous mode. Default is 200 ms.
+  // to the processing mode) if the timer expires before a matching response.
+  // is received. There is no timeout when the filter is running in asynchronous
+  // mode. Default is 200 milliseconds.
   google.protobuf.Duration message_timeout = 7;
 
   // [#not-implemented-hide:]

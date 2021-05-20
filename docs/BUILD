@@ -5,7 +5,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-exports_files(["protodoc_manifest.yaml"])
+exports_files([
+    "protodoc_manifest.yaml",
+    "v2_mapping.json",
+])
 
 envoy_package()
 
@@ -14,10 +17,11 @@ filegroup(
     srcs = glob(
         [
             "root/**/*.yaml",
-            "root/**/*.pb",
         ],
         exclude = [
-            "root/**/envoy-dynamic*.yaml",
+            "root/**/envoy-dynamic-cds-demo.yaml",
+            "root/**/envoy-dynamic-lds-demo.yaml",
+            "root/**/envoy-dynamic-filesystem-demo.yaml",
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
@@ -30,4 +34,13 @@ filegroup(
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
     }),
+)
+
+filegroup(
+    name = "proto_examples",
+    srcs = glob(
+        [
+            "root/**/*.pb",
+        ],
+    ),
 )

@@ -17,8 +17,8 @@ namespace ProfileAction {
 namespace {
 static constexpr uint64_t DefaultMaxProfiles = 10;
 
-std::string generateProfileFilePath(const std::string& directory, const SystemTime& now) {
-  auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+std::string generateProfileFilePath(const std::string& directory, TimeSource& time_source) {
+  const uint64_t timestamp = DateUtil::nowToSeconds(time_source);
   if (absl::EndsWith(directory, "/")) {
     return absl::StrFormat("%s%s.%d", directory, "ProfileAction", timestamp);
   }
@@ -89,7 +89,7 @@ void ProfileAction::run(
   }
 
   // Generate file path for output and try to profile
-  profile_filename_ = generateProfileFilePath(path_, context_.api_.timeSource().systemTime());
+  profile_filename_ = generateProfileFilePath(path_, context_.api_.timeSource());
 
   if (!Profiler::Cpu::profilerEnabled()) {
     if (Profiler::Cpu::startProfiler(profile_filename_)) {

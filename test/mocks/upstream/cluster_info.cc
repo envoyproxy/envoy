@@ -64,9 +64,11 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
   ON_CALL(*this, edsServiceName()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
+  ON_CALL(*this, http3Options()).WillByDefault(ReturnRef(http3_options_));
   ON_CALL(*this, commonHttpProtocolOptions())
       .WillByDefault(ReturnRef(common_http_protocol_options_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
@@ -105,6 +107,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(upstream_http_protocol_options_));
+  ON_CALL(*this, alternateProtocolsCacheOptions())
+      .WillByDefault(ReturnRef(alternate_protocols_cache_options_));
   // Delayed construction of typed_metadata_, to allow for injection of metadata
   ON_CALL(*this, typedMetadata())
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
@@ -127,6 +131,10 @@ Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
 
 Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, statsScope());
+}
+
+Http::Http3::CodecStats& MockClusterInfo::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, statsScope());
 }
 
 } // namespace Upstream

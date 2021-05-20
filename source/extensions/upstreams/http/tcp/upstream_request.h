@@ -5,6 +5,7 @@
 
 #include "envoy/http/codec.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/cleanup.h"

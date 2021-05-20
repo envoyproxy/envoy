@@ -79,6 +79,11 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
   }
 
+  ScopePtr scopeFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
+  }
+
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     Thread::LockGuard lock(lock_);
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
@@ -286,6 +291,10 @@ public:
     Thread::LockGuard lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
+  ScopePtr scopeFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
+  }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
@@ -364,11 +373,14 @@ public:
   void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
-  void mergeHistograms(PostMergeCb) override {}
+  void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }
+
+  void runMergeCallback() { merge_cb_(); }
 
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
+  PostMergeCb merge_cb_;
 };
 
 } // namespace Stats
@@ -397,12 +409,17 @@ public:
          Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
          uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
          Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-         bool use_real_stats = false, bool v2_bootstrap = false);
+         Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
+         bool v2_bootstrap = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
+
+  void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
+                              absl::string_view value);
+  void unsetDynamicContextParam(absl::string_view resource_type_url, absl::string_view key);
 
   Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
@@ -422,7 +439,7 @@ public:
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
              std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-             bool v2_bootstrap);
+             Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
@@ -506,7 +523,8 @@ protected:
                                        ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
                                        Random::RandomGeneratorPtr&& random_generator,
-                                       ProcessObjectOptRef process_object) PURE;
+                                       ProcessObjectOptRef process_object,
+                                       Buffer::WatermarkFactorySharedPtr watermark_factory) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), statStore(),
@@ -521,7 +539,7 @@ private:
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-                     bool v2_bootstrap);
+                     Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -570,7 +588,8 @@ private:
                                ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,
                                Random::RandomGeneratorPtr&& random_generator,
-                               ProcessObjectOptRef process_object) override;
+                               ProcessObjectOptRef process_object,
+                               Buffer::WatermarkFactorySharedPtr watermark_factory) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.

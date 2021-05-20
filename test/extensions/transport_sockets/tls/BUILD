@@ -56,6 +56,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -179,6 +180,26 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "handshaker_factory_test",
+    srcs = ["handshaker_factory_test.cc"],
+    deps = [
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:process_context_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:registry_lib",
     ],
 )
 

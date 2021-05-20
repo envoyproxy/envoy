@@ -6,7 +6,6 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/async_client_utility.h"
@@ -53,6 +52,7 @@ public:
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
+  const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
 
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;

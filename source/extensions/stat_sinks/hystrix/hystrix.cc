@@ -319,7 +319,10 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   // Separated out just so it's easier to understand
   auto on_destroy_callback = [this, &stream_decoder_filter_callbacks]() {
     ENVOY_LOG(debug, "stopped sending data to hystrix dashboard on port {}",
-              stream_decoder_filter_callbacks.connection()->remoteAddress()->asString());
+              stream_decoder_filter_callbacks.connection()
+                  ->addressProvider()
+                  .remoteAddress()
+                  ->asString());
 
     // Unregister the callbacks from the sink so data is no longer encoded through them.
     unregisterConnection(&stream_decoder_filter_callbacks);
@@ -328,8 +331,9 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   // Add the callback to the admin_filter list of callbacks
   admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
 
-  ENVOY_LOG(debug, "started sending data to hystrix dashboard on port {}",
-            stream_decoder_filter_callbacks.connection()->remoteAddress()->asString());
+  ENVOY_LOG(
+      debug, "started sending data to hystrix dashboard on port {}",
+      stream_decoder_filter_callbacks.connection()->addressProvider().remoteAddress()->asString());
   return Http::Code::OK;
 }
 

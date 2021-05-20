@@ -1,7 +1,7 @@
 #include "extensions/resource_monitors/fixed_heap/config.h"
 
-#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
-#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.validate.h"
+#include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
+#include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -14,7 +14,7 @@ namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 
 Server::ResourceMonitorPtr FixedHeapMonitorFactory::createResourceMonitorFromProtoTyped(
-    const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
+    const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
     Server::Configuration::ResourceMonitorFactoryContext& /*unused_context*/) {
   return std::make_unique<FixedHeapMonitor>(config);
 }

@@ -12,6 +12,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.upstreams",
     security_posture = "robust_to_untrusted_downstream",
     # This is core Envoy config.
     visibility = ["//visibility:public"],
@@ -20,7 +21,9 @@ envoy_cc_extension(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/http1:settings_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],

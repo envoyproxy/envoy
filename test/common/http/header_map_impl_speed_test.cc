@@ -110,7 +110,7 @@ static void headerMapImplSetInlineInteger(benchmark::State& state) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
   for (auto _ : state) { // NOLINT
-    headers->setConnection(value);
+    headers->setContentLength(value++);
   }
   benchmark::DoNotOptimize(headers->size());
 }

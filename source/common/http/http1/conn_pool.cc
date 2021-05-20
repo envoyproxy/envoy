@@ -39,26 +39,10 @@ ActiveClient::StreamWrapper::~StreamWrapper() {
 void ActiveClient::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
 void ActiveClient::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
-    close_connection_ =
-        HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
-    if (close_connection_) {
-      parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
-    }
-  } else {
-    // If Connection: close OR
-    //    Http/1.0 and not Connection: keep-alive OR
-    //    Proxy-Connection: close
-    if ((absl::EqualsIgnoreCase(headers->getConnectionValue(),
-                                Headers::get().ConnectionValues.Close)) ||
-        (parent_.codec_client_->protocol() == Protocol::Http10 &&
-         !absl::EqualsIgnoreCase(headers->getConnectionValue(),
-                                 Headers::get().ConnectionValues.KeepAlive)) ||
-        (absl::EqualsIgnoreCase(headers->getProxyConnectionValue(),
-                                Headers::get().ConnectionValues.Close))) {
-      parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
-      close_connection_ = true;
-    }
+  close_connection_ =
+      HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
+  if (close_connection_) {
+    parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
   }
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }

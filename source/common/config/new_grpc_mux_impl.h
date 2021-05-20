@@ -38,18 +38,17 @@ public:
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
-  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+  GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                           const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
-                           const bool use_namespace_matching = false) override;
+                           const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string& type_url,
-                             const std::set<std::string>& for_update) override;
+                             const absl::flat_hash_set<std::string>& for_update) override;
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
-
-  void registerVersionedTypeUrl(const std::string& type_url);
 
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
@@ -66,11 +65,18 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
+  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3::DeltaDiscoveryResponse>&
+  grpcStreamForTest() {
+    return grpc_stream_;
+  }
+
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher,
+                      const bool wildcard)
         : watch_map_(use_namespace_matching),
-          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
+          sub_state_(type_url, watch_map_, local_info, dispatcher, wildcard) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -89,8 +95,9 @@ public:
 private:
   class WatchImpl : public GrpcMuxWatch {
   public:
-    WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent)
-        : type_url_(type_url), watch_(watch), parent_(parent) {}
+    WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent,
+              const SubscriptionOptions& options)
+        : type_url_(type_url), watch_(watch), parent_(parent), options_(options) {}
 
     ~WatchImpl() override { remove(); }
 
@@ -101,14 +108,15 @@ private:
       }
     }
 
-    void update(const std::set<std::string>& resources) override {
-      parent_.updateWatch(type_url_, watch_, resources);
+    void update(const absl::flat_hash_set<std::string>& resources) override {
+      parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
   private:
     const std::string type_url_;
     Watch* watch_;
     NewGrpcMuxImpl& parent_;
+    const SubscriptionOptions options_;
   };
 
   void removeWatch(const std::string& type_url, Watch* watch);
@@ -117,10 +125,12 @@ private:
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources,
-                   const bool creating_namespace_watch = false);
+                   const absl::flat_hash_set<std::string>& resources,
+                   const SubscriptionOptions& options);
 
-  void addSubscription(const std::string& type_url, const bool use_namespace_matching);
+  // Adds a subscription for the type_url to the subscriptions map and order list.
+  void addSubscription(const std::string& type_url, bool use_namespace_matching,
+                       const bool wildcard);
 
   void trySendDiscoveryRequests();
 
@@ -135,6 +145,9 @@ private:
   // Then, prioritizes non-ACK updates in the order the various types
   // of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
+
+  // Invoked when dynamic context parameters change for a resource type.
+  void onDynamicContextUpdate(absl::string_view resource_type_url);
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for
@@ -153,11 +166,9 @@ private:
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
-
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
-
-  const bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

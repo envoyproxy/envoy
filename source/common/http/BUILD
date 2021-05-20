@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -65,10 +66,10 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
         "//source/common/network:filter_lib",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:codec_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -149,12 +150,56 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "http3_status_tracker",
+    srcs = ["http3_status_tracker.cc"],
+    hdrs = ["http3_status_tracker.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "alternate_protocols_cache",
+    srcs = [
+        "alternate_protocols_cache_impl.cc",
+        "alternate_protocols_cache_manager_impl.cc",
+    ],
+    hdrs = [
+        "alternate_protocols_cache_impl.h",
+        "alternate_protocols_cache_manager_impl.h",
+    ],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:alternate_protocols_cache_interface",
+        "//include/envoy/singleton:manager_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:resource_manager_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "conn_pool_grid",
+    srcs = ["conn_pool_grid.cc"],
+    hdrs = ["conn_pool_grid.h"],
+    deps = [
+        ":alternate_protocols_cache",
+        ":http3_status_tracker",
+        ":mixed_conn_pool",
+        "//source/common/http/http3:conn_pool_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [
         ":date_provider_lib",
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/http:original_ip_detection_interface",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/local_reply:local_reply_lib",
@@ -179,11 +224,16 @@ envoy_cc_library(
         "//include/envoy/matcher:matcher_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:linked_object",
+        "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -245,8 +295,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/http3:quic_codec_factory_lib",
-        "//source/common/http/http3:well_known_names",
+        "//source/common/http/match_wrapper:config",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_rds_lib",
@@ -422,6 +471,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -431,30 +481,37 @@ envoy_cc_library(
     name = "path_utility_lib",
     srcs = ["path_utility.cc"],
     hdrs = ["path_utility.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//include/envoy/http:header_map_interface",
-        "//source/common/chromium_url",
-        "//source/common/common:logger_lib",
+    external_deps = [
+        "abseil_optional",
     ],
+    deps = [
+        ":legacy_path_canonicalizer",
+        "//include/envoy/http:header_map_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "@com_googlesource_googleurl//url:envoy_url",
+    ],
+)
+
+envoy_cc_library(
+    name = "legacy_path_canonicalizer",
+    srcs = ["legacy_path_canonicalizer.cc"],
+    hdrs = ["legacy_path_canonicalizer.h"],
+    deps = ["//source/common/chromium_url"],
 )
 
 envoy_cc_library(
     name = "request_id_extension_lib",
     srcs = [
         "request_id_extension_impl.cc",
-        "request_id_extension_uuid_impl.cc",
     ],
     hdrs = [
         "request_id_extension_impl.h",
-        "request_id_extension_uuid_impl.h",
     ],
     deps = [
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/server:request_id_extension_config_interface",
-        "//source/common/common:random_generator_lib",
         "//source/common/config:utility_lib",
-        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

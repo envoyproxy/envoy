@@ -14,14 +14,14 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/http/codec.h"
@@ -95,7 +95,7 @@ namespace Redis {
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
-               const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
+               const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
@@ -290,7 +290,7 @@ private:
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                                envoy::config::cluster::redis::RedisClusterConfig> {
+                                envoy::extensions::clusters::redis::v3::RedisClusterConfig> {
 public:
   RedisClusterFactory()
       : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Redis) {}
@@ -301,7 +301,7 @@ private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
-      const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
+      const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;

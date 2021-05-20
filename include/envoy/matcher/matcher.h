@@ -7,11 +7,19 @@
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class FactoryContext;
+}
+} // namespace Server
+
 namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
@@ -59,9 +67,9 @@ public:
   /**
    * Helper to convert this action to its underlying type.
    */
-  template <class T> T& getTyped() {
-    ASSERT(dynamic_cast<T*>(this) != nullptr);
-    return static_cast<T&>(*this);
+  template <class T> const T& getTyped() const {
+    ASSERT(dynamic_cast<const T*>(this) != nullptr);
+    return static_cast<const T&>(*this);
   }
 };
 
@@ -70,7 +78,9 @@ using ActionFactoryCb = std::function<ActionPtr()>;
 
 class ActionFactory : public Config::TypedFactory {
 public:
-  virtual ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config) PURE;
+  virtual ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
+                        Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
@@ -142,9 +152,11 @@ using InputMatcherPtr = std::unique_ptr<InputMatcher>;
  */
 class InputMatcherFactory : public Config::TypedFactory {
 public:
-  virtual InputMatcherPtr createInputMatcher(const Protobuf::Message& config) PURE;
+  virtual InputMatcherPtr
+  createInputMatcher(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext& factory_context) PURE;
 
-  std::string category() const override { return "envoy.matching.input_matcher"; }
+  std::string category() const override { return "envoy.matching.input_matchers"; }
 };
 
 // The result of retrieving data from a DataInput. As the data is generally made available
@@ -190,7 +202,8 @@ struct DataInputGetResult {
 };
 
 /**
- * Interface for types providing a way to extract a string from the DataType to perform matching on.
+ * Interface for types providing a way to extract a string from the DataType to perform matching
+ * on.
  */
 template <class DataType> class DataInput {
 public:
@@ -209,7 +222,9 @@ public:
   /**
    * Creates a DataInput from the provided config.
    */
-  virtual DataInputPtr<DataType> createDataInput(const Protobuf::Message& config) PURE;
+  virtual DataInputPtr<DataType>
+  createDataInput(const Protobuf::Message& config,
+                  Server::Configuration::FactoryContext& factory_context) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist
@@ -221,6 +236,32 @@ public:
                   "DataType must implement valid name() function");
     return fmt::format("envoy.matching.{}.input", DataType::name());
   }
+};
+
+/**
+ * Interface for types providing a way to use a string for matching without depending on protocol
+ * data. As a result, these can be used for all protocols.
+ */
+class CommonProtocolInput {
+public:
+  virtual ~CommonProtocolInput() = default;
+  virtual absl::optional<absl::string_view> get() PURE;
+};
+using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
+
+/**
+ * Factory for CommonProtocolInput.
+ */
+class CommonProtocolInputFactory : public Config::TypedFactory {
+public:
+  /**
+   * Creates a CommonProtocolInput from the provided config.
+   */
+  virtual CommonProtocolInputPtr
+  createCommonProtocolInput(const Protobuf::Message& config,
+                            Server::Configuration::FactoryContext& factory_context) PURE;
+
+  std::string category() const override { return "envoy.matching.common_inputs"; }
 };
 
 } // namespace Matcher

@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 
 #include "common/http/message_impl.h"
@@ -328,7 +329,8 @@ TEST_F(SquashFilterTest, Timeout) {
   EXPECT_CALL(request_, cancel());
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
-  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
+  EXPECT_CALL(filter_callbacks_.dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(filter_callbacks_.dispatcher_, popTrackedObject(_));
   attachmentTimeout_timer_->invokeCallback();
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
@@ -357,7 +359,9 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
 
   // Expect the second get attachment request
   expectAsyncClientSend();
-  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
+  EXPECT_CALL(filter_callbacks_.dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(filter_callbacks_.dispatcher_, popTrackedObject(_));
+
   retry_timer->invokeCallback();
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   completeGetStatusRequest("attached");
@@ -377,7 +381,8 @@ TEST_F(SquashFilterTest, PollingAttachmentNoCluster) {
   // Expect the second get attachment request
   ON_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("squash"))
       .WillByDefault(Return(nullptr));
-  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
+  EXPECT_CALL(filter_callbacks_.dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(filter_callbacks_.dispatcher_, popTrackedObject(_));
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   retry_timer->invokeCallback();
 }
@@ -395,7 +400,8 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
   // Expect the second get attachment request
   expectAsyncClientSend();
 
-  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
+  EXPECT_CALL(filter_callbacks_.dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(filter_callbacks_.dispatcher_, popTrackedObject(_));
   retry_timer->invokeCallback();
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
@@ -466,7 +472,8 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
         attachmentTimeout_timer_->scope_ = scope;
         attachmentTimeout_timer_->enabled_ = true;
         // timer expires inline
-        EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
+        EXPECT_CALL(filter_callbacks_.dispatcher_, pushTrackedObject(_));
+        EXPECT_CALL(filter_callbacks_.dispatcher_, popTrackedObject(_));
         attachmentTimeout_timer_->invokeCallback();
       }));
 

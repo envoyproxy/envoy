@@ -10,11 +10,13 @@
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
@@ -44,7 +46,7 @@ namespace Router {
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
-      stream_info_(parent_.callbacks()->dispatcher().timeSource()),
+      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
@@ -169,6 +171,16 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
+
+void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "UpstreamRequest " << this << "\n";
+  const auto addressProvider = connection().addressProviderSharedPtr();
+  const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
+  DUMP_DETAILS(addressProvider);
+  DUMP_DETAILS(request_headers);
+}
+
 const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEntry(); }
 
 const Network::Connection& UpstreamRequest::connection() const {
@@ -337,7 +349,12 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    reset_reason = Http::StreamResetReason::LocalReset;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure")) {
+      reset_reason = Http::StreamResetReason::ConnectionFailure;
+    } else {
+      reset_reason = Http::StreamResetReason::LocalReset;
+    }
   }
 
   // Mimic an upstream reset.
@@ -371,6 +388,9 @@ void UpstreamRequest::onPoolReady(
 
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  parent_.callbacks()->streamInfo().setUpstreamFilterState(
+      std::make_shared<StreamInfo::FilterStateImpl>(info.filterState().parent()->parent(),
+                                                    StreamInfo::FilterState::LifeSpan::Request));
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
@@ -481,8 +501,8 @@ void UpstreamRequest::clearRequestEncoder() {
   // Before clearing the encoder, unsubscribe from callbacks.
   if (upstream_) {
     parent_.callbacks()->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
-    parent_.callbacks()->dispatcher().deferredDelete(std::move(upstream_));
   }
+  upstream_.reset();
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {

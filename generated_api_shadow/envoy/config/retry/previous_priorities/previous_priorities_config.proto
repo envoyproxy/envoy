@@ -2,12 +2,15 @@ syntax = "proto3";
 
 package envoy.config.retry.previous_priorities;
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.retry.previous_priorities";
 option java_outer_classname = "PreviousPrioritiesConfigProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.retry.priority.previous_priorities.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Previous priorities retry selector]

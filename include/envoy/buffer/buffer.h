@@ -10,6 +10,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
 #include "common/common/byte_order.h"
 #include "common/common/utility.h"
 
@@ -72,6 +73,46 @@ public:
 
 using SliceDataPtr = std::unique_ptr<SliceData>;
 
+class Reservation;
+class ReservationSingleSlice;
+
+// Base class for an object to manage the ownership for slices in a `Reservation` or
+// `ReservationSingleSlice`.
+class ReservationSlicesOwner {
+public:
+  virtual ~ReservationSlicesOwner() = default;
+};
+
+using ReservationSlicesOwnerPtr = std::unique_ptr<ReservationSlicesOwner>;
+
+/**
+ * An interface for accounting for the usage for byte tracking in buffers.
+ *
+ * Currently this is only used by L7 streams to track the amount of memory
+ * allocated in buffers by the stream.
+ */
+class BufferMemoryAccount {
+public:
+  virtual ~BufferMemoryAccount() = default;
+
+  /**
+   * Charges the account for using the specified amount of memory.
+   *
+   * @param amount the amount to debit.
+   */
+  virtual void charge(uint64_t amount) PURE;
+
+  /**
+   * Called to credit the account for an amount of memory
+   * is no longer used.
+   *
+   * @param amount the amount to credit.
+   */
+  virtual void credit(uint64_t amount) PURE;
+};
+
+using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;
+
 /**
  * A basic buffer abstraction.
  */
@@ -87,6 +128,14 @@ public:
    * from all buffers.
    */
   virtual void addDrainTracker(std::function<void()> drain_tracker) PURE;
+
+  /**
+   * Binds the account to be charged for resources used by the buffer. This
+   * should only be called once.
+   *
+   * @param account a shared_ptr to the account to charge.
+   */
+  virtual void bindAccount(BufferMemoryAccountSharedPtr account) PURE;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant
@@ -128,16 +177,6 @@ public:
    * @param data supplies the buffer to copy.
    */
   virtual void prepend(Instance& data) PURE;
-
-  /**
-   * Commit a set of slices originally obtained from reserve(). The number of slices should match
-   * the number obtained from reserve(). The size of each slice can also be altered. Commit must
-   * occur once following a reserve() without any mutating operations in between other than to the
-   * iovecs len_ fields.
-   * @param iovecs supplies the array of slices to commit.
-   * @param num_iovecs supplies the size of the slices array.
-   */
-  virtual void commit(RawSlice* iovecs, uint64_t num_iovecs) PURE;
 
   /**
    * Copy out a section of the buffer.
@@ -202,13 +241,22 @@ public:
   virtual void move(Instance& rhs, uint64_t length) PURE;
 
   /**
-   * Reserve space in the buffer.
-   * @param length supplies the amount of space to reserve.
-   * @param iovecs supplies the slices to fill with reserved memory.
-   * @param num_iovecs supplies the size of the slices array.
-   * @return the number of iovecs used to reserve the space.
+   * Reserve space in the buffer for reading into. The amount of space reserved is determined
+   * based on buffer settings and performance considerations.
+   * @return a `Reservation`, on which `commit()` can be called, or which can
+   *   be destructed to discard any resources in the `Reservation`.
    */
-  virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
+  virtual Reservation reserveForRead() PURE;
+
+  /**
+   * Reserve space in the buffer in a single slice.
+   * @param length the exact length of the reservation.
+   * @param separate_slice specifies whether the reserved space must be in a separate slice
+   *   from any other data in this buffer.
+   * @return a `ReservationSingleSlice` which has exactly one slice in it.
+   */
+  virtual ReservationSingleSlice reserveSingleSlice(uint64_t length,
+                                                    bool separate_slice = false) PURE;
 
   /**
    * Search for an occurrence of data within the buffer.
@@ -414,6 +462,17 @@ public:
    * the low watermark.
    */
   virtual bool highWatermarkTriggered() const PURE;
+
+private:
+  friend Reservation;
+  friend ReservationSingleSlice;
+
+  /**
+   * Called by a `Reservation` to commit `length` bytes of the
+   * reservation.
+   */
+  virtual void commit(uint64_t length, absl::Span<RawSlice> slices,
+                      ReservationSlicesOwnerPtr slices_owner) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
@@ -439,6 +498,142 @@ public:
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
+using WatermarkFactorySharedPtr = std::shared_ptr<WatermarkFactory>;
+
+/**
+ * Holds an in-progress addition to a buffer.
+ *
+ * @note For performance reasons, this class is passed by value to
+ * avoid an extra allocation, so it cannot have any virtual methods.
+ */
+class Reservation final {
+public:
+  Reservation(Reservation&&) = default;
+  ~Reservation() = default;
+
+  /**
+   * @return an array of `RawSlice` of length `numSlices()`.
+   */
+  RawSlice* slices() { return slices_.data(); }
+  const RawSlice* slices() const { return slices_.data(); }
+
+  /**
+   * @return the number of slices present.
+   */
+  uint64_t numSlices() const { return slices_.size(); }
+
+  /**
+   * @return the total length of the Reservation.
+   */
+  uint64_t length() const { return length_; }
+
+  /**
+   * Commits some or all of the data in the reservation.
+   * @param length supplies the number of bytes to commit. This must be
+   *   less than or equal to the size of the `Reservation`.
+   *
+   * @note No other methods should be called on the object after `commit()` is called.
+   */
+  void commit(uint64_t length) {
+    ENVOY_BUG(length <= length_, "commit() length must be <= size of the Reservation");
+    ASSERT(length == 0 || !slices_.empty(),
+           "Reservation.commit() called on empty Reservation; possible double-commit().");
+    buffer_.commit(length, absl::MakeSpan(slices_), std::move(slices_owner_));
+    length_ = 0;
+    slices_.clear();
+    ASSERT(slices_owner_ == nullptr);
+  }
+
+  // Tuned to allow reads of 128k, using 16k slices.
+  static constexpr uint32_t MAX_SLICES_ = 8;
+
+private:
+  Reservation(Instance& buffer) : buffer_(buffer) {}
+
+  // The buffer that created this `Reservation`.
+  Instance& buffer_;
+
+  // The combined length of all slices in the Reservation.
+  uint64_t length_;
+
+  // The RawSlices in the reservation, usable by operations such as `::readv()`.
+  absl::InlinedVector<RawSlice, MAX_SLICES_> slices_;
+
+  // An owner that can be set by the creator of the `Reservation` to free slices upon
+  // destruction.
+  ReservationSlicesOwnerPtr slices_owner_;
+
+public:
+  // The following are for use only by implementations of Buffer. Because c++
+  // doesn't allow inheritance of friendship, these are just trying to make
+  // misuse easy to spot in a code review.
+  static Reservation bufferImplUseOnlyConstruct(Instance& buffer) { return Reservation(buffer); }
+  decltype(slices_)& bufferImplUseOnlySlices() { return slices_; }
+  ReservationSlicesOwnerPtr& bufferImplUseOnlySlicesOwner() { return slices_owner_; }
+  void bufferImplUseOnlySetLength(uint64_t length) { length_ = length; }
+};
+
+/**
+ * Holds an in-progress addition to a buffer, holding only a single slice.
+ *
+ * @note For performance reasons, this class is passed by value to
+ * avoid an extra allocation, so it cannot have any virtual methods.
+ */
+class ReservationSingleSlice final {
+public:
+  ReservationSingleSlice(ReservationSingleSlice&&) = default;
+  ~ReservationSingleSlice() = default;
+
+  /**
+   * @return the slice in the Reservation.
+   */
+  RawSlice slice() const { return slice_; }
+
+  /**
+   * @return the total length of the Reservation.
+   */
+  uint64_t length() const { return slice_.len_; }
+
+  /**
+   * Commits some or all of the data in the reservation.
+   * @param length supplies the number of bytes to commit. This must be
+   *   less than or equal to the size of the `Reservation`.
+   *
+   * @note No other methods should be called on the object after `commit()` is called.
+   */
+  void commit(uint64_t length) {
+    ENVOY_BUG(length <= slice_.len_, "commit() length must be <= size of the Reservation");
+    ASSERT(length == 0 || slice_.mem_ != nullptr,
+           "Reservation.commit() called on empty Reservation; possible double-commit().");
+    buffer_.commit(length, absl::MakeSpan(&slice_, 1), std::move(slice_owner_));
+    slice_ = {nullptr, 0};
+    ASSERT(slice_owner_ == nullptr);
+  }
+
+private:
+  ReservationSingleSlice(Instance& buffer) : buffer_(buffer) {}
+
+  // The buffer that created this `Reservation`.
+  Instance& buffer_;
+
+  // The RawSlice in the reservation, usable by anything needing the raw pointer
+  // and length to read into.
+  RawSlice slice_{};
+
+  // An owner that can be set by the creator of the `ReservationSingleSlice` to free the slice upon
+  // destruction.
+  ReservationSlicesOwnerPtr slice_owner_;
+
+public:
+  // The following are for use only by implementations of Buffer. Because c++
+  // doesn't allow inheritance of friendship, these are just trying to make
+  // misuse easy to spot in a code review.
+  static ReservationSingleSlice bufferImplUseOnlyConstruct(Instance& buffer) {
+    return ReservationSingleSlice(buffer);
+  }
+  RawSlice& bufferImplUseOnlySlice() { return slice_; }
+  ReservationSlicesOwnerPtr& bufferImplUseOnlySliceOwner() { return slice_owner_; }
+};
 
 } // namespace Buffer
 } // namespace Envoy

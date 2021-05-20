@@ -4,6 +4,7 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -82,10 +83,10 @@ public:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
     cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, runtime_, factory_context,
                                                     std::move(scope), false);
-    cluster_->prioritySet().addPriorityUpdateCb(
+    priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -94,11 +95,11 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   OriginalDstClusterSharedPtr cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* cleanup_timer_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -107,6 +108,8 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
@@ -215,7 +218,6 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
 
-    EXPECT_CALL(connection, localAddressRestored()).WillOnce(Return(false));
     // First argument is normally the reference to the ThreadLocalCluster's HostSet, but in these
     // tests we do not have the thread local clusters, so we pass a reference to the HostSet of the
     // primary cluster. The implementation handles both cases the same.
@@ -229,8 +231,8 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
-    connection.local_address_ = std::make_shared<Network::Address::PipeInstance>("unix://foo");
-    EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+    connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+        std::make_shared<Network::Address::PipeInstance>("unix://foo"));
 
     OriginalDstCluster::LoadBalancer lb(cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
@@ -264,8 +266,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-  EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+  connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
 
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
@@ -275,7 +277,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   auto cluster_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
 
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*connection.local_address_, *host->address());
+  EXPECT_EQ(*connection.addressProvider().localAddress(), *host->address());
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -285,7 +287,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
       cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(*connection.local_address_,
+  EXPECT_EQ(*connection.addressProvider().localAddress(),
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address());
 
   // Same host is returned on the 2nd call
@@ -353,13 +355,13 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   NiceMock<Network::MockConnection> connection1;
   TestLoadBalancerContext lb_context1(&connection1);
-  connection1.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-  EXPECT_CALL(connection1, localAddressRestored()).WillRepeatedly(Return(true));
+  connection1.stream_info_.downstream_address_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
 
   NiceMock<Network::MockConnection> connection2;
   TestLoadBalancerContext lb_context2(&connection2);
-  connection2.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12");
-  EXPECT_CALL(connection2, localAddressRestored()).WillRepeatedly(Return(true));
+  connection2.stream_info_.downstream_address_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12"));
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
   EXPECT_CALL(membership_updated_, ready());
@@ -368,14 +370,14 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
-  EXPECT_EQ(*connection1.local_address_, *host1->address());
+  EXPECT_EQ(*connection1.addressProvider().localAddress(), *host1->address());
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
-  EXPECT_EQ(*connection2.local_address_, *host2->address());
+  EXPECT_EQ(*connection2.addressProvider().localAddress(), *host2->address());
 
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -385,11 +387,11 @@ TEST_F(OriginalDstClusterTest, Membership2) {
       cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_EQ(host1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(*connection1.local_address_,
+  EXPECT_EQ(*connection1.addressProvider().localAddress(),
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address());
 
   EXPECT_EQ(host2, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]);
-  EXPECT_EQ(*connection2.local_address_,
+  EXPECT_EQ(*connection2.addressProvider().localAddress(),
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->address());
 
   auto cluster_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -442,8 +444,8 @@ TEST_F(OriginalDstClusterTest, Connection) {
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
-  EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+  connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv6Instance>("FD00::1"));
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
@@ -451,9 +453,10 @@ TEST_F(OriginalDstClusterTest, Connection) {
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*connection.local_address_, *host->address());
+  EXPECT_EQ(*connection.addressProvider().localAddress(), *host->address());
 
-  EXPECT_CALL(dispatcher_, createClientConnection_(PointeesEq(connection.local_address_), _, _, _))
+  EXPECT_CALL(dispatcher_, createClientConnection_(
+                               PointeesEq(connection.addressProvider().localAddress()), _, _, _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   host->createConnection(dispatcher_, nullptr, nullptr);
 }
@@ -471,7 +474,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setupFromYaml(yaml);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
         // Update second hostset accordingly;
         HostVectorSharedPtr new_hosts(
@@ -491,8 +494,8 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
-  EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+  connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv6Instance>("FD00::1"));
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
@@ -500,7 +503,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*connection.local_address_, *host->address());
+  EXPECT_EQ(*connection.addressProvider().localAddress(), *host->address());
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   // Check that 'second' also gets updated
@@ -549,8 +552,6 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
   // and/or is done over Unix Domain Socket. This works, because properties of the downstream
   // connection are never checked when using HTTP header override.
   NiceMock<Network::MockConnection> connection2;
-  EXPECT_CALL(connection2, localAddress()).Times(0);
-  EXPECT_CALL(connection2, localAddressRestored()).Times(0);
   TestLoadBalancerContext lb_context2(&connection2, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5556");
 
@@ -607,8 +608,8 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
 
   // Downstream connection with original_dst filter, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection1;
-  connection1.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-  EXPECT_CALL(connection1, localAddressRestored()).WillOnce(Return(true));
+  connection1.stream_info_.downstream_address_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
   TestLoadBalancerContext lb_context1(&connection1, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
 
@@ -617,12 +618,12 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
-  EXPECT_EQ(*connection1.local_address_, *host1->address());
+  EXPECT_EQ(*connection1.addressProvider().localAddress(), *host1->address());
 
   // Downstream connection without original_dst filter, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection2;
-  connection2.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-  EXPECT_CALL(connection2, localAddressRestored()).WillOnce(Return(false));
+  connection2.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
   TestLoadBalancerContext lb_context2(&connection2, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
 
@@ -633,7 +634,8 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
 
   // Downstream connection over Unix Domain Socket, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection3;
-  connection3.local_address_ = std::make_shared<Network::Address::PipeInstance>("unix://foo");
+  connection3.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::PipeInstance>("unix://foo"));
   TestLoadBalancerContext lb_context3(&connection3, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
 

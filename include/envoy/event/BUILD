@@ -14,16 +14,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dispatcher_thread_deletable",
+    hdrs = ["dispatcher_thread_deletable.h"],
+)
+
+envoy_cc_library(
     name = "dispatcher_interface",
     hdrs = ["dispatcher.h"],
     deps = [
         ":deferred_deletable",
+        ":dispatcher_thread_deletable",
         ":file_event_interface",
+        ":scaled_timer",
         ":schedulable_cb_interface",
         ":signal_interface",
+        ":timer_interface",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/filesystem:watcher_interface",
         "//include/envoy/network:connection_handler_interface",
         "//include/envoy/network:connection_interface",
@@ -33,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/thread:thread_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,8 +50,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "scaled_timer_minimum",
-    hdrs = ["scaled_timer_minimum.h"],
+    name = "scaled_timer",
+    hdrs = ["scaled_timer.h"],
     deps = [
         "//source/common/common:interval_value",
     ],
@@ -53,7 +61,7 @@ envoy_cc_library(
     name = "scaled_range_timer_manager_interface",
     hdrs = ["scaled_range_timer_manager.h"],
     deps = [
-        ":scaled_timer_minimum",
+        ":scaled_timer",
         ":timer_interface",
     ],
 )

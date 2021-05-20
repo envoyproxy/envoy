@@ -129,7 +129,7 @@ TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
   // Respond to read attachment request
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("attached"));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("POST", create_stream->headers().getMethodValue());
   EXPECT_EQ("/api/v2/debugattachment/", create_stream->headers().getPathValue());
@@ -158,7 +158,7 @@ TEST_P(SquashFilterIntegrationTest, ErrorAttaching) {
   // Respond to read attachment request with error!
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("error"));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -174,7 +174,7 @@ TEST_P(SquashFilterIntegrationTest, TimeoutAttaching) {
   // before issuing another get attachment request.
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("attaching"));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -185,7 +185,7 @@ TEST_P(SquashFilterIntegrationTest, ErrorNoSquashServer) {
 
   // Don't respond to anything. squash filter should timeout within
   // squash_request_timeout and continue the request.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -197,7 +197,7 @@ TEST_P(SquashFilterIntegrationTest, BadCreateResponse) {
   // Respond to create request
   FakeStreamPtr create_stream = sendSquashCreate("not json...");
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -211,7 +211,7 @@ TEST_P(SquashFilterIntegrationTest, BadGetResponse) {
   // Respond to read attachment request with error!
   FakeStreamPtr get_stream = sendSquashOk("not json...");
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());

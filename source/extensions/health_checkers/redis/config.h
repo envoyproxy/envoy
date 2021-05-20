@@ -1,10 +1,10 @@
 #pragma once
 
 #include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/server/health_checker_config.h"
 
 #include "extensions/health_checkers/redis/redis.h"
@@ -26,7 +26,7 @@ public:
 
   std::string name() const override { return HealthCheckerNames::get().RedisHealthChecker; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
+    return ProtobufTypes::MessagePtr{new envoy::extensions::health_checkers::redis::v3::Redis()};
   }
 };
 

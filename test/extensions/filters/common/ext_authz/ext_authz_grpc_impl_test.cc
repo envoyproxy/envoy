@@ -117,10 +117,13 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
   const std::string empty_body{};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body, expected_headers);
-  auto authz_response =
-      TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
+  const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
+      {{"authorized-by", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -190,11 +193,13 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const std::string expected_body{"test"};
   const auto expected_headers =
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied,
-                                    envoy::type::v3::Unauthorized, expected_body, expected_headers);
-  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,
-                                                      expected_body, expected_headers);
+  const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
+  auto check_response = TestCommon::makeCheckResponse(
+      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::Unauthorized,
+      expected_body, expected_headers, expected_downstream_headers);
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
+                                    expected_headers, expected_downstream_headers);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);

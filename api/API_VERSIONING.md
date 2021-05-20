@@ -1,6 +1,6 @@
 # API versioning guidelines
 
-The Envoy project (and in the future [UDPA](https://github.com/cncf/udpa)) takes API stability and
+The Envoy project and [xDS working group](https://github.com/cncf/xds) take API stability and
 versioning seriously. Providing stable APIs is a necessary step in ensuring API adoption and success
 of the ecosystem. Below we articulate the API versioning guidelines that aim to deliver this
 stability.
@@ -105,7 +105,7 @@ Envoy will support at most three major versions of any API package at all times:
   for the next stable major version. This is only generated when the current stable major version
   requires a breaking change at the next cycle, e.g. a deprecation or field rename. This release
   candidate is mechanically generated via the
-  [protoxform](https://github.com/envoyproxy/envoy/tree/master/tools/protoxform) tool from the
+  [protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool from the
   current stable major version, making use of annotations such as `deprecated = true`. This is not a
   human editable artifact.
 
@@ -161,7 +161,7 @@ methods, depending on whether the change is mechanical or manual.
 ## Mechanical breaking changes
 
 Field deprecations, renames, etc. are mechanical changes that are supported by the
-[protoxform](https://github.com/envoyproxy/envoy/tree/master/tools/protoxform) tool. These are
+[protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool. These are
 guided by [annotations](STYLE.md#api-annotations).
 
 ## Manual breaking changes

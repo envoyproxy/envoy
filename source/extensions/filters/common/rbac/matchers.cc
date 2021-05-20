@@ -135,16 +135,16 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   Envoy::Network::Address::InstanceConstSharedPtr ip;
   switch (type_) {
   case ConnectionRemote:
-    ip = connection.remoteAddress();
+    ip = connection.addressProvider().remoteAddress();
     break;
   case DownstreamLocal:
-    ip = info.downstreamLocalAddress();
+    ip = info.downstreamAddressProvider().localAddress();
     break;
   case DownstreamDirectRemote:
-    ip = info.downstreamDirectRemoteAddress();
+    ip = info.downstreamAddressProvider().directRemoteAddress();
     break;
   case DownstreamRemote:
-    ip = info.downstreamRemoteAddress();
+    ip = info.downstreamAddressProvider().remoteAddress();
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -154,7 +154,8 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                           const StreamInfo::StreamInfo& info) const {
-  const Envoy::Network::Address::Ip* ip = info.downstreamLocalAddress().get()->ip();
+  const Envoy::Network::Address::Ip* ip =
+      info.downstreamAddressProvider().localAddress().get()->ip();
   return ip && ip->port() == port_;
 }
 

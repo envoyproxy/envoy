@@ -5,6 +5,7 @@
 #include "common/common/fmt.h"
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/socket_option_impl.h"
+#include "common/network/win32_redirect_records_option_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -49,6 +50,13 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
   options->push_back(std::make_shared<Network::AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_IP_TRANSPARENT,
       ENVOY_SOCKET_IPV6_TRANSPARENT, 1));
+  return options;
+}
+
+std::unique_ptr<Socket::Options>
+SocketOptionFactory::buildWFPRedirectRecordsOptions(const Win32RedirectRecords& redirect_records) {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<Network::Win32RedirectRecordsOptionImpl>(redirect_records));
   return options;
 }
 

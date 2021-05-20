@@ -14,22 +14,29 @@ namespace Common {
 namespace RBAC {
 
 /**
- * All stats for the RBAC filter. @see stats_macros.h
+ * All stats for the enforced rules in RBAC filter. @see stats_macros.h
  */
-#define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
+#define ENFORCE_RBAC_FILTER_STATS(COUNTER)                                                         \
   COUNTER(allowed)                                                                                 \
-  COUNTER(denied)                                                                                  \
+  COUNTER(denied)
+
+/**
+ * All stats for the shadow rules in RBAC filter. @see stats_macros.h
+ */
+#define SHADOW_RBAC_FILTER_STATS(COUNTER)                                                          \
   COUNTER(shadow_allowed)                                                                          \
   COUNTER(shadow_denied)
 
 /**
- * Wrapper struct for RBAC filter stats. @see stats_macros.h
+ * Wrapper struct for shadow rules in RBAC filter stats. @see stats_macros.h
  */
 struct RoleBasedAccessControlFilterStats {
-  ALL_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+  ENFORCE_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+  SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+RoleBasedAccessControlFilterStats
+generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats::Scope& scope);
 
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {

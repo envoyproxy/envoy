@@ -5,7 +5,11 @@ node:
     zone: bootstrap_zone
     sub_zone: bootstrap_sub_zone
 admin:
-  access_log_path: {{ null_device_path }}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {{ null_device_path }}
   address:
     socket_address:
       address: {{ ntop_ip_loopback_address }}
@@ -13,3 +17,4 @@ admin:
 stats_sinks:
 - name: envoy.custom_stats_sink
 stats_flush_on_admin: true
+enable_dispatcher_stats: true

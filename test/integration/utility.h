@@ -9,8 +9,10 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/factory_context.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
 #include "common/stats/isolated_store_impl.h"
@@ -40,6 +42,9 @@ public:
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void dumpState(std::ostream& os, int indent_level) const override {
+    DUMP_STATE_UNIMPLEMENTED(BufferingStreamDecoder);
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -184,6 +189,15 @@ public:
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
                     const std::string& content_type = "");
+
+  /**
+   * Create transport socket factory for Quic upstream transport socket.
+   * @return TransportSocketFactoryPtr the client transport socket factory.
+   */
+  static Network::TransportSocketFactoryPtr
+  createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
+                                           Ssl::ContextManager& context_manager,
+                                           const std::string& san_to_match);
 };
 
 // A set of connection callbacks which tracks connection state.

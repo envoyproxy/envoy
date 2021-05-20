@@ -92,8 +92,7 @@ message DnsCacheConfig {
   config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 
   // The config of circuit breakers for resolver. It provides a configurable threshold.
-  // If `envoy.reloadable_features.enable_dns_cache_circuit_breakers` is enabled,
-  // envoy will use dns cache circuit breakers with default settings even if this value is not set.
+  // Envoy will use dns cache circuit breakers with default settings even if this value is not set.
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 
   // [#next-major-version: Reconcile DNS options in a single message.]

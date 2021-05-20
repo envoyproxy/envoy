@@ -8,7 +8,10 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/udp_socket_config.pb.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/scaled_timer.h"
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -78,6 +81,20 @@ public:
   virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
 
   /**
+   * Allocates a scaled timer. @see Timer for docs on how to use the timer.
+   * @param timer_type the type of timer to create.
+   * @param cb supplies the callback to invoke when the timer fires.
+   */
+  virtual Event::TimerPtr createScaledTimer(Event::ScaledTimerType timer_type, TimerCb cb) PURE;
+
+  /**
+   * Allocates a scaled timer. @see Timer for docs on how to use the timer.
+   * @param minimum the rule for computing the minimum value of the timer.
+   * @param cb supplies the callback to invoke when the timer fires.
+   */
+  virtual Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum, TimerCb cb) PURE;
+
+  /**
    * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
    * callback.
    * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
@@ -86,15 +103,23 @@ public:
   virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
 
   /**
-   * Sets a tracked object, which is currently operating in this Dispatcher.
-   * This should be cleared with another call to setTrackedObject() when the object is done doing
-   * work. Calling setTrackedObject(nullptr) results in no object being tracked.
+   * Appends a tracked object to the current stack of tracked objects operating
+   * in the dispatcher.
    *
-   * This is optimized for performance, to avoid allocation where we do scoped object tracking.
-   *
-   * @return The previously tracked object or nullptr if there was none.
+   * It's recommended to use ScopeTrackerScopeState to manage the object's tracking. If directly
+   * invoking, there needs to be a subsequent call to popTrackedObject().
    */
-  virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
+  virtual void pushTrackedObject(const ScopeTrackedObject* object) PURE;
+
+  /**
+   * Removes the top of the stack of tracked object and asserts that it was expected.
+   */
+  virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
+
+  /**
+   * Whether the tracked object stack is empty.
+   */
+  virtual bool trackedObjectStackIsEmpty() const PURE;
 
   /**
    * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
@@ -212,10 +237,12 @@ public:
    * Creates a logical udp listener on a specific port.
    * @param socket supplies the socket to listen on.
    * @param cb supplies the udp listener callbacks to invoke for listener events.
+   * @param config provides the UDP socket configuration.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                                    Network::UdpListenerCallbacks& cb) PURE;
+  virtual Network::UdpListenerPtr
+  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+                    const envoy::config::core::v3::UdpSocketConfig& config) PURE;
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */
@@ -241,6 +268,12 @@ public:
    * of the dispatcher event loop which may be on a different thread than the caller.
    */
   virtual void post(PostCb callback) PURE;
+
+  /**
+   * Post the deletable to this dispatcher. The deletable objects are guaranteed to be destroyed on
+   * the dispatcher's thread before dispatcher destroy. This is safe cross thread.
+   */
+  virtual void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) PURE;
 
   /**
    * Runs the event loop. This will not return until exit() is called either from within a callback
@@ -269,6 +302,11 @@ public:
    * Updates approximate monotonic time to current value.
    */
   virtual void updateApproximateMonotonicTime() PURE;
+
+  /**
+   * Shutdown the dispatcher by clear dispatcher thread deletable.
+   */
+  virtual void shutdown() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

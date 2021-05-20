@@ -1,6 +1,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/socket.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/network/io_socket_handle_impl.h"
@@ -20,6 +21,15 @@ using testing::Return;
 namespace Envoy {
 namespace Network {
 namespace {
+
+TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
+  absl::string_view serverName("www.EXAMPLE.com");
+  absl::string_view expectedServerName("www.example.com");
+  auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
+  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr);
+  conn_socket_.setRequestedServerName(serverName);
+  EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
+}
 
 template <Network::Socket::Type Type>
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -87,8 +97,9 @@ protected:
         EXPECT_EQ(0, socket1->listen(0).rc_);
       }
 
-      EXPECT_EQ(addr->ip()->port(), socket1->localAddress()->ip()->port());
-      EXPECT_EQ(addr->ip()->addressAsString(), socket1->localAddress()->ip()->addressAsString());
+      EXPECT_EQ(addr->ip()->port(), socket1->addressProvider().localAddress()->ip()->port());
+      EXPECT_EQ(addr->ip()->addressAsString(),
+                socket1->addressProvider().localAddress()->ip()->addressAsString());
       EXPECT_EQ(Type, socket1->socketType());
 
       auto option2 = std::make_unique<MockSocketOption>();
@@ -108,7 +119,7 @@ protected:
       EXPECT_TRUE(SOCKET_VALID(socket_result.rc_));
       Network::IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(socket_result.rc_);
       auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
-      EXPECT_EQ(socket3->localAddress()->asString(), addr->asString());
+      EXPECT_EQ(socket3->addressProvider().localAddress()->asString(), addr->asString());
 
       // Test successful.
       return;
@@ -118,10 +129,11 @@ protected:
   void testBindPortZero() {
     auto loopback = Network::Test::getCanonicalLoopbackAddress(version_);
     auto socket = createListenSocketPtr(loopback, nullptr, true);
-    EXPECT_EQ(Address::Type::Ip, socket->localAddress()->type());
-    EXPECT_EQ(version_, socket->localAddress()->ip()->version());
-    EXPECT_EQ(loopback->ip()->addressAsString(), socket->localAddress()->ip()->addressAsString());
-    EXPECT_GT(socket->localAddress()->ip()->port(), 0U);
+    EXPECT_EQ(Address::Type::Ip, socket->addressProvider().localAddress()->type());
+    EXPECT_EQ(version_, socket->addressProvider().localAddress()->ip()->version());
+    EXPECT_EQ(loopback->ip()->addressAsString(),
+              socket->addressProvider().localAddress()->ip()->addressAsString());
+    EXPECT_GT(socket->addressProvider().localAddress()->ip()->port(), 0U);
     EXPECT_EQ(Type, socket->socketType());
   }
 };
@@ -160,9 +172,14 @@ TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
 
   TestListenSocket socket(Utility::getIpv4AnyAddress());
 
-  socket.setLocalAddress(address);
+  socket.addressProvider().setLocalAddress(address);
 
-  EXPECT_EQ(socket.localAddress(), address);
+  EXPECT_EQ(socket.addressProvider().localAddress(), address);
+}
+
+TEST_P(ListenSocketImplTestTcp, CheckIpVersionWithNullLocalAddress) {
+  TestListenSocket socket(Utility::getIpv4AnyAddress());
+  EXPECT_EQ(Address::IpVersion::v4, socket.ipVersion());
 }
 
 TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }

@@ -301,17 +301,16 @@ public:
     // Then wait for all children to be done.
     if (++completion_state.number_completed_children_ == verifiers_.size()) {
       // Aggregate all children status into a final status.
-      // JwtMissing should be treated differently than other failure status
-      // since it simply means there is not Jwt token for the required provider.
-      // If there is a failure status other than JwtMissing in the children,
-      // it should be used as the final status.
+      // JwtMissed and JwtUnknownIssuer should be treated differently than other errors.
+      // JwtMissed means not Jwt token for the required provider.
+      // JwtUnknownIssuer means wrong issuer for the required provider.
       Status final_status = Status::JwtMissed;
       for (const auto& it : verifiers_) {
-        // If a Jwt is extracted from a location not specified by the required provider,
-        // the authenticator returns JwtUnknownIssuer. It should be treated the same as
-        // JwtMissed.
+        // Prefer errors which are not JwtMissed nor JwtUnknownIssuer.
+        // Prefer JwtUnknownIssuer between JwtMissed and JwtUnknownIssuer.
         Status child_status = context.getCompletionState(it.get()).status_;
-        if (child_status != Status::JwtMissed && child_status != Status::JwtUnknownIssuer) {
+        if ((child_status != Status::JwtMissed && child_status != Status::JwtUnknownIssuer) ||
+            final_status == Status::JwtMissed) {
           final_status = child_status;
         }
       }

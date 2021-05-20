@@ -126,6 +126,7 @@ envoy_cc_library(
         ":codec_stats_lib",
         "//include/envoy/network:connection_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:dump_state_utils",
         "//source/common/http:status_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -41,7 +42,8 @@ public:
 };
 
 /**
- * Implementation of Network::Connection and Network::FilterManagerConnection.
+ * Implementation of Network::Connection, Network::FilterManagerConnection and
+ * Envoy::ScopeTrackedObject.
  */
 class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
@@ -68,14 +70,11 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const Address::InstanceConstSharedPtr& remoteAddress() const override {
-    return socket_->remoteAddress();
+  const SocketAddressProvider& addressProvider() const override {
+    return socket_->addressProvider();
   }
-  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
-    return socket_->directRemoteAddress();
-  }
-  const Address::InstanceConstSharedPtr& localAddress() const override {
-    return socket_->localAddress();
+  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+    return socket_->addressProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
@@ -84,7 +83,6 @@ public:
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
-  bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();
@@ -122,9 +120,13 @@ public:
   // Reconsider how to make fairness happen.
   void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
+  TransportSocketPtr& transportSocket() { return transport_socket_; }
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
   // A convenience function which returns true if

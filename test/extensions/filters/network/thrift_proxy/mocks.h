@@ -246,6 +246,7 @@ public:
   // ThriftProxy::ThriftFilters::DecoderFilterCallbacks
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(const Network::Connection*, connection, (), (const));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(TransportType, downstreamTransportType, (), (const));
@@ -255,10 +256,13 @@ public:
   MOCK_METHOD(ResponseStatus, upstreamData, (Buffer::Instance&));
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
+  MOCK_METHOD(bool, responseSuccess, ());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  MessageMetadataSharedPtr metadata_;
   std::shared_ptr<Router::MockRoute> route_;
 };
 

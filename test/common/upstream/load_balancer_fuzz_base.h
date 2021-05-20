@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"

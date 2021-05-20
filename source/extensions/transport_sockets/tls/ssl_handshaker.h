@@ -37,7 +37,9 @@ private:
       Envoy::Ssl::ClientValidationStatus::NotValidated};
 };
 
-class SslHandshakerImpl : public Ssl::ConnectionInfo, public Ssl::Handshaker {
+class SslHandshakerImpl : public Ssl::ConnectionInfo,
+                          public Ssl::Handshaker,
+                          protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                     Ssl::HandshakeCallbacks* handshake_callbacks);
@@ -133,6 +135,11 @@ public:
   Ssl::HandshakerCapabilities capabilities() const override {
     // The default handshaker impl requires Envoy to handle all enumerated behaviors.
     return Ssl::HandshakerCapabilities{};
+  }
+
+  Ssl::SslCtxCb sslctxCb(Ssl::HandshakerFactoryContext&) const override {
+    // The default handshaker impl doesn't additionally modify SSL_CTX.
+    return nullptr;
   }
 
   static HandshakerFactory* getDefaultHandshakerFactory() {

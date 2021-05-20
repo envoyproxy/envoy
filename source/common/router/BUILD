@@ -97,6 +97,7 @@ envoy_cc_library(
     hdrs = ["context_impl.h"],
     deps = [
         "//include/envoy/router:context_interface",
+        "//include/envoy/router:router_interface",
         "//include/envoy/stats:stats_macros",
     ],
 )
@@ -120,6 +121,7 @@ envoy_cc_library(
         ":config_lib",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_update_info_interface",
+        "//include/envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
@@ -232,6 +234,7 @@ envoy_cc_library(
         "//source/common/config:resource_name_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:version_converter_lib",
+        "//source/common/config:xds_resource_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -263,7 +266,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -318,7 +320,9 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:application_protocol_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:transport_socket_options_lib",
+        "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -334,11 +338,13 @@ envoy_cc_library(
     hdrs = ["router_ratelimit.h"],
     deps = [
         ":config_utility_lib",
+        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/router:router_ratelimit_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:metadata_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -365,6 +371,7 @@ envoy_cc_library(
     deps = [
         ":header_formatter_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -408,5 +415,14 @@ envoy_cc_library(
     hdrs = ["string_accessor_impl.h"],
     deps = [
         "//include/envoy/router:string_accessor_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "delegating_route_lib",
+    srcs = ["delegating_route_impl.cc"],
+    hdrs = ["delegating_route_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
     ],
 )

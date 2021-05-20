@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 #include "common/stats/utility.h"
 
 #include "extensions/filters/network/redis_proxy/config.h"
@@ -93,16 +94,11 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> par
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
-    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), parent->api_);
-    auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent->api_);
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
 
 InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
-  if (host_set_member_update_cb_handle_ != nullptr) {
-    host_set_member_update_cb_handle_->remove();
-  }
   while (!pending_requests_.empty()) {
     pending_requests_.pop_front();
   }
@@ -132,6 +128,9 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
 
   ASSERT(cluster_ == nullptr);
   cluster_ = &cluster;
+  // Update username and password when cluster updates.
+  auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
+  auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,
@@ -165,10 +164,7 @@ void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_
 
   // Treat cluster removal as a removal of all hosts. Close all connections and fail all pending
   // requests.
-  if (host_set_member_update_cb_handle_ != nullptr) {
-    host_set_member_update_cb_handle_->remove();
-    host_set_member_update_cb_handle_ = nullptr;
-  }
+  host_set_member_update_cb_handle_ = nullptr;
   while (!client_map_.empty()) {
     client_map_.begin()->second->redis_client_->close();
   }
@@ -261,6 +257,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
                                                            config_->readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
+    ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
   }
   pending_requests_.emplace_back(*this, std::move(request), callbacks);

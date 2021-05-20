@@ -71,12 +71,14 @@ public:
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
 
+  SSL* rawSslForTest() const { return rawSsl(); }
+
 protected:
   SSL* rawSsl() const { return info_->ssl_.get(); }
 
 private:
   struct ReadResult {
-    bool commit_slice_{};
+    uint64_t bytes_read_{0};
     absl::optional<int> error_;
   };
   ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
@@ -113,6 +115,10 @@ public:
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
+
+  const Ssl::ClientContextConfig& config() const { return *config_; }
+
+  Envoy::Ssl::ClientContextSharedPtr sslCtx();
 
 private:
   Envoy::Ssl::ContextManager& manager_;

@@ -17,6 +17,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -127,10 +128,11 @@ ReadOrParseState Filter::onReadWorker() {
     }
 
     // Only set the local address if it really changed, and mark it as address being restored.
-    if (*proxy_protocol_header_.value().local_address_ != *socket.localAddress()) {
-      socket.restoreLocalAddress(proxy_protocol_header_.value().local_address_);
+    if (*proxy_protocol_header_.value().local_address_ !=
+        *socket.addressProvider().localAddress()) {
+      socket.addressProvider().restoreLocalAddress(proxy_protocol_header_.value().local_address_);
     }
-    socket.setRemoteAddress(proxy_protocol_header_.value().remote_address_);
+    socket.addressProvider().setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
 
   // Release the file event so that we do not interfere with the connection read events.
@@ -220,11 +222,11 @@ bool Filter::parseV2Header(char* buf) {
         memset(&la6, 0, sizeof(la6));
         ra6.sin6_family = AF_INET6;
         ra6.sin6_port = v6->src_port;
-        memcpy(ra6.sin6_addr.s6_addr, v6->src_addr, sizeof(ra6.sin6_addr.s6_addr));
+        safeMemcpy(&(ra6.sin6_addr.s6_addr), &(v6->src_addr));
 
         la6.sin6_family = AF_INET6;
         la6.sin6_port = v6->dst_port;
-        memcpy(la6.sin6_addr.s6_addr, v6->dst_addr, sizeof(la6.sin6_addr.s6_addr));
+        safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
         proxy_protocol_header_.emplace(WireHeader{
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,

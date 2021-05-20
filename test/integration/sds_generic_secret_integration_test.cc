@@ -1,10 +1,10 @@
 #include <string>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/secret/secret_provider.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/datasource.h"
 #include "common/grpc/common.h"
@@ -120,7 +120,7 @@ public:
     secret.set_name("encryption_key");
     auto* generic_secret = secret.mutable_generic_secret();
     generic_secret->mutable_secret()->set_inline_string("DUMMY_AES_128_KEY");
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("0");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);

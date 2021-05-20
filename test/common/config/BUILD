@@ -229,6 +229,7 @@ envoy_cc_test_library(
     hdrs = ["delta_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
+        "//source/common/common:utility_lib",
         "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:common_lib",
@@ -380,6 +381,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
+        "//source/extensions/access_loggers/file:config",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/stats:stats_mocks",
@@ -435,6 +437,16 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "context_provider_impl_test",
+    srcs = ["context_provider_impl_test.cc"],
+    deps = [
+        ":xds_test_utility_lib",
+        "//source/common/config:context_provider_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

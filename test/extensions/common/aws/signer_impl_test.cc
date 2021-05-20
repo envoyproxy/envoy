@@ -40,7 +40,7 @@ public:
   void setBody(const std::string& body) { message_->body().add(body); }
 
   void expectSignHeaders(absl::string_view service_name, absl::string_view signature,
-                         absl::string_view payload) {
+                         absl::string_view payload, bool use_unsigned_payload) {
     auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
     EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
     Http::TestRequestHeaderMapImpl headers{};
@@ -50,7 +50,11 @@ public:
 
     SignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
                       time_system_);
-    signer.sign(headers);
+    if (use_unsigned_payload) {
+      signer.signUnsignedPayload(headers);
+    } else {
+      signer.signEmptyPayload(headers);
+    }
 
     EXPECT_EQ(fmt::format("AWS4-HMAC-SHA256 Credential=akid/20180102/region/{}/aws4_request, "
                           "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
@@ -204,13 +208,13 @@ TEST_F(SignerImplTest, SignHostHeader) {
 // Verify signing headers for services.
 TEST_F(SignerImplTest, SignHeadersByService) {
   expectSignHeaders("s3", "d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
-                    SignatureConstants::get().UnsignedPayload);
+                    SignatureConstants::get().UnsignedPayload, true);
   expectSignHeaders("service", "d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
-                    SignatureConstants::get().HashedEmptyString);
+                    SignatureConstants::get().HashedEmptyString, false);
   expectSignHeaders("es", "0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
-                    SignatureConstants::get().UnsignedPayload);
+                    SignatureConstants::get().UnsignedPayload, true);
   expectSignHeaders("glacier", "8d1f241d77c64cda57b042cd312180f16e98dbd7a96e5545681430f8dbde45a0",
-                    SignatureConstants::get().UnsignedPayload);
+                    SignatureConstants::get().UnsignedPayload, true);
 }
 
 } // namespace

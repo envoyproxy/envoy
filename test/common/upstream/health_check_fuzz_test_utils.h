@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 
 #include "common/upstream/health_checker_impl.h"
@@ -48,6 +50,7 @@ public:
     Network::MockClientConnection* client_connection_{};
     NiceMock<Http::MockRequestEncoder> request_encoder_;
     Http::ResponseDecoder* stream_response_callbacks_{};
+    CodecClientForTest* codec_client_{};
   };
 
   using TestSessionPtr = std::unique_ptr<TestSession>;

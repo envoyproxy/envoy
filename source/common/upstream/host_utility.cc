@@ -56,6 +56,20 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Host& host, std::strin
     }
     break;
   }
+
+  case Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL: {
+    if (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL)) {
+      health_status += "/excluded_via_immediate_hc_fail";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::ACTIVE_HC_TIMEOUT: {
+    if (host.healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
+      health_status += "/active_hc_timeout";
+    }
+    break;
+  }
   }
 }
 

@@ -6,6 +6,7 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/string_accessor_impl.h"
+#include "common/stream_info/uint32_accessor_impl.h"
 
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
@@ -45,7 +46,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
+               envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
+               Stats::Scope& scope));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -54,12 +56,16 @@ public:
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
+    config_.mutable_common_config()->set_transport_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type, Stats::Scope&) {
+                   envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
+                   Stats::Scope&) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
@@ -146,10 +152,15 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.start_time_ = SystemTime(1h);
     stream_info.start_time_monotonic_ = MonotonicTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
-    stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
+    stream_info.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("uint32_accessor",
+                                       std::make_unique<StreamInfo::UInt32AccessorImpl>(42),
                                        StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
@@ -179,6 +190,9 @@ common_properties:
     string_accessor:
       "@type": type.googleapis.com/google.protobuf.StringValue
       value: test_value
+    uint32_accessor:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+      value: 42
     serialized:
       "@type": type.googleapis.com/google.protobuf.Duration
       value: 10s

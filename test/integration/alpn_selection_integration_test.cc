@@ -107,7 +107,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMatchingAlpn) {
             fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -129,7 +129,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamMismatchingAlpn) {
   EXPECT_EQ("", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -149,7 +149,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http2UpstreamConfiguredALPN) {
   EXPECT_EQ("custom-alpn", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -167,7 +167,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMatchingAlpn) {
             fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -186,7 +186,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreaMismatchingAlpn) {
   EXPECT_EQ("", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -208,7 +208,7 @@ TEST_F(AlpnSelectionIntegrationTest, Http11UpstreamConfiguredALPN) {
   EXPECT_EQ("custom-alpn", fake_upstream_connection_->connection().nextProtocol());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 } // namespace Envoy

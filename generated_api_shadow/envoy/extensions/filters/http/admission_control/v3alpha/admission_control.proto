@@ -5,12 +5,8 @@ package envoy.extensions.filters.http.admission_control.v3alpha;
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/v3/range.proto";
 
-import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
-import "google/rpc/status.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 

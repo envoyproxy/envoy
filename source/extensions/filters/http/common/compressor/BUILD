@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

@@ -1,4 +1,4 @@
-#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.h"
+#include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
@@ -30,7 +30,7 @@ public:
     auto factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
         RetryPriorityValues::get().PreviousPrioritiesRetryPriority);
 
-    envoy::config::retry::previous_priorities::PreviousPrioritiesConfig config;
+    envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig config;
     config.set_update_frequency(update_frequency_);
     // Use createEmptyConfigProto to exercise that code path. This ensures the proto returned
     // by that method is compatible with the downcast in createRetryPriority.

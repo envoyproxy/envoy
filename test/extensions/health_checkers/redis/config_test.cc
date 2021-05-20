@@ -58,7 +58,7 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
         key: foo
     )EOF";
 
@@ -107,7 +107,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
   NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
@@ -131,7 +131,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     always_log_health_check_failures: true
     )EOF";
 
@@ -156,7 +156,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
         key: foo
     )EOF";
 

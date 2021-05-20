@@ -33,12 +33,14 @@ protected:
   testing::NiceMock<MockListenSocket> socket_mock_;
   Api::MockOsSysCalls os_sys_calls_mock_;
 
-  void SetUp() override { socket_mock_.local_address_.reset(); }
+  void SetUp() override { socket_mock_.address_provider_->setLocalAddress(nullptr); }
   void makeSocketV4() {
-    socket_mock_.local_address_ = std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
+    socket_mock_.address_provider_->setLocalAddress(
+        std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678));
   }
   void makeSocketV6() {
-    socket_mock_.local_address_ = std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
+    socket_mock_.address_provider_->setLocalAddress(
+        std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678));
   }
 };
 

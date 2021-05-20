@@ -1,0 +1,28 @@
+version: "3.7"
+services:
+
+  tls-inspector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "10000:10000"
+      - "12345:12345"
+
+  service-https-http2:
+    image: mendhak/http-https-echo
+    hostname: service-https-http2
+    environment:
+      - HTTP_PORT=0
+
+  service-https-http1.1:
+    image: mendhak/http-https-echo
+    hostname: service-https-http1.1
+    environment:
+      - HTTP_PORT=0
+
+  service-http:
+    image: mendhak/http-https-echo
+    hostname: service-http
+    environment:
+      - HTTPS_PORT=0

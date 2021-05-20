@@ -173,17 +173,17 @@ This example shows how to configure secrets fetched from remote SDS servers:
           name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-              common_tls_context:
-                tls_certificate_sds_secret_configs:
-                - name: client_cert
-                  sds_config:
-                    resource_api_version: V3
-                    api_config_source:
-                      api_type: GRPC
-                      transport_api_version: V3
-                      grpc_services:
-                        google_grpc:
-                          target_uri: unix:/tmp/uds_path
+            common_tls_context:
+              tls_certificate_sds_secret_configs:
+              - name: client_cert
+                sds_config:
+                  resource_api_version: V3
+                  api_config_source:
+                    api_type: GRPC
+                    transport_api_version: V3
+                    grpc_services:
+                      google_grpc:
+                        target_uri: unix:/tmp/uds_path
     listeners:
       ....
       filter_chains:
@@ -267,6 +267,7 @@ Paths to client certificate, including client's certificate chain and private ke
 
     resources:
       - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        name: tls_sds
         tls_certificate:
           certificate_chain:
             filename: /certs/sds_cert.pem
@@ -279,6 +280,7 @@ Path to CA certificate bundle for validating the xDS server certificate is given
 
     resources:
       - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        name: validation_context_sds
         validation_context:
           trusted_ca:
             filename: /certs/cacert.pem
@@ -293,6 +295,7 @@ supports this scheme via the use of *watched_directory*. Continuing the above ex
 
     resources:
       - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        name: tls_sds
         tls_certificate:
           certificate_chain:
             filename: /certs/current/sds_cert.pem
@@ -305,6 +308,7 @@ supports this scheme via the use of *watched_directory*. Continuing the above ex
 
     resources:
       - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        name: validation_context_sds
         validation_context:
           trusted_ca:
             filename: /certs/current/cacert.pem

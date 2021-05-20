@@ -32,7 +32,11 @@ public:
   static std::string configToUse() {
     return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -164,7 +168,7 @@ listener_filters:
   }
 
   void setup(uint32_t upstream_count) {
-    setUdpFakeUpstream(true);
+    setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     if (upstream_count > 1) {
       setDeterministic();
       setUpstreamCount(upstream_count);

@@ -4,7 +4,6 @@ package envoy.extensions.filters.http.on_demand.v3;
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.on_demand.v3";
 option java_outer_classname = "OnDemandProto";

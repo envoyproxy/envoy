@@ -14,6 +14,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -194,6 +195,7 @@ public:
   static envoy::config::core::v3::ApiVersion
   getAndCheckTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
+    ASSERT(Thread::MainThread::isMainThread());
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
         transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
       Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
@@ -204,7 +206,8 @@ public:
           "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
         throw DeprecatedMajorVersionException(warning);
       }
     }
@@ -238,8 +241,31 @@ public:
    * @return SubscriptionStats for scope.
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
-    return {
-        ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TEXT_READOUT(scope))};
+    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TEXT_READOUT(scope),
+                                   POOL_HISTOGRAM(scope))};
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name (and templated type) with error checking
+   * to ensure the name and factory are valid.
+   * @param name string identifier for the particular implementation.
+   * @param is_optional exception will be throw when the value is false and no factory found.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory>
+  static Factory* getAndCheckFactoryByName(const std::string& name, bool is_optional) {
+    if (name.empty()) {
+      ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
+    }
+
+    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
+
+    if (factory == nullptr && !is_optional) {
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Didn't find a registered implementation for name: '{}'", name));
+    }
+
+    return factory;
   }
 
   /**
@@ -249,18 +275,7 @@ public:
    * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
-    if (name.empty()) {
-      ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
-    }
-
-    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
-
-    if (factory == nullptr) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Didn't find a registered implementation for name: '{}'", name));
-    }
-
-    return *factory;
+    return *getAndCheckFactoryByName<Factory>(name, false);
   }
 
   /**
@@ -291,17 +306,29 @@ public:
 
   /**
    * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid. And a flag to control return nullptr or throw an exception.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   * @param is_optional an exception will be throw when the value is true and no factory found.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return factory;
+    }
+
+    return Utility::getAndCheckFactoryByName<Factory>(message.name(), is_optional);
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
    * valid.
    * @param message proto that contains fields 'name' and 'typed_config'.
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
-      return *factory;
-    }
-
-    return Utility::getAndCheckFactoryByName<Factory>(message.name());
+    return *getAndCheckFactory<Factory>(message, false);
   }
 
   /**
@@ -336,8 +363,8 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
-   * provided because for statically registered implementations, a custom config is generally
+   * @param enclosing_message proto that contains a field 'typed_config'. Note: the enclosing proto
+   * is provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
    * @param validation_visitor message validation visitor instance.
    * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
@@ -455,7 +482,7 @@ public:
    * @throws EnvoyException if there is a mismatch between design and configuration.
    */
   static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
-                                      const char* filter_chain_type, bool is_terminal_filter,
+                                      const std::string& filter_chain_type, bool is_terminal_filter,
                                       bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
       ExceptionUtil::throwEnvoyException(

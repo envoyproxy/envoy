@@ -4,6 +4,7 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/network/socket_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
@@ -64,15 +65,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
-  MOCK_METHOD(void, setDownstreamLocalAddress, (const Network::Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamLocalAddress, (), (const));
-  MOCK_METHOD(void, setDownstreamDirectRemoteAddress,
-              (const Network::Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamDirectRemoteAddress, (),
-              (const));
-  MOCK_METHOD(void, setDownstreamRemoteAddress, (const Network::Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamRemoteAddress, (),
-              (const));
+  MOCK_METHOD(const Network::SocketAddressProvider&, downstreamAddressProvider, (), (const));
   MOCK_METHOD(void, setDownstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, downstreamSslConnection, (), (const));
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
@@ -96,10 +89,15 @@ public:
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
   MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
               (const));
-  MOCK_METHOD(Http::RequestIDExtensionSharedPtr, getRequestIDExtension, (), (const));
-  MOCK_METHOD(void, setRequestIDExtension, (Http::RequestIDExtensionSharedPtr));
+  MOCK_METHOD(const Http::RequestIdStreamInfoProvider*, getRequestIDProvider, (), (const));
+  MOCK_METHOD(void, setRequestIDProvider,
+              (const Http::RequestIdStreamInfoProviderSharedPtr& provider));
+  MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
+  MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
   MOCK_METHOD(void, setConnectionID, (uint64_t));
+  MOCK_METHOD(void, setFilterChainName, (const absl::string_view));
+  MOCK_METHOD(const std::string&, filterChainName, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -126,14 +124,13 @@ public:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   std::string requested_server_name_;
   std::string route_name_;
   std::string upstream_transport_failure_reason_;
+  std::string filter_chain_name_;
 };
 
 } // namespace StreamInfo

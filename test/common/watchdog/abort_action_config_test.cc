@@ -28,11 +28,11 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
           "config": {
             "name": "envoy.watchdog.abort_action",
             "typed_config": {
-	      "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-	      "type_url": "type.googleapis.com/envoy.watchdog.abort_action.v3alpha.AbortActionConfig",
-	      "value": {
-		"wait_duration": "2s",
-	      }
+              "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+              "type_url": "type.googleapis.com/envoy.watchdog.abort_action.v3alpha.AbortActionConfig",
+              "value": {
+                "wait_duration": "2s",
+              }
             }
           },
         }

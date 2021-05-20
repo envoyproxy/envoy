@@ -47,7 +47,7 @@ public:
  * This is an HTTP client that multiple stream management and underlying connection management
  * across multiple HTTP codec types.
  */
-class CodecClient : Logger::Loggable<Logger::Id::client>,
+class CodecClient : protected Logger::Loggable<Logger::Id::client>,
                     public Http::ConnectionCallbacks,
                     public Network::ConnectionCallbacks,
                     public Event::DeferredDeletable {
@@ -140,10 +140,21 @@ protected:
   CodecClient(Type type, Network::ClientConnectionPtr&& connection,
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
+  /**
+   * Connect to the host.
+   * Needs to be called after codec_ is instantiated.
+   */
+  void connect();
+
   // Http::ConnectionCallbacks
   void onGoAway(GoAwayErrorCode error_code) override {
     if (codec_callbacks_) {
       codec_callbacks_->onGoAway(error_code);
+    }
+  }
+  void onSettings(ReceivedSettings& settings) override {
+    if (codec_callbacks_) {
+      codec_callbacks_->onSettings(settings);
     }
   }
 
@@ -251,6 +262,8 @@ private:
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
   bool remote_closed_{};
+  bool protocol_error_{false};
+  bool connect_called_{false};
 };
 
 using CodecClientPtr = std::unique_ptr<CodecClient>;

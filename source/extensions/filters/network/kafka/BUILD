@@ -18,6 +18,7 @@ envoy_cc_extension(
     name = "kafka_broker_config_lib",
     srcs = ["broker/config.cc"],
     hdrs = ["broker/config.h"],
+    category = "envoy.filters.network",
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "wip",
     deps = [
@@ -230,6 +231,7 @@ envoy_cc_library(
         ":kafka_types_lib",
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:byte_order_lib",
+        "//source/common/common:safe_memcpy_lib",
     ],
 )
 

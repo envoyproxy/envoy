@@ -21,6 +21,7 @@ envoy_cc_extension(
         "admission_control.h",
         "thread_local_controller.h",
     ],
+    category = "envoy.filters.http",
     security_posture = "unknown",
     deps = [
         "//include/envoy/http:filter_interface",
@@ -40,6 +41,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.http",
     security_posture = "unknown",
     status = "alpha",
     deps = [

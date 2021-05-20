@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.h"
-#include "envoy/config/transport_socket/raw_buffer/v2/raw_buffer.pb.validate.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 
 #include "common/network/raw_buffer_socket.h"
 
@@ -24,7 +24,7 @@ Network::TransportSocketFactoryPtr DownstreamRawBufferSocketFactory::createTrans
 }
 
 ProtobufTypes::MessagePtr RawBufferSocketFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::transport_socket::raw_buffer::v2::RawBuffer>();
+  return std::make_unique<envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer>();
 }
 
 REGISTER_FACTORY(UpstreamRawBufferSocketFactory,

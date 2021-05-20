@@ -26,6 +26,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.network",
     security_posture = "unknown",
     deps = [
         ":sni_cluster",

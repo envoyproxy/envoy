@@ -50,6 +50,18 @@
 
 namespace Envoy {
 namespace Server {
+namespace CompilationSettings {
+/**
+ * All server compilation settings stats. @see stats_macros.h
+ */
+#define ALL_SERVER_COMPILATION_SETTINGS_STATS(COUNTER, GAUGE, HISTOGRAM)                           \
+  GAUGE(fips_mode, NeverImport)
+
+struct ServerCompilationSettingsStats {
+  ALL_SERVER_COMPILATION_SETTINGS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                                        GENERATE_HISTOGRAM_STRUCT)
+};
+} // namespace CompilationSettings
 
 /**
  * All server wide stats. @see stats_macros.h
@@ -59,6 +71,7 @@ namespace Server {
   COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(dropped_stat_flushes)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(seconds_until_first_ocsp_response_expiring, Accumulate)                                    \
@@ -162,6 +175,7 @@ public:
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
+  const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
@@ -184,6 +198,7 @@ public:
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
   Init::Manager& initManager() override { return server_.initManager(); }
+  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation
@@ -216,7 +231,8 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context);
+               std::unique_ptr<ProcessContext> process_context,
+               Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   ~InstanceImpl() override;
 
@@ -255,7 +271,7 @@ public:
   Router::Context& routerContext() override { return router_context_; }
   ProcessContextOptRef processContext() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
+  LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
 
@@ -321,6 +337,8 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  std::unique_ptr<CompilationSettings::ServerCompilationSettingsStats>
+      server_compilation_settings_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
@@ -361,13 +379,14 @@ private:
   Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
-  const std::thread::id main_thread_id_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
   ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
+
+  bool stats_flush_in_progress_ : 1;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

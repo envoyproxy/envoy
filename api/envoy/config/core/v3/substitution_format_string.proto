@@ -3,9 +3,11 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/struct.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -18,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message SubstitutionFormatString {
   oneof format {
     option (validate.required) = true;
@@ -40,7 +42,8 @@ message SubstitutionFormatString {
     //   upstream connect error:503:path=/foo
     //
     // Deprecated in favor of :ref:`text_format_source <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format_source>`. To migrate text format strings, use the :ref:`inline_string <envoy_v3_api_field_config.core.v3.DataSource.inline_string>` field.
-    string text_format = 1 [deprecated = true];
+    string text_format = 1
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Specify a format with command operators to form a JSON string.
     // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
@@ -103,4 +106,8 @@ message SubstitutionFormatString {
   //   content_type: "text/html; charset=UTF-8"
   //
   string content_type = 4;
+
+  // Specifies a collection of Formatter plugins that can be called from the access log configuration.
+  // See the formatters extensions documentation for details.
+  repeated TypedExtensionConfig formatters = 6;
 }

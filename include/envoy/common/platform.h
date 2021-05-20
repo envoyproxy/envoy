@@ -148,6 +148,8 @@ struct msghdr {
 #define SOCKET_ERROR_ADDR_NOT_AVAIL WSAEADDRNOTAVAIL
 #define SOCKET_ERROR_INVAL WSAEINVAL
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
+#define SOCKET_ERROR_BADF WSAEBADF
+#define SOCKET_ERROR_CONNRESET WSAECONNRESET
 
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
@@ -157,7 +159,17 @@ struct msghdr {
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"NUL"};
+
+constexpr bool win32SupportsOriginalDestination() {
+#if defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
+  return true;
+#else
+  return false;
+#endif
 }
+
+} // namespace Platform
+
 #else // POSIX
 
 #include <arpa/inet.h>
@@ -245,6 +257,8 @@ typedef int signal_t;           // NOLINT(modernize-use-using)
 #define SOCKET_ERROR_ADDR_NOT_AVAIL EADDRNOTAVAIL
 #define SOCKET_ERROR_INVAL EINVAL
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
+#define SOCKET_ERROR_BADF EBADF
+#define SOCKET_ERROR_CONNRESET ECONNRESET
 
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES

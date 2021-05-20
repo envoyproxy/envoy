@@ -42,9 +42,21 @@ public:
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
    * that point to the same reference counted backing stats. This allows a new scope to be
    * gracefully swapped in while an old scope with the same name is being destroyed.
+   *
+   * See also scopeFromStatName, which is preferred.
+   *
    * @param name supplies the scope's namespace prefix.
    */
   virtual ScopePtr createScope(const std::string& name) PURE;
+
+  /**
+   * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
+   * that point to the same reference counted backing stats. This allows a new scope to be
+   * gracefully swapped in while an old scope with the same name is being destroyed.
+   *
+   * @param name supplies the scope's namespace prefix.
+   */
+  virtual ScopePtr scopeFromStatName(StatName name) PURE;
 
   /**
    * Deliver an individual histogram value to all registered sinks.

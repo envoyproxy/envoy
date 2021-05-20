@@ -3,7 +3,7 @@ overload_manager:
   resource_monitors:
   - name: "envoy.resource_monitors.fixed_heap"
     typed_config:
-      "@type": type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig
+      "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
       # TODO: Tune for your system.
       max_heap_size_bytes: 2147483648 # 2 GiB
   actions:
@@ -19,7 +19,6 @@ overload_manager:
         value: 0.98
 
 admin:
-  access_log_path: "/var/log/envoy_admin.log"
   address:
     socket_address:
       address: 127.0.0.1
@@ -56,6 +55,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           use_remote_address: true
+          normalize_path: true
+          merge_slashes: true
+          path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
           common_http_protocol_options:
             idle_timeout: 3600s # 1 hour
             headers_with_underscores_action: REJECT_REQUEST
@@ -68,14 +70,14 @@ static_resources:
           route_config:
             virtual_hosts:
             - name: default
-              domains: "*"
+              domains: ["*"]
               routes:
               - match: { prefix: "/" }
                 route:
                   cluster: service_foo
                   idle_timeout: 15s # must be disabled for long-lived and streaming requests
   clusters:
-    name: service_foo
+  - name: service_foo
     connect_timeout: 15s
     per_connection_buffer_limit_bytes: 32768 # 32 KiB
     load_assignment:

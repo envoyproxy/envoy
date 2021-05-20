@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <memory>
 #include <string>
 
@@ -29,21 +28,22 @@ public:
                               const envoy::config::core::v3::GrpcService& grpc_service,
                               Stats::Scope& scope);
 
-  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
-                                   const std::chrono::milliseconds& timeout) override;
+  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks) override;
 
 private:
   Grpc::AsyncClientFactoryPtr factory_;
 };
 
 class ExternalProcessorStreamImpl : public ExternalProcessorStream,
-                                    public Grpc::AsyncStreamCallbacks<ProcessingResponse> {
+                                    public Grpc::AsyncStreamCallbacks<ProcessingResponse>,
+                                    public Logger::Loggable<Logger::Id::filter> {
 public:
   ExternalProcessorStreamImpl(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-                              ExternalProcessorCallbacks& callbacks,
-                              const std::chrono::milliseconds& timeout);
+                              ExternalProcessorCallbacks& callbacks);
   void send(ProcessingRequest&& request, bool end_stream) override;
-  void close() override;
+  // Close the stream. This is idempotent and will return true if we
+  // actually closed it.
+  bool close() override;
 
   // AsyncStreamCallbacks
   void onReceiveMessage(ProcessingResponsePtr&& message) override;
@@ -58,6 +58,7 @@ private:
   ExternalProcessorCallbacks& callbacks_;
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> client_;
   Grpc::AsyncStream<ProcessingRequest> stream_;
+  bool stream_closed_ = false;
 };
 
 } // namespace ExternalProcessing

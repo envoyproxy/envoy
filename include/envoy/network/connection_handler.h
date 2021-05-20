@@ -4,10 +4,13 @@
 #include <memory>
 
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_balancer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
+
+#include "common/common/interval_value.h"
 
 namespace Envoy {
 namespace Network {
@@ -53,13 +56,6 @@ public:
   virtual void removeListeners(uint64_t listener_tag) PURE;
 
   /**
-   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
-   * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
-   * removed.
-   */
-  virtual UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) PURE;
-
-  /**
    * Remove the filter chains and the connections in the listener. All connections owned
    * by the filter chains will be closed. Once all the connections are destroyed(connections
    * could be deferred deleted!), invoke the completion.
@@ -98,7 +94,7 @@ public:
    * Set the fraction of connections the listeners should reject.
    * @param reject_fraction a value between 0 (reject none) and 1 (reject all).
    */
-  virtual void setListenerRejectFraction(float reject_fraction) PURE;
+  virtual void setListenerRejectFraction(UnitFloat reject_fraction) PURE;
 
   /**
    * @return the stat prefix used for per-handler stats.
@@ -160,6 +156,44 @@ public:
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 
 /**
+ * The connection handler from the view of a tcp listener.
+ */
+class TcpConnectionHandler : public virtual ConnectionHandler {
+public:
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Obtain the rebalancer of the tcp listener.
+   * @param listener_tag supplies the tag of the tcp listener that was passed to addListener().
+   * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. `nullopt` if
+   * listener doesn't exist or rebalancer doesn't exist.
+   */
+  virtual BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) PURE;
+
+  /**
+   * Obtain the rebalancer of the tcp listener.
+   * @param address supplies the address of the tcp listener.
+   * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. ``nullopt`` if
+   * listener doesn't exist or rebalancer doesn't exist.
+   */
+  virtual BalancedConnectionHandlerOptRef
+  getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
+};
+
+/**
+ * The connection handler from the view of a udp listener.
+ */
+class UdpConnectionHandler : public virtual ConnectionHandler {
+public:
+  /**
+   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
+   * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
+   * removed.
+   */
+  virtual UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) PURE;
+};
+
+/**
  * A registered factory interface to create different kinds of ActiveUdpListener.
  */
 class ActiveUdpListenerFactory {
@@ -177,7 +211,7 @@ public:
    * @return the ActiveUdpListener created.
    */
   virtual ConnectionHandler::ActiveUdpListenerPtr
-  createActiveUdpListener(uint32_t worker_index, ConnectionHandler& parent,
+  createActiveUdpListener(uint32_t worker_index, UdpConnectionHandler& parent,
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 
   /**

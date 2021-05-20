@@ -14,7 +14,8 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
-#include "extensions/common/wasm/wasm_state.h"
+#include "extensions/common/wasm/plugin.h"
+#include "extensions/filters/common/expr/cel_state.h"
 #include "extensions/filters/common/expr/evaluator.h"
 
 #include "eval/public/activation.h"
@@ -42,10 +43,13 @@ using proxy_wasm::WasmResult;
 using proxy_wasm::WasmStreamType;
 
 using VmConfig = envoy::extensions::wasm::v3::VmConfig;
+using CapabilityRestrictionConfig = envoy::extensions::wasm::v3::CapabilityRestrictionConfig;
+using SanitizationConfig = envoy::extensions::wasm::v3::SanitizationConfig;
 using GrpcService = envoy::config::core::v3::GrpcService;
 
 class Wasm;
 
+using PluginBaseSharedPtr = std::shared_ptr<PluginBase>;
 using PluginHandleBaseSharedPtr = std::shared_ptr<PluginHandleBase>;
 using WasmHandleBaseSharedPtr = std::shared_ptr<WasmHandleBase>;
 
@@ -95,22 +99,6 @@ private:
   const ::Envoy::Buffer::Instance* const_buffer_instance_{};
   ::Envoy::Buffer::Instance* buffer_instance_{};
 };
-
-// Plugin contains the information for a filter/service.
-struct Plugin : public PluginBase {
-  Plugin(absl::string_view name, absl::string_view root_id, absl::string_view vm_id,
-         absl::string_view runtime, absl::string_view plugin_configuration, bool fail_open,
-         envoy::config::core::v3::TrafficDirection direction,
-         const LocalInfo::LocalInfo& local_info,
-         const envoy::config::core::v3::Metadata* listener_metadata)
-      : PluginBase(name, root_id, vm_id, runtime, plugin_configuration, fail_open),
-        direction_(direction), local_info_(local_info), listener_metadata_(listener_metadata) {}
-
-  envoy::config::core::v3::TrafficDirection direction_;
-  const LocalInfo::LocalInfo& local_info_;
-  const envoy::config::core::v3::Metadata* listener_metadata_;
-};
-using PluginSharedPtr = std::shared_ptr<Plugin>;
 
 // A context which will be the target of callbacks for a particular session
 // e.g. a handler of a stream.
@@ -209,6 +197,7 @@ public:
   // General
   WasmResult log(uint32_t level, absl::string_view message) override;
   uint64_t getCurrentTimeNanoseconds() override;
+  uint64_t getMonotonicTimeNanoseconds() override;
   absl::string_view getConfiguration() override;
   std::pair<uint32_t, absl::string_view> getStatus() override;
 
@@ -216,11 +205,12 @@ public:
   WasmResult getProperty(absl::string_view path, std::string* result) override;
   WasmResult setProperty(absl::string_view path, absl::string_view value) override;
   WasmResult declareProperty(absl::string_view path,
-                             std::unique_ptr<const WasmStatePrototype> state_prototype);
+                             Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype);
 
   // Continue
   WasmResult continueStream(WasmStreamType stream_type) override;
   WasmResult closeStream(WasmStreamType stream_type) override;
+  void failStream(WasmStreamType stream_type) override;
   WasmResult sendLocalResponse(uint32_t response_code, absl::string_view body_text,
                                Pairs additional_headers, uint32_t grpc_status,
                                absl::string_view details) override;
@@ -426,7 +416,6 @@ protected:
   ::Envoy::Buffer::Instance* network_upstream_data_buffer_{};
 
   // HTTP filter state.
-  bool http_request_started_ = false; // When decodeHeaders() is called the request is "started".
   Http::RequestHeaderMap* request_headers_{};
   Http::ResponseHeaderMap* response_headers_{};
   ::Envoy::Buffer::Instance* request_body_buffer_{};
@@ -449,6 +438,7 @@ protected:
   Http::RequestHeaderMapPtr grpc_initial_metadata_;
 
   // Access log state.
+  bool access_log_phase_ = false;
   const StreamInfo::StreamInfo* access_log_stream_info_{};
   const Http::RequestHeaderMap* access_log_request_headers_{};
   const Http::ResponseHeaderMap* access_log_response_headers_{};
@@ -475,7 +465,8 @@ protected:
   bool tcp_connection_closed_ = false;
 
   // Filter state prototype declaration.
-  absl::flat_hash_map<std::string, std::unique_ptr<const WasmStatePrototype>> state_prototypes_;
+  absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
+      state_prototypes_;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

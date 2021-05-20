@@ -17,7 +17,9 @@ namespace RBACFilter {
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
+    : stats_(Filters::Common::RBAC::generateStats(stats_prefix,
+                                                  proto_config.shadow_rules_stat_prefix(), scope)),
+      shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
 
@@ -53,10 +55,10 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       "checking request: requestedServerName: {}, sourceIP: {}, directRemoteIP: {}, remoteIP: {},"
       "localAddress: {}, ssl: {}, headers: {}, dynamicMetadata: {}",
       callbacks_->connection()->requestedServerName(),
-      callbacks_->connection()->remoteAddress()->asString(),
-      callbacks_->streamInfo().downstreamDirectRemoteAddress()->asString(),
-      callbacks_->streamInfo().downstreamRemoteAddress()->asString(),
-      callbacks_->streamInfo().downstreamLocalAddress()->asString(),
+      callbacks_->connection()->addressProvider().remoteAddress()->asString(),
+      callbacks_->streamInfo().downstreamAddressProvider().directRemoteAddress()->asString(),
+      callbacks_->streamInfo().downstreamAddressProvider().remoteAddress()->asString(),
+      callbacks_->streamInfo().downstreamAddressProvider().localAddress()->asString(),
       callbacks_->connection()->ssl()
           ? "uriSanPeerCertificate: " +
                 absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ",") +
@@ -91,14 +93,10 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
 
     auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
-      *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
-                  .ShadowEffectivePolicyIdField]
-           .mutable_string_value() = effective_policy_id;
+      *fields[config_->shadowEffectivePolicyIdField()].mutable_string_value() = effective_policy_id;
     }
 
-    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField]
-         .mutable_string_value() = shadow_resp_code;
-
+    *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_resp_code;
     callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
 

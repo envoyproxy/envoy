@@ -153,6 +153,9 @@ int TestRunner::RunTests(int argc, char** argv) {
         TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
   }
 
+  // Reset all ENVOY_BUG counters.
+  Envoy::Assert::resetEnvoyBugCountersForTest();
+
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
   // Fuzz tests may run Envoy tests in fuzzing mode to generate corpora. In this case, we do not
   // want to fail building the fuzz test because of a failed test run, which can happen when testing

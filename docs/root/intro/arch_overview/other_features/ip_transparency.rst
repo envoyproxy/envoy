@@ -20,6 +20,14 @@ called the *downstream remote address*, for many reasons. Some examples include:
 Envoy supports multiple methods for providing the downstream remote address to the upstream host.
 These techniques vary in complexity and applicability.
 
+Envoy also supports
+:ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+for detecting the original IP address. This might be useful if none of the techniques below is
+applicable to your setup. Two available extensions are the :ref:`custom header
+<envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>`
+extension and the :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+extension.
+
 HTTP Headers
 ------------
 
@@ -91,6 +99,7 @@ Some drawbacks to the Original Source filter:
 * It requires that Envoy have access to the downstream remote address.
 * Its configuration is relatively complex.
 * It may introduce a slight performance hit due to restrictions on connection pooling.
+* Not supported on Windows.
 
 .. _arch_overview_ip_transparency_original_src_http:
 

@@ -23,7 +23,6 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   real_host_description_ = data.host_description_;
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);
-  connection_->detectEarlyCloseWhenReadDisabled(false);
   read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
   connection_->addReadFilter(read_filter_handle_);
   connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
@@ -40,7 +39,7 @@ ActiveTcpClient::~ActiveTcpClient() {
   // TcpConnectionData. Make sure the TcpConnectionData will not refer to this ActiveTcpClient
   // and handle clean up normally done in clearCallbacks()
   if (tcp_connection_data_) {
-    ASSERT(state_ == ActiveClient::State::CLOSED);
+    ASSERT(state() == ActiveClient::State::CLOSED);
     tcp_connection_data_->release();
     parent_.onStreamClosed(*this, true);
     parent_.checkForDrained();
@@ -48,7 +47,7 @@ ActiveTcpClient::~ActiveTcpClient() {
 }
 
 void ActiveTcpClient::clearCallbacks() {
-  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
+  if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
     pool->scheduleOnUpstreamReady();
   }
@@ -59,6 +58,13 @@ void ActiveTcpClient::clearCallbacks() {
 }
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
+  // If this is a newly established TCP connection, readDisable. This is to handle a race condition
+  // for TCP for protocols like MySQL where the upstream writes first, and the data needs to be
+  // preserved until a downstream connection is associated.
+  // This is also necessary for prefetch to be used with such protocols.
+  if (event == Network::ConnectionEvent::Connected) {
+    connection_->readDisable(true);
+  }
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
   if (callbacks_) {
     // Do not pass the Connected event to any session which registered during onEvent above.

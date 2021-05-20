@@ -15,6 +15,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.stats_sinks",
     security_posture = "data_plane_agnostic",
     status = "alpha",
     deps = [
@@ -35,5 +36,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/extensions/common/wasm:wasm_lib",
+        "@envoy_api//envoy/extensions/filters/network/wasm/v3:pkg_cc_proto",
     ],
 )

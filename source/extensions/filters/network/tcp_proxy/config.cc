@@ -15,6 +15,8 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
+  auto _ = Envoy::Router::HeaderParser::configure(proto_config.tunneling_config().headers_to_add());
+
   if (proto_config.has_hidden_envoy_deprecated_deprecated_v1()) {
     ASSERT(proto_config.hidden_envoy_deprecated_deprecated_v1().routes_size() > 0);
   }

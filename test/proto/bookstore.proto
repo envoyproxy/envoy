@@ -96,6 +96,11 @@ service Bookstore {
       get: "/indexStream"
     };
   }
+  rpc GetRoot(google.protobuf.Empty) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/"
+    };
+  }
   rpc PostBody(EchoBodyRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       post: "/postBody"

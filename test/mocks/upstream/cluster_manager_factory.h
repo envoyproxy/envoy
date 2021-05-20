@@ -23,9 +23,11 @@ public:
   MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                std::vector<Http::Protocol>& protocol,
+               const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                   alternate_protocol_options,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-               ClusterConnectivityState& state));
+               TimeSource& source, ClusterConnectivityState& state));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
@@ -37,7 +39,8 @@ public:
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
   MOCK_METHOD(CdsApiPtr, createCds,
-              (const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm));
+              (const envoy::config::core::v3::ConfigSource& cds_config,
+               const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;

@@ -25,13 +25,13 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    category = "envoy.filters.listener",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":http_inspector_lib",

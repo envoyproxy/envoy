@@ -23,6 +23,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
@@ -87,7 +88,8 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
+  void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
+                         const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;
@@ -114,7 +116,9 @@ public:
   }
 
   // Http::ConnectionManagerConfig
-  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
+    return request_id_extension_;
+  }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -173,12 +177,22 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
-  bool shouldStripMatchingPort() const override { return false; }
+  Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        KEEP_UNCHANGED;
+  }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return detection_extensions_;
+  }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
@@ -255,14 +269,6 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
-      Event::TimerPtr createScaledTimer(OverloadTimerType, Event::TimerCb callback) override {
-        return dispatcher_.createTimer(callback);
-      }
-      Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum,
-                                        Event::TimerCb callback) override {
-        return dispatcher_.createTimer(callback);
-      }
-
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
@@ -279,6 +285,8 @@ private:
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
       return tls_->getTyped<NullThreadLocalOverloadState>();
     }
+
+    Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
@@ -311,7 +319,7 @@ private:
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->localAddress();
+      return socket_->addressProvider().localAddress();
     }
 
     Network::SocketSharedPtr getListenSocket() override {
@@ -349,14 +357,8 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    Network::UdpListenerConfigOptRef udpListenerConfig() override {
+      return Network::UdpListenerConfigOptRef();
     }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -400,6 +402,8 @@ private:
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
       return empty_network_filter_factory_;
     }
+
+    absl::string_view name() const override { return "admin"; }
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
@@ -447,6 +451,7 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
+  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
 };
 
 } // namespace Server

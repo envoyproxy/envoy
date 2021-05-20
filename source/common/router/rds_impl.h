@@ -68,6 +68,7 @@ class RouteConfigProviderManagerImpl;
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
+                                const OptionalHttpFilters& http_filters,
                                 Server::Configuration::ServerFactoryContext& factory_context,
                                 ProtobufMessage::ValidationVisitor& validator,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
@@ -119,10 +120,7 @@ class RdsRouteConfigSubscription
 public:
   ~RdsRouteConfigSubscription() override;
 
-  absl::node_hash_set<RouteConfigProvider*>& routeConfigProviders() {
-    ASSERT(route_config_providers_.size() == 1 || route_config_providers_.empty());
-    return route_config_providers_;
-  }
+  absl::optional<RouteConfigProvider*>& routeConfigProvider() { return route_config_provider_opt_; }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
   void updateOnDemand(const std::string& aliases);
   void maybeCreateInitManager(const std::string& version_info,
@@ -139,7 +137,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
     return update_callback_manager_.add(callback);
   }
 
@@ -147,6 +145,7 @@ private:
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      const OptionalHttpFilters& optional_http_filters,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
@@ -169,11 +168,11 @@ private:
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const uint64_t manager_identifier_;
-  // TODO(lambdai): Prove that a subscription has exactly one provider and remove the container.
-  absl::node_hash_set<RouteConfigProvider*> route_config_providers_;
+  absl::optional<RouteConfigProvider*> route_config_provider_opt_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
+  const OptionalHttpFilters optional_http_filters_;
 
   friend class RouteConfigProviderManagerImpl;
   // Access to addUpdateCallback
@@ -218,7 +217,8 @@ private:
   };
 
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
-                             Server::Configuration::ServerFactoryContext& factory_context);
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             const OptionalHttpFilters& optional_http_filters);
 
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
@@ -229,6 +229,7 @@ private:
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
+  const OptionalHttpFilters optional_http_filters_;
 
   friend class RouteConfigProviderManagerImpl;
 };
@@ -245,11 +246,13 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+      const OptionalHttpFilters& optional_http_filters,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
+                                  const OptionalHttpFilters& optional_http_filters,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator) override;
 

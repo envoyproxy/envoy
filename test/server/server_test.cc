@@ -362,6 +362,23 @@ TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
   server_thread->join();
 }
 
+// Validates that the "server.fips_mode" stat indicates the FIPS compliance from the Envoy Build
+TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
+  auto server_thread =
+      startTestServer("test/server/test_data/server/proxy_version_bootstrap.yaml", true);
+
+  if (VersionInfo::sslFipsCompliant()) {
+    EXPECT_EQ(
+        1L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  } else {
+    EXPECT_EQ(
+        0L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  }
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/test_data/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -372,6 +389,31 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
                                        Stats::Histogram::Unit::Milliseconds)
                   .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+}
+
+// Catch exceptions in secondary cluster initialization callbacks. These are not caught in the main
+// initialization try/catch.
+TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of secondary cluster: API configs must have either "
+                      "a gRPC service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/health_check_nullptr.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
+}
+
+// Catch exceptions in HDS cluster initialization callbacks.
+TEST_P(ServerInstanceImplTest, HdsClusterException) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: API configs must have either a gRPC "
+                      "service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/hds_exception.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
@@ -670,6 +712,57 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  options_.bootstrap_version_ = 3;
+
+  bool workers_started = false;
+  absl::Notification workers_started_fired;
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+    });
+    initialize("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+
+  // Flush three times in a row. Two of these should get dropped.
+  server_->dispatcher().post([&] {
+    server_->flushStats();
+    server_->flushStats();
+    server_->flushStats();
+  });
+
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+
+  // Trigger another flush after the first one finished. This should go through an no drops should
+  // be recorded.
+  server_->dispatcher().post([&] { server_->flushStats(); });
+
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
+
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -758,6 +851,21 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
+// Validate server localInfo().zoneStatName() is set from bootstrap config
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromBootstrap) {
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
+// Validate server localInfo().zoneStatName() can by overridden by option
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromOption) {
+  options_.service_zone_name_ = "bootstrap_zone_override";
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone_override",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
 // set.
 TEST_P(ServerInstanceImplTest,
@@ -780,9 +888,12 @@ TEST_P(ServerInstanceImplTest,
 // set.
 TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/hds_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+  // HDS cluster initialization happens through callbacks after runtime initialization. Exceptions
+  // are caught and will result in server shutdown.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: V2 (and AUTO) xDS transport "
+                      "protocol versions are deprecated",
+                      initialize("test/server/test_data/server/hds_v2.yaml"));
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
@@ -796,7 +907,7 @@ TEST_P(ServerInstanceImplTest,
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
 TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromPbText)) {
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromPbText)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
@@ -812,7 +923,7 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapFrom
 
 // Validate that bootstrap v2 YAML with deprecated fields loads when --bootstrap-version is set.
 TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromYaml)) {
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromYaml)) {
   options_.bootstrap_version_ = 2;
   EXPECT_LOG_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
@@ -829,7 +940,7 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailsToLoadV2BootstrapFro
 }
 
 // Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
+TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromPbText) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_THROW_WITH_REGEX(
@@ -838,7 +949,7 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
 }
 
 // Validate that bootstrap v3 YAML with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromYaml) {
+TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromYaml) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_THROW_WITH_REGEX(
@@ -847,7 +958,8 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromYaml) {
 }
 
 // Validate that we correctly parse a V2 pb_text file when configured to do so.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromPbText)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromPbText)) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_LOG_CONTAINS(
@@ -857,7 +969,8 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2Select
 }
 
 // Validate that we correctly parse a V2 YAML file when configured to do so.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromYaml)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromYaml)) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_LOG_CONTAINS(
@@ -917,19 +1030,22 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3S
 }
 
 // Validate that bootstrap with v2 dynamic transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2TransportWithoutExplicitVersion)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2TransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/dynamic_v2.yaml");
 }
 
 // Validate that bootstrap with v2 ADS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2AdsTransportWithoutExplicitVersion)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2AdsTransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/ads_v2.yaml");
 }
 
 // Validate that bootstrap with v2 HDS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2HdsTransportWithoutExplicitVersion)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2HdsTransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/hds_v2.yaml");
 }
@@ -948,6 +1064,15 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       EnvoyException, "Unknown bootstrap version 1.");
+}
+
+// Validate that we always reject v2.
+TEST_P(ServerInstanceImplTest, InvalidV2Bootstrap) {
+  options_.bootstrap_version_ = 2;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "v2 bootstrap is deprecated and no longer supported.");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
@@ -1023,7 +1148,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
                           EnvoyException, "Unknown gRPC client cluster");
 }
 
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_InvalidLegacyBootstrapRuntime)) {
   options_.bootstrap_version_ = 2;
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"),
@@ -1041,7 +1166,7 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/invalid_layered_runtime_missing_name.yaml"),
-      EnvoyException, "RuntimeLayerValidationError.Name: \\[\"value length must be at least");
+      EnvoyException, "RuntimeLayerValidationError.Name: value length must be at least");
 }
 
 // Validate invalid layered runtime with duplicate names is rejected.
@@ -1078,8 +1203,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0.25),
-      EnvoyException,
-      "HealthCheckValidationError.Timeout: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid interval entry of a health check config entry.
@@ -1087,8 +1211,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0.5, 0),
-      EnvoyException,
-      "HealthCheckValidationError.Interval: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Interval: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid timeout and interval entry of a health check
@@ -1097,8 +1220,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInter
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0),
-      EnvoyException,
-      "HealthCheckValidationError.Timeout: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on valid interval entry of a health check config entry.
@@ -1115,13 +1237,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
   // that there is no listener.
   server_->admin().addListenerToHandler(/*handler=*/nullptr);
-}
-
-// Validate that an admin config with a server address but no access log path is rejected.
-TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/node_bootstrap_without_access_log.yaml"),
-      EnvoyException, "An admin access log path is required for a listening server.");
 }
 
 namespace {
@@ -1143,7 +1258,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(
       initialize("test/server/test_data/server/node_bootstrap_with_admin_socket_options.yaml"));
-  const auto address = server_->admin().socket().localAddress();
+  const auto address = server_->admin().socket().addressProvider().localAddress();
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
@@ -1274,6 +1389,13 @@ TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
 }
 
+TEST_P(ServerInstanceImplTest, CoreDumpEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.core_dump_enabled_ = true;
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
+}
+
 TEST_P(ServerInstanceImplTest, NoHttpTracing) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
@@ -1282,7 +1404,7 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
               ProtoEq(server_->httpContext().defaultTracingConfig()));
 }
 
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.bootstrap_version_ = 2;
@@ -1320,13 +1442,20 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
     return std::make_unique<test::common::config::DummyConfig>();
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext&) {
-        const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
-        EXPECT_NE(nullptr, proto);
-        EXPECT_EQ(proto->a(), "foo");
-        return std::make_unique<FooBootstrapExtension>();
-      }));
+      .WillOnce(
+          Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
+            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            EXPECT_NE(nullptr, proto);
+            EXPECT_EQ(proto->a(), "foo");
+            auto mock_extension = std::make_unique<MockBootstrapExtension>();
+            EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
+              // call to cluster manager, to make sure it is not nullptr.
+              ctx.clusterManager().clusters();
+            }));
+            return mock_extension;
+          }));
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -1363,7 +1492,7 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
 #ifndef WIN32
 class SafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called SafeFatalAction" << std::endl;
   }
 
@@ -1372,7 +1501,7 @@ public:
 
 class UnsafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called UnsafeFatalAction" << std::endl;
   }
 

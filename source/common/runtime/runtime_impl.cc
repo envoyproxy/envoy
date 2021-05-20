@@ -27,6 +27,10 @@
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/platform/quiche_flags_impl.h"
+#endif
+
 namespace Envoy {
 namespace Runtime {
 
@@ -37,6 +41,21 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
   // Similar to the above, but a gauge that isn't imported during a hot restart.
   stats.deprecated_feature_seen_since_process_start_.inc();
 }
+
+// TODO(12923): Document the Quiche reloadable flag setup.
+#ifdef ENVOY_ENABLE_QUIC
+void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
+  absl::flat_hash_map<std::string, bool> quiche_flags_override;
+  for (const auto& it : flag_map) {
+    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
+        it.second.bool_value_.has_value()) {
+      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
+          it.second.bool_value_.value();
+    }
+  }
+  quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
+}
+#endif
 
 } // namespace
 
@@ -178,6 +197,8 @@ const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() co
   return layers_;
 }
 
+const Snapshot::EntryMap& SnapshotImpl::values() const { return values_; }
+
 SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
                            std::vector<OverrideLayerConstPtr>&& layers)
     : layers_{std::move(layers)}, generator_{generator}, stats_{stats} {
@@ -238,13 +259,16 @@ bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
 
 void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::v3::FractionalPercent converted_fractional_percent;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
                                          ProtobufMessage::getStrictValidationVisitor());
-  } catch (const ProtoValidationException& ex) {
+  }
+  END_TRY
+  catch (const ProtoValidationException& ex) {
     ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
     return;
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     // An EnvoyException is thrown when we try to parse a bogus string as a protobuf. This is fine,
     // since there was no expectation that the raw string was a valid proto.
     return;
@@ -438,8 +462,8 @@ RtdsSubscription::RtdsSubscription(
 void RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
-      resource_decoder_);
+      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this, resource_decoder_,
+      {});
 }
 
 void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -510,6 +534,10 @@ void LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
+#ifdef ENVOY_ENABLE_QUIC
+  refreshQuicheReloadableFlags(ptr->values());
+#endif
+
   {
     absl::MutexLock lock(&snapshot_mutex_);
     thread_safe_snapshot_ = ptr;
@@ -569,10 +597,12 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
         path += "/" + service_cluster_;
       }
       if (api_.fileSystem().directoryExists(path)) {
-        try {
+        TRY_ASSERT_MAIN_THREAD {
           layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
           ++disk_layers;
-        } catch (EnvoyException& e) {
+        }
+        END_TRY
+        catch (EnvoyException& e) {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;

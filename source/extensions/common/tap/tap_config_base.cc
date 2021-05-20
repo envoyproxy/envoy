@@ -209,7 +209,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
-    output_file_ << MessageUtil::getJsonStringFromMessage(*trace, true, true);
+    output_file_ << MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

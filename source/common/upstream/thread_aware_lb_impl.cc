@@ -94,7 +94,7 @@ void ThreadAwareLoadBalancerBase::initialize() {
   // I will look into doing this in a follow up. Doing everything using a background thread heavily
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
-  priority_set_.addPriorityUpdateCb(
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
 
   refresh();

@@ -8,6 +8,8 @@
 #include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
+#include "common/network/utility.h"
+
 namespace Envoy {
 namespace Network {
 namespace Test {
@@ -152,6 +154,8 @@ public:
     return empty_network_filter_factory_;
   }
 
+  absl::string_view name() const override { return "EmptyFilterChain"; }
+
 private:
   const TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
@@ -176,15 +180,17 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  * UdpRecvData without worrying about the packet processor interface. The function will
  * instantiate the buffer returned in data.
  */
-Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       UdpRecvData& data);
+Api::IoCallUint64Result
+readFromSocket(IoHandle& handle, const Address::Instance& local_address, UdpRecvData& data,
+               uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
 /**
  * A synchronous UDP peer that can be used for testing.
  */
 class UdpSyncPeer {
 public:
-  UdpSyncPeer(Network::Address::IpVersion version);
+  UdpSyncPeer(Network::Address::IpVersion version,
+              uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);
@@ -193,10 +199,13 @@ public:
   void recv(Network::UdpRecvData& datagram);
 
   // Return the local peer's socket address.
-  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+  const Network::Address::InstanceConstSharedPtr& localAddress() {
+    return socket_->addressProvider().localAddress();
+  }
 
 private:
   const Network::SocketPtr socket_;
+  const uint64_t max_rx_datagram_size_;
   std::list<Network::UdpRecvData> received_datagrams_;
 };
 

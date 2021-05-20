@@ -1,9 +1,12 @@
+#pragma once
+
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,15 +34,17 @@ protected:
   void cleanFuzzedConfig(absl::string_view filter_name, Protobuf::Message* message);
 
 private:
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   Http::FilterFactoryCb cb_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   Network::Address::InstanceConstSharedPtr addr_;
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
+  envoy::config::core::v3::Metadata listener_metadata_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  TestScopedRuntime scoped_runtime_;
 
   // Filter constructed from the config.
   Http::StreamDecoderFilterSharedPtr decoder_filter_;

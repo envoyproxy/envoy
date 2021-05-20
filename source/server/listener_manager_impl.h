@@ -284,6 +284,9 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  void setNewOrDrainingSocketFactory(const std::string& name,
+                                     const envoy::config::core::v3::Address& proto_address,
+                                     ListenerImpl& listener, bool reuse_port);
   Network::ListenSocketFactorySharedPtr
   createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
                             ListenerImpl& listener, bool reuse_port);
@@ -320,11 +323,6 @@ public:
   ListenerFilterChainFactoryBuilder(
       ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
 
-  ListenerFilterChainFactoryBuilder(
-      ProtobufMessage::ValidationVisitor& validator,
-      ListenerComponentFactory& listener_component_factory,
-      Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
-
   Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const override;
@@ -334,6 +332,7 @@ private:
       const envoy::config::listener::v3::FilterChain& filter_chain,
       Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const;
 
+  ListenerImpl& listener_;
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;

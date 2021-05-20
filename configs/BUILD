@@ -48,7 +48,11 @@ genrule(
     srcs = [
         ":configs",
         "//examples:configs",
+        "//examples:certs",
+        "//examples:lua",
+        "//examples/wasm-cc:configs",
         "//docs:configs",
+        "//docs:proto_examples",
         "//test/config/integration/certs",
     ],
     outs = ["example_configs.tar"],
@@ -56,11 +60,33 @@ genrule(
         "$(location configgen.sh) $(location configgen) $(@D) " +
         "$(locations :configs) " +
         "$(locations //examples:configs) " +
+        "$(locations //examples:certs) " +
+        "$(locations //examples:lua) " +
+        "$(locations //examples/wasm-cc:configs) " +
         "$(locations //docs:configs) " +
+        "$(locations //docs:proto_examples) " +
         "$(locations //test/config/integration/certs)"
     ),
     tools = [
         "configgen.sh",
         ":configgen",
+    ],
+)
+
+py_binary(
+    name = "example_configs_validation",
+    srcs = ["example_configs_validation.py"],
+    args = (
+        "$(locations :configs) ",
+        "$(locations //examples:configs) ",
+        "$(locations //docs:configs) ",
+    ),
+    data = [
+        ":configs",
+        "//docs:configs",
+        "//examples:configs",
+    ],
+    deps = [
+        "//tools/config_validation:validate_fragment",
     ],
 )

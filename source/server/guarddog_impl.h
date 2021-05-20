@@ -87,7 +87,7 @@ public:
    */
   void forceCheckForTest() {
     Thread::LockGuard guard(mutex_);
-    loop_timer_->enableTimer(std::chrono::milliseconds(0));
+    dispatcher_->post([this]() { loop_timer_->enableTimer(std::chrono::milliseconds(0)); });
     test_interlock_hook_->waitFromTest(mutex_);
   }
 

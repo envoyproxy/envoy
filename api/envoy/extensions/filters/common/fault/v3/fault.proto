@@ -6,7 +6,6 @@ import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";

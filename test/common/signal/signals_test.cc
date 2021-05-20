@@ -1,6 +1,9 @@
 #include <sys/mman.h>
 
 #include <csignal>
+#include <vector>
+
+#include "envoy/common/scope_tracker.h"
 
 #include "common/signal/fatal_error_handler.h"
 #include "common/signal/signal_action.h"
@@ -28,21 +31,27 @@ extern void resetFatalActionStateForTest();
 // Use this test handler instead of a mock, because fatal error handlers must be
 // signal-safe and a mock might allocate memory.
 class TestFatalErrorHandler : public FatalErrorHandlerInterface {
+public:
   void onFatalError(std::ostream& os) const override { os << "HERE!"; }
   void
   runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override {
     // Run the actions
     for (const auto& action : actions) {
-      action->run(nullptr);
+      action->run(tracked_objects_);
     }
   }
+
+private:
+  std::vector<const ScopeTrackedObject*> tracked_objects_{nullptr};
 };
 
 // Use this to test fatal actions get called, as well as the order they run.
 class EchoFatalAction : public Server::Configuration::FatalAction {
 public:
   EchoFatalAction(absl::string_view echo_msg) : echo_msg_(echo_msg) {}
-  void run(const ScopeTrackedObject* /*current_object*/) override { std::cerr << echo_msg_; }
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
+    std::cerr << echo_msg_;
+  }
   bool isAsyncSignalSafe() const override { return true; }
 
 private:
@@ -52,7 +61,9 @@ private:
 // Use this to test failing while in a signal handler.
 class SegfaultFatalAction : public Server::Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override { raise(SIGSEGV); }
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
+    raise(SIGSEGV);
+  }
   bool isAsyncSignalSafe() const override { return false; }
 };
 
