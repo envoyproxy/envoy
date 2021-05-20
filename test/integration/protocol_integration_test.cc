@@ -1570,12 +1570,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-#ifdef WIN32
-  // TODO(alyssawilk, wrowe) debug.
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
-    return;
-  }
-#endif
   // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
   testLargeRequestHeaders(2048, 1, 1024, 100);
 }
