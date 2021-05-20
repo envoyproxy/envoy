@@ -12,7 +12,7 @@ when the request's route or virtual host has a per filter
 :ref:`bandwidth limit configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit>`.
 
 If the bandwidth limit has been exhausted the filter stops further transfer until more bandwidth gets allocated
-according to the `fill_interval` (default is 50 milliseconds). If the connection buffer fills up with accumulated
+according to the ``fill_interval`` (default is 50 milliseconds). If the connection buffer fills up with accumulated
 data then the source of data will be readDisabled as described in the :ref:`flow control doc<faq_flow_control>`.
 
 .. note::

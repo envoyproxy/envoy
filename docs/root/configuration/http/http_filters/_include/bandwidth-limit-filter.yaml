@@ -9,8 +9,24 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/path/with/bandwidth/limit" }
+                route: { cluster: service_protected_by_bandwidth_limit }
+                typed_per_filter_config:
+                  envoy.filters.http.bandwidth_limit:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
+                    enable_mode: DecodeAndEncode
+                    limit_kbps: 500
+                    fill_interval: 0.1s
+              - match: { prefix: "/" }
+                route: { cluster: web_service }
           http_filters:
           - name: envoy.filters.http.bandwidth_limit
             typed_config:
@@ -19,28 +35,11 @@ static_resources:
           - name: envoy.filters.http.router
             typed_config: {}
 
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      routes:
-      - match: { prefix: "/path/with/bandwidth/limit" }
-        route: { cluster: service_protected_by_bandwidth_limit }
-        typed_per_filter_config:
-          envoy.filters.http.bandwidth_limit:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
-            enable_mode: DecodeAndEncode
-            limit_kbps: 500
-            fill_interval: 0.1s
-      - match: { prefix: "/" }
-        route: { cluster: web_service }
-
   clusters:
   - name: service_protected_by_bandwidth_limit
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -52,8 +51,8 @@ static_resources:
                 port_value: 9000
   - name: web_service
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service1
       endpoints:
