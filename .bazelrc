@@ -237,6 +237,10 @@ build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
+build:remote-tsan --config=remote
+build:remote-tsan --config=rbe-toolchain-clang-libc++
+build:remote-tsan --config=rbe-toolchain-tsan
+
 build:remote-msvc-cl --config=remote-windows
 build:remote-msvc-cl --config=msvc-cl
 build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
@@ -247,7 +251,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3d0491e2034287959a292806e3891fd0b7dd2703
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:55d9e4719d2bd0accce8f829b44dab70cd42112a
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -264,6 +268,10 @@ build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=rbe-toolchain-gcc
+
+build:docker-asan --config=docker-sandbox
+build:docker-asan --config=rbe-toolchain-clang-libc++
+build:docker-asan --config=rbe-toolchain-asan
 
 build:docker-msan --config=docker-sandbox
 build:docker-msan --config=rbe-toolchain-clang-libc++

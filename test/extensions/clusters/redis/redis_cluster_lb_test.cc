@@ -350,17 +350,29 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
   Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
                              Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime())};
+  Upstream::HostVector replicas{Upstream::makeTestHost(info_, "tcp://127.0.0.2:90", simTime()),
+                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:91", simTime()),
+                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:90", simTime()),
+                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:91", simTime())};
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()),
       ClusterSlot(1001, 2000, hosts[1]->address()),
       ClusterSlot(2001, 16383, hosts[2]->address()),
   });
+
+  (*slots)[0].addReplica(replicas[0]->address());
+  (*slots)[0].addReplica(replicas[1]->address());
   Upstream::HostMap all_hosts{
       {hosts[0]->address()->asString(), hosts[0]},
       {hosts[1]->address()->asString(), hosts[1]},
       {hosts[2]->address()->asString(), hosts[2]},
+      {replicas[0]->address()->asString(), replicas[0]},
+      {replicas[1]->address()->asString(), replicas[1]},
   };
 
   // A list of (hash: host_index) pair.
@@ -373,10 +385,12 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
 
   // Calling cluster slot update without change should not change assignment.
   std::vector<ClusterSlot> updated_slot{
-      ClusterSlot(0, 1000, hosts[0]->address()),
-      ClusterSlot(1001, 2000, hosts[1]->address()),
-      ClusterSlot(2001, 16383, hosts[2]->address()),
+      ClusterSlot(0, 1000, hosts[3]->address()),
+      ClusterSlot(1001, 2000, hosts[4]->address()),
+      ClusterSlot(2001, 16383, hosts[5]->address()),
   };
+  updated_slot[0].addReplica(replicas[3]->address());
+  updated_slot[0].addReplica(replicas[2]->address());
   EXPECT_EQ(false, factory_->onClusterSlotUpdate(
                        std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts));
   validateAssignment(hosts, expected_assignments);

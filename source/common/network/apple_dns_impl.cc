@@ -324,8 +324,6 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     return;
   }
 
-  ENVOY_BUG(interface_index == 0, fmt::format("unexpected interface_index={}", interface_index));
-
   // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are only
   // additive.
   if (flags & kDNSServiceFlagsAdd) {

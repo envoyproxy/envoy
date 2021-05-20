@@ -53,10 +53,14 @@ envoy_extension_cc_test(
 
 envoy_cc_test(
     name = "crash_integration_test",
+    size = "large",
     srcs = ["crash_integration_test.cc"],
+    shard_count = 2,
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/integration:http_protocol_integration_lib",
+        "//test/integration/filters:stop_and_continue_filter_config_proto_cc_proto",
+        "//test/integration/filters:stop_iteration_and_continue",
         "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
     ],
 )
