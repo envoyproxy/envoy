@@ -54,6 +54,7 @@ if [[ $${ENVOY_UBSAN_VPTR-} == "1" ]]; then
 fi
 if [[ $${ENVOY_MSAN-} == "1" ]]; then
   WEE8_BUILD_ARGS+=" is_msan=true"
+  WEE8_BUILD_ARGS+=" msan_track_origins=2"
   export LDFLAGS="$${LDFLAGS} -L/opt/libcxx_msan/lib -Wl,-rpath,/opt/libcxx_msan/lib"
 fi
 if [[ $${ENVOY_TSAN-} == "1" ]]; then
