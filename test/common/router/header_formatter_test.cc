@@ -1464,9 +1464,8 @@ response_headers_to_remove: ["x-baz-header"]
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  auto filter_state =
-      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
-          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto filter_state = std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -1508,16 +1507,16 @@ response_headers_to_remove: ["x-baz-header"]
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  auto filter_state =
-      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
-          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto filter_state = std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
-  auto transforms = response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
+  auto transforms =
+      response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
   EXPECT_THAT(transforms.headers_to_append,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
   EXPECT_THAT(transforms.headers_to_overwrite,
