@@ -17,6 +17,7 @@ namespace Envoy {
 
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::BodyResponse;
+using envoy::service::ext_proc::v3alpha::CommonResponse;
 using envoy::service::ext_proc::v3alpha::HeadersResponse;
 using envoy::service::ext_proc::v3alpha::HttpBody;
 using envoy::service::ext_proc::v3alpha::HttpHeaders;
@@ -568,7 +569,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
   });
 
   verifyDownstreamResponse(*response, 200);
-  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-length", "13"));
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
   EXPECT_EQ("Hello, World!", response->body());
 }
@@ -832,6 +832,91 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   // we actually get an error message here.
   verifyDownstreamResponse(*response, 401);
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the ability of the filter to turn a GET into a POST by adding a body
+// and changing the method.
+TEST_P(ExtProcIntegrationTest, ConvertGetToPost) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+    auto* header_mut = headers_resp.mutable_response()->mutable_header_mutation();
+    auto* method = header_mut->add_set_headers();
+    method->mutable_header()->set_key(":method");
+    method->mutable_header()->set_value("POST");
+    auto* content_type = header_mut->add_set_headers();
+    content_type->mutable_header()->set_key("content-type");
+    content_type->mutable_header()->set_value("text/plain");
+    headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
+    // This special status tells us to replace the whole request
+    headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+    return true;
+  });
+
+  handleUpstreamRequest();
+
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "POST"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("content-type", "text/plain"));
+  EXPECT_EQ(upstream_request_->bodyLength(), 14);
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
+
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test the ability of the filter to completely replace a request message with a new
+// request message.
+TEST_P(ExtProcIntegrationTest, ReplaceCompleteRequest) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+    headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
+    // This special status tells us to replace the whole request
+    headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+    return true;
+  });
+
+  handleUpstreamRequest();
+
+  // Ensure that we replaced and did not append to the request.
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
+
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test the ability of the filter to completely replace a request message with a new
+// request message.
+TEST_P(ExtProcIntegrationTest, ReplaceCompleteRequestBuffered) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+    headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
+    // This special status tells us to replace the whole request
+    headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+    return true;
+  });
+
+  // Even though we set the body mode to BUFFERED, we should receive no callback because
+  // we returned CONTINUE_AND_REPLACE.
+
+  handleUpstreamRequest();
+
+  // Ensure that we replaced and did not append to the request.
+  EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
+
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
 }
 
 // Send a request, but wait longer than the "message timeout" before sending a response
