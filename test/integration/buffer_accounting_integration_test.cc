@@ -77,15 +77,16 @@ protected:
         [&stream](Buffer::TrackedWatermarkBufferFactory::AccountToBoundBuffersMap& map) {
           stream << "Printing Account map. Size: " << map.size() << '\n';
           for (auto& entry : map) {
-            // We can't access the accounts balance in a thread safe way here.
+            // This runs in the context of the worker thread, so we can access
+            // the balance.
             stream << "  Account: " << entry.first << '\n';
-            for (auto& buffer : entry.second) {
-              stream << "    Buffer: " << buffer << '\n';
-            }
+            stream << "    Balance:"
+                   << static_cast<Buffer::BufferMemoryAccountImpl*>(entry.first.get())->balance()
+                   << '\n';
+            stream << "    Number of associated buffers: " << entry.second.size() << '\n';
           }
         };
-
-    buffer_factory_->inspectAccounts(print_map);
+    buffer_factory_->inspectAccounts(print_map, test_server_->server());
     return stream.str();
   }
 };

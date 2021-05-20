@@ -1,5 +1,9 @@
 #include "test/integration/tracked_watermark_buffer.h"
 
+#include "envoy/thread/thread.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
+
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -158,6 +162,38 @@ void TrackedWatermarkBufferFactory::removeDanglingAccounts() {
 
     accounts_it = next;
   }
+}
+
+void TrackedWatermarkBufferFactory::inspectAccounts(
+    std::function<void(AccountToBoundBuffersMap&)> func, Server::Instance& server) {
+  absl::Notification done_notification;
+  ThreadLocal::TypedSlotPtr<> slot;
+  Envoy::Thread::ThreadId main_tid;
+
+  server.dispatcher().post([&] {
+    slot = ThreadLocal::TypedSlot<>::makeUnique(server.threadLocal());
+    slot->set(
+        [](Envoy::Event::Dispatcher&) -> std::shared_ptr<Envoy::ThreadLocal::ThreadLocalObject> {
+          return nullptr;
+        });
+
+    main_tid = server.api().threadFactory().currentThreadId();
+
+    slot->runOnAllThreads(
+        [&main_tid, &server, &func, this](OptRef<ThreadLocal::ThreadLocalObject>) {
+          // Run on the worker thread.
+          if (server.api().threadFactory().currentThreadId() != main_tid) {
+            absl::MutexLock lock(&(this->mutex_));
+            func(this->account_infos_);
+          }
+        },
+        [&slot, &done_notification] {
+          slot.reset(nullptr);
+          done_notification.Notify();
+        });
+  });
+
+  done_notification.WaitForNotification();
 }
 
 void TrackedWatermarkBufferFactory::setExpectedAccountBalance(uint64_t byte_size_per_account,

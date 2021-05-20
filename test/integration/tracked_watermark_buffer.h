@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/server/instance.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
@@ -115,10 +116,8 @@ public:
   using AccountToBoundBuffersMap =
       absl::flat_hash_map<BufferMemoryAccountSharedPtr,
                           absl::flat_hash_set<TrackedWatermarkBuffer*>>;
-  void inspectAccounts(std::function<void(AccountToBoundBuffersMap&)> func) {
-    absl::MutexLock lock(&mutex_);
-    func(account_infos_);
-  }
+  void inspectAccounts(std::function<void(AccountToBoundBuffersMap&)> func,
+                       Server::Instance& server);
 
 private:
   // Remove "dangling" accounts; accounts where the account_info map is the only
