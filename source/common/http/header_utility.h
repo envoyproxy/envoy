@@ -154,13 +154,6 @@ public:
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**
-   * Add headers from one HeaderMap to another
-   * @param headers target where headers will be added
-   * @param headers_to_add supplies the headers to be added
-   */
-  static void addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add);
-
-  /**
    * @brief a helper function to determine if the headers represent an envoy internal request
    */
   static bool isEnvoyInternalRequest(const RequestHeaderMap& headers);

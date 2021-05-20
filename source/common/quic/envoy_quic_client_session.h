@@ -33,7 +33,7 @@ public:
                          const quic::ParsedQuicVersionVector& supported_versions,
                          std::unique_ptr<EnvoyQuicClientConnection> connection,
                          const quic::QuicServerId& server_id,
-                         quic::QuicCryptoClientConfig* crypto_config,
+                         std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
@@ -89,6 +89,7 @@ private:
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
   const absl::string_view host_name_;
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
 };
 
 } // namespace Quic
