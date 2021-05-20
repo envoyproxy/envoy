@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "envoy/common/optref.h"
@@ -141,6 +142,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Tracing::Span& activeSpan() override;
   Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
+  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -917,6 +919,8 @@ public:
   bool enableInternalRedirectsWithBody() const {
     return filter_manager_callbacks_.enableInternalRedirectsWithBody();
   }
+
+  void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
 private:
   // Indicates which filter to start the iteration with.

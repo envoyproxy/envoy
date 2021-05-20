@@ -15,6 +15,7 @@
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/filters/process_context_filter.h"
+#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -360,7 +361,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
+    "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   testEnvoyProxying1xx(true);
 }
