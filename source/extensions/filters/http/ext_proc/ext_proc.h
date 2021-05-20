@@ -133,8 +133,8 @@ private:
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
   void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
-  Http::FilterHeadersStatus onHeaders(ProcessorState& state, Http::HeaderMap& headers,
-                                      bool end_stream);
+  Http::FilterHeadersStatus onHeaders(ProcessorState& state,
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
