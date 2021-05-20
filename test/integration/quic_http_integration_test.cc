@@ -113,7 +113,7 @@ public:
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
-        persistent_info.server_id_, persistent_info.crypto_config_.get(), &push_promise_index_,
+        persistent_info.server_id_, persistent_info.cryptoConfig(), &push_promise_index_,
         *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
