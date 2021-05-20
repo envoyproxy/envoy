@@ -23,16 +23,16 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
   sign(headers, content_hash);
 }
 
-void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  if (require_content_hash_) {
-    headers.setReference(SignatureHeaders::get().ContentSha256,
-                         SignatureConstants::get().UnsignedPayload);
-    sign(headers, SignatureConstants::get().UnsignedPayload);
-  } else {
-    headers.setReference(SignatureHeaders::get().ContentSha256,
-                         SignatureConstants::get().HashedEmptyString);
-    sign(headers, SignatureConstants::get().HashedEmptyString);
-  }
+void SignerImpl::signEmptyPayload(Http::RequestHeaderMap& headers) {
+  headers.setReference(SignatureHeaders::get().ContentSha256,
+                       SignatureConstants::get().HashedEmptyString);
+  sign(headers, SignatureConstants::get().HashedEmptyString);
+}
+
+void SignerImpl::signUnsignedPayload(Http::RequestHeaderMap& headers) {
+  headers.setReference(SignatureHeaders::get().ContentSha256,
+                       SignatureConstants::get().UnsignedPayload);
+  sign(headers, SignatureConstants::get().UnsignedPayload);
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash) {

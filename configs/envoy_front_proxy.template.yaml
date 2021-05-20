@@ -79,7 +79,8 @@
             typed_config:
               "@type": type.googleapis.com/envoy.config.trace.v3.LightstepConfig
               collector_cluster: lightstep_saas
-              access_token_file: "/etc/envoy/lightstep_access_token"
+              access_token:
+                filename: "/etc/envoy/lightstep_access_token"
         {% endif %}
         common_http_protocol_options:
           idle_timeout: 840s
