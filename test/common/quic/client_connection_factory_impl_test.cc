@@ -40,8 +40,11 @@ TEST_F(QuicNetworkConnectionTest, BufferLimits) {
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
   ASSERT(session != nullptr);
   EXPECT_EQ(highWatermark(session), 45);
+  EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
+  EXPECT_EQ(absl::nullopt, session->lastRoundTripTime());
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 

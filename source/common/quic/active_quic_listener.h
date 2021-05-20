@@ -3,9 +3,9 @@
 #include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
+#include "envoy/network/socket.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/network/socket_option_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/quic/envoy_quic_dispatcher.h"
 #include "common/runtime/runtime_protos.h"

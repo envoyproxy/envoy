@@ -279,6 +279,7 @@ envoy_cc_test(
     deps = [
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],

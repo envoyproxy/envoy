@@ -43,7 +43,11 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
   // TODO(alyssawilk) actually set this up properly.
   quic::QuicConfig quic_config_;
+  // The cluster buffer limits.
   const uint32_t buffer_limit_;
+  // This arguably should not be shared across connections but as Envoy doesn't
+  // support push promise it's really moot point.
+  quic::QuicClientPushPromiseIndex push_promise_index_;
 };
 
 std::unique_ptr<Network::ClientConnection>
