@@ -92,6 +92,7 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   void pushTrackedObject(const ScopeTrackedObject* object) override;
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
+  bool trackedObjectStackIsEmpty() const override { return tracked_object_stack_.empty(); }
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
   void shutdown() override;

@@ -15,13 +15,13 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 
 // Specifies a routing scope, which associates a
-// :ref:`Key<envoy_api_msg_config.route.v4alpha.ScopedRouteConfiguration.Key>` to a
-// :ref:`envoy_api_msg_config.route.v4alpha.RouteConfiguration` (identified by its resource name).
+// :ref:`Key<envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration.Key>` to a
+// :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` (identified by its resource name).
 //
 // The HTTP connection manager builds up a table consisting of these Key to
 // RouteConfiguration mappings, and looks up the RouteConfiguration to use per
 // request according to the algorithm specified in the
-// :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.ScopedRoutes.scope_key_builder>`
+// :ref:`scope_key_builder<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
 // assigned to the HttpConnectionManager.
 //
 // For example, with the following configurations (in YAML):
@@ -43,7 +43,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //               key: vip
 //
 // ScopedRouteConfiguration resources (specified statically via
-// :ref:`scoped_route_configurations_list<envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.ScopedRoutes.scoped_route_configurations_list>`
+// :ref:`scoped_route_configurations_list<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scoped_route_configurations_list>`
 // or obtained dynamically via SRDS):
 //
 // .. code::
@@ -78,7 +78,7 @@ message ScopedRouteConfiguration {
       "envoy.config.route.v3.ScopedRouteConfiguration";
 
   // Specifies a key which is matched against the output of the
-  // :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.ScopedRoutes.scope_key_builder>`
+  // :ref:`scope_key_builder<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`
   // specified in the HttpConnectionManager. The matching is done per HTTP
   // request and is dependent on the order of the fragments contained in the
   // Key.
@@ -100,7 +100,7 @@ message ScopedRouteConfiguration {
 
     // The ordered set of fragments to match against. The order must match the
     // fragments in the corresponding
-    // :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.ScopedRoutes.scope_key_builder>`.
+    // :ref:`scope_key_builder<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scope_key_builder>`.
     repeated Fragment fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
@@ -110,8 +110,8 @@ message ScopedRouteConfiguration {
   // The name assigned to the routing scope.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The resource name to use for a :ref:`envoy_api_msg_service.discovery.v4alpha.DiscoveryRequest` to an
-  // RDS server to fetch the :ref:`envoy_api_msg_config.route.v4alpha.RouteConfiguration` associated
+  // The resource name to use for a :ref:`envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest` to an
+  // RDS server to fetch the :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated
   // with this scope.
   string route_configuration_name = 2 [(validate.rules).string = {min_len: 1}];
 

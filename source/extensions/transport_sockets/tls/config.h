@@ -3,8 +3,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -17,7 +15,7 @@ namespace Tls {
 class SslSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   ~SslSocketConfigFactory() override = default;
-  std::string name() const override { return TransportSocketNames::get().Tls; }
+  std::string name() const override { return "envoy.transport_sockets.tls"; }
 };
 
 class UpstreamSslSocketFactory : public Server::Configuration::UpstreamTransportSocketConfigFactory,
