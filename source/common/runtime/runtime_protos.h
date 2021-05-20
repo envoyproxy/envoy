@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace Runtime {
 
+// TODO(WeavingGao): use for #16392
 // Helper class for runtime-derived uint32.
 class UInt32 : Logger::Loggable<Logger::Id::runtime> {
 public:
