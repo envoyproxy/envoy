@@ -114,7 +114,7 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHostConnectLegacy) {
   }
 }
 
-// Host's trailing dot from host header get removed
+// Host's trailing dot from host header get removed.
 TEST_F(HeaderUtilityTest, RemoveTrailingDotFromHost) {
   const std::vector<std::pair<std::string, std::string>> host_headers{
       {"localhost", "localhost"},      // w/o dot

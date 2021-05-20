@@ -228,10 +228,8 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
     return;
   }
   // If the dot is just before a colon, it must be preceding the port number.
-  // Because although the host may contain a colon via an IPv6 bracketed
-  // address, and although that IPv6 address may also contain dots when
-  // embedding an address per RFC 4291 2.2.3. In this case the dot will never
-  // directly precede the colon like it would in foo.com.:123.
+  // IPv6 addresses may contain colons or dots, but the dot will never directly
+  // precede the colon, so this check should be sufficient to detect a trailing port number.
   if (host[dot_index + 1] == ':') {
     headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
   }

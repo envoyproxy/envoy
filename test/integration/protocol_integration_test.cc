@@ -2320,7 +2320,7 @@ TEST_P(ProtocolIntegrationTest, EnableStripTrailingHostDot) {
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         hcm.set_strip_trailing_host_dot(true);
-        // clear existing domains and add new domain
+        // clear existing domains and add new domain.
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         virtual_host->clear_domains();
@@ -2349,7 +2349,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         hcm.set_strip_trailing_host_dot(false);
-        // clear existing domains and add new domain
+        // clear existing domains and add new domain.
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         virtual_host->clear_domains();
