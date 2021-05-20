@@ -82,11 +82,11 @@ class SdsDynamicIntegrationBaseTest : public Grpc::BaseGrpcClientIntegrationPara
                                       public testing::TestWithParam<TestParams> {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam().ip_version),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert"), test_quic_(GetParam().test_quic) {}
 
-  SdsDynamicIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
+  SdsDynamicIntegrationBaseTest(Http::CodecType downstream_protocol,
                                 Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(downstream_protocol, version, config), server_cert_("server_cert"),
         validation_secret_("validation_secret"), client_cert_("client_cert"),
@@ -192,14 +192,13 @@ protected:
 class SdsDynamicDownstreamIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   SdsDynamicDownstreamIntegrationTest()
-      : SdsDynamicIntegrationBaseTest((GetParam().test_quic ? Http::CodecClient::Type::HTTP3
-                                                            : Http::CodecClient::Type::HTTP1),
-                                      GetParam().ip_version,
-                                      ConfigHelper::httpProxyConfig(GetParam().test_quic)) {}
+      : SdsDynamicIntegrationBaseTest(
+            (GetParam().test_quic ? Http::CodecType::HTTP3 : Http::CodecType::HTTP1),
+            GetParam().ip_version, ConfigHelper::httpProxyConfig(GetParam().test_quic)) {}
 
   void initialize() override {
-    ASSERT(test_quic_ ? downstream_protocol_ == Http::CodecClient::Type::HTTP3
-                      : downstream_protocol_ == Http::CodecClient::Type::HTTP1);
+    ASSERT(test_quic_ ? downstream_protocol_ == Http::CodecType::HTTP3
+                      : downstream_protocol_ == Http::CodecType::HTTP1);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       config_helper_.configDownstreamTransportSocketWithTls(
           bootstrap,
@@ -256,7 +255,7 @@ public:
 
   Network::ClientConnectionPtr makeSslClientConnection() {
     int port = lookupPort("http");
-    if (downstream_protocol_ <= Http::CodecClient::Type::HTTP2) {
+    if (downstream_protocol_ <= Http::CodecType::HTTP2) {
       Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, port);
       return dispatcher_->createClientConnection(
           address, Network::Address::InstanceConstSharedPtr(),
@@ -643,7 +642,7 @@ public:
   void initialize() override {
     if (test_quic_) {
       upstream_tls_ = true;
-      setUpstreamProtocol(FakeHttpConnection::Type::HTTP3);
+      setUpstreamProtocol(Http::CodecType::HTTP3);
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // add sds cluster first.
@@ -746,7 +745,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 
   // Wait for the raw TCP connection with bad credentials and close it.
-  if (upstreamProtocol() != FakeHttpConnection::Type::HTTP3) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
     FakeRawConnectionPtr fake_upstream_connection;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -831,11 +830,11 @@ public:
 
   void createUpstreams() override {
     // Static cluster.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
     // Cds Cluster.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Sds Cluster.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void sendCdsResponse() {
