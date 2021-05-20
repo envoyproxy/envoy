@@ -231,8 +231,8 @@ envoy_cmake_external(
     static_libraries = select({
         "//conditions:default": [
             # Order from llvm-config --libnames asmparser core debuginfodwarf
-            #   engine lto mcparser mirparser orcjit passes runtimedyld
-            #   support x86asmparser x86desc
+            # engine lto mcparser mirparser orcjit passes runtimedyld
+            # support x86asmparser x86desc
             "libLLVMOrcJIT.a",
             "libLLVMOrcError.a",
             "libLLVMJITLink.a",
