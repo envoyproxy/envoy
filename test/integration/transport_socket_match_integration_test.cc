@@ -119,7 +119,7 @@ transport_socket:
       auto endpoint = upstream_address_fn_(i);
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
-            HttpIntegrationTest::createUpstreamTlsContext(), endpoint->ip()->port(),
+            HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), endpoint->ip()->port(),
             endpoint->ip()->version(), upstreamConfig(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(

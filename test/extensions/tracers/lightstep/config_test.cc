@@ -41,7 +41,7 @@ TEST(LightstepTracerConfigTest, DEPRECATED_FEATURE_TEST(LightstepHttpTracer)) {
   LightstepTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr lightstep_tracer = factory.createHttpTracer(*message, context);
+  auto lightstep_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 
@@ -67,7 +67,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracerAccessToken) {
   LightstepTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr lightstep_tracer = factory.createHttpTracer(*message, context);
+  auto lightstep_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 

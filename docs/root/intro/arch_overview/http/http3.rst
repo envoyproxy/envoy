@@ -19,8 +19,9 @@ HTTP3 downstream
 ----------------
 
 Downstream Envoy HTTP/3 support can be turned up via adding
-:ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` and
-ensuring the downstream transport socket is a QuicDownstreamTransport.
+:ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`,
+ensuring the downstream transport socket is a QuicDownstreamTransport, and setting the codec
+to HTTP/3.
 
 See example :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.yaml>` for example configuration.
 

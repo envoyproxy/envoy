@@ -59,18 +59,16 @@ std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p)
       p.param.test_quic ? "UsesQuic" : "UsesTcp");
 }
 
-std::vector<TestParams> getSdsTestsParams(bool test_quic) {
+std::vector<TestParams> getSdsTestsParams() {
   std::vector<TestParams> ret;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto sds_grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
       ret.push_back(TestParams{ip_version, sds_grpc_type, false});
-      if (test_quic) {
 #ifdef ENVOY_ENABLE_QUIC
-        ret.push_back(TestParams{ip_version, sds_grpc_type, true});
+      ret.push_back(TestParams{ip_version, sds_grpc_type, true});
 #else
-        ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
+      ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
 #endif
-      }
     }
   }
   return ret;
@@ -86,7 +84,7 @@ public:
   SdsDynamicIntegrationBaseTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam().ip_version),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
-        client_cert_("client_cert") {}
+        client_cert_("client_cert"), test_quic_(GetParam().test_quic) {}
 
   SdsDynamicIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
                                 Network::Address::IpVersion version, const std::string& config)
@@ -286,7 +284,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
-                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
 
 class SdsDynamicKeyRotationIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
 protected:
@@ -307,7 +305,7 @@ protected:
 // We don't care about multiple gRPC types here, Envoy gRPC is fine, the
 // interest is on the filesystem.
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
-                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
 
 // Validate that a basic key-cert rotation works via symlink rename.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
@@ -507,7 +505,7 @@ public:
 
   void createUpstreams() override {
     // Fake upstream with SSL/TLS for the first cluster.
-    addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(createUpstreamSslContext(), upstreamProtocol());
     create_xds_upstream_ = true;
   }
 
@@ -544,7 +542,7 @@ private:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
-                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
 
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
@@ -640,10 +638,13 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
 }
 
 // Upstream SDS integration test: a static cluster has ssl cert from SDS.
-// TODO(15034) Enable SDS support in QUIC upstream.
 class SdsDynamicUpstreamIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   void initialize() override {
+    if (test_quic_) {
+      upstream_tls_ = true;
+      setUpstreamProtocol(FakeHttpConnection::Type::HTTP3);
+    }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // add sds cluster first.
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -651,16 +652,29 @@ public:
       sds_cluster->set_name("sds_cluster");
       ConfigHelper::setHttp2(*sds_cluster);
 
+      // Unwind Quic for sds cluster.
+      if (test_quic_) {
+        sds_cluster->clear_transport_socket();
+      }
+
       // change the first cluster with ssl and sds.
       auto* transport_socket =
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      tls_context.set_sni("lyft.com");
       auto* secret_config =
           tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
       setUpSdsConfig(secret_config, "client_cert");
 
-      transport_socket->set_name("envoy.transport_sockets.tls");
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      if (test_quic_) {
+        envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
+        quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
+        transport_socket->set_name("envoy.transport_sockets.quic");
+        transport_socket->mutable_typed_config()->PackFrom(quic_context);
+      } else {
+        transport_socket->set_name("envoy.transport_sockets.tls");
+        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      }
     });
 
     HttpIntegrationTest::initialize();
@@ -679,14 +693,14 @@ public:
 
   void createUpstreams() override {
     // This is for backend with ssl
-    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_),
-                    FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_, test_quic_),
+                    upstreamProtocol());
     create_xds_upstream_ = true;
   }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
-                         testing::ValuesIn(getSdsTestsParams(false)), sdsTestParamsToString);
+                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
 
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.
@@ -731,24 +745,25 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  // To flush out the reset connection from the first request in upstream.
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  // Wait for the raw TCP connection with bad credentials and close it.
+  if (upstreamProtocol() != FakeHttpConnection::Type::HTTP3) {
+    FakeRawConnectionPtr fake_upstream_connection;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  }
 
-  // Failure
+  test_server_->waitForCounterGe("sds.client_cert.update_rejected", 1);
   EXPECT_EQ(0, test_server_->counter("sds.client_cert.update_success")->value());
-  EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
 
   sendSdsResponse(getClientSecret());
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
-  testRouterHeaderOnlyRequestAndResponse();
-
-  // Success
-  EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_success")->value());
+  test_server_->waitForCounterGe("sds.client_cert.update_success", 1);
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
+
+  // Verify the update succeeded.
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 // Test CDS with SDS. A cluster provided by CDS raises new SDS request for upstream cert.
@@ -842,8 +857,8 @@ public:
   FakeStreamPtr sds_stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, SdsCdsIntegrationTest,
-                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsCdsIntegrationTest, testing::ValuesIn(getSdsTestsParams()),
+                         sdsTestParamsToString);
 
 TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {

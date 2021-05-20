@@ -43,7 +43,6 @@ fi
 SCRIPT_DIR="$(dirname "$0")"
 SRC_DIR="$(dirname "$SCRIPT_DIR")"
 ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
-API_DIR="${SRC_DIR}"/api
 CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
@@ -132,17 +131,6 @@ function generate_api_rst() {
 
 generate_api_rst v3
 
-# Fixup anchors and references in v3 so they form a distinct namespace.
-# TODO(htuch): Do this in protodoc generation in the future.
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
-
-# TODO(phlax): Remove this once above is removed
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_v2_api_#envoy_api_#g"
-
-# xDS protocol spec.
-mkdir -p "${GENERATED_RST_DIR}/api-docs"
-cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
 cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
@@ -153,8 +141,6 @@ copy_example_configs () {
 }
 
 copy_example_configs
-
-rsync -rav  "${API_DIR}/diagrams" "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av \
       "${SCRIPT_DIR}"/root/ \

@@ -272,7 +272,7 @@ Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, boo
     uint64_t bytes_to_drain_this_iteration =
         prev_bytes_to_drain_ > 0
             ? prev_bytes_to_drain_
-            : std::min(buffer.length(), actual_frame_size_to_use_ - frame_overhead_size_);
+            : std::min<size_t>(buffer.length(), actual_frame_size_to_use_ - frame_overhead_size_);
     // Consumed all data. Exit.
     if (bytes_to_drain_this_iteration == 0) {
       break;
