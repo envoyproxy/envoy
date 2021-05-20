@@ -50,7 +50,6 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
   }
 
   response_headers_ = &headers;
-  ASSERT(response_headers_);
   if (end_stream) {
     // We may still need to set an http status and content length based on gRPC trailers
     // present in the response headers. This is known as a gRPC trailers-only response.
@@ -93,6 +92,7 @@ void Http1BridgeFilter::updateHttpStatusAndContentLength(
   // Here we check for grpc-status. If it's not zero, we change the response code. We assume
   // that if a reset comes in and we disconnect the HTTP/1.1 client it will raise some type
   // of exception/error that the response was not complete.
+  ASSERT(response_headers_);
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
   if (grpc_status_header) {
     uint64_t grpc_status_code;
