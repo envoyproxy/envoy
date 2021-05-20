@@ -15,18 +15,6 @@
 namespace Envoy {
 namespace Server {
 
-<<<<<<< HEAD
-namespace {
-void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
-  stream_info.onRequestComplete();
-  for (const auto& access_log : config.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info);
-  }
-}
-} // namespace
-
-=======
->>>>>>> 30201e97c4 (use active_stream_socket in active tcp listener)
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config)
     : ActiveStreamListenerBase(
@@ -72,31 +60,6 @@ void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
   ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
   ActiveConnections& active_connections = connection.active_connections_;
   ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
-  parent_.dispatcher().deferredDelete(std::move(removed));
-  // Delete map entry only iff connections becomes empty.
-  if (active_connections.connections_.empty()) {
-    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
-    ASSERT(iter != connections_by_context_.end());
-    // To cover the lifetime of every single connection, Connections need to be deferred deleted
-    // because the previously contained connection is deferred deleted.
-    parent_.dispatcher().deferredDelete(std::move(iter->second));
-    // The erase will break the iteration over the connections_by_context_ during the deletion.
-    if (!is_deleting_) {
-      connections_by_context_.erase(iter);
-    }
-  }
-}
-
-void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
-  ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
-  ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
-  config_ = &config;
-}
-
-void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
-  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-  ActiveConnections& active_connections = connection.active_connections_;
-  ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
   dispatcher().deferredDelete(std::move(removed));
   // Delete map entry only iff connections becomes empty.
   if (active_connections.connections_.empty()) {
@@ -112,53 +75,52 @@ void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
   }
 }
 
-<<<<<<< HEAD
-void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
-                                         const ProtobufWkt::Struct& value) {
-  stream_info_->setDynamicMetadata(name, value);
-}
-
-void ActiveTcpSocket::newConnection() {
-  connected_ = true;
-
-  // Check if the socket may need to be redirected to another listener.
-  Network::BalancedConnectionHandlerOptRef new_listener;
-
-  if (hand_off_restored_destination_connections_ &&
-      socket_->addressProvider().localAddressRestored()) {
-    // Find a listener associated with the original destination address.
-    new_listener =
-        listener_.parent_.getBalancedHandlerByAddress(*socket_->addressProvider().localAddress());
-  }
-  if (new_listener.has_value()) {
-    // Hands off connections redirected by iptables to the listener associated with the
-    // original destination address. Pass 'hand_off_restored_destination_connections' as false to
-    // prevent further redirection.
-    // Leave the new listener to decide whether to execute re-balance.
-    // Note also that we must account for the number of connections properly across both listeners.
-    // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
-    listener_.decNumConnections();
-    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
-  } else {
-    // Set default transport protocol if none of the listener filters did it.
-    if (socket_->detectedTransportProtocol().empty()) {
-      socket_->setDetectedTransportProtocol("raw_buffer");
-    }
-    // TODO(lambdai): add integration test
-    // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
-    // Erase accept filter states because accept filters may not get the opportunity to clean up.
-    // Particularly the assigned events need to reset before assigning new events in the follow up.
-    accept_filters_.clear();
-    // Create a new connection on this listener.
-    listener_.newConnection(std::move(socket_), std::move(stream_info_));
-  }
-=======
 void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
   ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
   config_ = &config;
->>>>>>> 30201e97c4 (use active_stream_socket in active tcp listener)
 }
+
+// void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
+//                                          const ProtobufWkt::Struct& value) {
+//   stream_info_->setDynamicMetadata(name, value);
+// }
+
+// void ActiveTcpSocket::newConnection() {
+//   connected_ = true;
+
+//   // Check if the socket may need to be redirected to another listener.
+//   Network::BalancedConnectionHandlerOptRef new_listener;
+
+//   if (hand_off_restored_destination_connections_ &&
+//       socket_->addressProvider().localAddressRestored()) {
+//     // Find a listener associated with the original destination address.
+//     new_listener =
+//         listener_.parent_.getBalancedHandlerByAddress(*socket_->addressProvider().localAddress());
+//   }
+//   if (new_listener.has_value()) {
+//     // Hands off connections redirected by iptables to the listener associated with the
+//     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
+//     // prevent further redirection.
+//     // Leave the new listener to decide whether to execute re-balance.
+//     // Note also that we must account for the number of connections properly across both listeners.
+//     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
+//     listener_.decNumConnections();
+//     new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
+//   } else {
+//     // Set default transport protocol if none of the listener filters did it.
+//     if (socket_->detectedTransportProtocol().empty()) {
+//       socket_->setDetectedTransportProtocol("raw_buffer");
+//     }
+//     // TODO(lambdai): add integration test
+//     // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
+//     // Erase accept filter states because accept filters may not get the opportunity to clean up.
+//     // Particularly the assigned events need to reset before assigning new events in the follow up.
+//     accept_filters_.clear();
+//     // Create a new connection on this listener.
+//     listener_.newConnection(std::move(socket_), std::move(stream_info_));
+//   }
+// }
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   if (listenerConnectionLimitReached()) {

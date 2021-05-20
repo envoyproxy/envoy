@@ -8,7 +8,6 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "server/active_stream_socket.h"
-#include "server/connection_handler_impl.h"
 #include "server/active_listener_base.h"
 #include "server/active_stream_socket.h"
 namespace Envoy {
