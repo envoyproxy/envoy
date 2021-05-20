@@ -105,7 +105,8 @@ void BaseIntegrationTest::initialize() {
   createEnvoy();
 }
 
-Network::TransportSocketFactoryPtr BaseIntegrationTest::createUpstreamTlsContext() {
+Network::TransportSocketFactoryPtr
+BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string yaml = absl::StrFormat(
       R"EOF(
@@ -120,12 +121,12 @@ common_tls_context:
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
   TestUtility::loadFromYaml(yaml, tls_context);
-  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  if (upstream_config.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
-  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  } else if (upstream_config.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
-  if (upstream_config_.upstream_protocol_ != FakeHttpConnection::Type::HTTP3) {
+  if (upstream_config.upstream_protocol_ != FakeHttpConnection::Type::HTTP3) {
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
@@ -146,7 +147,8 @@ common_tls_context:
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     Network::TransportSocketFactoryPtr factory =
-        upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
+        upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
+                      : Network::Test::createRawBufferSocketFactory();
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(new AutonomousUpstream(
