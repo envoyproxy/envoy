@@ -110,7 +110,7 @@ getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_
   StatusOr<Address::InstanceConstSharedPtr> address =
       Address::addressFromSockAddr(ss, ss_len, v6only);
   if (!address.ok()) {
-    PANIC(fmt::format("Invalid address for fd: {}", fd));
+    PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, address.status().ToString()));
   }
   return *address;
 }
