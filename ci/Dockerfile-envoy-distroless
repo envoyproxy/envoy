@@ -7,4 +7,5 @@ ADD linux/amd64/build_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
 
 EXPOSE 10000
 
-CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+ENTRYPOINT ["envoy"]
+CMD ["-c", "/etc/envoy/envoy.yaml"]

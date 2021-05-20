@@ -3,7 +3,10 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/base64.h"
 #include "common/grpc/async_client_impl.h"
+
+#include "absl/strings/match.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
 #include "common/grpc/google_async_client_impl.h"
@@ -18,6 +21,15 @@ namespace {
 bool validateGrpcHeaderChars(absl::string_view key) {
   for (auto ch : key) {
     if (!(absl::ascii_isalnum(ch) || ch == '_' || ch == '.' || ch == '-')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool validateGrpcCompatibleAsciiHeaderValue(absl::string_view h_value) {
+  for (auto ch : h_value) {
+    if (ch < 0x20 || ch > 0x7e) {
       return false;
     }
   }
@@ -84,8 +96,18 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   // Check metadata for gRPC API compliance. Uppercase characters are lowered in the HeaderParser.
   // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
   for (const auto& header : config.initial_metadata()) {
-    if (!validateGrpcHeaderChars(header.key()) || !validateGrpcHeaderChars(header.value())) {
-      throw EnvoyException("Illegal characters in gRPC initial metadata.");
+    // Validate key
+    if (!validateGrpcHeaderChars(header.key())) {
+      throw EnvoyException(
+          fmt::format("Illegal characters in gRPC initial metadata header key: {}.", header.key()));
+    }
+
+    // Validate value
+    // Binary base64 encoded - handled by the GRPC library
+    if (!::absl::EndsWith(header.key(), "-bin") &&
+        !validateGrpcCompatibleAsciiHeaderValue(header.value())) {
+      throw EnvoyException(fmt::format(
+          "Illegal ASCII value for gRPC initial metadata header key: {}.", header.key()));
     }
   }
 }
