@@ -774,18 +774,14 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
 
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes))
-      .Times(2);
+  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _))
-      .Times(2);
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rs_size", Stats::Histogram::Unit::Bytes))
-      .Times(4);
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
+  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rs_size"), _))
-      .Times(4);
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
   MockThriftObject* upgrade_response = new NiceMock<MockThriftObject>();
 
@@ -1043,12 +1039,10 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rs_size", Stats::Histogram::Unit::Bytes))
-      .Times(2);
+  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rs_size"), _))
-      .Times(2);
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
   startRequest(MessageType::Call);
   connectUpstream();
@@ -1346,12 +1340,10 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rs_size", Stats::Histogram::Unit::Bytes))
-      .Times(2);
+  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rs_size"), _))
-      .Times(2);
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
