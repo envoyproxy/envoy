@@ -141,7 +141,7 @@ protected:
     MsgAction unknown_;
   };
 
-  void processMessageBody(Buffer::Instance& data, const std::string& direction, uint32_t length,
+  void processMessageBody(Buffer::Instance& data, absl::string_view direction, uint32_t length,
                           MessageProcessor& msg, const std::unique_ptr<Message>& parser);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
@@ -170,9 +170,6 @@ protected:
   char command_{'-'};
   std::string message_;
   uint32_t message_len_{};
-
-  static const std::string FRONTEND;
-  static const std::string BACKEND;
 
   bool startup_{true};    // startup stage does not have 1st byte command
   bool encrypted_{false}; // tells if exchange is encrypted

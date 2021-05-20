@@ -13,8 +13,8 @@ namespace PostgresProxy {
   []() -> std::unique_ptr<Message> { return createMsgBodyReader<__VA_ARGS__>(); }
 #define NO_BODY BODY_FORMAT()
 
-const std::string DecoderImpl::FRONTEND = "Frontend";
-const std::string DecoderImpl::BACKEND = "Backend";
+constexpr absl::string_view FRONTEND = "Frontend";
+constexpr absl::string_view BACKEND = "Backend";
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
@@ -283,7 +283,7 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
 /*
   Method invokes actions associated with message type and generate debug logs.
 */
-void DecoderImpl::processMessageBody(Buffer::Instance& data, const std::string& direction,
+void DecoderImpl::processMessageBody(Buffer::Instance& data, absl::string_view direction,
                                      uint32_t length, MessageProcessor& msg,
                                      const std::unique_ptr<Message>& parser) {
   uint32_t bytes_to_read = length;
