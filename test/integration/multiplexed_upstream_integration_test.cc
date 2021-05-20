@@ -17,8 +17,8 @@ namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2,
-                                                                 FakeHttpConnection::Type::HTTP3})),
+                             {Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP2, FakeHttpConnection::Type::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
