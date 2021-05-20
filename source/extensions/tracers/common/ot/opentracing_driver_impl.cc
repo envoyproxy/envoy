@@ -7,7 +7,9 @@
 #include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/common/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "common/http/header_map_impl.h"
+#include "common/tracing/common_values.h"
+#include "common/tracing/null_span_impl.h"
 
 namespace Envoy {
 namespace Extensions {

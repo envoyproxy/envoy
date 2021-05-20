@@ -1,4 +1,5 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
+#include "test/common/http/ip_detection_extensions.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
@@ -3012,6 +3013,29 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   // Only scoped route config provider valid.
   EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, RequestRejectedViaIPDetection) {
+  OriginalIPRejectRequestOptions reject_options = {Http::Code::Forbidden, "ip detection failed"};
+  auto extension = getCustomHeaderExtension("x-ip", reject_options);
+  ip_detection_extensions_.push_back(extension);
+
+  use_remote_address_ = false;
+
+  setup(false, "");
+
+  // 403 direct response when IP detection fails.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("403", headers.getStatusValue());
+      }));
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  startRequest();
+
+  EXPECT_EQ("ip detection failed", response_body);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_rejected_via_ip_detection_.value());
 }
 
 } // namespace Http
