@@ -91,8 +91,8 @@ static_resources:
 #              pipe:
 #                path: "@/tmp/pipetest"
               envoy_internal_address:
-                server_listener_name: test_internal_listener_foo           
- 
+                server_listener_name: test_internal_listener_foo
+
   listeners:
   - name: listener_0
     address:
@@ -105,7 +105,7 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
-          cluster: cluster_internal                   
+          cluster: cluster_internal
   - name: listener_internal
     address:
 #      pipe:
@@ -813,7 +813,7 @@ TEST_P(ChainedProxyInternalTcpProxyIntegrationTest,
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
-TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
+TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, DISABLED_TestNoCloseOnHealthFailure) {
   concurrency_ = 2;
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -882,7 +882,7 @@ TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, TestNoCloseOnHealthFailure) 
   tcp_client->close();
 }
 
-TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, TestCloseOnHealthFailure) {
+TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, DISABLED_TestCloseOnHealthFailure) {
   concurrency_ = 2;
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

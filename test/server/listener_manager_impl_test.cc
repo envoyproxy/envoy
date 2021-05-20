@@ -4999,7 +4999,7 @@ per_connection_buffer_limit_bytes: 10
   address:
     envoy_internal_address:
       server_listener_name: test_internal_listener_baz
-  internal_listener: {}    
+  internal_listener: {}
   filter_chains:
   - filters:
     - name: fake

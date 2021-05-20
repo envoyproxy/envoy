@@ -8,14 +8,11 @@
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "envoy/network/address.h"
 
 #include "common/config/api_version.h"
-#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/filters/network/common/factory_base.h"
-#include "extensions/io_socket/user_space/io_handle_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
@@ -369,9 +366,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  tcp_client->waitForDisconnect();
+  tcp_client->waitForHalfClose();
 
-  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 2);
+  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 0);
 }
 
