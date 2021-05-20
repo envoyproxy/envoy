@@ -31,17 +31,18 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
   return sock_interface == nullptr ? &SocketInterfaceSingleton::get() : sock_interface;
 }
 
-void throwOnError(StatusOr<InstanceConstSharedPtr> address) {
-  ASSERT(Thread::MainThread::isMainThread());
-  if (!address.ok()) {
-    throw EnvoyException(address.status().ToString());
-  }
-}
-
 void throwOnError(absl::Status address) {
   if (!address.ok()) {
     throw EnvoyException(address.ToString());
   }
+}
+
+InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
+  ASSERT(Thread::MainThread::isMainThread());
+  if (!address.ok()) {
+    throwOnError(address.status());
+  }
+  return *address;
 }
 
 } // namespace
@@ -93,8 +94,7 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
 Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,
                                                            socklen_t ss_len, bool v6only) {
   StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
-  throwOnError(address);
-  return *address;
+  return throwOnError(address);
 }
 
 Address::InstanceConstSharedPtr
