@@ -85,6 +85,18 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
 
 void FileEventImpl::updateEvents(uint32_t events) {
   ASSERT(dispatcher_.isThreadSafe());
+  // The update can be skipped in cases where the old and new event mask are the same if the fd is
+  // using Level or EmulatedEdge trigger modes, but not Edge trigger mode. When the fd is registered
+  // in edge trigger mode, re-registering the fd will force re-computation of the readable/writable
+  // state even in cases where the event mask is not changing. See
+  // https://github.com/envoyproxy/envoy/pull/16389 for more details.
+  // TODO(antoniovicente) Consider ways to optimize away event registration updates in edge trigger
+  // mode once setEnabled stops clearing injected_activation_events_ before calling updateEvents
+  // and/or implement optimizations at the Network::ConnectionImpl level to reduce the number of
+  // calls to setEnabled.
+  if (events == enabled_events_ && trigger_ != FileTriggerType::Edge) {
+    return;
+  }
   auto* base = event_get_base(&raw_event_);
   event_del(&raw_event_);
   assignEvents(events, base);
@@ -111,9 +123,7 @@ void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
     ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
     if (trigger_ == FileTriggerType::EmulatedEdge) {
       auto new_event_mask = enabled_events_ & ~event;
-      if (new_event_mask != enabled_events_) {
-        updateEvents(new_event_mask);
-      }
+      updateEvents(new_event_mask);
     }
   }
 }
@@ -129,9 +139,7 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
         // We never ask for both early close and read at the same time.
         new_event_mask = new_event_mask & ~FileReadyType::Read;
       }
-      if (new_event_mask != enabled_events_) {
-        updateEvents(new_event_mask);
-      }
+      updateEvents(new_event_mask);
     }
   }
 }
