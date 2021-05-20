@@ -57,8 +57,7 @@ Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     for (const auto& resolver_addr : resolver_addrs) {
       resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
     }
-    const bool use_tcp_for_dns_lookups = config.use_tcp_for_dns_lookups();
-    return main_thread_dispatcher.createDnsResolver(resolvers, use_tcp_for_dns_lookups);
+    return main_thread_dispatcher.createDnsResolver(resolvers, config.use_tcp_for_dns_lookups());
   }
 
   return main_thread_dispatcher.createDnsResolver({}, config.use_tcp_for_dns_lookups());
