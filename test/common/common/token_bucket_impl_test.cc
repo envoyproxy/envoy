@@ -113,9 +113,8 @@ TEST_F(TokenBucketImplTest, ConsumeAndNextToken) {
 }
 
 TEST_F(TokenBucketImplTest, OptimizeConsume) {
-  TokenBucketImpl token_bucket{1000, time_system_, 500};
-  TokenBucketOriginalImpl original_token_bucket{1000, original_time_system_, 500};
-
+  uint64_t max_tokens{1000};
+  double tokens_per_sec(500);
   auto IsImproved = [](uint64_t optimize_access_nums, uint64_t original_access_nums) {
     return optimize_access_nums <= original_access_nums;
   };
@@ -136,24 +135,36 @@ TEST_F(TokenBucketImplTest, OptimizeConsume) {
   };
 
   {
+    TokenBucketImpl token_bucket{max_tokens, time_system_, tokens_per_sec};
+    TokenBucketOriginalImpl original_token_bucket{max_tokens, original_time_system_,
+                                                  tokens_per_sec};
     uint64_t access_nums = TestConsume(token_bucket, 400);
     uint64_t original_access_nums = TestConsume(original_token_bucket, 400);
     EXPECT_EQ(access_nums, original_access_nums);
   }
 
   {
+    TokenBucketImpl token_bucket{max_tokens, time_system_, tokens_per_sec};
+    TokenBucketOriginalImpl original_token_bucket{max_tokens, original_time_system_,
+                                                  tokens_per_sec};
     uint64_t access_nums = TestConsume(token_bucket, 600);
     uint64_t original_access_nums = TestConsume(original_token_bucket, 600);
     EXPECT_TRUE(IsImproved(access_nums, original_access_nums));
   }
 
   {
+    TokenBucketImpl token_bucket{max_tokens, time_system_, tokens_per_sec};
+    TokenBucketOriginalImpl original_token_bucket{max_tokens, original_time_system_,
+                                                  tokens_per_sec};
     uint64_t access_nums = TestConsume(token_bucket, 800);
     uint64_t original_access_nums = TestConsume(original_token_bucket, 800);
     EXPECT_TRUE(IsImproved(access_nums, original_access_nums));
   }
 
   {
+    TokenBucketImpl token_bucket{max_tokens, time_system_, tokens_per_sec};
+    TokenBucketOriginalImpl original_token_bucket{max_tokens, original_time_system_,
+                                                  tokens_per_sec};
     uint64_t access_nums = TestConsume(token_bucket, 1000);
     uint64_t original_access_nums = TestConsume(original_token_bucket, 1000);
     EXPECT_TRUE(IsImproved(access_nums, original_access_nums));
