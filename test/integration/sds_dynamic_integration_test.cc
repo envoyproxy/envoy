@@ -463,11 +463,11 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
   // `setCipherSuites`, so in the QUIC config, this test only uses one of the certs.
   if (!test_quic_) {
     EXPECT_EQ(1,
-              test_server_->counter("listener.127.0.0.1_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256")
+              test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
                   ->value());
-    EXPECT_EQ(
-        1, test_server_->counter("listener.127.0.0.1_0.ssl.ciphers.ECDHE-ECDSA-AES128-GCM-SHA256")
-               ->value());
+    EXPECT_EQ(1,
+              test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-ECDSA-AES128-GCM-SHA256"))
+                  ->value());
   }
 }
 
