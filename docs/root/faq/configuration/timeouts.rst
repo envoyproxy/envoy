@@ -104,8 +104,8 @@ TCP
 ---
 
 * The cluster :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>` specifies the amount
-  of time Envoy will wait for an upstream TCP connection to be established. This timeout has no
-  default, but is required in the configuration.
+  of time Envoy will wait for an upstream TCP connection to be established. If this value is not set,
+  a default value of 5 seconds will be used.
 
   .. attention::
 
