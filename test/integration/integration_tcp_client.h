@@ -30,6 +30,11 @@ public:
                        Network::Address::IpVersion version, bool enable_half_close,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        Network::Address::InstanceConstSharedPtr source_address = nullptr);
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory,
+                       Network::Address::InstanceConstSharedPtr dest_address,
+                       bool enable_half_close,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       Network::Address::InstanceConstSharedPtr source_address = nullptr);
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);

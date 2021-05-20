@@ -22,8 +22,25 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
     : io_handle_(std::move(io_handle)),
       address_provider_(std::make_shared<SocketAddressSetterImpl>(local_address, remote_address)) {
 
+  FANCY_LOG(debug,
+            "lambdai: SocketImpl::SocketImpl( local address = {} provider local address = {}",
+            local_address == nullptr ? "nullptr" : local_address->asStringView(),
+            address_provider_->localAddress() == nullptr
+                ? "nullptr"
+                : address_provider_->localAddress()->asStringView());
+  FANCY_LOG(debug,
+            "lambdai: SocketImpl::SocketImpl( remote address = {} provider local address = {}",
+            remote_address == nullptr ? "nullptr" : remote_address->asStringView(),
+            address_provider_->remoteAddress() == nullptr
+                ? "nullptr"
+                : address_provider_->remoteAddress()->asStringView());
   if (address_provider_->localAddress() != nullptr) {
     addr_type_ = address_provider_->localAddress()->type();
+    return;
+  }
+
+  if (address_provider_->remoteAddress() != nullptr) {
+    addr_type_ = address_provider_->remoteAddress()->type();
     return;
   }
 

@@ -25,7 +25,6 @@ public:
 
   void initialize() override;
 };
-
 class TcpProxySslIntegrationTest : public TcpProxyIntegrationTest {
 public:
   void initialize() override;

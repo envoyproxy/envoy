@@ -16,7 +16,9 @@ envoy_cc_extension(
     security_posture = "unknown",
     status = "wip",
     undocumented = True,
+    visibility = ["//visibility:public"],
     deps = [
+        ":io_handle_impl_lib",
     ],
 )
 

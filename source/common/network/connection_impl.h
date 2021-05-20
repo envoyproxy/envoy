@@ -12,6 +12,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl_base.h"
+#include "common/network/listen_socket_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
@@ -237,6 +238,13 @@ public:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+  // Internal socket is manufactured by its own factory.
+  ClientConnectionImpl(Event::Dispatcher& dispatcher,
+                       std::unique_ptr<Network::IoHandle> client_io_handle,
+                       const Network::Address::InstanceConstSharedPtr& address,
+                       const Network::Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
 

@@ -90,7 +90,6 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
 }
 
 // Test that connecting to internal address will crash.
-// TODO(lambdai): Add internal connection implementation to enable the connection creation.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -101,14 +100,41 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "false"}});
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
                    Network::Test::createRawBufferSocket(), nullptr),
                "panic: not implemented");
 }
 
+// Test that connecting to internal address will crash.
+TEST_P(SocketInterfaceIntegrationTest, CreateClientConnectionToInternalAddress) {
+
+  BaseIntegrationTest::initialize();
+
+  ConnectionStatusCallbacks connect_callbacks_;
+  Network::ClientConnectionPtr client_;
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "true"}});
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr);
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  ASSERT_TRUE(connect_callbacks_.closed());
+  client_->close(Network::ConnectionCloseType::NoFlush);
+}
+
 // Test that recv from internal address will crash.
-// TODO(lambdai): Add internal socket implementation to enable the io path.
+// TODO(lambdai): Add UDP internal listener implementation to enable the io path.
 TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 

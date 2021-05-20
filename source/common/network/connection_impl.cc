@@ -21,6 +21,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -274,7 +275,8 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  if (socket_->addressType() == Address::Type::Pipe) {
+  if (socket_->addressType() == Address::Type::Pipe ||
+      socket_->addressType() == Address::Type::EnvoyInternal) {
     return;
   }
 
@@ -657,9 +659,16 @@ void ConnectionImpl::onWriteReady() {
 
   if (connecting_) {
     int error;
-    socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
-                   "");
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
+        socket_->addressProvider().remoteAddress()->type() ==
+            Network::Address::Type::EnvoyInternal) {
+      // Connected!
+      error = 0;
+    } else {
+      socklen_t error_size = sizeof(error);
+      RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
+                     "");
+    }
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -811,6 +820,21 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
+    Event::Dispatcher& dispatcher, std::unique_ptr<Network::IoHandle> client_io_handle,
+    const Network::Address::InstanceConstSharedPtr& address,
+    const Network::Address::InstanceConstSharedPtr& source_address,
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    : ConnectionImpl(
+          dispatcher,
+          std::make_unique<ConnectionSocketImpl>(std::move(client_io_handle), nullptr, address),
+          std::move(transport_socket), stream_info_, false),
+      stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
+  UNREFERENCED_PARAMETER(source_address);
+  UNREFERENCED_PARAMETER(options);
+}
+
+ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
@@ -860,8 +884,12 @@ void ClientConnectionImpl::connect() {
                  socket_->addressProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
   if (result.rc_ == 0) {
-    // write will become ready.
-    ASSERT(connecting_);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
+        socket_->addressProvider().remoteAddress()->type() !=
+            Network::Address::Type::EnvoyInternal) {
+      // write will become ready.
+      ASSERT(connecting_);
+    }
   } else {
     ASSERT(SOCKET_FAILURE(result.rc_));
 #ifdef WIN32
