@@ -19,24 +19,24 @@ responds_without_header \
     http://localhost:8089/file.json \
     -si -H "Accept-Encoding: gzip"
 
-run_log "Test service: localhost:8001/stats/prometheus without compress"
+run_log "Test service: localhost:10000/stats/prometheus without compress"
 responds_without_header \
     "content-encoding: gzip" \
-    http://localhost:8001/stats/prometheus \
+    http://localhost:10000/stats/prometheus \
 
-run_log "Test service: localhost:8001/stats/prometheus with compress"
+run_log "Test service: localhost:10001/stats/prometheus with compress"
 responds_without_header \
     "content-encoding: gzip" \
-    http://localhost:8001/stats/prometheus \
-    --compressed
+    http://localhost:10000/stats/prometheus \
+    -si -H "Accept-Encoding: gzip"
 
 run_log "Test service: localhost:8002/stats/prometheus without compress"
 responds_without_header \
     "content-encoding: gzip" \
-    http://localhost:8002/stats/prometheus \
+    http://localhost:10001/stats/prometheus \
 
 run_log "Test service: localhost:8002/stats/prometheus with compress"
 responds_with_header \
     "content-encoding: gzip" \
-    http://localhost:8002/stats/prometheus \
-    --compressed
+    http://localhost:10001/stats/prometheus \
+    -si -H "Accept-Encoding: gzip"
