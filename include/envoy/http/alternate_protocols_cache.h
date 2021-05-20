@@ -1,12 +1,14 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 
 #include "absl/strings/string_view.h"
 
@@ -26,7 +28,8 @@ public:
    */
   struct Origin {
   public:
-    Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port);
+    Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port)
+        : scheme_(scheme), hostname_(hostname), port_(port) {}
 
     bool operator==(const Origin& other) const {
       return std::tie(scheme_, hostname_, port_) ==
@@ -65,7 +68,8 @@ public:
    */
   struct AlternateProtocol {
   public:
-    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port);
+    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port)
+        : alpn_(alpn), hostname_(hostname), port_(port) {}
 
     bool operator==(const AlternateProtocol& other) const {
       return std::tie(alpn_, hostname_, port_) ==
@@ -94,9 +98,9 @@ public:
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the
-   * specified origin, or nullptr if not alternatives are found. The returned pointer
-   * is owned by the AlternateProtocolsCacheImpl and is valid until the next operation on
-   * AlternateProtocolsCacheImpl.
+   * specified origin, or nullptr if not alternatives are found. The returned reference
+   * is owned by the AlternateProtocolsCache and is valid until the next operation on the
+   * AlternateProtocolsCache.
    * @param origin The origin to find alternate protocols for.
    * @return An optional list of alternate protocols for the given origin.
    */
@@ -107,6 +111,39 @@ public:
    * @return the number if entries in the map.
    */
   virtual size_t size() const PURE;
+};
+
+using AlternateProtocolsCacheSharedPtr = std::shared_ptr<AlternateProtocolsCache>;
+
+/**
+ * A manager for multiple alternate protocols caches.
+ */
+class AlternateProtocolsCacheManager {
+public:
+  virtual ~AlternateProtocolsCacheManager() = default;
+
+  /**
+   * Get an alternate protocols cache.
+   * @param config supplies the cache parameters. If a cache exists with the same parameters it
+   *               will be returned, otherwise a new one will be created.
+   */
+  virtual AlternateProtocolsCacheSharedPtr
+  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) PURE;
+};
+
+using AlternateProtocolsCacheManagerSharedPtr = std::shared_ptr<AlternateProtocolsCacheManager>;
+
+/**
+ * Factory for getting an alternate protocols cache manager.
+ */
+class AlternateProtocolsCacheManagerFactory {
+public:
+  virtual ~AlternateProtocolsCacheManagerFactory() = default;
+
+  /**
+   * Get the alternate protocols cache manager.
+   */
+  virtual AlternateProtocolsCacheManagerSharedPtr get() PURE;
 };
 
 } // namespace Http
