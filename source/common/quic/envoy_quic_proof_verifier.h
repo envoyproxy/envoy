@@ -12,7 +12,9 @@ namespace Quic {
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
   EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context)
-      : context_(std::move(context)) {}
+      : context_(std::move(context)) {
+    ASSERT(context_.get());
+  }
 
   // EnvoyQuicProofVerifierBase
   quic::QuicAsyncStatus
