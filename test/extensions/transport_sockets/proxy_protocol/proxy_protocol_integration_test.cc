@@ -284,8 +284,6 @@ public:
     BaseIntegrationTest::initialize();
   }
 
-  FakeRawConnectionPtr fake_upstream_raw_connection_;
-
 private:
   envoy::config::core::v3::ProxyProtocolConfig_Version version_;
   bool health_checks_;
@@ -305,6 +303,7 @@ TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocol) {
   auto tcp_client = makeTcpConnection(lookupPort("http"));
   auto request = "GET / HTTP/1.1\r\nhost: host\r\n\r\n";
   ASSERT_TRUE(tcp_client->write(request, false));
+  FakeRawConnectionPtr fake_upstream_raw_connection_;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_raw_connection_));
 
   std::string observed_data;
@@ -355,12 +354,11 @@ TEST_P(ProxyProtocolHttpIntegrationTest, TestV1ProxyProtocolMultipleConnections)
   ASSERT_TRUE(tcp_client->write(request, false));
   ASSERT_TRUE(tcp_client2->write(request, false));
 
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_raw_connection_));
-  FakeRawConnectionPtr conn2;
+  FakeRawConnectionPtr conn1, conn2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn1));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn2));
   std::string data1, data2;
-  ASSERT_TRUE(fake_upstream_raw_connection_->waitForData(FakeRawConnection::waitForAtLeastBytes(48),
-                                                         &data1));
+  ASSERT_TRUE(conn1->waitForData(FakeRawConnection::waitForAtLeastBytes(48), &data1));
   ASSERT_TRUE(conn2->waitForData(FakeRawConnection::waitForAtLeastBytes(48), &data2));
 
   std::string delimiter = "\r\n";
