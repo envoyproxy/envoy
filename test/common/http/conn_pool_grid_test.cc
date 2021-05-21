@@ -122,7 +122,7 @@ public:
   void addHttp3AlternateProtocol() {
     AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
     const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+        {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
     alternate_protocols_->setAlternatives(origin, protocols);
   }
 
@@ -512,7 +512,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3)
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithExpiredHttp3) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-    {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+      {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
   simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
 
@@ -535,7 +535,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithExpiredHt
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingHostname) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-    {"h3-29", "otherhostname", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+      {"h3-29", "otherhostname", origin.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
 
   EXPECT_EQ(grid_.first(), nullptr);
@@ -556,7 +556,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingPort) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-    {"h3-29", "", origin.port_ + 1, simTime().monotonicTime() + Seconds(5)}};
+      {"h3-29", "", origin.port_ + 1, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
 
   EXPECT_EQ(grid_.first(), nullptr);
@@ -576,7 +576,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingAlpn) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-    {"http/2", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+      {"http/2", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin, protocols);
 
   EXPECT_EQ(grid_.first(), nullptr);

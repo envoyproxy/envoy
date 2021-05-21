@@ -22,7 +22,8 @@ public:
   ~AlternateProtocolsCacheImpl() override;
 
   // AlternateProtocolsCache
-  void setAlternatives(const Origin& origin, const std::vector<AlternateProtocol>& protocols) override;
+  void setAlternatives(const Origin& origin,
+                       const std::vector<AlternateProtocol>& protocols) override;
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin) override;
   size_t size() const override;
 

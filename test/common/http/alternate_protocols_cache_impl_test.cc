@@ -29,8 +29,10 @@ public:
   const AlternateProtocolsCacheImpl::Origin origin1_ = {https_, hostname1_, port1_};
   const AlternateProtocolsCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
 
-  const AlternateProtocolsCacheImpl::AlternateProtocol protocol1_ = {alpn1_, hostname1_, port1_, expiration1_};
-  const AlternateProtocolsCacheImpl::AlternateProtocol protocol2_ = {alpn2_, hostname2_, port2_, expiration2_};
+  const AlternateProtocolsCacheImpl::AlternateProtocol protocol1_ = {alpn1_, hostname1_, port1_,
+                                                                     expiration1_};
+  const AlternateProtocolsCacheImpl::AlternateProtocol protocol2_ = {alpn2_, hostname2_, port2_,
+                                                                     expiration2_};
 
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols1_ = {protocol1_};
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols2_ = {protocol2_};
@@ -84,7 +86,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) {
-  protocols_.setAlternatives(origin1_, { protocol1_, protocol2_});
+  protocols_.setAlternatives(origin1_, {protocol1_, protocol2_});
   simTime().setMonotonicTime(expiration1_ + Seconds(1));
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
