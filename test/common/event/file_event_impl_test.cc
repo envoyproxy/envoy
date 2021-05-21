@@ -309,8 +309,8 @@ TEST_F(FileEventImplTest, LevelTrigger) {
   count = 1;
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // Activate read and then call setEnabled. Verify that the read event is not delivered, setEnabled
-  // clears explicit activations.
+  // Activate read and then call setEnabled. Verify that the read event is not delivered; setEnabled
+  // clears events from explicit calls to activate.
   EXPECT_CALL(read_event, ready()).Times(0);
   EXPECT_CALL(write_event, ready());
   file_event->activate(FileReadyType::Read);
