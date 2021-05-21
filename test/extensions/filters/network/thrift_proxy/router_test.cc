@@ -973,19 +973,26 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
 TEST_P(ThriftRouterFieldTypeTest, OneWay) {
   FieldType field_type = GetParam();
 
+  Stats::MockStore cluster_scope;
+  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+      .WillByDefault(ReturnRef(cluster_scope));
+
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_oneway"));
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(0);
+  EXPECT_CALL(cluster_scope,
+              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds))
+      .Times(0);
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _))
+      .Times(0);
+
   initializeRouter();
   startRequest(MessageType::Oneway);
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
   destroyRouter();
-
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_oneway")
-                     .value());
-  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, Call) {
