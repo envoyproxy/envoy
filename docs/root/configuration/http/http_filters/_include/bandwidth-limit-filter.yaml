@@ -22,6 +22,7 @@ static_resources:
                 typed_per_filter_config:
                   envoy.filters.http.bandwidth_limit:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
+                    stat_prefix: bandwidth_limiter_custom_route
                     enable_mode: DecodeAndEncode
                     limit_kbps: 500
                     fill_interval: 0.1s
@@ -31,7 +32,7 @@ static_resources:
           - name: envoy.filters.http.bandwidth_limit
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
-              stat_prefix: http_bandwidth_limiter
+              stat_prefix: bandwidth_limiter_default
           - name: envoy.filters.http.router
             typed_config: {}
 
