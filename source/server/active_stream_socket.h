@@ -58,6 +58,50 @@ public:
   std::list<std::unique_ptr<ActiveStreamSocket>> sockets_;
 };
 
+template <typename ActiveStreamType,
+          typename ActiveConnectionCollectionType = typename ActiveStreamType::CollectionType>
+class TypedActiveStreamListenerBase : public ActiveStreamListenerBase {
+
+public:
+  TypedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                                Network::ListenerPtr&& listener, Network::ListenerConfig& config)
+      : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
+  using ActiveGenericConnectionPtr = std::unique_ptr<ActiveStreamType>;
+  using ActiveGenericConnectionsPtr = std::unique_ptr<ActiveConnectionCollectionType>;
+
+  /**
+   * Schedule to remove and destroy the active connections which are not tracked by listener
+   * config. Caution: The connection are not destroyed yet when function returns.
+   */
+  void
+  deferredRemoveFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains) {
+    // Need to recover the original deleting state.
+    const bool was_deleting = is_deleting_;
+    is_deleting_ = true;
+    for (const auto* filter_chain : draining_filter_chains) {
+      auto iter = connections_by_context_.find(filter_chain);
+      if (iter == connections_by_context_.end()) {
+        // It is possible when listener is stopping.
+      } else {
+        auto& connections = iter->second->connections_;
+        while (!connections.empty()) {
+          connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+        }
+        // Since is_deleting_ is on, we need to manually remove the map value and drive the
+        // iterator. Defer delete connection container to avoid race condition in destroying
+        // connection.
+        dispatcher().deferredDelete(std::move(iter->second));
+        connections_by_context_.erase(iter);
+      }
+    }
+    is_deleting_ = was_deleting;
+  }
+
+  absl::node_hash_map<const Network::FilterChain*, ActiveGenericConnectionsPtr>
+      connections_by_context_;
+  bool is_deleting_{false};
+};
+
 /**
  * Wrapper for an active accepted socket owned by the active listener.
  */

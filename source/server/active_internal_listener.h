@@ -33,7 +33,48 @@ using ActiveInternalConnectionPtr = std::unique_ptr<ActiveInternalConnection>;
 class ActiveInternalConnections;
 using ActiveInternalConnectionsPtr = std::unique_ptr<ActiveInternalConnections>;
 
-class ActiveInternalListener : public ActiveStreamListenerBase,
+class ActiveInternalListener;
+/**
+ * Wrapper for a group of active connections which are attached to the same filter chain context.
+ */
+class ActiveInternalConnections : public Event::DeferredDeletable {
+public:
+  ActiveInternalConnections(ActiveInternalListener& listener,
+                            const Network::FilterChain& filter_chain);
+  ~ActiveInternalConnections() override;
+
+  // Listener filter chain pair is the owner of the connections.
+  ActiveInternalListener& listener_;
+  const Network::FilterChain& filter_chain_;
+  // Owned connections
+  std::list<ActiveInternalConnectionPtr> connections_;
+};
+
+/**
+ * Wrapper for an active internal connection owned by this handler.
+ */
+struct ActiveInternalConnection : LinkedObject<ActiveInternalConnection>,
+                                  public Event::DeferredDeletable,
+                                  public Network::ConnectionCallbacks {
+  ActiveInternalConnection(ActiveInternalConnections& active_connections,
+                           Network::ConnectionPtr&& new_connection, TimeSource& time_system,
+                           std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
+  ~ActiveInternalConnection() override;
+
+  using CollectionType = ActiveInternalConnections;
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+  ActiveInternalConnections& active_connections_;
+  Network::ConnectionPtr connection_;
+  Stats::TimespanPtr conn_length_;
+};
+
+class ActiveInternalListener : public TypedActiveStreamListenerBase<ActiveInternalConnection>,
                                public Network::InternalListenerCallbacks,
                                Logger::Loggable<Logger::Id::conn_handler> {
 public:
@@ -95,66 +136,10 @@ public:
   ActiveInternalConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
 
   /**
-   * Schedule to remove and destroy the active connections which are not tracked by listener
-   * config. Caution: The connection are not destroyed yet when function returns.
-   */
-  void
-  deferredRemoveFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains);
-
-  /**
    * Update the listener config. The follow up connections will see the new config. The existing
    * connections are not impacted.
    */
   void updateListenerConfig(Network::ListenerConfig& config);
-
-  absl::node_hash_map<const Network::FilterChain*, ActiveInternalConnectionsPtr>
-      connections_by_context_;
-  bool is_deleting_{false};
-};
-
-/**
- * Wrapper for a group of active connections which are attached to the same filter chain context.
- */
-class ActiveInternalConnections : public Event::DeferredDeletable {
-public:
-  ActiveInternalConnections(ActiveInternalListener& listener,
-                            const Network::FilterChain& filter_chain);
-  ~ActiveInternalConnections() override;
-
-  // Listener filter chain pair is the owner of the connections.
-  ActiveInternalListener& listener_;
-  const Network::FilterChain& filter_chain_;
-  // Owned connections
-  std::list<ActiveInternalConnectionPtr> connections_;
-};
-
-/**
- * Wrapper for an active internal connection owned by this handler.
- */
-struct ActiveInternalConnection : LinkedObject<ActiveInternalConnection>,
-                                  public Event::DeferredDeletable,
-                                  public Network::ConnectionCallbacks {
-  ActiveInternalConnection(ActiveInternalConnections& active_connections,
-                           Network::ConnectionPtr&& new_connection, TimeSource& time_system,
-                           std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
-  ~ActiveInternalConnection() override;
-
-  // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override {
-    FANCY_LOG(info, "lambdai: internal connection on event {}", static_cast<int>(event));
-    // Any event leads to destruction of the connection.
-    if (event == Network::ConnectionEvent::LocalClose ||
-        event == Network::ConnectionEvent::RemoteClose) {
-      active_connections_.listener_.removeConnection(*this);
-    }
-  }
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
-
-  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
-  ActiveInternalConnections& active_connections_;
-  Network::ConnectionPtr connection_;
-  Stats::TimespanPtr conn_length_;
 };
 
 } // namespace Server

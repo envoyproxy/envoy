@@ -17,7 +17,7 @@ namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(
+    : TypedActiveStreamListenerBase<ActiveTcpConnection>(
           parent, parent.dispatcher(),
           parent.dispatcher().createListener(config.listenSocketFactory().getListenSocket(), *this,
                                              config.bindToPort(), config.tcpBacklogSize()),
@@ -29,7 +29,8 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
                                      Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
+    : TypedActiveStreamListenerBase<ActiveTcpConnection>(parent, parent.dispatcher(),
+                                                         std::move(listener), config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -182,7 +183,7 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
     // If active_socket is about to be destructed, emit logs if a connection is not created.
     if (!active_socket->connected_) {
       if (active_socket->stream_info_ != nullptr) {
-        ActiveStreamListenerBase::emitLogs(*config_, *active_socket->stream_info_);
+        emitLogs(*config_, *active_socket->stream_info_);
       } else {
         // If the active_socket is not connected, this socket is not promoted to active connection.
         // Thus the stream_info_ is owned by this active socket.
@@ -220,7 +221,7 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
-    ActiveStreamListenerBase::emitLogs(*config_, *stream_info);
+    emitLogs(*config_, *stream_info);
     socket->close();
     return;
   }
@@ -262,29 +263,6 @@ ActiveTcpListener::getOrCreateActiveConnections(const Network::FilterChain& filt
     connections = std::make_unique<ActiveConnections>(*this, filter_chain);
   }
   return *connections;
-}
-
-void ActiveTcpListener::deferredRemoveFilterChains(
-    const std::list<const Network::FilterChain*>& draining_filter_chains) {
-  // Need to recover the original deleting state.
-  const bool was_deleting = is_deleting_;
-  is_deleting_ = true;
-  for (const auto* filter_chain : draining_filter_chains) {
-    auto iter = connections_by_context_.find(filter_chain);
-    if (iter == connections_by_context_.end()) {
-      // It is possible when listener is stopping.
-    } else {
-      auto& connections = iter->second->connections_;
-      while (!connections.empty()) {
-        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-      }
-      // Since is_deleting_ is on, we need to manually remove the map value and drive the iterator.
-      // Defer delete connection container to avoid race condition in destroying connection.
-      dispatcher().deferredDelete(std::move(iter->second));
-      connections_by_context_.erase(iter);
-    }
-  }
-  is_deleting_ = was_deleting;
 }
 
 void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
@@ -352,6 +330,17 @@ ActiveTcpConnection::~ActiveTcpConnection() {
 
   // Active handler connections (not listener).
   listener.parent_.decNumConnections();
+}
+
+// Network::ConnectionCallbacks
+void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
+  FANCY_LOG(info, "lambdai: tcp connection on event {}", static_cast<int>(event));
+
+  // Any event leads to destruction of the connection.
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    active_connections_.listener_.removeConnection(*this);
+  }
 }
 
 } // namespace Server

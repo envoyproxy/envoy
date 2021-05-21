@@ -14,14 +14,15 @@ namespace Server {
 ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_handler,
                                                Event::Dispatcher& dispatcher,
                                                Network::ListenerConfig& config)
-    : ActiveInternalListener(conn_handler, dispatcher,
-                             std::make_unique<ActiveInternalListener::NetworkInternalListener>(),
-                             config) {}
+    : TypedActiveStreamListenerBase<ActiveInternalConnection>(
+          conn_handler, dispatcher,
+          std::make_unique<ActiveInternalListener::NetworkInternalListener>(), config) {}
 ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_handler,
                                                Event::Dispatcher& dispatcher,
                                                Network::ListenerPtr listener,
                                                Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(conn_handler, dispatcher, std::move(listener), config) {}
+    : TypedActiveStreamListenerBase<ActiveInternalConnection>(conn_handler, dispatcher,
+                                                              std::move(listener), config) {}
 
 ActiveInternalListener::~ActiveInternalListener() {
   // TODO(lambdai): delete the active connections.
@@ -123,29 +124,6 @@ ActiveInternalListener::getOrCreateActiveConnections(const Network::FilterChain&
   return *connections;
 }
 
-void ActiveInternalListener::deferredRemoveFilterChains(
-    const std::list<const Network::FilterChain*>& draining_filter_chains) {
-  // Need to recover the original deleting state.
-  const bool was_deleting = is_deleting_;
-  is_deleting_ = true;
-  for (const auto* filter_chain : draining_filter_chains) {
-    auto iter = connections_by_context_.find(filter_chain);
-    if (iter == connections_by_context_.end()) {
-      // It is possible when listener is stopping.
-    } else {
-      auto& connections = iter->second->connections_;
-      while (!connections.empty()) {
-        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-      }
-      // Since is_deleting_ is on, we need to manually remove the map value and drive the iterator.
-      // Defer delete connection container to avoid race condition in destroying connection.
-      dispatcher().deferredDelete(std::move(iter->second));
-      connections_by_context_.erase(iter);
-    }
-  }
-  is_deleting_ = was_deleting;
-}
-
 void ActiveInternalListener::updateListenerConfig(Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
   config_ = &config;
@@ -184,7 +162,7 @@ ActiveInternalConnection::ActiveInternalConnection(
 }
 
 ActiveInternalConnection::~ActiveInternalConnection() {
-  ActiveStreamListenerBase::emitLogs(*active_connections_.listener_.config_, *stream_info_);
+  ActiveInternalListener::emitLogs(*active_connections_.listener_.config_, *stream_info_);
   auto& listener = active_connections_.listener_;
   listener.stats_.downstream_cx_active_.dec();
   listener.stats_.downstream_cx_destroy_.inc();
@@ -224,6 +202,16 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
     if (!active_socket->connected_) {
       emitLogs(*config_, *active_socket->stream_info_);
     }
+  }
+}
+
+// Network::ConnectionCallbacks
+void ActiveInternalConnection::onEvent(Network::ConnectionEvent event) {
+  FANCY_LOG(info, "lambdai: internal connection on event {}", static_cast<int>(event));
+  // Any event leads to destruction of the connection.
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    active_connections_.listener_.removeConnection(*this);
   }
 }
 } // namespace Server
