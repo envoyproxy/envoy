@@ -13,7 +13,7 @@ when the request's route or virtual host has a per filter
 
 If the bandwidth limit has been exhausted the filter stops further transfer until more bandwidth gets allocated
 according to the ``fill_interval`` (default is 50 milliseconds). If the connection buffer fills up with accumulated
-data then the source of data will be readDisabled as described in the :repo:`flow control doc<source/docs/flow_control.md>`.
+data then the source of data will have ``readDisable(true)`` set as described in the :repo:`flow control doc<source/docs/flow_control.md>`.
 
 .. note::
   The token bucket is shared across all workers, thus the limits are applied per Envoy process.
