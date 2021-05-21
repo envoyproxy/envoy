@@ -678,7 +678,7 @@ class RstFormatVisitor(visitor.Visitor):
         normal_enum_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
         header = format_header('-', 'Enum %s' % normal_enum_type)
-        proto_link = github_url("f[{normal_enum_type} proto]", type_context) + '\n\n'
+        proto_link = github_url(f"[{normal_enum_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
         if hide_not_implemented(leading_comment):
