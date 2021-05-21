@@ -230,7 +230,7 @@ xDS APIs:
   breaking changes where there is no substantial gain in functionality,
   performance, security or implementation simplification. We will tolerate
   technical debt in the API itself, e.g. in the form of vestigial deprecated
-  fields or reduced ergnomics (such as not using `oneof` when we would prefer
+  fields or reduced ergonomics (such as not using `oneof` when we would prefer
   to), in order to meet this principle.
 
 * Namespaces for extensions, metadata, etc. use a reverse DNS naming scheme,
