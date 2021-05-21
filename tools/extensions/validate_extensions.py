@@ -110,6 +110,10 @@ class ExtensionDbError(Exception):
     pass
 
 
+def is_missing(value):
+    return value == '(missing)'
+
+
 def num_read_filters_fuzzed():
     data = pathlib.Path(
         os.path.join(
