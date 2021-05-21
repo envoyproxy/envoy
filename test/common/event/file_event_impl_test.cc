@@ -264,18 +264,17 @@ TEST_F(FileEventImplTest, EdgeTrigger) {
 #endif
 
 TEST_F(FileEventImplTest, LevelTrigger) {
+  testing::InSequence s;
   ReadyWatcher read_event;
-  EXPECT_CALL(read_event, ready()).Times(2);
   ReadyWatcher write_event;
-  EXPECT_CALL(write_event, ready()).Times(2);
 
-  int count = 2;
+  int count = 0;
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
       fds_[0],
       [&](uint32_t events) -> void {
-        if (count-- == 0) {
+        ASSERT(count > 0);
+        if (--count == 0) {
           dispatcher_->exit();
-          return;
         }
         if (events & FileReadyType::Read) {
           read_event.ready();
@@ -287,6 +286,36 @@ TEST_F(FileEventImplTest, LevelTrigger) {
       },
       FileTriggerType::Level, FileReadyType::Read | FileReadyType::Write);
 
+  // Expect events to be delivered twice since count=2 and level events are delivered on each
+  // iteration until the fd state changes.
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
+  count = 2;
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Change the event mask to just Write and verify that only that event is delivered.
+  EXPECT_CALL(read_event, ready()).Times(0);
+  EXPECT_CALL(write_event, ready());
+  file_event->setEnabled(FileReadyType::Write);
+  count = 1;
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Activate read, and verify it is delivered despite not being part of the enabled event mask.
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
+  file_event->activate(FileReadyType::Read);
+  count = 1;
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Activate read and then call setEnabled. Verify that the read event is not delivered, setEnabled
+  // clears explicit activations.
+  EXPECT_CALL(read_event, ready()).Times(0);
+  EXPECT_CALL(write_event, ready());
+  file_event->activate(FileReadyType::Read);
+  file_event->setEnabled(FileReadyType::Write);
+  count = 1;
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
