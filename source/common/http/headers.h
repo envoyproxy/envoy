@@ -51,7 +51,6 @@ private:
 class CustomHeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
-  const LowerCaseString Age{"age"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
@@ -60,6 +59,8 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Age{"age"};
+  const LowerCaseString AltSvc{"alt-svc"};
   const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};

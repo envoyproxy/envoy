@@ -78,6 +78,8 @@ public:
   const std::string OriginalSrc = "envoy.filters.http.original_src";
   // Dynamic forward proxy filter
   const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
+  // Alternate Protocols Cache filter
+  const std::string AlternateProtocolsCache = "envoy.filters.http.alternate_protocols_cache";
   // WebAssembly filter
   const std::string Wasm = "envoy.filters.http.wasm";
   // AWS request signing filter

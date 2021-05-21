@@ -727,6 +727,9 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
         new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http3_protocol_options());
       }
+      new_protocol_options.mutable_auto_config()
+          ->mutable_alternate_protocols_cache_options()
+          ->set_name("default_alternate_protocols_cache");
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
               .PackFrom(new_protocol_options);
