@@ -229,7 +229,7 @@ constexpr bool win32SupportsOriginalDestination() {
 #define UDP_SEGMENT 103
 #endif
 
-typedef int os_fd_t;
+typedef int os_fd_t;            // NOLINT(modernize-use-using)
 typedef int filesystem_os_id_t; // NOLINT(modernize-use-using)
 typedef int signal_t;           // NOLINT(modernize-use-using)
 
