@@ -10,11 +10,23 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Quic {
 
 class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
+  void initialize() {
+    Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
+    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
+        .WillOnce(Return(context));
+    factory_ = std::make_unique<Quic::QuicClientTransportSocketFactory>(
+        std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
+            new NiceMock<Ssl::MockClientContextConfig>),
+        context_);
+  }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
@@ -23,13 +35,13 @@ protected:
   Network::Address::InstanceConstSharedPtr test_address_ =
       Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
-  Quic::QuicClientTransportSocketFactory factory_{
-      std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
-      context_};
+  std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
 };
 
 TEST_F(QuicNetworkConnectionTest, BufferLimits) {
-  PersistentQuicInfoImpl info{dispatcher_, factory_, simTime(), test_address_};
+  initialize();
+
+  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_};
 
   std::unique_ptr<Network::ClientConnection> client_connection =
       createQuicNetworkConnection(info, dispatcher_, test_address_, test_address_);
