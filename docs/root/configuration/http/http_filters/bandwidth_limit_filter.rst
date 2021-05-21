@@ -25,9 +25,9 @@ Example filter configuration for a globally disabled bandwidth limiter but enabl
 
 .. literalinclude:: _include/bandwidth-limit-filter.yaml
     :language: yaml
-	:lines: 11-53
-	:emphasize-lines: 9-29
-	:caption: :download:`bandwidth-limit-filter.yaml <_include/bandwidth-limit-filter.yaml>`
+    :lines: 11-53
+    :emphasize-lines: 9-29
+    :caption: :download:`bandwidth-limit-filter.yaml <_include/bandwidth-limit-filter.yaml>`
 
 Note that if this filter is configured as globally disabled and there are no virtual host or route level
 token buckets, no bandwidth limiting will be applied.
