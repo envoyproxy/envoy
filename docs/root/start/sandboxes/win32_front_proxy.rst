@@ -258,12 +258,12 @@ enter the ``front-envoy`` container, and ``curl`` for services locally:
     Hello from behind Envoy (service 1)! hostname: 8d2359ee21a8 resolvedhostname: 172.30.101.143
 
 
-Step 5: Enter container and curl admin
-**************************************
+Step 5: Enter container and curl admin interface
+************************************************
 
 When Envoy runs it also attaches an ``admin`` to your desired port.
 
-In the example configs the admin is bound to port ``8001``.
+In the example configs the admin listener is bound to port ``8001``.
 
 We can ``curl`` it to gain useful information:
 
