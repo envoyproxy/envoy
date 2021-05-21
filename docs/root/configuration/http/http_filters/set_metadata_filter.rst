@@ -45,7 +45,7 @@ After applying this filter, the namespace will contain:
    mytags:
      tag0: 1
      tag1: 1
- 
+
 Statistics
 ----------
 
