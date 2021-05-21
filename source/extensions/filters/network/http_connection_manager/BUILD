@@ -68,6 +68,7 @@ envoy_cc_extension(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic:codec_lib",
+        "//source/common/quic:quic_stats_lib",
     ]),
 )
 

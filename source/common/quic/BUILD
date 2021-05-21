@@ -26,6 +26,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_stats_lib",
+    srcs = ["quic_stats.cc"],
+    hdrs = ["quic_stats.h"],
+    tags = ["nofips"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
+        "@com_googlesource_quiche//:quic_core_error_codes_lib",
+        "@com_googlesource_quiche//:quic_core_types_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_alarm_factory_lib",
     srcs = ["envoy_quic_alarm_factory.cc"],
     hdrs = ["envoy_quic_alarm_factory.h"],
@@ -193,6 +206,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":quic_network_connection_lib",
+        ":quic_stats_lib",
         ":send_buffer_monitor_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:connection_interface",

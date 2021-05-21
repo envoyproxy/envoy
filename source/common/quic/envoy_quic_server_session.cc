@@ -82,6 +82,8 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
+  ASSERT(quic_stats_.has_value());
+  quic_stats_->get().chargeQuicConnectionCloseStats(frame.quic_error_code, source);
   onConnectionCloseEvent(frame, source);
 }
 

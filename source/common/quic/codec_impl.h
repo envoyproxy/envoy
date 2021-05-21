@@ -42,7 +42,7 @@ public:
   QuicHttpServerConnectionImpl(
       EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
       Http::Http3::CodecStats& stats,
-      const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+      const envoy::config::core::v3::Http3ProtocolOptions& http3_options, QuicStats& quic_stats,
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action);

@@ -23,6 +23,7 @@
 #include "common/network/connection_impl_base.h"
 #include "common/quic/quic_network_connection.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "common/quic/quic_stats.h"
 #include "common/quic/send_buffer_monitor.h"
 #include "common/stream_info/stream_info_impl.h"
 
@@ -143,6 +144,8 @@ public:
     codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
   }
 
+  void setQuicStats(QuicStats& stats) { quic_stats_ = std::reference_wrapper<QuicStats>(stats); }
+
   uint32_t maxIncomingHeadersCount() { return max_headers_count_; }
 
   void setMaxIncomingHeadersCount(uint32_t max_headers_count) {
@@ -167,6 +170,7 @@ protected:
   absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
   absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
       http3_options_;
+  absl::optional<std::reference_wrapper<QuicStats>> quic_stats_;
   bool initialized_{false};
 
 private:

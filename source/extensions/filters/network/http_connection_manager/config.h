@@ -27,6 +27,7 @@
 #include "common/http/http3/codec_stats.h"
 #include "common/json/json_loader.h"
 #include "common/local_reply/local_reply.h"
+#include "common/quic/quic_stats.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -227,6 +228,7 @@ private:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  mutable Quic::QuicStats quic_stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
   const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;

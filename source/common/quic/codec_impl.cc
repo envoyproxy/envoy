@@ -21,13 +21,14 @@ bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSe
 QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
     EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
     Http::Http3::CodecStats& stats,
-    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options, QuicStats& quic_stats,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
     : QuicHttpConnectionImplBase(quic_session, stats), quic_server_session_(quic_session) {
   quic_session.setCodecStats(stats);
   quic_session.setHttp3Options(http3_options);
+  quic_session.setQuicStats(quic_stats);
   quic_session.setHeadersWithUnderscoreAction(headers_with_underscores_action);
   quic_session.setHttpConnectionCallbacks(callbacks);
   quic_session.setMaxIncomingHeadersCount(max_request_headers_count);

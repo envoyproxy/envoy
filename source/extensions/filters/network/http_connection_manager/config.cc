@@ -244,6 +244,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Filter::Http::FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
+      quic_stats_(context_.scope(), false),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
@@ -687,7 +688,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
         Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        quic_stats_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+        headersWithUnderscoresAction());
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
