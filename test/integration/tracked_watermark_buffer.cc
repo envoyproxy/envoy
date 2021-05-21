@@ -180,7 +180,7 @@ void TrackedWatermarkBufferFactory::inspectAccounts(
     main_tid = server.api().threadFactory().currentThreadId();
 
     slot->runOnAllThreads(
-        [&main_tid, &server, &func, this](OptRef<ThreadLocal::ThreadLocalObject>) {
+        [main_tid, &server, &func, this](OptRef<ThreadLocal::ThreadLocalObject>) {
           // Run on the worker thread.
           if (server.api().threadFactory().currentThreadId() != main_tid) {
             absl::MutexLock lock(&(this->mutex_));
