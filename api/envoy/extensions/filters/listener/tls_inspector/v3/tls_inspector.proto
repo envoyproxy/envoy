@@ -17,4 +17,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message TlsInspector {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.tls_inspector.v2.TlsInspector";
+
+  // Populate connection fingerprint using data from the SSL Client Hello packet
+  // Defaults to false.
+  bool enable_connection_fingerprinting = 1;
 }

@@ -60,6 +60,16 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
+   * @param fingerprint Connection fingerprint of the downstream connection.
+   **/
+  virtual void setConnectionFingerprint(absl::string_view fingerprint) PURE;
+
+  /**
+   * @return Connection fingerprint of the downstream connection, if any.
+   **/
+  virtual absl::string_view connectionFingerprint() const PURE;
+
+  /**
    *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.

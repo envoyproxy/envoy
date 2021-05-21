@@ -121,6 +121,11 @@ public:
   }
   absl::string_view requestedServerName() const override { return server_name_; }
 
+  void setConnectionFingerprint(absl::string_view fingerprint) override {
+    connection_fingerprint_ = std::string(fingerprint);
+  }
+  absl::string_view connectionFingerprint() const override { return connection_fingerprint_; }
+
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
   }
@@ -136,6 +141,7 @@ protected:
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
   std::string server_name_;
+  std::string connection_fingerprint_;
 };
 
 // ConnectionSocket used with server connections.

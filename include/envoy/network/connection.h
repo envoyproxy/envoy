@@ -240,6 +240,11 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
+   * @return Connection fingerprint of the downstream connection, if any.
+   **/
+  virtual absl::string_view connectionFingerprint() const PURE;
+
+  /**
    * @return State the current state of the connection.
    */
   virtual State state() const PURE;

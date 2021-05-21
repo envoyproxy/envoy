@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <sstream>
+#include <iomanip>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
@@ -14,6 +16,7 @@
 #include "common/common/assert.h"
 
 #include "absl/strings/str_join.h"
+#include "openssl/md5.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -25,9 +28,13 @@ namespace TlsInspector {
 const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
 const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
 
-Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
+Config::Config(
+    Stats::Scope& scope,
+    const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
+    uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
+      enable_connection_fingerprinting_(proto_config.enable_connection_fingerprinting()),
       max_client_hello_size_(max_client_hello_size) {
 
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
@@ -41,11 +48,13 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   SSL_CTX_set_select_certificate_cb(
       ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
+        Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
+        filter->connectionFingerprint(client_hello);
+
         const uint8_t* data;
         size_t len;
         if (SSL_early_callback_ctx_extension_get(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-          Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
           filter->onALPN(data, len);
         }
         return ssl_select_cert_success;
@@ -232,6 +241,171 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
     return ParseState::Done;
   default:
     return ParseState::Error;
+  }
+}
+
+static const uint16_t GREASE[] = {
+    0x0a0a,
+    0x1a1a,
+    0x2a2a,
+    0x3a3a,
+    0x4a4a,
+    0x5a5a,
+    0x6a6a,
+    0x7a7a,
+    0x8a8a,
+    0x9a9a,
+    0xaaaa,
+    0xbaba,
+    0xcaca,
+    0xdada,
+    0xeaea,
+    0xfafa,
+};
+
+bool isNotGrease(uint16_t id) {
+  for (size_t i = 0; i < (sizeof(GREASE) / sizeof(GREASE[0])); ++i) {
+    if (id == GREASE[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+  CBS cipher_suites;
+  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+
+  bool first = true;
+  while (CBS_len(&cipher_suites) > 0) {
+    uint16_t id;
+    if (!CBS_get_u16(&cipher_suites, &id)) {
+      return false;
+    }
+    if (!first) {
+      out << "-";
+    }
+    out << id;
+    first = false;
+  }
+
+  return true;
+}
+
+bool writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+  CBS extensions;
+  CBS_init(&extensions, ssl_client_hello->extensions, ssl_client_hello->extensions_len);
+
+  bool first = true;
+  while (CBS_len(&extensions) > 0) {
+    uint16_t id;
+    if (!CBS_get_u16(&extensions, &id)) {
+      return false;
+    }
+    if (isNotGrease(id)) {
+      if (!first) {
+        out << "-";
+      }
+      out << id;
+      first = false;
+    }
+  }
+
+  return true;
+}
+
+bool writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+  const uint8_t* ec_data;
+  size_t ec_len;
+  if (!SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
+                                            &ec_data, &ec_len)) {
+    return false;
+  }
+
+  CBS ec;
+  CBS_init(&ec, ec_data, ec_len);
+
+  bool first = true;
+  while (CBS_len(&ec) > 0) {
+    uint16_t id;
+    if (!CBS_get_u16(&ec, &id)) {
+      return false;
+    }
+    if (!first) {
+      out << "-";
+    }
+    out << id;
+    first = false;
+  }
+
+  return true;
+}
+
+bool writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+  const uint8_t* ecpf_data;
+  size_t ecpf_len;
+  if (!SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_ec_point_formats,
+                                            &ecpf_data, &ecpf_len)) {
+    return false;
+  }
+
+  CBS ecpf;
+  CBS_init(&ecpf, ecpf_data, ecpf_len);
+
+  bool first = true;
+  while (CBS_len(&ecpf) > 0) {
+    uint16_t id;
+    if (!CBS_get_u16(&ecpf, &id)) {
+      return false;
+    }
+    if (!first) {
+      out << "-";
+    }
+    out << id;
+    first = false;
+  }
+
+  return true;
+}
+
+void Filter::connectionFingerprint(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  if (config_->enableConnectionFingerprinting()) {
+    std::ostringstream out;
+    const uint16_t client_version = ssl_client_hello->version;
+    out << client_version << ",";
+    if (!writeCipherSuites(ssl_client_hello, out)) {
+      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write cipher suites");
+      return;
+    }
+    out << ",";
+    if (!writeExtensions(ssl_client_hello, out)) {
+      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write extensions");
+      return;
+    }
+    out << ",";
+    if (!writeEllipticCurves(ssl_client_hello, out)) {
+      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write elliptic curves");
+      return;
+    }
+    out << ",";
+    if (!writeEllipticCurvePointFormats(ssl_client_hello, out)) {
+      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write elliptic curve point formats");
+      return;
+    }
+
+    std::string fingerprint = out.str();
+    ENVOY_LOG(trace, "tls:connectionFingerprint(), fingerprint: {}", fingerprint);
+
+    uint8_t buf[MD5_DIGEST_LENGTH];
+    MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
+
+    std::ostringstream md5;
+    md5 << std::hex << std::uppercase << std::setfill('0');
+    for (const auto &byte: buf) {
+      md5 << std::setw(2) << static_cast<int>(byte);
+    }
+
+    cb_->socket().setConnectionFingerprint(md5.str());
   }
 }
 

@@ -284,6 +284,12 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
 
+  void setConnectionFingerprint(absl::string_view fingerprint) override {
+    connection_fingerprint_ = std::string(fingerprint);
+  }
+
+  const std::string& connectionFingerprint() const override { return connection_fingerprint_; }
+
   void setFilterChainName(absl::string_view filter_chain_name) override {
     filter_chain_name_ = filter_chain_name;
   }
@@ -343,6 +349,7 @@ private:
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   absl::optional<uint64_t> connection_id_;
+  std::string connection_fingerprint_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
 };

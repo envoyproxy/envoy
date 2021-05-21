@@ -1,5 +1,6 @@
 #include "common/quic/envoy_quic_client_session.h"
 
+#include "common/common/empty_string.h"
 #include "common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
@@ -23,6 +24,8 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return host_name_; }
+
+absl::string_view EnvoyQuicClientSession::connectionFingerprint() const { return EMPTY_STRING; }
 
 void EnvoyQuicClientSession::connect() {
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)->setUpConnectionSocket();

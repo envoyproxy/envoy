@@ -130,6 +130,7 @@ protected:
       void setConnectionStats(const Network::Connection::ConnectionStats&) override {}
       Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
       absl::string_view requestedServerName() const override { return EMPTY_STRING; }
+      absl::string_view connectionFingerprint() const override { return EMPTY_STRING; }
       State state() const override { return Network::Connection::State::Open; }
       bool connecting() const override { return false; }
       void write(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

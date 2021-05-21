@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/quic/envoy_quic_proof_source.h"
 #include "common/quic/envoy_quic_server_stream.h"
 
@@ -28,6 +29,10 @@ EnvoyQuicServerSession::~EnvoyQuicServerSession() {
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
+}
+
+absl::string_view EnvoyQuicServerSession::connectionFingerprint() const {
+  return EMPTY_STRING;
 }
 
 std::unique_ptr<quic::QuicCryptoServerStreamBase>

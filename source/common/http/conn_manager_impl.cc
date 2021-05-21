@@ -665,6 +665,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   filter_manager_.streamInfo().setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
+
+  filter_manager_.streamInfo().setConnectionFingerprint(
+      connection_manager_.read_callbacks_->connection().connectionFingerprint());
 }
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {

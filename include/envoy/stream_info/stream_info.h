@@ -598,6 +598,17 @@ public:
   virtual void setConnectionID(uint64_t id) PURE;
 
   /**
+   * @return Connection fingerprint of the downstream connection, if any.
+   **/
+
+  virtual const std::string& connectionFingerprint() const PURE;
+
+  /**
+   * @param fingerprint Connection fingerprint of the downstream connection.
+   **/
+  virtual void setConnectionFingerprint(absl::string_view fingerprint) PURE;
+
+  /**
    * @param filter_chain_name Network filter chain name of the downstream connection.
    */
   virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;

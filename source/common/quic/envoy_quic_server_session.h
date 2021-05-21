@@ -47,6 +47,7 @@ public:
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
+  absl::string_view connectionFingerprint() const override;
   void dumpState(std::ostream&, int) const override {
     // TODO(kbaichoo): Implement dumpState for H3.
   }
