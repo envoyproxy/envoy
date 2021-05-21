@@ -694,8 +694,7 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   auto* const connection_wrapper = new_connections_.front().get();
   // Skip the thread safety check if the network connection has already been freed since there's no
   // alternate way to get access to the dispatcher.
-  ASSERT(!connection_wrapper->connected() ||
-         connection_wrapper->connection().dispatcher().isThreadSafe());
+  ASSERT(!connection_wrapper->connected() || connection_wrapper->dispatcher().isThreadSafe());
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
   if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
@@ -786,7 +785,7 @@ void FakeRawConnection::initialize() {
     ENVOY_LOG(warn, "FakeRawConnection::initialize: network connection is already disconnected");
     return;
   }
-  ASSERT(shared_connection_.connection().dispatcher().isThreadSafe());
+  ASSERT(shared_connection_.dispatcher().isThreadSafe());
   shared_connection_.connection().addReadFilter(filter);
 }
 

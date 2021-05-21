@@ -265,7 +265,8 @@ class SharedConnectionWrapper : public Network::ConnectionCallbacks,
 public:
   using DisconnectCallback = std::function<void()>;
 
-  SharedConnectionWrapper(Network::Connection& connection) : connection_(connection) {
+  SharedConnectionWrapper(Network::Connection& connection)
+      : connection_(connection), dispatcher_(connection_.dispatcher()) {
     connection_.addConnectionCallbacks(*this);
   }
 
@@ -284,6 +285,8 @@ public:
 
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   bool connected() {
     absl::MutexLock lock(&lock_);
@@ -355,6 +358,7 @@ public:
 
 private:
   Network::Connection& connection_;
+  Event::Dispatcher& dispatcher_;
   absl::Mutex lock_;
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
@@ -401,7 +405,7 @@ public:
 protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : shared_connection_(shared_connection), lock_(shared_connection.lock()),
-        dispatcher_(shared_connection_.connection().dispatcher()), time_system_(time_system) {}
+        dispatcher_(shared_connection_.dispatcher()), time_system_(time_system) {}
 
   SharedConnectionWrapper& shared_connection_;
   absl::Mutex& lock_; // TODO(mattklein123): Use the shared connection lock and figure out better
