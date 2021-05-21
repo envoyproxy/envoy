@@ -9,8 +9,6 @@
 namespace Envoy {
 namespace Upstream {
 
-using ::testing::_;
-using ::testing::Eq;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
