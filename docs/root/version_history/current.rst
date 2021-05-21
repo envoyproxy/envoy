@@ -50,6 +50,7 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* event: removed ``envoy.reloadable_features.activate_timers_next_event_loop`` runtime guard and legacy code path.
 * http: removed ``envoy.reloadable_features.allow_500_after_100`` runtime guard and the legacy code path.
 * http: removed ``envoy.reloadable_features.always_apply_route_header_rules`` runtime guard and legacy code path.
 * http: removed ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` for disabling closing HTTP/1.1 connections on error. Connection-closing can still be disabled by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>`.

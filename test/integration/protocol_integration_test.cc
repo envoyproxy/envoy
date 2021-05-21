@@ -2314,6 +2314,24 @@ TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// Tests a filter that returns a FilterHeadersStatus::Continue after a local reply without
+// processing new metadata generated in decodeHeader
+TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
+  config_helper_.addFilter(R"EOF(
+  name: local-reply-with-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  ASSERT_EQ("200", response->headers().getStatusValue());
+}
+
 // Verify that host's trailing dot is removed and matches the domain for routing request.
 TEST_P(ProtocolIntegrationTest, EnableStripTrailingHostDot) {
   config_helper_.addConfigModifier(
