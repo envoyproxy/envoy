@@ -141,7 +141,7 @@ private:
 
   void populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
-  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getRateLimiter();
+  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
   const FilterConfig* getConfig() const;

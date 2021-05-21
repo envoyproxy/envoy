@@ -90,11 +90,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     populateDescriptors(descriptors, headers);
   }
 
-  const bool is_request_allowed = config->rateLimitPerConnection()
-                                      ? requestAllowed(descriptors)
-                                      : config->requestAllowed(descriptors);
-
-  if (is_request_allowed) {
+  if (requestAllowed(descriptors)) {
     config->stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -120,14 +116,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 bool Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
-  return getRateLimiter().requestAllowed(request_descriptors);
+  const auto* config = getConfig();
+  return config->rateLimitPerConnection()
+             ? getPerConnectionRateLimiter().requestAllowed(request_descriptors)
+             : config->requestAllowed(request_descriptors);
 }
 
-const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getRateLimiter() {
+const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
+  const auto* config = getConfig();
+  ASSERT(config->rateLimitPerConnection());
+
   if (!decoder_callbacks_->streamInfo().filterState()->hasData<PerConnectionRateLimiter>(
           PerConnectionRateLimiter::key())) {
-
-    const auto* config = getConfig();
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(),
         std::make_unique<PerConnectionRateLimiter>(

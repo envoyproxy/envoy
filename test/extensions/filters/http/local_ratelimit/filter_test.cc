@@ -41,6 +41,10 @@ request_headers_to_add_when_not_enforced:
       value: 'true'
 local_rate_limit_per_downstream_connection: {}
   )";
+// '{}' used in the yaml config above are position dependent placeholders used for substitutions.
+// Different test cases toggle functionality based on these positional placeholder variables
+// For instance, fmt::format(config_yaml, "1", "false") substitutes '1' and 'false' for 'max_tokens'
+// and 'local_rate_limit_per_downstream_connection' configurations, respectively.
 
 class FilterTest : public testing::Test {
 public:
@@ -168,6 +172,12 @@ TEST_F(FilterTest, RequestRateLimited) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
+/*
+This test sets 'local_rate_limit_per_downstream_connection' to true. Doing this enables per
+connection rate limiting and even though 'max_token' is set to 1, it allows 2 requests to go through
+- one on each connection. This is in contrast to the 'RequestOk' test above where only 1 request is
+allowed (across the process) for the same configuration.
+*/
 TEST_F(FilterTest, RequestRateLimitedPerConnection) {
   setup(fmt::format(config_yaml, "1", "true"));
 

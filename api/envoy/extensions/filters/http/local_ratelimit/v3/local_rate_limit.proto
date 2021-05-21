@@ -104,5 +104,6 @@ message LocalRateLimit {
   // If set to true, a token bucket is allocated for each connection.
   // Thus the rate limits are applied per connection thereby allowing
   // one to rate limit requests on a per connection basis.
+  // If unspecified, the default value is false.
   bool local_rate_limit_per_downstream_connection = 11;
 }
