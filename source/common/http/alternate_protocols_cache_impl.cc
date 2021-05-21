@@ -9,15 +9,8 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(TimeSource& time_source
 AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
-                                                  const std::vector<AlternateProtocol>& protocols,
-                                                  const MonotonicTime& expiration) {
-  Entry& entry = protocols_[origin];
-  if (entry.protocols_ != protocols) {
-    entry.protocols_ = protocols;
-  }
-  if (entry.expiration_ != expiration) {
-    entry.expiration_ = expiration;
-  }
+                                                  const std::vector<AlternateProtocol>& protocols) {
+  protocols_[origin] = protocols;
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
@@ -28,15 +21,26 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
         nullptr);
   }
 
-  const Entry& entry = entry_it->second;
-  if (time_source_.monotonicTime() > entry.expiration_) {
-    // Expire the entry.
-    // TODO(RyanTheOptimist): expire entries based on a timer.
+  auto& protocols = entry_it->second;
+
+  const MonotonicTime now = time_source_.monotonicTime();
+  auto it = protocols.begin();
+  while (it != protocols.end()) {
+    if (now > it->expiration_) {
+      it = protocols.erase(it);
+      continue;
+    }
+    ++it;
+  }
+
+  if (protocols.empty()) {
     protocols_.erase(entry_it);
     return makeOptRefFromPtr<const std::vector<AlternateProtocolsCache::AlternateProtocol>>(
         nullptr);
   }
-  return makeOptRef(entry.protocols_);
+
+  const auto& p = entry_it->second;
+  return makeOptRef(p);
 }
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
