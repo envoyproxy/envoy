@@ -21,7 +21,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
         nullptr);
   }
 
-  auto& protocols = entry_it->second;
+  std::vector<AlternateProtocol>& protocols = entry_it->second;
 
   const MonotonicTime now = time_source_.monotonicTime();
   auto it = protocols.begin();
@@ -39,8 +39,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
         nullptr);
   }
 
-  const auto& p = entry_it->second;
-  return makeOptRef(p);
+  return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
 }
 
 size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
