@@ -1,19 +1,19 @@
 .. _config_http_filters_bandwidth_limit:
 
-HTTP Bandwidth limit
+Bandwidth limit
 ====================
 
 * Bandwidth limiting :ref:`architecture overview <arch_overview_bandwidth_limit>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit>`
 * This filter should be configured with the name ``envoy.filters.http.bandwidth_limit``.
 
-The HTTP Bandwidth limit filter limits the size of data flow to the max bandwidth set in the limit_kbps
+The HTTP Bandwidth limit filter limits the size of data flow to the max bandwidth set in the ``limit_kbps``
 when the request's route or virtual host has a per filter
 :ref:`bandwidth limit configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit>`.
 
 If the bandwidth limit has been exhausted the filter stops further transfer until more bandwidth gets allocated
 according to the ``fill_interval`` (default is 50 milliseconds). If the connection buffer fills up with accumulated
-data then the source of data will be readDisabled as described in the :ref:`flow control doc<faq_flow_control>`.
+data then the source of data will be readDisabled as described in the :repo:`flow control doc<source/docs/flow_control.md>`.
 
 .. note::
   The token bucket is shared across all workers, thus the limits are applied per Envoy process.
@@ -25,6 +25,9 @@ Example filter configuration for a globally disabled bandwidth limiter but enabl
 
 .. literalinclude:: _include/bandwidth-limit-filter.yaml
     :language: yaml
+	:lines: 11-53
+	:emphasize-lines: 9-29
+	:caption: :download:`bandwidth-limit-filter.yaml <_include/bandwidth-limit-filter.yaml>`
 
 Note that if this filter is configured as globally disabled and there are no virtual host or route level
 token buckets, no bandwidth limiting will be applied.
