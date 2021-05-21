@@ -21,7 +21,7 @@ public:
 private:
   void incCounter(Stats::Scope& scope, const Stats::StatNameVec& names);
 
-  Stats::StatName ConnectionCloseStatName(quic::QuicErrorCode error_code);
+  Stats::StatName connectionCloseStatName(quic::QuicErrorCode error_code);
 
   Stats::StatNamePool stat_name_pool_;
   Stats::SymbolTable& symbol_table_;

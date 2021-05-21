@@ -8,7 +8,7 @@ QuicStats::QuicStats(Stats::SymbolTable& symbol_table)
       downstream_(stat_name_pool_.add("downstream")), upstream_(stat_name_pool_.add("upstream")),
       from_self_(stat_name_pool_.add("self")), from_peer_(stat_name_pool_.add("peer")) {
   // Preallocate most used counters
-  ConnectionCloseStatName(quic::QUIC_NETWORK_IDLE_TIMEOUT);
+  connectionCloseStatName(quic::QUIC_NETWORK_IDLE_TIMEOUT);
 }
 
 void QuicStats::incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) {
@@ -21,13 +21,13 @@ void QuicStats::chargeQuicConnectionCloseStats(Stats::Scope& scope, quic::QuicEr
                                                bool is_upstream) {
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
-  const Stats::StatName connection_close = ConnectionCloseStatName(error_code);
+  const Stats::StatName connection_close = connectionCloseStatName(error_code);
   incCounter(scope, {is_upstream ? upstream_ : downstream_,
                      source == quic::ConnectionCloseSource::FROM_SELF ? from_self_ : from_peer_,
                      connection_close});
 }
 
-Stats::StatName QuicStats::ConnectionCloseStatName(quic::QuicErrorCode error_code) {
+Stats::StatName QuicStats::connectionCloseStatName(quic::QuicErrorCode error_code) {
   ASSERT(error_code < quic::QUIC_LAST_ERROR);
 
   return Stats::StatName(
