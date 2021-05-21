@@ -1,3 +1,5 @@
+#include "server/listener_impl.h"
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -27,7 +29,6 @@
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
-#include "server/listener_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
 
