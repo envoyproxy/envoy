@@ -1,6 +1,11 @@
 FROM golang
 
-RUN apt-get -y update && apt-get install -y -qq --no-install-recommends netcat
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y netcat \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
+
 RUN git clone https://github.com/envoyproxy/go-control-plane
 ADD ./resource.go /go/go-control-plane/internal/example/resource.go
 RUN cd go-control-plane && make bin/example

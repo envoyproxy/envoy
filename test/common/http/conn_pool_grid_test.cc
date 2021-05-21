@@ -610,6 +610,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   auto factory = std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config));
   factory->initialize();
+  ASSERT_FALSE(factory->usesProxyProtocolOptions());
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
   EXPECT_CALL(matcher, resolve(_))
