@@ -599,6 +599,26 @@ TEST(HttpUtility, TestParseCookieMultipleValues) {
   EXPECT_THAT(values, testing::ElementsAre("toto", "bar"));
 }
 
+TEST(HttpUtility, TestParseCookieNoValue) {
+  {
+    TestRequestHeaderMapImpl headers{{"cookie", "foo=bar"}};
+    EXPECT_TRUE(Utility::parseCookieValues(headers, "key0", 0, false /* reversed_order */).empty());
+    EXPECT_TRUE(Utility::parseCookieValues(headers, "key1", 0, false /* reversed_order */).empty());
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    EXPECT_TRUE(
+        Utility::parseCookieValues(headers, "somekey", 0, false /* reversed_order */).empty());
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{"myheader", "somekey=bar"}};
+    EXPECT_TRUE(
+        Utility::parseCookieValues(headers, "somekey", 0, false /* reversed_order */).empty());
+  }
+}
+
 TEST(HttpUtility, TestMakeSetCookieValue) {
   EXPECT_EQ("name=\"value\"; Max-Age=10",
             Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false));
