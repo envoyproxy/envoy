@@ -154,8 +154,7 @@ public:
                     *connection_socket.addressProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
                     *connection_socket.addressProvider().remoteAddress());
-          EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                    connection_socket.detectedTransportProtocol());
+          EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
           EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
         }));
@@ -243,8 +242,7 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoCertConfig) {
                   *connection_socket.addressProvider().localAddress());
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
                   *connection_socket.addressProvider().remoteAddress());
-        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                  connection_socket.detectedTransportProtocol());
+        EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
         EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
         return &filter_chain_;
       }));
