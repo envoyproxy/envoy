@@ -6,8 +6,6 @@
 from collections import defaultdict
 import json
 import functools
-import os
-import pathlib
 import sys
 
 from google.protobuf import json_format
@@ -115,7 +113,10 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
-EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text())
+r = runfiles.Create()
+
+with open(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml")) as f:
+    EXTENSION_DB = yaml.safe_load(f.read())
 
 # create an index of extension categories from extension db
 EXTENSION_CATEGORIES = {}
@@ -241,7 +242,7 @@ def format_extension(extension):
     """
     try:
         extension_metadata = EXTENSION_DB[extension]
-        status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
+        status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
         security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
         categories = extension_metadata["categories"]
     except KeyError as e:
@@ -662,8 +663,6 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        r = runfiles.Create()
-
         with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
             self.v2_mapping = json.load(f)
 
