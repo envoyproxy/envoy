@@ -249,6 +249,14 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   verifyActualFrameSizeToUse();
 }
 
+TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyRawHttp) {
+  ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
+    return makeAltsConnection();
+  };
+  testRouterRequestAndResponseWithBodyRawHttp(&creator);
+  verifyActualFrameSizeToUse();
+}
+
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
 public:
   AltsIntegrationTestEmptyPeer()

@@ -53,6 +53,7 @@ namespace Envoy {
 namespace {
 
 using testing::HasSubstr;
+using testing::StartsWith;
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
@@ -511,6 +512,23 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(expected_response_size, response->body().size());
+}
+
+void HttpIntegrationTest::testRouterRequestAndResponseWithBodyRawHttp(
+    ConnectionCreationFunction* create_connection) {
+  initialize();
+  codec_client_ = makeHttpConnection(
+      create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\n"
+                                "Host: foo.com\r\n"
+                                "Foo: bar\r\n"
+                                "User-Agent: public\r\n"
+                                "User-Agent: 123\r\n"
+                                "Eep: baz\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(

@@ -187,6 +187,7 @@ protected:
   void testRouterVirtualClusters();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
 
+  void testRouterRequestAndResponseWithBodyRawHttp(ConnectionCreationFunction* creator = nullptr);
   void testRouterRequestAndResponseWithBody(
       uint64_t request_size, uint64_t response_size, bool big_header,
       bool set_content_length_header = false, ConnectionCreationFunction* creator = nullptr,
