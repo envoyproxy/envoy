@@ -32,13 +32,13 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
 }
 
 void throwOnError(absl::Status address) {
+  // ASSERT(Thread::MainThread::isMainThread());
   if (!address.ok()) {
     throw EnvoyException(address.ToString());
   }
 }
 
 InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
-  ASSERT(Thread::MainThread::isMainThread());
   if (!address.ok()) {
     throwOnError(address.status());
   }

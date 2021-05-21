@@ -194,6 +194,14 @@ struct MainThread {
    */
   static void clear();
   static bool isMainThread();
+  static bool isNotMainThread() {
+    auto main_thread_singleton = MainThreadSingleton::getExisting();
+    if (main_thread_singleton == nullptr) {
+      return true;
+    }
+    // When threading is on, compare thread id with main thread id.
+    return !main_thread_singleton->inMainThread();
+  }
 
 private:
   std::thread::id main_thread_id_;

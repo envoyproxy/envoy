@@ -9,6 +9,7 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
+#include "envoy/common/exception.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -577,27 +578,38 @@ IoHandlePtr IoSocketHandleImpl::duplicate() {
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
+  ASSERT(Thread::MainThread::isNotMainThread());
   sockaddr_storage ss;
   socklen_t ss_len = sizeof(ss);
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.rc_ != 0) {
+    /*
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
+                                     */
+                                       ASSERT(false);
+    return nullptr;
   }
-  return Address::getAddressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
+  // throw EnvoyException("miao miao miao\n");
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
+  ASSERT(Thread::MainThread::isNotMainThread());
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.rc_ != 0) {
+    /*
     throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
+        fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
+        */
+        ASSERT(false);
+    return nullptr;
   }
 
   if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
@@ -607,11 +619,15 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     ss_len = sizeof ss;
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
     if (result.rc_ != 0) {
+      /*
       throw EnvoyException(
-          fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
+          fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));*/
+          ASSERT(false);
+      return nullptr;
     }
   }
-  return Address::getAddressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
+  // throw EnvoyException("miao miao miao\n");
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
