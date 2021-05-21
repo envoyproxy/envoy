@@ -1,5 +1,3 @@
-#include "server/listener_impl.h"
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -29,6 +27,7 @@
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
+#include "server/listener_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
 
@@ -283,7 +282,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
-          parent.server_.drainManager().createChildManager(parent.server_.dispatcher(), config.drain_type()))),
+          parent.server_.drainManager().createChildManager(parent.server_.dispatcher(),
+                                                           config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
