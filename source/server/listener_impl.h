@@ -97,7 +97,7 @@ public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 envoy::config::listener::v3::Listener_DrainType drain_type);
+                                 DrainManagerSharedPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
@@ -156,10 +156,9 @@ public:
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
                                 const Network::ListenerConfig* listener_config,
-                                ListenerImpl& listener_impl,
-                                envoy::config::listener::v3::Listener_DrainType drain_type)
+                                ListenerImpl& listener_impl, DrainManagerSharedPtr drain_manager)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-            server, validation_visitor, config_message, drain_type)),
+            server, validation_visitor, config_message, drain_manager)),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,

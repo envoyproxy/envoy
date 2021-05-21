@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/drain_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
@@ -183,8 +184,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::config::listener::v3::Listener& config,
-    envoy::config::listener::v3::Listener_DrainType drain_type)
+    const envoy::config::listener::v3::Listener& config, DrainManagerSharedPtr drain_manager)
     : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
       global_scope_(server.stats().createScope("")),
       listener_scope_(server_.stats().createScope(
@@ -192,8 +192,7 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
                       !config.stat_prefix().empty()
                           ? config.stat_prefix()
                           : Network::Address::resolveProtoAddress(config.address())->asString()))),
-      validation_visitor_(validation_visitor),
-      drain_manager_(server.drainManager().createChildManager(server.dispatcher(), drain_type)) {}
+      validation_visitor_(validation_visitor), drain_manager_(drain_manager) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -283,7 +282,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
-          parent.server_, validation_visitor_, config, this, *this, config.drain_type())),
+          parent.server_, validation_visitor_, config, this, *this,
+          parent.server_.drainManager().createChildManager(parent.server_.dispatcher(), config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
@@ -300,7 +300,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           listener_init_target_.ready();
         }
       }) {
-
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {
