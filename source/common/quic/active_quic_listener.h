@@ -84,7 +84,7 @@ class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
                                   Logger::Loggable<Logger::Id::quic> {
 public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
-                            uint32_t concurrency, QuicStats* quic_stats_);
+                            uint32_t concurrency, QuicStats* quic_stats);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
