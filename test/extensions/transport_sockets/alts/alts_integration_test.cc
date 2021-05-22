@@ -179,12 +179,17 @@ public:
     fake_handshaker_server_thread_->join();
   }
 
-  Network::ClientConnectionPtr makeAltsConnection() {
-    Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
+  Network::TransportSocketPtr makeAltsTransportSocket() {
     auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     client_tsi_socket_->setActualFrameSizeToUse(16384);
     client_tsi_socket_->setFrameOverheadSize(4);
+    return client_transport_socket;
+  }
+
+  Network::ClientConnectionPtr makeAltsConnection() {
+    auto client_transport_socket = makeAltsTransportSocket();
+    Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                std::move(client_transport_socket), nullptr);
   }
@@ -250,10 +255,18 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyRawHttp) {
-  ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
-    return makeAltsConnection();
-  };
-  testRouterRequestAndResponseWithBodyRawHttp(&creator);
+  autonomous_upstream_ = true;
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\n"
+                                "Host: foo.com\r\n"
+                                "Foo: bar\r\n"
+                                "User-Agent: public\r\n"
+                                "User-Agent: 123\r\n"
+                                "Eep: baz\r\n\r\n",
+                                &response, true, makeAltsTransportSocket());
+  EXPECT_THAT(response, testing::StartsWith("HTTP/1.1 200 OK\r\n"));
   verifyActualFrameSizeToUse();
 }
 

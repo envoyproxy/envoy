@@ -514,23 +514,6 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
   EXPECT_EQ(expected_response_size, response->body().size());
 }
 
-void HttpIntegrationTest::testRouterRequestAndResponseWithBodyRawHttp(
-    ConnectionCreationFunction* create_connection) {
-  initialize();
-  codec_client_ = makeHttpConnection(
-      create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
-  std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"),
-                                "GET / HTTP/1.1\r\n"
-                                "Host: foo.com\r\n"
-                                "Foo: bar\r\n"
-                                "User-Agent: public\r\n"
-                                "User-Agent: 123\r\n"
-                                "Eep: baz\r\n\r\n",
-                                &response, true);
-  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
-}
-
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header, bool set_content_length_header,
     ConnectionCreationFunction* create_connection, std::chrono::milliseconds timeout) {
