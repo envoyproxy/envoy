@@ -8,14 +8,14 @@ namespace Quic {
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
-    quic::QuicCryptoClientConfig* crypto_config,
+    std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
-                                  crypto_config, push_promise_index),
-      host_name_(server_id.host()) {}
+                                  crypto_config.get(), push_promise_index),
+      host_name_(server_id.host()), crypto_config_(crypto_config) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());

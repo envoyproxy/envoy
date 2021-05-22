@@ -45,9 +45,7 @@ public:
  * Implementation of Network::Connection, Network::FilterManagerConnection and
  * Envoy::ScopeTrackedObject.
  */
-class ConnectionImpl : public ConnectionImplBase,
-                       public TransportSocketCallbacks,
-                       public ScopeTrackedObject {
+class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
