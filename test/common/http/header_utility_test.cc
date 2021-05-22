@@ -495,7 +495,7 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, HeaderPresentMatch) {
+TEST(MatchHeadersTest, HeaderPresentMatchWithTrueValue) {
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl unmatching_headers{{"nonmatch-header", "1234"},
                                               {"other-nonmatch-header", "123.456"}};
@@ -512,7 +512,24 @@ present_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, HeaderPresentInverseMatch) {
+TEST(MatchHeadersTest, HeaderPresentMatchWithFalseValue) {
+  TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
+  TestRequestHeaderMapImpl unmatching_headers{{"nonmatch-header", "1234"},
+                                              {"other-nonmatch-header", "123.456"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+present_match: false
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderPresentInverseMatchWithTrueValue) {
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl matching_headers{{"nonmatch-header", "1234"},
                                             {"other-nonmatch-header", "123.456"}};
@@ -528,6 +545,24 @@ invert_match: true
       std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderPresentInverseMatchWithFalseValue) {
+  TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
+  TestRequestHeaderMapImpl matching_headers{{"nonmatch-header", "1234"},
+                                            {"other-nonmatch-header", "123.456"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+present_match: false
+invert_match: true
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
 TEST(MatchHeadersTest, HeaderPrefixMatch) {
