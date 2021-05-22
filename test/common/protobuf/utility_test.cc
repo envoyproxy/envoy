@@ -1187,10 +1187,8 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
             "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
 }
 
-TEST_F(ProtobufUtilityTest, ValueUtilLoadObjectWithIgnoredEntries) {
-  EXPECT_EQ(ValueUtil::loadFromYaml("[foo, !ignore bar, baz]").ShortDebugString(),
-            "list_value { values { string_value: \"foo\" } values { string_value: \"baz\" } }");
-  EXPECT_EQ(ValueUtil::loadFromYaml("foo: !ignore bar\nbaz: qux").ShortDebugString(),
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
+  EXPECT_EQ(ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux").ShortDebugString(),
             "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }");
 }
 

@@ -65,9 +65,6 @@ void blockFormat(YAML::Node node) {
 
 ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   ProtobufWkt::Value value;
-  if (node.Tag() == "!ignore") {
-    return value;
-  }
   switch (node.Type()) {
   case YAML::NodeType::Null:
     value.set_null_value(ProtobufWkt::NULL_VALUE);
@@ -114,9 +111,8 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   case YAML::NodeType::Map: {
     auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
     for (const auto& it : node) {
-      auto entry = parseYamlNode(it.second);
-      if (entry.kind_case()) {
-        struct_fields[it.first.as<std::string>()] = entry;
+      if (it.first.Tag() != "!ignore")
+        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
       }
     }
     break;

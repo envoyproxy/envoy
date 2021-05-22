@@ -21,6 +21,28 @@ from bazel_tools.tools.python.runfiles import runfiles
 import argparse
 
 
+class IgnoredKey(yaml.YAMLObject):
+    """Python support type for Envoy's config !ignore tag."""
+    yaml_tag = u'!ignore'
+
+    def __init__(self, strval):
+       self.strval = strval
+
+    def __repr__(self):
+       return f'IgnoredKey({str})'
+
+    def __eq__(self, other):
+        return isinstance(other, IgnoredKey) && self.strval == other.strval
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return IgnoredKey(node.value)
+
+    @classmethod
+    def to_yaml(cls, dumper, data):
+        return dumper.represent_scalar(cls.yaml_tag, data.strval)
+
+
 def validate_fragment(type_name, fragment):
     """Validate a dictionary representing a JSON/YAML fragment against an Envoy API proto3 type.
 
@@ -33,7 +55,7 @@ def validate_fragment(type_name, fragment):
         fragment: a dictionary representing the parsed JSON/YAML configuration
           fragment.
     """
-    json_fragment = json.dumps(fragment)
+    json_fragment = json.dumps(fragment, skipKeys=True)
 
     r = runfiles.Create()
     all_protos_pb_text_path = r.Rlocation(
@@ -69,4 +91,6 @@ if __name__ == '__main__':
     message_type = parsed_args.message_type
     content = parsed_args.s if (parsed_args.fragment_path is None) else pathlib.Path(
         parsed_args.fragment_path).read_text()
+    yaml.SafeLoader.add_constructor('!ignore', IgnoredKey.from_yaml)
+    yaml.SafeDumper.add_multi_representer(IgnoredKey, IgnoredKey.to_yaml)
     validate_fragment(message_type, yaml.safe_load(content))
