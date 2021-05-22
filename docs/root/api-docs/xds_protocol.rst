@@ -427,13 +427,18 @@ names becomes empty, that means that the client is no longer interested in any r
 specified type.
 
 For :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resource
-types, there is also a "wildcard" mode, which is triggered when the initial request on the stream
-for that resource type contains no resource names. In this case, the server should use
+types, there is also a "wildcard" mode, which comes in two flavors. First flavor, implicit, is triggered when the initial request on the stream
+for that resource type contains no resource names. Second flavor, explicit, is triggered when a request
+(not necessarily an initial one on the stream) for that resource type contains (among other names) a special name "*".
+For wildcard requests, the server should use
 site-specific business logic to determine the full set of resources that the client is interested
-in, typically based on the client's :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification. Note
-that once a stream has entered wildcard mode for a given resource type, there is no way to change
-the stream out of wildcard mode; resource names specified in any subsequent request on the stream
-will be ignored.
+in, typically based on the client's :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification.
+The client can opt out from the wildcard mode by unsubscribing from the "*" resource name. Note that
+opting back into the wildcard mode can only be done with a request containing the "*" resource name,
+thus switching into the explicit wildcard mode. Also note that if client wants to express
+an interest in a resource name after sending an empty initial request on the stream, the client
+needs to switch to the explicit wildcard mode, otherwise resource names specified in subsequent
+request on the stream will be ignored.
 
 Client Behavior
 """""""""""""""
