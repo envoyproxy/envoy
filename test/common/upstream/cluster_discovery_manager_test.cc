@@ -138,10 +138,9 @@ std::ostream& operator<<(std::ostream& os, const ActionsParameter& param) {
 class ActionExecutor {
 public:
   ActionExecutor()
-      : lifecycle_handler_(), cdm_("test_thread", lifecycle_handler_),
-        previous_(addCallback("foo", "previous")), self_(addCallback("foo", "self")),
-        next_(addCallback("foo", "next")), last_(addCallback("foo", "last")),
-        other_(addCallback("bar", "other")) {}
+      : cdm_("test_thread", lifecycle_handler_), previous_(addCallback("foo", "previous")),
+        self_(addCallback("foo", "self")), next_(addCallback("foo", "next")),
+        last_(addCallback("foo", "last")), other_(addCallback("bar", "other")) {}
 
   void setSelfCallback(std::function<void()> self_callback) {
     self_callback_ = std::move(self_callback);
@@ -216,10 +215,8 @@ public:
   }
 
   void processClusterName(std::string name) {
-    auto cluster = MockThreadLocalCluster();
+    auto cluster = NiceMock<MockThreadLocalCluster>();
     cluster.cluster_.info_->name_ = std::move(name);
-    // Silence warnings about "Uninteresting mock function call".
-    EXPECT_CALL(cluster, info());
     lifecycle_handler_.invokeClusterAdded(cluster);
   }
 
