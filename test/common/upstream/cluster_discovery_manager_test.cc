@@ -333,13 +333,13 @@ std::vector<ActionsParameter> all_actions = {
     ActionsParameter({Action::ProcessFoo, Action::InvokeSelf}, {"previous", "self", "next", "last"},
                      OtherActionsExecution::WithinFirstAction),
     // when processing foo, invoke next; expect next to be called once (with the invoke), while
-    // calling during processing should become a noop
+    // calling it during the process should become a noop
     ActionsParameter({Action::ProcessFoo, Action::InvokeNext}, {"previous", "self", "next", "last"},
                      OtherActionsExecution::WithinFirstAction),
     // when processing foo, invoke last; expect last to be called out of order
     ActionsParameter({Action::ProcessFoo, Action::InvokeLast}, {"previous", "self", "last", "next"},
                      OtherActionsExecution::WithinFirstAction),
-    // when processing foo, process foo; expect the second processing to be a noop
+    // when processing foo, process foo; expect the second process to be a noop
     ActionsParameter({Action::ProcessFoo, Action::ProcessFoo}, {"previous", "self", "next", "last"},
                      OtherActionsExecution::WithinFirstAction),
     // when processing foo, process bar; expect the callbacks to be called normally, but bar
@@ -357,33 +357,35 @@ std::vector<ActionsParameter> all_actions = {
     ActionsParameter({Action::ProcessFoo, Action::DestroyNext}, {"previous", "self", "last"},
                      OtherActionsExecution::WithinFirstAction),
     // when processing foo, add a new callback to foo; expect the new callback to be not invoked
-    // (could be invoked with a follow-up processing)
+    // (could be invoked with a follow-up process)
     ActionsParameter({Action::ProcessFoo, Action::AddNewToFoo},
                      {"previous", "self", "next", "last"},
                      OtherActionsExecution::WithinFirstAction),
 
-    // when invoking self, invoke previous and process foo; expect processing to call only next and
+    // when invoking self, invoke previous and process foo; expect the process to call only next and
     // last
     ActionsParameter({Action::InvokeSelf, Action::InvokePrevious, Action::ProcessFoo},
                      {"self", "previous", "next", "last"},
                      OtherActionsExecution::WithinFirstAction),
-    // when invoking self, invoke next and process foo; expect processing to call only previous and
+    // when invoking self, invoke next and process foo; expect process to call only previous and
     // last
     ActionsParameter({Action::InvokeSelf, Action::InvokeNext, Action::ProcessFoo},
                      {"self", "next", "previous", "last"},
                      OtherActionsExecution::WithinFirstAction),
-    // when invoking self, invoke other invoke last, and process bar; expect processing to be a noop
-    // (invoking last for visibility of the noop)
+    // when invoking self, invoke other invoke last, and process bar; expect the process to be a
+    // noop (invoking last for visibility of the noop)
     ActionsParameter(
         {Action::InvokeSelf, Action::InvokeOther, Action::InvokeLast, Action::ProcessBar},
         {"self", "other", "last"}, OtherActionsExecution::WithinFirstAction),
-    // when invoking self, process foo then invoke previous; expect processing to skip self (as it's
-    // being called at the moment) and invoking previous to be a noop (called during processing)
+    // when invoking self, process foo then invoke previous; expect the process to skip self (as
+    // it's being called at the moment) and invoking previous to be a noop (called during the
+    // process)
     ActionsParameter({Action::InvokeSelf, Action::ProcessFoo, Action::InvokePrevious},
                      {"self", "previous", "next", "last"},
                      OtherActionsExecution::WithinFirstAction),
-    // when invoking self, process foo then invoke previous; expect processing to skip self (as it's
-    // being called at the moment) and invoking previous to be a noop (called during processing)
+    // when invoking self, process foo then invoke previous; expect the process to skip self (as
+    // it's being called at the moment) and invoking previous to be a noop (called during the
+    // process)
     ActionsParameter({Action::InvokeSelf, Action::ProcessFoo, Action::DestroyPrevious},
                      {"self", "previous", "next", "last"},
                      OtherActionsExecution::WithinFirstAction),
@@ -391,7 +393,7 @@ std::vector<ActionsParameter> all_actions = {
     // when processing
     ActionsParameter({Action::InvokeSelf, Action::DestroyPrevious, Action::ProcessFoo},
                      {"self", "next", "last"}, OtherActionsExecution::WithinFirstAction),
-    // when invoking self, destroy other and process bar; expect processing to be a noop
+    // when invoking self, destroy other and process bar; expect the process to be a noop
     ActionsParameter({Action::InvokeSelf, Action::DestroyOther, Action::ProcessBar}, {"self"},
                      OtherActionsExecution::WithinFirstAction),
     // when invoking self, add new callback to foo and process foo; expect self to be skipped, but
@@ -400,8 +402,8 @@ std::vector<ActionsParameter> all_actions = {
                      {"self", "previous", "next", "last", "new0"},
                      OtherActionsExecution::WithinFirstAction),
     // when processing foo, add new callback to foo, process foo then invoke other; expect the
-    // second process to call only the new callback, then first the process to resume with the rest
-    // of the callbacks (the other callback is added to see the split between two processes)
+    // second process to call only the new callback, then first process to resume with the rest of
+    // the callbacks (the other callback is added to see the split between two processes)
     ActionsParameter(
         {Action::ProcessFoo, Action::AddNewToFoo, Action::ProcessFoo, Action::InvokeOther},
         {"previous", "self", "new0", "other", "next", "last"},
