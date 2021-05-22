@@ -718,6 +718,7 @@ message Cluster {
   EdsClusterConfig eds_cluster_config = 3;
 
   // The timeout for new network connections to hosts in the cluster.
+  // If not set, a default value of 5s will be used.
   google.protobuf.Duration connect_timeout = 4 [(validate.rules).duration = {gt {}}];
 
   // Soft limit on size of the cluster’s connections read and write buffers. If

@@ -20,6 +20,7 @@ Minor Behavior Changes
   requests to S3, ES or Glacier, which used the literal string ``UNSIGNED-PAYLOAD``. Buffering can
   be now be disabled in favor of using unsigned payloads with compatible services via the new
   `use_unsigned_payload` filter option (default false).
+* cluster: added default value of 5 seconds for :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>`.
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
   ``envoy.reloadable_features.experimental_matching_api`` to true.
@@ -49,6 +50,7 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* event: removed ``envoy.reloadable_features.activate_timers_next_event_loop`` runtime guard and legacy code path.
 * http: removed ``envoy.reloadable_features.allow_500_after_100`` runtime guard and the legacy code path.
 * http: removed ``envoy.reloadable_features.always_apply_route_header_rules`` runtime guard and legacy code path.
 * http: removed ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` for disabling closing HTTP/1.1 connections on error. Connection-closing can still be disabled by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>`.
@@ -60,12 +62,11 @@ Removed Config or Runtime
 
 New Features
 ------------
+* crash support: restore crash context when continuing to processing requests or responses as a result of an asynchronous callback that invokes a filter directly. This is unlike the call stacks that go through the various network layers, to eventually reach the filter. For  a concrete example see: ``Envoy::Extensions::HttpFilters::Cache::CacheFilter::getHeaders`` which posts a callback on the dispatcher that will invoke the filter directly.
 * http: a new field `is_optional` is added to `extensions.filters.network.http_connection_manager.v3.HttpFilter`. When
   value is `true`, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter
   in the typed per filter config. For more information, please reference
   :ref:`HttpFilter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>`.
-
-* crash support: restore crash context when continuing to processing requests or responses as a result of an asynchronous callback that invokes a filter directly. This is unlike the call stacks that go through the various network layers, to eventually reach the filter. For a concrete example see: ``Envoy::Extensions::HttpFilters::Cache::CacheFilter::getHeaders`` which posts a callback on the dispatcher that will invoke the filter directly.
 * http: added support for :ref:`original IP detection extensions<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`.
   Two initial extensions were added, the :ref:`custom header <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension and the
   :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` extension.
