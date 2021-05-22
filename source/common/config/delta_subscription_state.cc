@@ -204,16 +204,15 @@ DeltaSubscriptionState::getNextRequestAckless() {
       if (!resource_state.waitingForServer()) {
         (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
-      // Fill resource_names_subscribe with everything, including names we have yet to receive any
-      // resource.
-      names_added_.insert(resource_name);
+      // Add resource names to resource_names_subscribe only if this is not a wildcard subscription
+      // request.
+      if (mode_ == WildcardMode::Disabled) {
+        names_added_.insert(resource_name);
+      }
     }
-    // Wildcard subscription initial requests need to switch immediately to explicit mode if some
-    // resource names were explicitly requested.
-    if (mode_ == WildcardMode::Implicit && !names_added_.empty()) {
-      mode_ = WildcardMode::Explicit;
-      names_added_.insert("*");
-    }
+    // We are not clearing the names_added_ set. If we are in implicit wildcard subscription mode,
+    // then the set should be empty. If we are in explicit wildcard mode then the set will contain
+    // the names we requested, but not the resources.
     names_removed_.clear();
   }
   std::copy(names_added_.begin(), names_added_.end(),
