@@ -21,7 +21,7 @@ public:
   AssertionFilterFactory() : FactoryBase("assertion") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::assertion::Assertion& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

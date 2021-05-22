@@ -23,7 +23,7 @@ public:
   TestAccessorFilterFactory() : FactoryBase("test_accessor") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::test_accessor::TestAccessor& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

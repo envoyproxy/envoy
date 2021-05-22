@@ -28,9 +28,9 @@ def upstream_envoy_overrides():
             "@envoy//bazel:protobuf.patch",
             "@envoy_mobile//bazel:protobuf.patch",
         ],
-        sha256 = "6dd0f6b20094910fbb7f1f7908688df01af2d4f6c5c21331b9f636048674aebf",
-        strip_prefix = "protobuf-3.14.0",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-all-3.14.0.tar.gz"],
+        sha256 = "d7371dc2d46fddac1af8cb27c0394554b068768fc79ecaf5be1a1863e8ff3392",
+        strip_prefix = "protobuf-3.16.0",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.16.0/protobuf-all-3.16.0.tar.gz"],
     )
 
     # Workaround old NDK version breakages https://github.com/lyft/envoy-mobile/issues/934
