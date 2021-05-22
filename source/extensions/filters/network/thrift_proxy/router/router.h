@@ -2,8 +2,10 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/router/router.h"
+#include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 
@@ -14,6 +16,58 @@ namespace ThriftProxy {
 namespace Router {
 
 class RateLimitPolicy;
+
+/**
+ * RequestMirrorPolicy is an individual mirroring rule for a route entry.
+ */
+class RequestMirrorPolicy {
+public:
+  virtual ~RequestMirrorPolicy() = default;
+
+  /**
+   * @return const std::string& the upstream cluster that should be used for the mirrored request.
+   */
+  virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return bool whether this policy is currently enabled.
+   */
+  virtual bool enabled(Runtime::Loader& runtime) const PURE;
+};
+
+/**
+ * ShadowRequestHandle is used to write a request or release a connection early if needed.
+ */
+class ShadowRequestHandle {
+public:
+  virtual ~ShadowRequestHandle() = default;
+
+  /**
+   * Submits a serialized request to be shadowed.
+   */
+  virtual void tryWriteRequest(const Buffer::OwnedImpl& buffer) PURE;
+
+  /**
+   * Releases the upstream connection obtained for the shadow request if there's no request in
+   * progress.
+   */
+  virtual void tryReleaseConnection() PURE;
+};
+
+/**
+ * ShadowWriter is used for submitting requests and ignoring the response.
+ */
+class ShadowWriter {
+public:
+  virtual ~ShadowWriter() = default;
+
+  /**
+   * Starts the shadow request by requesting an upstream connection.
+   */
+  virtual absl::optional<std::reference_wrapper<ShadowRequestHandle>>
+  submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
+         TransportType original_transport, ProtocolType original_protocol) PURE;
+};
 
 /**
  * RouteEntry is an individual resolved route entry.
@@ -47,6 +101,13 @@ public:
    * @return const Http::LowerCaseString& the header used to determine the cluster.
    */
   virtual const Http::LowerCaseString& clusterHeader() const PURE;
+
+  /**
+   * @return const std::vector<RequestMirrorPolicy>& the mirror policies associated with this route,
+   * if any.
+   */
+  virtual const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
+  requestMirrorPolicies() const PURE;
 };
 
 /**

@@ -42,6 +42,11 @@ namespace ThriftProxy {
 namespace Router {
 namespace {
 
+class MockShadowWriter : public ShadowWriter {
+public:
+  void submit(const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType) override {}
+};
+
 class TestNamedTransportConfigFactory : public NamedTransportConfigFactory {
 public:
   TestNamedTransportConfigFactory(std::function<MockTransport*()> f) : f_(f) {}
@@ -91,7 +96,8 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
+    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
+                                       context_.runtime(), shadow_writer_);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -354,6 +360,7 @@ public:
   NiceMock<Upstream::MockHostDescription>* host_{};
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
+  MockShadowWriter shadow_writer_;
   RouteConstSharedPtr route_ptr_;
   std::unique_ptr<Router> router_;
 

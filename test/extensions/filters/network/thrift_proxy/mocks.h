@@ -321,6 +321,16 @@ public:
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
 
+class MockRequestMirrorPolicy : public RequestMirrorPolicy {
+public:
+  MockRequestMirrorPolicy();
+  ~MockRequestMirrorPolicy() override;
+
+  MOCK_METHOD(const std::string&, clusterName, (), (const));
+
+  std::string cluster_name_;
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -333,10 +343,13 @@ public:
   MOCK_METHOD(RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(bool, stripServiceName, (), (const));
   MOCK_METHOD(const Http::LowerCaseString&, clusterHeader, (), (const));
+  MOCK_METHOD(const std::vector<std::shared_ptr<RequestMirrorPolicy>>&, requestMirrorPolicies, (),
+              (const));
 
   std::string cluster_name_{"fake_cluster"};
   Http::LowerCaseString cluster_header_{""};
   NiceMock<MockRateLimitPolicy> rate_limit_policy_;
+  std::vector<std::shared_ptr<RequestMirrorPolicy>> policies_;
 };
 
 class MockRoute : public Route {

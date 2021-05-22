@@ -19,6 +19,7 @@
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"
 #include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
+#include "extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
 #include "extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
@@ -28,6 +29,28 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
+
+class RequestMirrorPolicyImpl : public RequestMirrorPolicy {
+public:
+  RequestMirrorPolicyImpl(
+      const envoy::extensions::filters::network::thrift_proxy::v3::RouteAction::RequestMirrorPolicy&
+          mirror_policy)
+      : cluster_name_(mirror_policy.cluster()),
+        runtime_key_(mirror_policy.runtime_fraction().runtime_key()),
+        default_value_(mirror_policy.runtime_fraction().default_value()) {}
+
+  // Router::RequestMirrorPolicy
+  const std::string& clusterName() const override { return cluster_name_; }
+  bool enabled(Runtime::Loader& runtime) const override {
+    return runtime_key_.empty() ? true
+                                : runtime.snapshot().featureEnabled(runtime_key_, default_value_);
+  }
+
+private:
+  const std::string cluster_name_;
+  const std::string runtime_key_;
+  const envoy::type::v3::FractionalPercent default_value_;
+};
 
 class RouteEntryImplBase : public RouteEntry,
                            public Route,
@@ -43,6 +66,9 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   bool stripServiceName() const override { return strip_service_name_; };
   const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
+  const std::vector<std::shared_ptr<RequestMirrorPolicy>>& requestMirrorPolicies() const override {
+    return mirror_policies_;
+  }
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
@@ -76,6 +102,10 @@ private:
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
     const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
+    requestMirrorPolicies() const override {
+      return parent_.requestMirrorPolicies();
+    }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -101,6 +131,10 @@ private:
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
     const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
+    requestMirrorPolicies() const override {
+      return parent_.requestMirrorPolicies();
+    }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -110,6 +144,9 @@ private:
     const std::string cluster_name_;
   };
 
+  static std::vector<std::shared_ptr<RequestMirrorPolicy>> buildMirrorPolicies(
+      const envoy::extensions::filters::network::thrift_proxy::v3::RouteAction& route);
+
   const std::string cluster_name_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
@@ -118,6 +155,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const bool strip_service_name_;
   const Http::LowerCaseString cluster_header_;
+  const std::vector<std::shared_ptr<RequestMirrorPolicy>> mirror_policies_;
 };
 
 using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
@@ -177,7 +215,7 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                Logger::Loggable<Logger::Id::thrift> {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         Stats::Scope& scope)
+         Stats::Scope& scope, Runtime::Loader& runtime, ShadowWriter& shadow_writer)
       : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
         stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
         symbol_table_(scope.symbolTable()),
@@ -192,7 +230,7 @@ public:
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
         upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
-        passthrough_supported_(false) {}
+        passthrough_supported_(false), runtime_(runtime), shadow_writer_(shadow_writer) {}
 
   ~Router() override = default;
 
@@ -315,6 +353,9 @@ private:
   bool passthrough_supported_ : 1;
   uint64_t request_size_{};
   uint64_t response_size_{};
+  Runtime::Loader& runtime_;
+  ShadowWriter& shadow_writer_;
+  std::vector<std::reference_wrapper<ShadowRequestHandle>> shadow_requests_{};
 };
 
 } // namespace Router

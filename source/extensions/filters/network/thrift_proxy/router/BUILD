@@ -31,6 +31,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/router:router_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
     ],
 )
@@ -46,12 +47,35 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "shadow_writer_lib",
+    srcs = ["shadow_writer_impl.cc"],
+    hdrs = ["shadow_writer_impl.h"],
+    deps = [
+        ":router_interface",
+        "//include/envoy/tcp:conn_pool_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:load_balancer_interface",
+        "//include/envoy/upstream:thread_local_cluster_interface",
+        "//source/common/common:linked_object",
+        "//source/common/upstream:load_balancer_lib",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_interface",
+        "//source/extensions/filters/network/thrift_proxy:thrift_object_interface",
+        "//source/extensions/filters/network/thrift_proxy:transport_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "router_lib",
     srcs = ["router_impl.cc"],
     hdrs = ["router_impl.h"],
     deps = [
         ":router_interface",
         ":router_ratelimit_lib",
+        ":shadow_writer_lib",
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:load_balancer_interface",

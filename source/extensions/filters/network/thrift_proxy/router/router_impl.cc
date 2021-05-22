@@ -26,7 +26,8 @@ RouteEntryImplBase::RouteEntryImplBase(
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       rate_limit_policy_(route.route().rate_limits()),
       strip_service_name_(route.route().strip_service_name()),
-      cluster_header_(route.route().cluster_header()) {
+      cluster_header_(route.route().cluster_header()),
+      mirror_policies_(buildMirrorPolicies(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -47,6 +48,17 @@ RouteEntryImplBase::RouteEntryImplBase(
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
     }
   }
+}
+
+std::vector<std::shared_ptr<RequestMirrorPolicy>> RouteEntryImplBase::buildMirrorPolicies(
+    const envoy::extensions::filters::network::thrift_proxy::v3::RouteAction& route) {
+  std::vector<std::shared_ptr<RequestMirrorPolicy>> policies{};
+
+  for (const auto& policy : route.request_mirror_policies()) {
+    policies.push_back(std::make_shared<RequestMirrorPolicyImpl>(policy));
+  }
+
+  return policies;
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
@@ -189,6 +201,11 @@ void Router::onDestroy() {
     upstream_request_->resetStream();
     cleanup();
   }
+
+  // Release the connections allocated for the shadow requests if the request is not in progress.
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().tryReleaseConnection();
+  }
 }
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
@@ -302,6 +319,21 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
   }
 
+  // Prepare connections for shadow requests, if there are mirror policies configured and currently
+  // enabled.
+  const auto& policies = route_entry_->requestMirrorPolicies();
+  if (!policies.empty()) {
+    for (const auto& policy : policies) {
+      if (policy->enabled(runtime_)) {
+        auto shadow_request =
+            shadow_writer_.submit(policy->clusterName(), metadata, transport, protocol);
+        if (shadow_request.has_value()) {
+          shadow_requests_.push_back(shadow_request.value());
+        }
+      }
+    }
+  }
+
   upstream_request_ =
       std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata, transport, protocol);
   return upstream_request_->start();
@@ -320,8 +352,23 @@ FilterStatus Router::messageEnd() {
   request_size_ += transport_buffer.length();
   recordClusterScopeHistogram({upstream_rq_size_}, Stats::Histogram::Unit::Bytes, request_size_);
 
+  Buffer::OwnedImpl shadow_buffer;
+  if (!shadow_requests_.empty()) {
+    shadow_buffer.add(transport_buffer);
+  }
+
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
+
+  // Dispatch shadow requests, if any.
+  //
+  // Note: if connections aren't ready, the shadow request will copy the buffer
+  //       and write when appropriate.
+  for (auto& shadow_request : shadow_requests_) {
+    // TODO: set the right sequence id for shadow requests.
+    shadow_request.get().tryWriteRequest(shadow_buffer);
+  }
+
   return FilterStatus::Continue;
 }
 
