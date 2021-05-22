@@ -59,13 +59,36 @@ private:
   void handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
 
+  // This enumeration describes the resource type, which is only relevant for wildcard
+  // subscriptions. Depending on its type, the resource will or will not be resent on the initial
+  // wildcard subscription.
+  enum class ResourceType {
+    // Explicitly requested resource type means that we have asked about the resource by updating
+    // the subscription interest. Such resources are resent on the initial wildcard request.
+    ExplicitlyRequested,
+    // Received from server resources are resources that the state knows about only from the server
+    // response. Such resources are not resent on the initial wildcard request.
+    ReceivedFromServer,
+  };
+
+  // Determines the effective resource type. Explicitly requested type overrides the received from
+  // server type.
+  ResourceType effectiveResourceType(ResourceType old_type, ResourceType new_type) {
+    return (old_type == ResourceType::ReceivedFromServer) ? new_type : old_type;
+  }
+
   class ResourceState {
   public:
-    ResourceState(const envoy::service::discovery::v3::Resource& resource)
-        : version_(resource.version()) {}
+    ResourceState(absl::optional<std::string> version, ResourceType type)
+        : version_(std::move(version)), type_(type) {}
+
+    ResourceState(const envoy::service::discovery::v3::Resource& resource, ResourceType type)
+        : ResourceState(resource.version(), type) {}
 
     // Builds a ResourceState in the waitingForServer state.
-    ResourceState() = default;
+    ResourceState(ResourceType type) : ResourceState(absl::nullopt, type) {}
+
+    ResourceType type() const { return type_; }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
@@ -79,6 +102,7 @@ private:
 
   private:
     absl::optional<std::string> version_;
+    ResourceType type_;
   };
 
   // Describes the wildcard mode the subscription is in.
@@ -93,12 +117,10 @@ private:
     Disabled,
   };
 
-  // Use these helpers to ensure resource_state_ and resource_names_ get updated together.
-  void addResourceState(const envoy::service::discovery::v3::Resource& resource);
-  void setResourceWaitingForServer(const std::string& resource_name);
+  void addResourceState(const envoy::service::discovery::v3::Resource& resource, ResourceType type);
+  bool setResourceWaitingForServer(const std::string& resource_name);
+  void addResourceWaitingForServer(const std::string& resource_name, ResourceType type);
   void removeResourceState(const std::string& resource_name);
-
-  void populateDiscoveryRequest(envoy::service::discovery::v3::DeltaDiscoveryResponse& request);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have
@@ -111,9 +133,6 @@ private:
   // disable heartbeats for these resources (currently only VHDS).
   const bool supports_heartbeats_;
   TtlManager ttl_;
-  // The keys of resource_versions_. Only tracked separately because std::map does not provide an
-  // iterator into just its keys.
-  absl::flat_hash_set<std::string> resource_names_;
 
   const std::string type_url_;
   WildcardMode mode_;
