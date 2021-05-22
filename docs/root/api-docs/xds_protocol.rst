@@ -540,6 +540,8 @@ being requested by the client, and if one of those resources springs into existe
 server must send an update to the client informing it of the new resource. Clients that initially
 see a resource that does not exist must be prepared for the resource to be created at any time.
 
+.. _xds_protocol_unsubscribing_from_resources:
+
 Unsubscribing From Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -558,7 +560,10 @@ Note that for :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and
 resource types where the stream is in "wildcard" mode (see :ref:`How the client specifies what
 resources to return <xds_protocol_resource_hints>` for details), the set of resources being
 subscribed to is determined by the server instead of the client, so there is no mechanism
-for the client to unsubscribe from resources.
+for the client to unsubscribe from resources. The only resources that the client could unsubscribe
+from are the resources that the client explicitly expressed the interest in before. Note that
+the server may still send the resource to the client if the resource was also a part of the set
+of resources determined by the server from the wildcard subscription.
 
 Requesting Multiple Resources on a Single Stream
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
