@@ -22,7 +22,7 @@ public:
   PlatformBridgeFilterFactory() : FactoryBase("platform_bridge") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

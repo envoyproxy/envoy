@@ -19,7 +19,7 @@ public:
   LocalErrorFilterFactory() : FactoryBase("local_error") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::local_error::LocalError& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

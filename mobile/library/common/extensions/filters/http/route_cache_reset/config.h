@@ -20,7 +20,7 @@ public:
   RouteCacheResetFilterFactory() : FactoryBase("route_cache_reset") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
