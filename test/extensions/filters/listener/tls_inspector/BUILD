@@ -36,6 +36,7 @@ envoy_proto_library(
     srcs = ["tls_inspector_fuzz_test.proto"],
     deps = [
         "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_proto",
+        "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg",
     ],
 )
 

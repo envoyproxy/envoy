@@ -40,6 +40,10 @@ public:
 
   absl::string_view requestedServerName() const override;
 
+  void setConnectionFingerprint(absl::string_view fingerprint) override;
+
+  absl::string_view connectionFingerprint() const override;
+
   Api::SysCallIntResult getSocketOption(int level, int, void* optval, socklen_t*) const override;
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
@@ -49,6 +53,7 @@ private:
   std::vector<std::string> application_protocols_;
   std::string transport_protocol_;
   std::string server_name_;
+  std::string connection_fingerprint_;
 };
 
 // TODO: Move over to Fake (name is confusing)

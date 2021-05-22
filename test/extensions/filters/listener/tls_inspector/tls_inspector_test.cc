@@ -31,7 +31,7 @@ namespace {
 class TlsInspectorTest : public testing::TestWithParam<std::tuple<uint16_t, uint16_t>> {
 public:
   TlsInspectorTest()
-      : cfg_(std::make_shared<Config>(store_)),
+      : cfg_(std::make_shared<Config>(store_, envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
         io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
   ~TlsInspectorTest() override { io_handle_->close(); }
 
@@ -79,7 +79,8 @@ INSTANTIATE_TEST_SUITE_P(TlsProtocolVersions, TlsInspectorTest,
 
 // Test that an exception is thrown for an invalid value for max_client_hello_size
 TEST_P(TlsInspectorTest, MaxClientHelloSize) {
-  EXPECT_THROW_WITH_MESSAGE(Config(store_, Config::TLS_MAX_CLIENT_HELLO + 1), EnvoyException,
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  EXPECT_THROW_WITH_MESSAGE(Config(store_, proto_config, Config::TLS_MAX_CLIENT_HELLO + 1), EnvoyException,
                             "max_client_hello_size of 65537 is greater than maximum of 65536.");
 }
 
@@ -213,8 +214,9 @@ TEST_P(TlsInspectorTest, NoExtensions) {
 // Test that the filter fails if the ClientHello is larger than the
 // maximum allowed size.
 TEST_P(TlsInspectorTest, ClientHelloTooBig) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   const size_t max_size = 50;
-  cfg_ = std::make_shared<Config>(store_, static_cast<uint32_t>(max_size));
+  cfg_ = std::make_shared<Config>(store_, proto_config, static_cast<uint32_t>(max_size));
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "");
   ASSERT(client_hello.size() > max_size);
@@ -229,6 +231,29 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
+}
+
+// Test that the filter correctly sets the connection fingerprint
+TEST_P(TlsInspectorTest, ConnectionFingerprint) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.set_enable_connection_fingerprinting(true);
+  cfg_ = std::make_shared<Config>(store_, proto_config);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), "", "");
+  init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke(
+          [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }));
+  EXPECT_CALL(socket_, setConnectionFingerprint(_));
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  file_event_callback_(Event::FileReadyType::Read);
 }
 
 // Test that the filter fails on non-SSL data

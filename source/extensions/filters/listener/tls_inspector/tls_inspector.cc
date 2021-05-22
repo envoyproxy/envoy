@@ -272,7 +272,7 @@ bool isNotGrease(uint16_t id) {
   return true;
 }
 
-bool writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+void writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
   CBS cipher_suites;
   CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
 
@@ -280,7 +280,7 @@ bool writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstr
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t id;
     if (!CBS_get_u16(&cipher_suites, &id)) {
-      return false;
+      return;
     }
     if (!first) {
       out << "-";
@@ -288,19 +288,19 @@ bool writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstr
     out << id;
     first = false;
   }
-
-  return true;
 }
 
-bool writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+void writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
   CBS extensions;
   CBS_init(&extensions, ssl_client_hello->extensions, ssl_client_hello->extensions_len);
 
   bool first = true;
   while (CBS_len(&extensions) > 0) {
     uint16_t id;
-    if (!CBS_get_u16(&extensions, &id)) {
-      return false;
+    CBS extension;
+
+    if (!CBS_get_u16(&extensions, &id) || !CBS_get_u16_length_prefixed(&extensions, &extension)) {
+      return;
     }
     if (isNotGrease(id)) {
       if (!first) {
@@ -310,62 +310,52 @@ bool writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstrea
       first = false;
     }
   }
-
-  return true;
 }
 
-bool writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+void writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
   const uint8_t* ec_data;
   size_t ec_len;
-  if (!SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
                                             &ec_data, &ec_len)) {
-    return false;
-  }
+    CBS ec;
+    CBS_init(&ec, ec_data, ec_len);
 
-  CBS ec;
-  CBS_init(&ec, ec_data, ec_len);
-
-  bool first = true;
-  while (CBS_len(&ec) > 0) {
-    uint16_t id;
-    if (!CBS_get_u16(&ec, &id)) {
-      return false;
+    bool first = true;
+    while (CBS_len(&ec) > 0) {
+      uint16_t id;
+      if (!CBS_get_u16(&ec, &id)) {
+        return;
+      }
+      if (!first) {
+        out << "-";
+      }
+      out << id;
+      first = false;
     }
-    if (!first) {
-      out << "-";
-    }
-    out << id;
-    first = false;
   }
-
-  return true;
 }
 
-bool writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
+void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello, std::ostringstream& out) {
   const uint8_t* ecpf_data;
   size_t ecpf_len;
-  if (!SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_ec_point_formats,
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_ec_point_formats,
                                             &ecpf_data, &ecpf_len)) {
-    return false;
-  }
+    CBS ecpf;
+    CBS_init(&ecpf, ecpf_data, ecpf_len);
 
-  CBS ecpf;
-  CBS_init(&ecpf, ecpf_data, ecpf_len);
-
-  bool first = true;
-  while (CBS_len(&ecpf) > 0) {
-    uint16_t id;
-    if (!CBS_get_u16(&ecpf, &id)) {
-      return false;
+    bool first = true;
+    while (CBS_len(&ecpf) > 0) {
+      uint8_t id;
+      if (!CBS_get_u8(&ecpf, &id)) {
+        return;
+      }
+      if (!first) {
+        out << "-";
+      }
+      out << static_cast<int>(id);
+      first = false;
     }
-    if (!first) {
-      out << "-";
-    }
-    out << id;
-    first = false;
   }
-
-  return true;
 }
 
 void Filter::connectionFingerprint(const SSL_CLIENT_HELLO* ssl_client_hello) {
@@ -373,25 +363,13 @@ void Filter::connectionFingerprint(const SSL_CLIENT_HELLO* ssl_client_hello) {
     std::ostringstream out;
     const uint16_t client_version = ssl_client_hello->version;
     out << client_version << ",";
-    if (!writeCipherSuites(ssl_client_hello, out)) {
-      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write cipher suites");
-      return;
-    }
+    writeCipherSuites(ssl_client_hello, out);
     out << ",";
-    if (!writeExtensions(ssl_client_hello, out)) {
-      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write extensions");
-      return;
-    }
+    writeExtensions(ssl_client_hello, out);
     out << ",";
-    if (!writeEllipticCurves(ssl_client_hello, out)) {
-      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write elliptic curves");
-      return;
-    }
+    writeEllipticCurves(ssl_client_hello, out);
     out << ",";
-    if (!writeEllipticCurvePointFormats(ssl_client_hello, out)) {
-      ENVOY_LOG(debug, "tls:connectionFingerprint(), failed to write elliptic curve point formats");
-      return;
-    }
+    writeEllipticCurvePointFormats(ssl_client_hello, out);
 
     std::string fingerprint = out.str();
     ENVOY_LOG(trace, "tls:connectionFingerprint(), fingerprint: {}", fingerprint);

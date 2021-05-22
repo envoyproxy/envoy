@@ -185,6 +185,12 @@ public:
 
   const std::string& requestedServerName() const override { return requested_server_name_; }
 
+  void setConnectionFingerprint(const absl::string_view fingerprint) override {
+    connection_fingerprint_ = std::string(fingerprint);
+  }
+
+  const std::string& connectionFingerprint() const override { return connection_fingerprint_; }
+
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);
   }
@@ -264,6 +270,7 @@ public:
   Envoy::StreamInfo::FilterStateSharedPtr upstream_filter_state_;
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
+  std::string connection_fingerprint_;
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;

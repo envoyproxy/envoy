@@ -116,6 +116,11 @@ MockStreamInfo::MockStreamInfo()
         requested_server_name_ = std::string(requested_server_name);
       }));
   ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+  ON_CALL(*this, setConnectionFingerprint(_))
+      .WillByDefault(Invoke([this](const absl::string_view fingerprint) {
+        connection_fingerprint_ = std::string(fingerprint);
+      }));
+  ON_CALL(*this, connectionFingerprint()).WillByDefault(ReturnRef(connection_fingerprint_));
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));

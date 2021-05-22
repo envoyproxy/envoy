@@ -46,6 +46,12 @@ void FakeConnectionSocket::setRequestedServerName(absl::string_view server_name)
 
 absl::string_view FakeConnectionSocket::requestedServerName() const { return server_name_; }
 
+void FakeConnectionSocket::setConnectionFingerprint(absl::string_view fingerprint) {
+  connection_fingerprint_ = std::string(fingerprint);
+}
+
+absl::string_view FakeConnectionSocket::connectionFingerprint() const { return connection_fingerprint_; }
+
 Api::SysCallIntResult FakeConnectionSocket::getSocketOption([[maybe_unused]] int level, int,
                                                             [[maybe_unused]] void* optval,
                                                             socklen_t*) const {

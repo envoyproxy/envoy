@@ -294,6 +294,8 @@ public:
   MOCK_METHOD(const std::vector<std::string>&, requestedApplicationProtocols, (), (const));
   MOCK_METHOD(void, setRequestedServerName, (absl::string_view));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
+  MOCK_METHOD(void, setConnectionFingerprint, (absl::string_view));
+  MOCK_METHOD(absl::string_view, connectionFingerprint, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr&));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr&));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, options, (), (const));
