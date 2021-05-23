@@ -168,6 +168,12 @@ def format_comment_with_annotations(comment, type_name=''):
     Returns:
         A string with additional RST from annotations.
     """
+    alpha_warning = ''
+    if annotations.ALPHA_ANNOTATION in comment.annotations:
+        experimental_warning = (
+            '.. warning::\n   This API is alpha and is not covered by the :ref:`threat model <arch_overview_threat_model>`.\n\n'
+        )
+
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
         extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
@@ -177,7 +183,7 @@ def format_comment_with_annotations(comment, type_name=''):
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
     comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return comment + formatted_extension + formatted_extension_category
+    return alpha_warning + comment + formatted_extension + formatted_extension_category
 
 
 def map_lines(f, s):
@@ -672,7 +678,7 @@ class RstFormatVisitor(visitor.Visitor):
         normal_enum_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
         header = format_header('-', 'Enum %s' % normal_enum_type)
-        proto_link = github_url("f[{normal_enum_type} proto]", type_context) + '\n\n'
+        proto_link = github_url(f"[{normal_enum_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
         if hide_not_implemented(leading_comment):
