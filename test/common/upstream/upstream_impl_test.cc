@@ -2612,6 +2612,20 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
+TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  EXPECT_FALSE(cluster_config.has_connect_timeout());
+  EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
+}
+
 TEST_F(ClusterInfoImplTest, Timeouts) {
   const std::string yaml = R"EOF(
     name: name

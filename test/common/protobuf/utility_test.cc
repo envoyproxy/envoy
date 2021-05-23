@@ -41,9 +41,7 @@ using namespace std::chrono_literals;
 
 namespace Envoy {
 
-using testing::AllOf;
 using testing::HasSubstr;
-using testing::Property;
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:

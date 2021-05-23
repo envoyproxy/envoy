@@ -82,7 +82,37 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   return output;
 }
 
+// When single_host_per_subset is set to be true, only expect 1 subset selector and 1 key inside the
+// selector. Reject the misconfiguration as the use of single_host_per_subset is well documented.
+// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto#config-cluster-v3-cluster-lbsubsetconfig-lbsubsetselector
+bool validateLbSubsetConfig(const envoy::config::bootstrap::v3::Bootstrap& input) {
+  for (auto& cluster : input.static_resources().clusters()) {
+    bool use_single_host_per_subset = false;
+    int subset_selectors = 0;
+    for (auto& subset_selector : cluster.lb_subset_config().subset_selectors()) {
+      subset_selectors++;
+      if (subset_selector.single_host_per_subset()) {
+        use_single_host_per_subset = true;
+        // Only expect 1 key inside subset selector when use_single_host_per_subset is set to true.
+        if (subset_selector.keys().size() != 1) {
+          return false;
+        }
+      }
+      // Only expect 1 subset selector when use_single_host_per_subset is set to true.
+      if (use_single_host_per_subset && subset_selectors != 1) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
+
+  if (!validateLbSubsetConfig(input)) {
+    return;
+  }
+
   testing::NiceMock<MockOptions> options;
   DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;

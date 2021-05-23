@@ -3,7 +3,6 @@
 #include "envoy/extensions/http/original_ip_detection/custom_header/v3/custom_header.pb.h"
 #include "envoy/extensions/http/original_ip_detection/custom_header/v3/custom_header.pb.validate.h"
 #include "envoy/http/original_ip_detection.h"
-#include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 
