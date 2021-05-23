@@ -60,7 +60,7 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
 Install Envoy on CentOS Linux
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can `install Envoy on CentOS <https://www.getenvoy.io/install/envoy/centos/>`_
+You can `install Envoy on CentOS <https://www.getenvoy.io/install/envoy/rpm/>`_
 using `Get Envoy <https://www.getenvoy.io/>`__.
 
 .. code-block:: console
@@ -82,7 +82,7 @@ Install Envoy on Redhat Enterprise Linux (RHEL)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can
-`install Envoy on Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rhel/>`_
+`install Envoy on Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rpm/>`_
 using `Get Envoy <https://www.getenvoy.io/>`__.
 
 .. code-block:: console
