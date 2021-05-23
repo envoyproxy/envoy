@@ -12,8 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::ElementsAre;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -25,7 +23,7 @@ namespace SetMetadataFilter {
 class SetMetadataIntegrationTest : public testing::Test {
 
 public:
-  SetMetadataIntegrationTest() {}
+  SetMetadataIntegrationTest() = default;
 
   void runFilter(envoy::config::core::v3::Metadata& metadata, const std::string& yaml_config) {
     envoy::extensions::filters::http::set_metadata::v3::Config ext_config;
