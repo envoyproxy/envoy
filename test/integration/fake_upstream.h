@@ -415,7 +415,6 @@ class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeCo
 public:
   // This is a legacy alias.
   using Type = Envoy::Http::CodecType;
-  // using Type = Envoy::Http::CodecType;
   static absl::string_view typeToString(Http::CodecType type) {
     switch (type) {
     case Http::CodecType::HTTP1:
