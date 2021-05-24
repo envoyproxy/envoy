@@ -1,5 +1,3 @@
-#include "extensions/filters/http/kill_request/kill_request_filter.h"
-
 #include <csignal>
 #include <string>
 
@@ -8,6 +6,7 @@
 
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/http/kill_request/kill_request_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -61,8 +60,7 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
 
     if (per_route_kill_settings) {
       is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::REQUEST;
-      envoy::type::v3::FractionalPercent probability = per_route_kill_settings->getProbability();
-      kill_request_.set_allocated_probability(&probability);
+      kill_request_.mutable_probability()->CopyFrom(per_route_kill_settings->getProbability());
     }
   }
 
