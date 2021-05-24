@@ -7,7 +7,7 @@ from google.protobuf.json_format import ParseError
 
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
-from tools.config_validation.validate_fragment import validate_fragment
+from tools.config_validation.validate_fragment import validate_yaml
 
 
 def main():
