@@ -18,7 +18,6 @@
 namespace Envoy {
 namespace Http {
 namespace Http3 {
-class Http3ConnPoolImplTest;
 
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
