@@ -55,7 +55,7 @@ def validate_fragment(type_name, fragment):
         fragment: a dictionary representing the parsed JSON/YAML configuration
           fragment.
     """
-    json_fragment = json.dumps(fragment, skipKeys=True)
+    json_fragment = json.dumps(fragment, skipkeys=True)
 
     r = runfiles.Create()
     all_protos_pb_text_path = r.Rlocation(
