@@ -102,6 +102,7 @@ void ConnectionHandlerImpl::removeFilterChains(
     std::function<void()> completion) {
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
+      FANCY_LOG(debug, "removing listener tag {}", listener_tag);
       listener.second.tcpListener()->get().deferredRemoveFilterChains(filter_chains);
       break;
     }

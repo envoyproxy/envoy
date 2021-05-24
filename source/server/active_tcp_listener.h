@@ -136,13 +136,10 @@ public:
    */
   void updateListenerConfig(Network::ListenerConfig& config);
 
-  absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
-
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for
   // connection balancing across per-handler listeners.
   std::atomic<uint64_t> num_listener_connections_{};
-  bool is_deleting_{false};
 };
 
 using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;

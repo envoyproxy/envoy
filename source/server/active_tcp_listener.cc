@@ -258,6 +258,7 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
 
 ActiveConnections&
 ActiveTcpListener::getOrCreateActiveConnections(const Network::FilterChain& filter_chain) {
+  FANCY_LOG(debug, "calling {} with filter chain {}", __FUNCTION__, static_cast<const void*>(&filter_chain));
   ActiveConnectionsPtr& connections = connections_by_context_[&filter_chain];
   if (connections == nullptr) {
     connections = std::make_unique<ActiveConnections>(*this, filter_chain);
