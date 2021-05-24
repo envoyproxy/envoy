@@ -46,7 +46,7 @@ public:
   // Listener filter chain pair is the owner of the connections.
   ActiveInternalListener& listener_;
   const Network::FilterChain& filter_chain_;
-  // Owned connections
+  // Owned connections.
   std::list<ActiveInternalConnectionPtr> connections_;
 };
 
@@ -89,9 +89,12 @@ public:
     void disable() override {
       // TODO(lambdai): think about how to elegantly disable internal listener. (Queue socket or
       // close socket immediately?)
+      ENVOY_LOG(debug, "Warning: the internal listener cannot be disabled.");
     }
 
-    void enable() override {}
+    void enable() override {
+      ENVOY_LOG(debug, "Warning: the internal listener is always enabled.");
+    }
 
     void setRejectFraction(UnitFloat) override {}
   };

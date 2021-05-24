@@ -34,7 +34,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
-          listener.second.tcpListener()->get().updateListenerConfig(config);
+          listener.second.internalListener()->get().updateListenerConfig(config);
           return;
         }
       }

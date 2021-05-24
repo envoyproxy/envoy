@@ -65,6 +65,16 @@ public:
     internal_listener_ = std::make_shared<ActiveInternalListener>(
         conn_handler_, dispatcher_, std::move(mock_listener_will_be_moved), listener_config_);
   }
+  Network::Listener* addListenerWithRealNetworkListener() {
+    EXPECT_CALL(listener_config_, listenerFiltersTimeout());
+    EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
+    EXPECT_CALL(listener_config_, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
+    EXPECT_CALL(listener_config_, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
+
+    internal_listener_ =
+        std::make_shared<ActiveInternalListener>(conn_handler_, dispatcher_, listener_config_);
+    return internal_listener_->listener();
+  }
   void expectFilterChainFactory() {
     EXPECT_CALL(listener_config_, filterChainFactory())
         .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -76,12 +86,9 @@ public:
   Network::MockListener* generic_listener_;
   Network::MockListenerConfig listener_config_;
   NiceMock<Network::MockFilterChainManager> manager_;
-
   NiceMock<Network::MockFilterChainFactory> filter_chain_factory_;
   std::shared_ptr<Network::MockFilterChain> filter_chain_;
-
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
-
   std::shared_ptr<ActiveInternalListener> internal_listener_;
 };
 
@@ -89,6 +96,7 @@ TEST_F(ActiveInternalListenerTest, BasicInternalListener) {
   addListener();
   EXPECT_CALL(*generic_listener_, onDestroy());
 }
+
 TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
   addListener();
   expectFilterChainFactory();
@@ -166,6 +174,19 @@ TEST_F(ActiveInternalListenerTest, StopListener) {
   addListener();
   EXPECT_CALL(*generic_listener_, onDestroy());
   internal_listener_->shutdownListener();
+}
+
+TEST_F(ActiveInternalListenerTest, PausedListenerAcceptNewSocket) {
+  addListenerWithRealNetworkListener();
+  internal_listener_->pauseListening();
+
+  expectFilterChainFactory();
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 }
 } // namespace
 } // namespace Server
