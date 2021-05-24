@@ -126,7 +126,7 @@ struct ClusterConnectivityState {
  * Cluster manager is initialized in two phases. In the first phase which begins at the construction
  * all primary clusters (i.e. with endpoint assignments provisioned statically in bootstrap,
  * discovered through DNS or file based CDS) are initialized. This phase may complete synchronously
- * with cluster manager construction iff all clusters are STATIC and without health checks
+ * with cluster manager construction if all clusters are STATIC and without health checks
  * configured. At the completion of the first phase cluster manager invokes callback set through the
  * `setPrimaryClustersInitializedCb` method.
  * After the first phase has completed the server instance initializes services (i.e. RTDS) needed
