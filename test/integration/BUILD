@@ -857,7 +857,6 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tap:config",
         "//source/server:connection_handler_lib",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -893,7 +892,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
@@ -1054,6 +1052,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
+    shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
@@ -1720,7 +1719,6 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
-        "//source/extensions/resource_monitors/injected_resource:config",
         "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/common/quic:test_utils_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
