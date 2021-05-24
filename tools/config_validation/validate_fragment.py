@@ -43,6 +43,12 @@ class IgnoredKey(yaml.YAMLObject):
         return dumper.represent_scalar(cls.yaml_tag, data.strval)
 
 
+def validate_yaml(type_name, content):
+    yaml.SafeLoader.add_constructor('!ignore', IgnoredKey.from_yaml)
+    yaml.SafeDumper.add_multi_representer(IgnoredKey, IgnoredKey.to_yaml)
+    validate_fragment(type_name, yaml.safe_load(content))
+
+
 def validate_fragment(type_name, fragment):
     """Validate a dictionary representing a JSON/YAML fragment against an Envoy API proto3 type.
 
@@ -91,6 +97,4 @@ if __name__ == '__main__':
     message_type = parsed_args.message_type
     content = parsed_args.s if (parsed_args.fragment_path is None) else pathlib.Path(
         parsed_args.fragment_path).read_text()
-    yaml.SafeLoader.add_constructor('!ignore', IgnoredKey.from_yaml)
-    yaml.SafeDumper.add_multi_representer(IgnoredKey, IgnoredKey.to_yaml)
-    validate_fragment(message_type, yaml.safe_load(content))
+    validate_yaml(message_type, content)
