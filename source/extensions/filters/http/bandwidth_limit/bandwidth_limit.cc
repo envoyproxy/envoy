@@ -48,7 +48,7 @@ BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
 Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   const auto* config = getConfig();
 
-  if (config->enabled() && (config->enableMode() & BandwidthLimit::Decode)) {
+  if (config->enabled() && (config->enableMode() & BandwidthLimit::DECODE)) {
     config->stats().decode_enabled_.inc();
     decode_limiter_ = std::make_unique<StreamRateLimiter>(
         config->limit(), decoder_callbacks_->decoderBufferLimit(),
@@ -106,7 +106,7 @@ Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailer
 Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
   auto* config = getConfig();
 
-  if (config->enabled() && (config->enableMode() & BandwidthLimit::Encode)) {
+  if (config->enabled() && (config->enableMode() & BandwidthLimit::ENCODE)) {
     config->stats().encode_enabled_.inc();
 
     encode_limiter_ = std::make_unique<StreamRateLimiter>(

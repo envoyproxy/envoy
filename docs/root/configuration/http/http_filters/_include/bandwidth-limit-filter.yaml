@@ -23,7 +23,7 @@ static_resources:
                   envoy.filters.http.bandwidth_limit:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
                     stat_prefix: bandwidth_limiter_custom_route
-                    enable_mode: DecodeAndEncode
+                    enable_mode: DECODE_AND_ENCODE
                     limit_kbps: 500
                     fill_interval: 0.1s
               - match: { prefix: "/" }

@@ -26,16 +26,16 @@ message BandwidthLimit {
   // Values represent bitmask.
   enum EnableMode {
     // Filter is disabled.
-    Disabled = 0;
+    DISABLED = 0;
 
     // Filter enabled only for incoming traffic.
-    Decode = 1;
+    DECODE = 1;
 
     // Filter enabled only for outgoing traffic.
-    Encode = 2;
+    ENCODE = 2;
 
     // Filter enabled for both incoming and outgoing traffic.
-    DecodeAndEncode = 3;
+    DECODE_AND_ENCODE = 3;
   }
 
   // The human readable prefix to use when emitting stats.

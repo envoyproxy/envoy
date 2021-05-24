@@ -65,7 +65,7 @@ TEST_F(FilterTest, Disabled) {
   runtime_enabled:
     default_value: false
     runtime_key: foo_key
-  enable_mode: Disabled
+  enable_mode: DISABLED
   limit_kbps: 10
   fill_interval: 1s
   )";
@@ -88,7 +88,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   runtime_enabled:
     default_value: true
     runtime_key: foo_key
-  enable_mode: Decode
+  enable_mode: DECODE
   limit_kbps: 1
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -187,7 +187,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   runtime_enabled:
     default_value: true
     runtime_key: foo_key
-  enable_mode: Encode
+  enable_mode: ENCODE
   limit_kbps: 1
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -288,7 +288,7 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   runtime_enabled:
     default_value: true
     runtime_key: foo_key
-  enable_mode: DecodeAndEncode
+  enable_mode: DECODE_AND_ENCODE
   limit_kbps: 1
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -416,7 +416,7 @@ TEST_F(FilterTest, WithTrailers) {
   runtime_enabled:
     default_value: true
     runtime_key: foo_key
-  enable_mode: DecodeAndEncode
+  enable_mode: DECODE_AND_ENCODE
   limit_kbps: 1
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -487,7 +487,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   runtime_enabled:
     default_value: true
     runtime_key: foo_key
-  enable_mode: DecodeAndEncode
+  enable_mode: DECODE_AND_ENCODE
   limit_kbps: 1
   )";
   setup(fmt::format(config_yaml, "1"));

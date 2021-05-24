@@ -35,7 +35,7 @@ TEST(Factory, GlobalEmptyConfig) {
 TEST(Factory, RouteSpecificFilterConfig) {
   const std::string config_yaml = R"(
   stat_prefix: test
-  enable_mode: DecodeAndEncode
+  enable_mode: DECODE_AND_ENCODE
   limit_kbps: 10
   fill_interval: 0.1s
   )";
@@ -52,7 +52,7 @@ TEST(Factory, RouteSpecificFilterConfig) {
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fillInterval().count(), 100);
-  EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_DecodeAndEncode);
+  EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_DECODE_AND_ENCODE);
   EXPECT_FALSE(config->tokenBucket() == nullptr);
 }
 
@@ -73,7 +73,7 @@ TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_Disabled);
+  EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_DISABLED);
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fillInterval().count(), 100);
 }
@@ -81,7 +81,7 @@ TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
 TEST(Factory, RouteSpecificFilterConfigDefaultFillInterval) {
   const std::string config_yaml = R"(
   stat_prefix: test
-  enable_mode: DecodeAndEncode
+  enable_mode: DECODE_AND_ENCODE
   limit_kbps: 10
   )";
 
