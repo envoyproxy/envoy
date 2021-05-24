@@ -75,18 +75,15 @@ public:
    */
   void
   deferredRemoveFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains) {
-    FANCY_LOG(debug, "calling {}", __FUNCTION__);
     // Need to recover the original deleting state.
     const bool was_deleting = is_deleting_;
     is_deleting_ = true;
     for (const auto* filter_chain : draining_filter_chains) {
-      FANCY_LOG(debug, "finding filter cahin {}", static_cast<const void*>(filter_chain));
       auto iter = connections_by_context_.find(filter_chain);
       if (iter == connections_by_context_.end()) {
         // It is possible when listener is stopping.
       } else {
         auto& connections = iter->second->connections_;
-        FANCY_LOG(debug, "will defer delete filter chain which owns {} connections", connections.size());
         while (!connections.empty()) {
           connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
         }
@@ -98,6 +95,27 @@ public:
       }
     }
     is_deleting_ = was_deleting;
+  }
+
+protected:
+  void cleanupConnections() {
+    is_deleting_ = true;
+
+    // Purge sockets that have not progressed to connections. This should only happen when
+    // a listener filter stops iteration and never resumes.
+    while (!sockets_.empty()) {
+      auto removed = sockets_.front()->removeFromList(sockets_);
+      dispatcher().deferredDelete(std::move(removed));
+    }
+
+    for (auto& chain_and_connections : connections_by_context_) {
+      ASSERT(chain_and_connections.second != nullptr);
+      auto& connections = chain_and_connections.second->connections_;
+      while (!connections.empty()) {
+        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      }
+    }
+    dispatcher().clearDeferredDeleteList();
   }
 
   absl::node_hash_map<const Network::FilterChain*, ActiveGenericConnectionsPtr>

@@ -24,26 +24,7 @@ ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_
     : TypedActiveStreamListenerBase<ActiveInternalConnection>(conn_handler, dispatcher,
                                                               std::move(listener), config) {}
 
-ActiveInternalListener::~ActiveInternalListener() {
-  // TODO(lambdai): delete the active connections.
-  is_deleting_ = true;
-
-  // Purge sockets that have not progressed to connections. This should only happen when
-  // a listener filter stops iteration and never resumes.
-  while (!sockets_.empty()) {
-    auto removed = sockets_.front()->removeFromList(sockets_);
-    dispatcher().deferredDelete(std::move(removed));
-  }
-
-  for (auto& chain_and_connections : connections_by_context_) {
-    ASSERT(chain_and_connections.second != nullptr);
-    auto& connections = chain_and_connections.second->connections_;
-    while (!connections.empty()) {
-      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-    }
-  }
-  dispatcher().clearDeferredDeleteList();
-}
+ActiveInternalListener::~ActiveInternalListener() { cleanupConnections(); }
 
 void ActiveInternalListener::removeConnection(ActiveInternalConnection& connection) {
   ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
