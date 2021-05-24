@@ -101,10 +101,7 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   case YAML::NodeType::Sequence: {
     auto& list_values = *value.mutable_list_value()->mutable_values();
     for (const auto& it : node) {
-      auto entry = parseYamlNode(it);
-      if (entry.kind_case()) {
-        *list_values.Add() = entry;
-      }
+      *list_values.Add() = parseYamlNode(it);
     }
     break;
   }
