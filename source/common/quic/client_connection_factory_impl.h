@@ -8,6 +8,7 @@
 #include "common/quic/envoy_quic_utils.h"
 
 #include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "extensions/quic/envoy_quic_crypto_client_stream.h"
 
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
@@ -42,6 +43,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
   // TODO(alyssawilk) actually set this up properly.
   quic::QuicConfig quic_config_;
+  // Hard code with real crypto stream for now.
+  RealEnvoyQuicCryptoClientStreamFactory crypto_stream_factory_;
 };
 
 std::unique_ptr<Network::ClientConnection>

@@ -16,6 +16,7 @@
 #include "common/quic/envoy_quic_client_stream.h"
 #include "common/quic/envoy_quic_client_connection.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
+#include "common/quic/envoy_quic_crypto_stream_factory.h"
 
 namespace Envoy {
 namespace Quic {
@@ -35,7 +36,8 @@ public:
                          const quic::QuicServerId& server_id,
                          std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                         EnvoyQuicCryptoClientStreamFactory& crypto_stream_factory);
 
   ~EnvoyQuicClientSession() override;
 
@@ -77,6 +79,8 @@ protected:
   // quic::QuicSpdySession
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
+   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream()
+      override;
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
@@ -90,6 +94,7 @@ private:
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
   const absl::string_view host_name_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  EnvoyQuicCryptoClientStreamFactory& crypto_stream_factory_;
 };
 
 } // namespace Quic

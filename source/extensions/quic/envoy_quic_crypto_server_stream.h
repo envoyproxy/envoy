@@ -21,7 +21,7 @@ public:
                                     quic::QuicCryptoServerStreamBase::Helper* helper) override;
 };
 
-REGISTER_FACTORY(RealEnvoyQuicCryptoServerStreamFactory, EnvoyQuicCryptoServerStreamFactory);
+DECLARE_FACTORY(RealEnvoyQuicCryptoServerStreamFactory);
 
 } // namespace Quic
 } // namespace Envoy

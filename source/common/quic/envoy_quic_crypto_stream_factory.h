@@ -12,6 +12,7 @@
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
 #include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/quic_crypto_client_stream.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -30,6 +31,20 @@ public:
                                     quic::QuicCompressedCertsCache* compressed_certs_cache,
                                     quic::QuicSession* session,
                                     quic::QuicCryptoServerStreamBase::Helper* helper) PURE;
+};
+
+class EnvoyQuicCryptoClientStreamFactory {
+public:
+ virtual ~EnvoyQuicCryptoClientStreamFactory() {}
+
+  // Return an Envoy specific quic crypto client stream object.
+  virtual std::unique_ptr<quic::QuicCryptoClientStreamBase>
+  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id,
+                         quic::QuicSession* session,
+                         std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                         quic::QuicCryptoClientConfig* crypto_config,
+                         quic::QuicCryptoClientStream::ProofHandler* proof_handler,
+                         bool has_application_state) PURE;
 };
 
 } // namespace Quic

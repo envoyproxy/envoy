@@ -11,7 +11,7 @@ RealEnvoyQuicCryptoServerStreamFactory::createEnvoyQuicCryptoServerStream(
   return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
 }
 
-DECLARE_FACTORY(RealEnvoyQuicCryptoServerStreamFactory);
+REGISTER_FACTORY(RealEnvoyQuicCryptoServerStreamFactory, EnvoyQuicCryptoServerStreamFactory);
 
 } // namespace Quic
 } // namespace Envoy

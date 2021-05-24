@@ -166,6 +166,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/http/http3:quic_client_connection_factory_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/extensions/quic:envoy_quic_crypto_client_stream_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )
@@ -246,6 +247,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_client_connection_lib",
+        ":envoy_quic_crypto_stream_factory_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",

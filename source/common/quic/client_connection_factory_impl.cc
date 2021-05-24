@@ -86,7 +86,7 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, std::move(config), &static_info.push_promise_index_, dispatcher,
-      /*send_buffer_limit=*/0);
+      /*send_buffer_limit=*/0, info_impl->crypto_stream_factory_);
   return ret;
 }
 
