@@ -306,7 +306,7 @@ The management server could respond to EDS requests with:
 Special YAML usage
 ~~~~~~~~~~~~~~~~~~
 
-When loading YAML configuration, the Envoy loader will interpret nodes tagged with !ignore
+When loading YAML configuration, the Envoy loader will interpret map keys tagged with !ignore
 specially, and omit them entirely from the native configuration tree. Ordinarily, the YAML stream
 must adhere strictly to the proto schemas defined for Envoy configuration. This allows content to
 be declared that is explicitly handled as a non-represented type.
