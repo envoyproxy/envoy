@@ -244,13 +244,14 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
-    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
+    auto trailers = spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount());
+    if (trailers.get() == nullptr) {
       details_ = Http3ResponseCodeDetailValues::too_many_trailers;
       onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
       return;
     }
-    response_decoder_->decodeTrailers(
-        spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
+    response_decoder_->decodeTrailers(std::move(trailers));
     MarkTrailersConsumed();
   }
 }

@@ -105,14 +105,22 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 }
 
 template <class T>
-std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
+std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block,
+                                                 uint32_t max_headers_allowed) {
   auto headers = T::create();
+  if (header_block.size() > max_headers_allowed) {
+    return nullptr;
+  }
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
     // QUICHE coalesces multiple trailer values with the same key with '\0'.
     std::vector<absl::string_view> values = absl::StrSplit(entry.second, '\0');
     for (const absl::string_view& value : values) {
+      if (max_headers_allowed == 0) {
+        return nullptr;
+      }
+      max_headers_allowed--;
       headers->addCopy(Http::LowerCaseString(key), value);
     }
   }

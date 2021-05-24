@@ -61,7 +61,8 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   // converting to Envoy headers.
   headers_block.AppendValueOrAddHeader("key", "value1");
   headers_block.AppendValueOrAddHeader("key", "value2");
-  auto envoy_headers = spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block);
+  auto envoy_headers =
+      spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block, 100);
   // Envoy header block is 1 header larger because QUICHE header block does coalescing.
   EXPECT_EQ(headers_block.size() + 1u, envoy_headers->size());
   EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
@@ -108,6 +109,19 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
       });
   EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers2, validator,
                                                                            100, details));
+}
+
+TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
+  spdy::SpdyHeaderBlock headers_block;
+  headers_block[":authority"] = "www.google.com";
+  headers_block[":path"] = "/index.hml";
+  headers_block[":scheme"] = "https";
+  headers_block["foo"] = std::string("bar\0eep\0baz", 11);
+  // 6 headers are allowed.
+  EXPECT_NE(nullptr, spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block, 6));
+  // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
+  EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block, 5));
+  EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block, 4));
 }
 
 } // namespace Quic
