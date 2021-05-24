@@ -262,9 +262,8 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
         (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      ret = Address::getAddressFromSockAddrOrDie(
-          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6),
-          -1);
+      ret = Address::addressFromSockAddrOrThrow(
+          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
       if (!isLoopbackAddress(*ret)) {
         break;
       }

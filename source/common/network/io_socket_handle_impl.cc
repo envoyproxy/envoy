@@ -1,6 +1,7 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
@@ -9,7 +10,6 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
-#include "envoy/common/exception.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -578,37 +578,27 @@ IoHandlePtr IoSocketHandleImpl::duplicate() {
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
-  ASSERT(Thread::MainThread::isNotMainThread());
   sockaddr_storage ss;
   socklen_t ss_len = sizeof(ss);
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.rc_ != 0) {
-    /*
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
-                                     */
-                                       ASSERT(false);
-    return nullptr;
   }
-  // throw EnvoyException("miao miao miao\n");
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
-  ASSERT(Thread::MainThread::isNotMainThread());
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.rc_ != 0) {
-    /*
     throw EnvoyException(
         fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
-        */
-        ASSERT(false);
     return nullptr;
   }
 
@@ -619,14 +609,10 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     ss_len = sizeof ss;
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
     if (result.rc_ != 0) {
-      /*
       throw EnvoyException(
-          fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));*/
-          ASSERT(false);
-      return nullptr;
+          fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  // throw EnvoyException("miao miao miao\n");
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
