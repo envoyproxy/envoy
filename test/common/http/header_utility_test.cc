@@ -495,6 +495,8 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+// Test the case present_match is true. Expected true when
+// header matched, expected false when no header matched.
 TEST(MatchHeadersTest, HeaderPresentMatchWithTrueValue) {
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl unmatching_headers{{"nonmatch-header", "1234"},
@@ -512,6 +514,8 @@ present_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+// Test the case present_match is false. Expected false when
+// header matched, expected true when no header matched.
 TEST(MatchHeadersTest, HeaderPresentMatchWithFalseValue) {
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl unmatching_headers{{"nonmatch-header", "1234"},
@@ -529,6 +533,8 @@ present_match: false
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+// Test the case present_match is true and invert_match is true. Expected true when
+// no header matched, expected false when header matched.
 TEST(MatchHeadersTest, HeaderPresentInverseMatchWithTrueValue) {
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl matching_headers{{"nonmatch-header", "1234"},
@@ -547,6 +553,8 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+// Test the case present_match is true and invert_match is true. Expected false when
+// no header matched, expected true when header matched.
 TEST(MatchHeadersTest, HeaderPresentInverseMatchWithFalseValue) {
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl matching_headers{{"nonmatch-header", "1234"},
