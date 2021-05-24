@@ -1,5 +1,8 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 
+#include "common/buffer/buffer_impl.h"
+#include "common/common/logger.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -96,6 +99,7 @@ DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
 }
 
 DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
+  int total = buffer.length();
   uint16_t ext_cap;
   if (BufferHelper::readUint16(buffer, ext_cap) != DecodeStatus::Success) {
     ENVOY_LOG(debug, "error when parsing client cap flag of client login message");
@@ -155,6 +159,47 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
     ENVOY_LOG(debug, "error when parsing auth plugin name of client login message");
     return DecodeStatus::Failure;
   }
+  if (client_cap_ & CLIENT_CONNECT_ATTRS) {
+    // length of all key value pairs
+    uint64_t kvs_len;
+    if (BufferHelper::readLengthEncodedInteger(buffer, kvs_len) != DecodeStatus::Success) {
+      ENVOY_LOG(debug, "error when parsing length of all key-values in connect attributions of "
+                       "client login message");
+      return DecodeStatus::Failure;
+    }
+    while (kvs_len > 0) {
+      uint64_t str_len;
+      uint64_t prev_len = buffer.length();
+      if (BufferHelper::readLengthEncodedInteger(buffer, str_len) != DecodeStatus::Success) {
+        ENVOY_LOG(debug,
+                  "error when parsing length of conn contribute key in connect attributions of "
+                  "client login message");
+        return DecodeStatus::Failure;
+      }
+      std::string key;
+      if (BufferHelper::readStringBySize(buffer, str_len, key) != DecodeStatus::Success) {
+        ENVOY_LOG(debug, "error when parsing conn contribute key in connect attributions of "
+                         "client login message");
+        return DecodeStatus::Failure;
+      }
+      if (BufferHelper::readLengthEncodedInteger(buffer, str_len) != DecodeStatus::Success) {
+        ENVOY_LOG(debug,
+                  "error when parsing length of conn contribute value in connect attributions of "
+                  "client login message");
+        return DecodeStatus::Failure;
+      }
+      std::string val;
+      if (BufferHelper::readStringBySize(buffer, str_len, val) != DecodeStatus::Success) {
+        ENVOY_LOG(debug, "error when parsing conn contribute val in connect attributions of "
+                         "client login message");
+        return DecodeStatus::Failure;
+      }
+      conn_attr_.emplace_back(std::make_pair(std::move(key), std::move(val)));
+      kvs_len -= prev_len - buffer.length();
+    }
+  }
+  ENVOY_LOG(debug, "parse client login protocol 41, comsumed len {}, remain {}",
+            total - buffer.length(), buffer.length());
   return DecodeStatus::Success;
 }
 
@@ -237,6 +282,17 @@ void ClientLogin::encodeResponse41(Buffer::Instance& out) const {
   if (client_cap_ & CLIENT_PLUGIN_AUTH) {
     BufferHelper::addString(out, auth_plugin_name_);
     BufferHelper::addUint8(out, enc_end_string);
+  }
+  if (client_cap_ & CLIENT_CONNECT_ATTRS) {
+    Buffer::OwnedImpl conn_attr;
+    for (const auto& kv : conn_attr_) {
+      BufferHelper::addLengthEncodedInteger(conn_attr, kv.first.length());
+      BufferHelper::addString(conn_attr, kv.first);
+      BufferHelper::addLengthEncodedInteger(conn_attr, kv.second.length());
+      BufferHelper::addString(conn_attr, kv.second);
+    }
+    BufferHelper::addLengthEncodedInteger(out, conn_attr.length());
+    out.move(conn_attr);
   }
 }
 

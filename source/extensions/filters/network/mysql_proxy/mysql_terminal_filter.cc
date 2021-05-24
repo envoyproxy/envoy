@@ -143,6 +143,10 @@ void MySQLTerminalFilter::onClientLogin(ClientLogin& client_login) {
 
 void MySQLTerminalFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
   MySQLMoniterFilter::onClientLoginResponse(client_login_resp);
+  if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+    ENVOY_LOG(debug, "user failed to login into server, error message {}",
+              dynamic_cast<ErrMessage&>(client_login_resp).getErrorMessage());
+  }
   sendLocal(client_login_resp);
 }
 
@@ -203,7 +207,7 @@ Network::FilterStatus MySQLTerminalFilter::onNewConnection() {
 
 Network::FilterStatus MySQLTerminalFilter::onData(Buffer::Instance& buffer, bool) {
   MySQLMoniterFilter::clearDynamicData();
-
+  ENVOY_LOG(debug, "downstream data recevied, len {}", buffer.length());
   read_buffer_.move(buffer);
   decoder_->onData(read_buffer_);
   return Network::FilterStatus::StopIteration;

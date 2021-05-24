@@ -102,6 +102,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     case MYSQL_RESP_OK: {
       msg = std::make_unique<OkMessage>();
       state = MySQLSession::State::Req;
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
     case MYSQL_RESP_MORE: {

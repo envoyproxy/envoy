@@ -57,6 +57,7 @@ private:
   std::vector<uint8_t> auth_resp_;
   std::string db_;
   std::string auth_plugin_name_;
+  std::vector<std::pair<std::string, std::string>> conn_attr_;
 };
 
 } // namespace MySQLProxy
