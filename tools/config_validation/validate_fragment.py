@@ -23,7 +23,7 @@ import argparse
 
 class IgnoredKey(yaml.YAMLObject):
     """Python support type for Envoy's config !ignore tag."""
-    yaml_tag = u'!ignore'
+    yaml_tag = '!ignore'
 
     def __init__(self, strval):
        self.strval = strval
@@ -32,7 +32,7 @@ class IgnoredKey(yaml.YAMLObject):
        return f'IgnoredKey({str})'
 
     def __eq__(self, other):
-        return isinstance(other, IgnoredKey) && self.strval == other.strval
+        return isinstance(other, IgnoredKey) and self.strval == other.strval
 
     @classmethod
     def from_yaml(cls, loader, node):

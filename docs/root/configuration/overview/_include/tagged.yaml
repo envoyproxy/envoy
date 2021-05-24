@@ -1,5 +1,3 @@
-:type-name: envoy.config.bootstrap.v3.Bootstrap
-
 !ignore dynamic_sockets:
   - &admin_address { address: 127.0.0.1, port_value: 9901 }
   - &listener_address { address: 127.0.0.1, port_value: 10000 }
