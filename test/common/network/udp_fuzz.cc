@@ -44,6 +44,7 @@ public:
   void onDatagramsDropped(uint32_t dropped) override;
   uint32_t workerIndex() const override;
   Network::UdpPacketWriter& udpPacketWriter() override;
+  size_t numPacketsExpectedPerEventLoop() const override;
 
 private:
   UdpFuzz* my_upf_;
@@ -176,6 +177,10 @@ void FuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
     my_upf_->dispatcher_->exit();
   }
   UNREFERENCED_PARAMETER(dropped);
+}
+
+size_t FuzzUdpListenerCallbacks::numPacketsExpectedPerEventLoop() const {
+  return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) { UdpFuzz udp_instance(buf, len); }
