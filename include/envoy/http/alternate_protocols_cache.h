@@ -74,8 +74,8 @@ public:
         : alpn_(alpn), hostname_(hostname), port_(port), expiration_(expiration) {}
 
     bool operator==(const AlternateProtocol& other) const {
-      return std::tie(alpn_, hostname_, port_) ==
-             std::tie(other.alpn_, other.hostname_, other.port_);
+      return std::tie(alpn_, hostname_, port_, expiration_) ==
+             std::tie(other.alpn_, other.hostname_, other.port_, other.expiration_);
     }
 
     bool operator!=(const AlternateProtocol& other) const { return !this->operator==(other); }
