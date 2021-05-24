@@ -23,6 +23,7 @@
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
@@ -576,10 +577,10 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time, bool prefer_gro,
+                                                MonotonicTime receive_time, bool use_gro,
                                                 uint32_t* packets_dropped) {
 
-  if (prefer_gro && handle.supportsUdpGro()) {
+  if (use_gro) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -696,11 +697,24 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, bool prefer_gro,
                                                uint32_t& packets_dropped) {
+  // Read at least one time, and attempt to read numPacketsExpectedPerEventLoop() packets unless
+  // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
+  size_t num_packets_to_read = std::min<size_t>(
+      MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
+  const bool use_gro = prefer_gro && handle.supportsUdpGro();
+  size_t num_reads =
+      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_GRO_RECEIVE)
+              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_MMSG_RECEIVE)
+                                       : num_packets_to_read);
+  // Make sure to read at least once.
+  num_reads = std::max<size_t>(1, num_reads);
+  bool honor_read_limit =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, prefer_gro, &packets_dropped);
+        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -722,6 +736,12 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           "max datagram size.",
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
+    }
+    if (honor_read_limit) {
+      --num_reads;
+    }
+    if (num_reads == 0) {
+      return std::move(result.err_);
     }
   } while (true);
 }

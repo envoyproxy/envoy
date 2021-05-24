@@ -67,10 +67,10 @@ public:
   static void clear() { loader_ = nullptr; }
 
 protected:
-  static T* loader_;
+  static std::atomic<T*> loader_;
 };
 
-template <class T> T* InjectableSingleton<T>::loader_ = nullptr;
+template <class T> std::atomic<T*> InjectableSingleton<T>::loader_ = nullptr;
 
 template <class T> class ScopedInjectableLoader {
 public:

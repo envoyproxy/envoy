@@ -1570,12 +1570,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-#ifdef WIN32
-  // TODO(alyssawilk, wrowe) debug.
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
-    return;
-  }
-#endif
   // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
   testLargeRequestHeaders(2048, 1, 1024, 100);
 }
@@ -1586,10 +1580,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
-  // Fail under TSAN. Quic blackhole detection fired and closed the connection with
-  // QUIC_TOO_MANY_RTOS while waiting for upstream finishing transferring the large header. Observed
-  // long event loop.
-  EXCLUDE_DOWNSTREAM_HTTP3;
   // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
   testLargeRequestHeaders(100, 70, 8192, 100, TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
@@ -1964,15 +1954,7 @@ name: encode-headers-return-stop-all-filter
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
-  int times_added = (upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ||
-                     downstreamProtocol() == Http::CodecClient::Type::HTTP1)
-                        ? 1
-                        : 2;
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1 &&
-      upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
-    // TODO(alyssawilk) Figure out why the bytes mismatch with the test expectation below.
-    return;
-  }
+  int times_added = upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ? 1 : 2;
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
@@ -2016,15 +1998,7 @@ name: encode-headers-return-stop-all-filter
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
-  int times_added = (upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ||
-                     downstreamProtocol() == Http::CodecClient::Type::HTTP1)
-                        ? 1
-                        : 2;
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1 &&
-      upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
-    // TODO(alyssawilk) Figure out why the bytes mismatch with the test expectation below.
-    return;
-  }
+  int times_added = upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ? 1 : 2;
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
