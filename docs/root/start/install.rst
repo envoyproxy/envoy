@@ -57,8 +57,8 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
    To add the nightly repository instead, replace the word ``stable`` with ``nightly``,
    when adding the ``apt`` repository.
 
-Install Envoy on RPM-based distros: CentOS/RHEL/Suse/Amazon Linux/Fedora etc
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install Envoy on RPM-based distros
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can `install Envoy on Centos/Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rpm/>`_
 using `Get Envoy <https://www.getenvoy.io/>`__.
