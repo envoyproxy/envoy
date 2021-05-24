@@ -199,10 +199,10 @@ def validate_extensions():
     returns = 0
     with open("source/extensions/extensions_metadata.yaml") as f:
         metadata = yaml.safe_load(f.read())
-    returns += compare_old_and_new(generate_old_extension_db(), metadata)
+    returns = compare_old_and_new(generate_old_extension_db(), metadata)
 
     if num_robust_to_downstream_network_filters(metadata) != num_read_filters_fuzzed():
-        returns += 1
+        returns = 1
         print(
             'Check that all network filters robust against untrusted'
             'downstreams are fuzzed by adding them to filterNames() in'
@@ -210,25 +210,25 @@ def validate_extensions():
 
     for k, v in metadata.items():
         if not v["security_posture"]:
-            returns += 1
+            returns = 1
             print(
                 f"Missing security posture for {k}. "
                 "Please make sure the target is an envoy_cc_extension and security_posture is set")
         elif v["security_posture"] not in EXTENSION_SECURITY_POSTURES:
             print("Unknown extension security posture: {v['security_posture']}")
-            returns += 1
+            returns = 1
         if not v["categories"]:
-            returns += 1
+            returns = 1
             print(
                 f"Missing extension category for {k}. "
                 "Please make sure the target is an envoy_cc_extension and category is set")
         else:
             for cat in v["categories"]:
                 if cat not in EXTENSION_CATEGORIES:
-                    returns += 1
+                    returns = 1
                     print(f"Unknown extension category for {k}: {cat}")
         if v["status"] not in EXTENSION_STATUS_VALUES:
-            returns += 1
+            returns = 1
             print(f"Unknown extension status: {v['status']}")
 
     return returns
