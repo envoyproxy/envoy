@@ -1570,12 +1570,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-#ifdef WIN32
-  // TODO(alyssawilk, wrowe) debug.
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    return;
-  }
-#endif
   // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
   testLargeRequestHeaders(2048, 1, 1024, 100);
 }
@@ -1586,10 +1580,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
-  // Fail under TSAN. Quic blackhole detection fired and closed the connection with
-  // QUIC_TOO_MANY_RTOS while waiting for upstream finishing transferring the large header. Observed
-  // long event loop.
-  EXCLUDE_DOWNSTREAM_HTTP3;
   // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
   testLargeRequestHeaders(100, 70, 8192, 100, TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
@@ -1964,15 +1954,7 @@ name: encode-headers-return-stop-all-filter
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
-  int times_added = (upstreamProtocol() == Http::CodecType::HTTP1 ||
-                     downstreamProtocol() == Http::CodecType::HTTP1)
-                        ? 1
-                        : 2;
-  if (downstreamProtocol() == Http::CodecType::HTTP1 &&
-      upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(alyssawilk) Figure out why the bytes mismatch with the test expectation below.
-    return;
-  }
+  int times_added = upstreamProtocol() == Http::CodecType::HTTP1 ? 1 : 2;
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
@@ -2016,15 +1998,7 @@ name: encode-headers-return-stop-all-filter
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
-  int times_added = (upstreamProtocol() == Http::CodecType::HTTP1 ||
-                     downstreamProtocol() == Http::CodecType::HTTP1)
-                        ? 1
-                        : 2;
-  if (downstreamProtocol() == Http::CodecType::HTTP1 &&
-      upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(alyssawilk) Figure out why the bytes mismatch with the test expectation below.
-    return;
-  }
+  int times_added = upstreamProtocol() == Http::CodecType::HTTP1 ? 1 : 2;
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
@@ -2312,6 +2286,24 @@ TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
   EXPECT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// Tests a filter that returns a FilterHeadersStatus::Continue after a local reply without
+// processing new metadata generated in decodeHeader
+TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
+  config_helper_.addFilter(R"EOF(
+  name: local-reply-with-metadata-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  ASSERT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace Envoy

@@ -79,7 +79,7 @@ extensions/filters/common/original_src @snowp @klarose
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
 # HTTP caching extension
-/*/extensions/filters/http/cache @toddmgreer @jmarantz
+/*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
 /*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
 /*/extensions/common/aws @lavignes @mattklein123 @tonya11en

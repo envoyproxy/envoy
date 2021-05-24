@@ -17,6 +17,7 @@
 #include "common/quic/envoy_quic_proof_source.h"
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_network_connection.h"
 #include "common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -26,17 +27,20 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    uint32_t packets_received_to_connection_count_ratio)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config, std::move(options), kernel_worker_routing, enabled) {}
+                         quic_config, std::move(options), kernel_worker_routing, enabled,
+                         packets_received_to_connection_count_ratio) {}
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    uint32_t packets_to_read_to_connection_count_ratio)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
@@ -44,7 +48,8 @@ ActiveQuicListener::ActiveQuicListener(
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      kernel_worker_routing_(kernel_worker_routing) {
+      kernel_worker_routing_(kernel_worker_routing),
+      packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio) {
   // This flag fix a QUICHE issue which may crash Envoy during connection close.
   SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   // Do not include 32-byte per-entry overhead while counting header size.
@@ -215,9 +220,18 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
   return connection_id_snippet % concurrency_;
 }
 
+size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
+  // Expect each session to read packets_to_read_to_connection_count_ratio_ number of packets in
+  // this read event.
+  return quic_dispatcher_->NumSessions() * packets_to_read_to_connection_count_ratio_;
+}
+
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
-    : concurrency_(concurrency), enabled_(config.enabled()) {
+    : concurrency_(concurrency), enabled_(config.enabled()),
+      packets_to_read_to_connection_count_ratio_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
+                                          DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
   uint64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -300,9 +314,9 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
   }
 #endif
 
-  return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
-                                              config, quic_config_, std::move(options),
-                                              kernel_worker_routing, enabled_);
+  return std::make_unique<ActiveQuicListener>(
+      worker_index, concurrency_, disptacher, parent, config, quic_config_, std::move(options),
+      kernel_worker_routing, enabled_, packets_to_read_to_connection_count_ratio_);
 } // namespace Quic
 
 } // namespace Quic
