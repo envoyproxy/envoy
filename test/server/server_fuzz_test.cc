@@ -98,8 +98,8 @@ bool validateLbSubsetConfig(const envoy::config::bootstrap::v3::Bootstrap& input
           return false;
         }
         // Expect key to be non-empty when use_single_host_per_subset is set to true.
-        if (subset_selector.keys()[0].size() == 0) {
-          // return false;
+        if (subset_selector.keys()[0].empty()) {
+          return false;
         }
       }
       // Only expect 1 subset selector when use_single_host_per_subset is set to true.
