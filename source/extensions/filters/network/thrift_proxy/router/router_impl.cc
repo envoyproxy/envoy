@@ -316,6 +316,10 @@ FilterStatus Router::messageEnd() {
 
   upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
                                              upstream_request_buffer_);
+
+  request_size_ += transport_buffer.length();
+  recordClusterScopeHistogram({upstream_rq_size_}, Stats::Histogram::Unit::Bytes, request_size_);
+
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
@@ -323,6 +327,8 @@ FilterStatus Router::messageEnd() {
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
+
+  response_size_ += data.length();
 
   if (upstream_request_->upgrade_response_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "reading upgrade response: {} bytes", *callbacks_, data.length());
@@ -351,6 +357,9 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
     if (status == ThriftFilters::ResponseStatus::Complete) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
+      recordClusterScopeHistogram({upstream_resp_size_}, Stats::Histogram::Unit::Bytes,
+                                  response_size_);
+
       switch (callbacks_->responseMetadata()->messageType()) {
       case MessageType::Reply:
         incClusterScopeCounter({upstream_resp_reply_});
@@ -373,6 +382,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       cleanup();
       return;
     } else if (status == ThriftFilters::ResponseStatus::Reset) {
+      // Note: invalid responses are not accounted in the response size histogram.
       ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
       upstream_request_->resetStream();
       return;
@@ -503,6 +513,7 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
     upgrade_response_ =
         protocol_->attemptUpgrade(*transport_, *conn_state_, parent_.upstream_request_buffer_);
     if (upgrade_response_ != nullptr) {
+      parent_.request_size_ += parent_.upstream_request_buffer_.length();
       conn_data_->connection().write(parent_.upstream_request_buffer_, false);
       return;
     }

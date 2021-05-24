@@ -10,9 +10,32 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
 
+using testing::NiceMock;
+using testing::Return;
+
 namespace Envoy {
 namespace Http {
 namespace Http3 {
+
+TEST(Convert, Basic) {
+  NiceMock<Upstream::MockClusterInfo> cluster_info;
+  quic::QuicConfig config;
+
+  EXPECT_CALL(cluster_info, connectTimeout).WillOnce(Return(std::chrono::milliseconds(42)));
+  auto* protocol_options = cluster_info.http3_options_.mutable_quic_protocol_options();
+  protocol_options->mutable_max_concurrent_streams()->set_value(43);
+  protocol_options->mutable_initial_stream_window_size()->set_value(65555);
+
+  Http3ConnPoolImpl::setQuicConfigFromClusterConfig(cluster_info, config);
+
+  EXPECT_EQ(config.max_time_before_crypto_handshake(), quic::QuicTime::Delta::FromMilliseconds(42));
+  EXPECT_EQ(config.GetMaxBidirectionalStreamsToSend(),
+            protocol_options->max_concurrent_streams().value());
+  EXPECT_EQ(config.GetMaxUnidirectionalStreamsToSend(),
+            protocol_options->max_concurrent_streams().value());
+  EXPECT_EQ(config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
+            protocol_options->initial_stream_window_size().value());
+}
 
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
@@ -45,6 +68,20 @@ public:
 TEST_F(Http3ConnPoolImplTest, CreationWithBufferLimits) {
   EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
+}
+
+TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
+  // Set a couple of options from setQuicConfigFromClusterConfig to make sure they are applied.
+  auto* options = mockHost().cluster_.http3_options_.mutable_quic_protocol_options();
+  options->mutable_max_concurrent_streams()->set_value(15);
+  options->mutable_initial_stream_window_size()->set_value(65555);
+  initialize();
+
+  Quic::PersistentQuicInfoImpl& info = static_cast<Http3ConnPoolImpl*>(pool_.get())->quicInfo();
+  EXPECT_EQ(info.quic_config_.GetMaxUnidirectionalStreamsToSend(),
+            options->max_concurrent_streams().value());
+  EXPECT_EQ(info.quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
+            options->initial_stream_window_size().value());
 }
 
 } // namespace Http3
