@@ -16,7 +16,7 @@ using DrainManagerSharedPtr = std::shared_ptr<DrainManager>;
 
 /**
  * Handles connection draining. This concept is used globally during hot restart / server draining
- * as well as on individual listeners when they are being dynamically removed.
+ * as well as on individual listeners and filter-chains when they are being dynamically removed.
  */
 class DrainManager : public Network::DrainDecision {
 public:
@@ -24,8 +24,19 @@ public:
    * @brief Create a child drain-manager. Will proxy the drain status from the parent, but can also
    * be used to enact local draining.
    *
+   * Child managers can be used to construct "drain trees" where each node in the tree can drain
+   * independently of it's parent node, but the drain status cascades to child nodes. This
+   * relationship is managed through the callback methods in the DrainDecision interface. When
+   * constructed, the child is registered with the parent through this interface.
+   *
+   * The primary difference to a normal callback is that children managers do not respect the
+   * drain-time parameter of the parent. This is because the children may have their own drain
+   * strategies and may wish to define drain time and strategy separately. Observing this drain-time
+   * at each layer may also lead to unexpected/unwanted delays.
+   *
    * @param dispatcher Dispatcher for the current thread in which the new child drain-manager will
    * exist.
+   * @param drain_type The drain-type for the manager. May be different from the parent manager.
    */
   virtual DrainManagerSharedPtr
   createChildManager(Event::Dispatcher& dispatcher,
