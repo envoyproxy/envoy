@@ -67,7 +67,7 @@ if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" =~ "clang-cl" ]]; then
   FAIL_GROUP=clang_cl
 fi
 
-# Optional arguments include //source/exe:envoy-static to build, 
+# Optional arguments include //source/exe:envoy-static to build,
 # //test/... to test all with flake handling and test tag filters
 # (these are the default), either one or the other, or a list of
 # explicit tests or patterns which does not perform tag exclusions,
