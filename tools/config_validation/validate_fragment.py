@@ -26,10 +26,10 @@ class IgnoredKey(yaml.YAMLObject):
     yaml_tag = '!ignore'
 
     def __init__(self, strval):
-       self.strval = strval
+        self.strval = strval
 
     def __repr__(self):
-       return f'IgnoredKey({str})'
+        return f'IgnoredKey({str})'
 
     def __eq__(self, other):
         return isinstance(other, IgnoredKey) and self.strval == other.strval
