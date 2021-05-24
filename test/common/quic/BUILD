@@ -39,6 +39,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_stats_test",
+    srcs = ["quic_stats_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:quic_stats_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = ["envoy_quic_proof_source_test.cc"],
     external_deps = ["quiche_quic_platform"],

@@ -28,6 +28,7 @@
 #include "common/quic/envoy_quic_connection_helper.h"
 #include "common/quic/envoy_quic_alarm_factory.h"
 #include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_stats.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
 
@@ -140,9 +141,10 @@ public:
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5),
-        stats_({ALL_HTTP3_CODEC_STATS(
-            POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
-            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
+        stats_(
+            {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
+                                   POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
+        quic_stats_(listener_config_.listenerScope(), false) {
 
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
@@ -163,6 +165,7 @@ public:
 
   void SetUp() override {
     envoy_quic_session_.Initialize();
+    envoy_quic_session_.setQuicStats(quic_stats_);
     setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     envoy_quic_session_.OnConfigNegotiated();
     quic::test::QuicConfigPeer::SetNegotiated(envoy_quic_session_.config(), true);
@@ -203,8 +206,8 @@ public:
     EXPECT_CALL(*read_filter_, onNewConnection()).WillOnce(Invoke([this]() {
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(
-          envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100,
-          envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+          envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, quic_stats_,
+          64 * 1024, 100, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
       EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
@@ -263,6 +266,7 @@ protected:
   Http::ServerConnectionPtr http_connection_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  QuicStats quic_stats_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerSessionTests, EnvoyQuicServerSessionTest,

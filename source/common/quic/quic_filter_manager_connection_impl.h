@@ -144,7 +144,7 @@ public:
     codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
   }
 
-  void setQuicStats(QuicStats& stats) { quic_stats_ = std::reference_wrapper<QuicStats>(stats); }
+  void setQuicStats(QuicStats& stats) { quic_stats_ = stats; }
 
   uint32_t maxIncomingHeadersCount() { return max_headers_count_; }
 
@@ -170,7 +170,7 @@ protected:
   absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
   absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
       http3_options_;
-  absl::optional<std::reference_wrapper<QuicStats>> quic_stats_;
+  OptRef<QuicStats> quic_stats_;
   bool initialized_{false};
 
 private:

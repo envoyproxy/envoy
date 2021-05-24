@@ -37,6 +37,7 @@
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "common/quic/active_quic_listener.h"
+#include "common/quic/quic_stats.h"
 #endif
 
 #include "server/active_raw_udp_listener_config.h"
@@ -664,6 +665,10 @@ public:
     return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, stats_store_);
   }
 
+#if defined(ENVOY_ENABLE_QUIC)
+  Quic::QuicStats& quicStats() { return quic_stats_; }
+#endif
+
   // Write into the outbound buffer of the network connection at the specified index.
   // Note: that this write bypasses any processing by the upstream codec.
   ABSL_MUST_USE_RESULT
@@ -829,6 +834,9 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+#if defined(ENVOY_ENABLE_QUIC)
+  Quic::QuicStats quic_stats_ = Quic::QuicStats(stats_store_, false);
+#endif
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;
