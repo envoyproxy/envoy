@@ -11,6 +11,8 @@
 namespace Envoy {
 namespace Quic {
 
+// This class is responsible for logging important QUIC error codes and tracking the dynamically
+// created stat tokens.
 class QuicStats {
 public:
   QuicStats(Stats::Scope& scope, bool is_upstream);
