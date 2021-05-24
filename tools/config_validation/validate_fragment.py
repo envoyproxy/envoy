@@ -34,6 +34,9 @@ class IgnoredKey(yaml.YAMLObject):
     def __eq__(self, other):
         return isinstance(other, IgnoredKey) and self.strval == other.strval
 
+    def __hash__(self):
+        return hash((self.yaml_tag, self.strval))
+
     @classmethod
     def from_yaml(cls, loader, node):
         return IgnoredKey(node.value)
