@@ -128,17 +128,18 @@ message ClientConfig {
 
   // GenericXdsConfig is a simpler and generic version of specifying
   // XDS config status and the dump.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message GenericXdsConfig {
-    // type_url represents the fully qualified name of xDS resource type
+    // Type_url represents the fully qualified name of xDS resource type
     // like envoy.v3.Cluster, envoy.v3.ClusterLoadAssignment etc.
     string type_url = 1;
 
-    // name of the xDS resource
+    // Name of the xDS resource
     string name = 2;
 
-    // This is the :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>`
-    // in the last processed xDS discovery response. If there are only static bootstrap listeners, this
+    // This is the :ref:`version_info <envoy_api_field_service.discovery.v3.
+    // DiscoveryResponse.version_info>` in the last processed xDS discovery
+    // response. If there are only static bootstrap listeners, this
     // field will be ""
     string version_info = 3;
 
@@ -155,12 +156,17 @@ message ClientConfig {
     // Per xDS resource status from the view of a xDS client
     admin.v3.ClientResourceStatus client_status = 7;
 
-    // Set if the last update failed, cleared after the next successful update.
-    // The *error_state* field contains the rejected version of this particular
-    // resource along with the reason and timestamp. For successfully updated or
-    // acknowledged resource, this field should be empty.
+    // Set if the last update failed, cleared after the next successful
+    // update. The *error_state* field contains the rejected version of
+    // this particular resource along with the reason and timestamp. For
+    // successfully updated or acknowledged resource, this field should
+    // be empty.
     // [#not-implemented-hide:]
     admin.v3.UpdateFailureState error_state = 8;
+
+    // Is static resource is true if it is specified in the envoy config
+    // supplied during the start.
+    bool is_static_resource = 9;
   }
 
   // Node for a particular client.
