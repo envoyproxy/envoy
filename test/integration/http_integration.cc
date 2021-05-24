@@ -1514,6 +1514,7 @@ std::string HttpIntegrationTest::downstreamProtocolStatsRoot() const {
   case Http::CodecClient::Type::HTTP3:
     return "http3";
   }
+  return "invalid";
 }
 
 std::string HttpIntegrationTest::upstreamProtocolStatsRoot() const {
@@ -1525,6 +1526,7 @@ std::string HttpIntegrationTest::upstreamProtocolStatsRoot() const {
   case FakeHttpConnection::Type::HTTP3:
     return "http3";
   }
+  return "invalid";
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
