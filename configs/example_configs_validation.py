@@ -1,8 +1,6 @@
 import pathlib
 import sys
 
-import yaml
-
 from google.protobuf.json_format import ParseError
 
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
