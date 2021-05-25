@@ -33,7 +33,6 @@
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
 #include "common/protobuf/message_validator_impl.h"
-#include "common/quic/quic_stats.h"
 #include "common/router/context_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
@@ -377,7 +376,6 @@ private:
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
-  std::unique_ptr<Quic::QuicStats> quic_stats_;
   Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;

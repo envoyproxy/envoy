@@ -52,9 +52,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_stats_lib",
-    srcs = ["quic_stats.cc"],
-    hdrs = ["quic_stats.h"],
+    name = "quic_stat_names_lib",
+    srcs = ["quic_stat_names.cc"],
+    hdrs = ["quic_stat_names.h"],
     tags = ["nofips"],
     deps = [
         "//include/envoy/stats:stats_interface",
@@ -327,7 +327,7 @@ envoy_cc_library(
     hdrs = ["envoy_quic_dispatcher.h"],
     tags = ["nofips"],
     deps = [
-        "quic_stats_lib",
+        "quic_stat_names_lib",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_session_lib",

@@ -105,9 +105,6 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-#ifdef ENVOY_ENABLE_QUIC
-    quic_stats_ = std::make_unique<Quic::QuicStats>(store.symbolTable());
-#endif
     initialize(options, std::move(local_address), component_factory, hooks);
   }
   END_TRY
@@ -494,8 +491,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ = std::make_unique<ListenerManagerImpl>(
-      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats(),
-      quic_stats_.get());
+      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.

@@ -257,7 +257,7 @@ Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_G
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, uint32_t concurrency, Quic::QuicStats* quic_stats)
+                           uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
@@ -289,17 +289,15 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
           std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
           cx_limit_runtime_key_)),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
-                            if (workers_started_) {
-                              parent_.onListenerWarmed(*this);
-                            } else {
-                              // Notify Server that this listener is
-                              // ready.
-                              listener_init_target_.ready();
-                            }
-                          }),
-      quic_stats_(quic_stats) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
+        if (workers_started_) {
+          parent_.onListenerWarmed(*this);
+        } else {
+          // Notify Server that this listener is
+          // ready.
+          listener_init_target_.ready();
+        }
+      }) {
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -336,7 +334,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, uint32_t concurrency, Quic::QuicStats* quic_stats)
+                           uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
@@ -362,12 +360,10 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
-                            ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(*this);
-                          }),
-      quic_stats_(quic_stats) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
+        ASSERT(workers_started_);
+        parent_.inPlaceFilterChainUpdate(*this);
+      }) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -406,8 +402,9 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(config_.udp_listener_config());
   if (config_.udp_listener_config().has_quic_options()) {
 #if defined(ENVOY_ENABLE_QUIC)
+    ASSERT(quic_stat_names_.has_value());
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config_.udp_listener_config().quic_options(), concurrency, quic_stats_);
+        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_.value());
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
@@ -760,10 +757,10 @@ ListenerImplPtr
 ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                                          bool workers_started, uint64_t hash) {
   // Use WrapUnique since the constructor is private.
-  return absl::WrapUnique(new ListenerImpl(
-      *this, config, version_info_, parent_, name_, added_via_api_,
-      /* new new workers started state */ workers_started,
-      /* use new hash */ hash, parent_.server_.options().concurrency(), quic_stats_));
+  return absl::WrapUnique(
+      new ListenerImpl(*this, config, version_info_, parent_, name_, added_via_api_,
+                       /* new new workers started state */ workers_started,
+                       /* use new hash */ hash, parent_.server_.options().concurrency()));
 }
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,

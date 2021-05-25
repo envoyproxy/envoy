@@ -55,11 +55,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "quic_stats_test",
-    srcs = ["quic_stats_test.cc"],
+    name = "quic_stat_names_test",
+    srcs = ["quic_stat_names_test.cc"],
     tags = ["nofips"],
     deps = [
-        "//source/common/quic:quic_stats_lib",
+        "//source/common/quic:quic_stat_names_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",

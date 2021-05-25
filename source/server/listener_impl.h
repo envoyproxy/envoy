@@ -17,11 +17,14 @@
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
-#include "common/quic/quic_stats.h"
 
 #include "server/filter_chain_manager_impl.h"
 
 #include "absl/base/call_once.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/quic_stat_names.h"
+#endif
 
 namespace Envoy {
 namespace Server {
@@ -228,8 +231,8 @@ public:
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, uint32_t concurrency,
-               Quic::QuicStats* quic_stats);
+               bool workers_started, uint64_t hash, uint32_t concurrency);
+
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -332,6 +335,12 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
+#ifdef ENVOY_ENABLE_QUIC
+  void setQuicStatNames(Quic::QuicStatNames& quic_stat_names) {
+    quic_stat_names_ = quic_stat_names;
+  }
+#endif
+
   SystemTime last_updated_;
 
 private:
@@ -360,7 +369,7 @@ private:
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               uint32_t concurrency, Quic::QuicStats* quic_stats);
+               uint32_t concurrency);
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
@@ -426,7 +435,9 @@ private:
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
 
-  Quic::QuicStats* quic_stats_;
+#ifdef ENVOY_ENABLE_QUIC
+  OptRef<Quic::QuicStatNames> quic_stat_names_;
+#endif
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

@@ -1,9 +1,9 @@
-#include "common/quic/quic_stats.h"
+#include "common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Quic {
 
-QuicStats::QuicStats(Stats::SymbolTable& symbol_table)
+QuicStatNames::QuicStatNames(Stats::SymbolTable& symbol_table)
     : stat_name_pool_(symbol_table), symbol_table_(symbol_table),
       downstream_(stat_name_pool_.add("downstream")), upstream_(stat_name_pool_.add("upstream")),
       from_self_(stat_name_pool_.add("self")), from_peer_(stat_name_pool_.add("peer")) {
@@ -11,14 +11,15 @@ QuicStats::QuicStats(Stats::SymbolTable& symbol_table)
   connectionCloseStatName(quic::QUIC_NETWORK_IDLE_TIMEOUT);
 }
 
-void QuicStats::incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) {
+void QuicStatNames::incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) {
   Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
-void QuicStats::chargeQuicConnectionCloseStats(Stats::Scope& scope, quic::QuicErrorCode error_code,
-                                               quic::ConnectionCloseSource source,
-                                               bool is_upstream) {
+void QuicStatNames::chargeQuicConnectionCloseStats(Stats::Scope& scope,
+                                                   quic::QuicErrorCode error_code,
+                                                   quic::ConnectionCloseSource source,
+                                                   bool is_upstream) {
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
   const Stats::StatName connection_close = connectionCloseStatName(error_code);
@@ -27,7 +28,7 @@ void QuicStats::chargeQuicConnectionCloseStats(Stats::Scope& scope, quic::QuicEr
                      connection_close});
 }
 
-Stats::StatName QuicStats::connectionCloseStatName(quic::QuicErrorCode error_code) {
+Stats::StatName QuicStatNames::connectionCloseStatName(quic::QuicErrorCode error_code) {
   ASSERT(error_code < quic::QUIC_LAST_ERROR);
 
   return Stats::StatName(

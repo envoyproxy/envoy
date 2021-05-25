@@ -65,7 +65,7 @@ protected:
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
     manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
-                                                     enable_dispatcher_stats_, nullptr);
+                                                     enable_dispatcher_stats_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))

@@ -19,7 +19,7 @@
 #include "envoy/network/listener.h"
 #include "server/connection_handler_impl.h"
 #include "server/active_listener_base.h"
-#include "common/quic/quic_stats.h"
+#include "common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -52,7 +52,7 @@ public:
       uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
       Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
       Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
-      Network::Socket& listen_socket, QuicStats* quic_stats);
+      Network::Socket& listen_socket, QuicStatNames& quic_stat_names);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -80,7 +80,7 @@ private:
   Server::PerHandlerListenerStats& per_worker_stats_;
   Event::Dispatcher& dispatcher_;
   Network::Socket& listen_socket_;
-  QuicStats* quic_stats_;
+  QuicStatNames& quic_stat_names_;
 };
 
 } // namespace Quic

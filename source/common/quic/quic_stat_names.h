@@ -11,9 +11,10 @@
 namespace Envoy {
 namespace Quic {
 
-class QuicStats {
+class QuicStatNames {
 public:
-  explicit QuicStats(Stats::SymbolTable& symbol_table);
+  // This class holds lazily symbolized stat names and is responsible for charging them.
+  explicit QuicStatNames(Stats::SymbolTable& symbol_table);
 
   void chargeQuicConnectionCloseStats(Stats::Scope& scope, quic::QuicErrorCode error_code,
                                       quic::ConnectionCloseSource source, bool is_upstream);
