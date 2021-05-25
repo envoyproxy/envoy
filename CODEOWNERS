@@ -186,3 +186,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @rgs1 @alyssawilk @antoniovicente
 /*/extensions/http/original_ip_detection/xff @rgs1 @alyssawilk @antoniovicente
+# set_metadata extension
+/*/extensions/filters/http/set_metadata @aguinet @snowp
