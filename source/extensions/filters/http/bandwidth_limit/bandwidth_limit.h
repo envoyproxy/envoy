@@ -131,7 +131,7 @@ public:
 
 private:
   friend class FilterTest;
-  const FilterConfig* getConfig() const;
+  const FilterConfig& getConfig() const;
 
   void updateStatsOnDecodeFinish();
   void updateStatsOnEncodeFinish();

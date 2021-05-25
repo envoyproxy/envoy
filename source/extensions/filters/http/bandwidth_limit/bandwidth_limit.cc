@@ -46,12 +46,12 @@ BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
 // BandwidthLimiter members
 
 Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  const auto* config = getConfig();
+  const auto& config = getConfig();
 
-  if (config->enabled() && (config->enableMode() & BandwidthLimit::DECODE)) {
-    config->stats().decode_enabled_.inc();
+  if (config.enabled() && (config.enableMode() & BandwidthLimit::DECODE)) {
+    config.stats().decode_enabled_.inc();
     decode_limiter_ = std::make_unique<StreamRateLimiter>(
-        config->limit(), decoder_callbacks_->decoderBufferLimit(),
+        config.limit(), decoder_callbacks_->decoderBufferLimit(),
         [this] { decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark(); },
         [this] { decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
@@ -64,9 +64,9 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
         },
-        [config](uint64_t len) { config->stats().decode_allowed_size_.set(len); },
-        const_cast<FilterConfig*>(config)->timeSource(), decoder_callbacks_->dispatcher(),
-        decoder_callbacks_->scope(), config->tokenBucket(), config->fillInterval());
+        [config](uint64_t len) { config.stats().decode_allowed_size_.set(len); },
+        const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
+        decoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -74,15 +74,15 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
 
 Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (decode_limiter_ != nullptr) {
-    const auto* config = getConfig();
+    const auto& config = getConfig();
 
     if (!decode_latency_) {
       decode_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-          config->stats().decode_transfer_duration_,
-          const_cast<FilterConfig*>(config)->timeSource());
-      config->stats().decode_pending_.inc();
+          config.stats().decode_transfer_duration_,
+          const_cast<FilterConfig*>(&config)->timeSource());
+      config.stats().decode_pending_.inc();
     }
-    config->stats().decode_incoming_size_.set(data.length());
+    config.stats().decode_incoming_size_.set(data.length());
 
     decode_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -104,13 +104,13 @@ Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailer
 }
 
 Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
-  auto* config = getConfig();
+  auto& config = getConfig();
 
-  if (config->enabled() && (config->enableMode() & BandwidthLimit::ENCODE)) {
-    config->stats().encode_enabled_.inc();
+  if (config.enabled() && (config.enableMode() & BandwidthLimit::ENCODE)) {
+    config.stats().encode_enabled_.inc();
 
     encode_limiter_ = std::make_unique<StreamRateLimiter>(
-        config->limit(), encoder_callbacks_->encoderBufferLimit(),
+        config.limit(), encoder_callbacks_->encoderBufferLimit(),
         [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
         [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
@@ -123,9 +123,9 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           updateStatsOnEncodeFinish();
           encoder_callbacks_->continueEncoding();
         },
-        [config](uint64_t len) { config->stats().encode_allowed_size_.set(len); },
-        const_cast<FilterConfig*>(config)->timeSource(), encoder_callbacks_->dispatcher(),
-        encoder_callbacks_->scope(), config->tokenBucket(), config->fillInterval());
+        [config](uint64_t len) { config.stats().encode_allowed_size_.set(len); },
+        const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
+        encoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -133,15 +133,15 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
 
 Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (encode_limiter_ != nullptr) {
-    const auto* config = getConfig();
+    const auto& config = getConfig();
 
     if (!encode_latency_) {
       encode_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-          config->stats().encode_transfer_duration_,
-          const_cast<FilterConfig*>(config)->timeSource());
-      config->stats().encode_pending_.inc();
+          config.stats().encode_transfer_duration_,
+          const_cast<FilterConfig*>(&config)->timeSource());
+      config.stats().encode_pending_.inc();
     }
-    config->stats().encode_incoming_size_.set(data.length());
+    config.stats().encode_incoming_size_.set(data.length());
 
     encode_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -166,7 +166,7 @@ void BandwidthLimiter::updateStatsOnDecodeFinish() {
   if (decode_latency_) {
     decode_latency_->complete();
     decode_latency_.reset();
-    getConfig()->stats().decode_pending_.dec();
+    getConfig().stats().decode_pending_.dec();
   }
 }
 
@@ -174,17 +174,17 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
   if (encode_latency_) {
     encode_latency_->complete();
     encode_latency_.reset();
-    getConfig()->stats().encode_pending_.dec();
+    getConfig().stats().encode_pending_.dec();
   }
 }
 
-const FilterConfig* BandwidthLimiter::getConfig() const {
+const FilterConfig& BandwidthLimiter::getConfig() const {
   const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
       "envoy.filters.http.bandwidth_limit", decoder_callbacks_->route());
   if (config) {
-    return config;
+    return *config;
   }
-  return config_.get();
+  return *config_;
 }
 
 void BandwidthLimiter::onDestroy() {
