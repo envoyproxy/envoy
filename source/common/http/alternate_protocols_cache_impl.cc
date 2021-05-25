@@ -16,7 +16,8 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   static const size_t max_protocols = 10;
   if (protocols.size() > max_protocols) {
     ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
-    protocols_[origin].erase(protocols_[origin].begin() + max_protocols);
+    std::vector<AlternateProtocol>& p = protocols_[origin];
+    p.erase(p.begin() + max_protocols, p.end());
   }
 }
 

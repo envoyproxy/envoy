@@ -106,6 +106,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterTruncation) {
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> full_protocols = expected_protocols;
   protocol.port_++;
   full_protocols.push_back(protocol);
+  full_protocols.push_back(protocol);
 
   protocols_.setAlternatives(origin1_, full_protocols);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
