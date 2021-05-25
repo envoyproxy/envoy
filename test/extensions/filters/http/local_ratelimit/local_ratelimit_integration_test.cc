@@ -6,7 +6,7 @@ namespace Envoy {
 namespace {
 
 class LocalRateLimitFilterIntegrationTest : public Event::TestUsingSimulatedTime,
-                                         public HttpProtocolIntegrationTest {
+                                            public HttpProtocolIntegrationTest {
 protected:
   void initializeFilter(const std::string& filter_config) {
     config_helper_.addFilter(filter_config);
