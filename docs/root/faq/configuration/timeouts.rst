@@ -19,7 +19,7 @@ Connection timeouts
 
 Connection timeouts apply to the entire HTTP connection and all streams the connection carries.
 
-* The HTTP protocol :ref:`idle timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
+* The HTTP protocol :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream
   cluster HTTP connections. The idle timeout is the time at which a downstream or upstream
   connection will be terminated if there are no active streams. The default idle timeout if not
@@ -60,7 +60,7 @@ context request/stream is interchangeable.
   is the amount of time that the connection manager will allow a stream to exist with no upstream
   or downstream activity. The default stream idle timeout is *5 minutes*. This timeout is strongly
   recommended for all requests (not just streaming requests/responses) as it additionally defends
-  against an HTTP/2 peer that does not open stream window once an entire response has been buffered
+  against a peer that does not open the stream window once an entire response has been buffered
   to be sent to a downstream client.
 * The HTTP protocol :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`
   is defined in a generic message used by the HTTP connection manager. The max stream duration is the
@@ -104,8 +104,8 @@ TCP
 ---
 
 * The cluster :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>` specifies the amount
-  of time Envoy will wait for an upstream TCP connection to be established. This timeout has no
-  default, but is required in the configuration.
+  of time Envoy will wait for an upstream TCP connection to be established. If this value is not set,
+  a default value of 5 seconds will be used.
 
   .. attention::
 

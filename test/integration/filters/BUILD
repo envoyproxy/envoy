@@ -70,6 +70,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "local_reply_with_metadata_filter_lib",
+    srcs = [
+        "local_reply_with_metadata_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "continue_headers_only_inject_body",
     srcs = [
         "continue_headers_only_inject_body_filter.cc",
@@ -266,16 +281,44 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "set_is_terminal_filter_lib",
+    srcs = [
+        "set_is_terminal_filter.cc",
+    ],
+    deps = [
+        ":set_is_terminal_filter_config_proto_cc_proto",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "set_is_terminal_filter_config_proto",
+    srcs = [":set_is_terminal_filter_config.proto"],
+)
+
+envoy_proto_library(
+    name = "stop_and_continue_filter_config_proto",
+    srcs = [":stop_and_continue_filter_config.proto"],
+)
+
+envoy_cc_test_library(
     name = "stop_iteration_and_continue",
     srcs = [
         "stop_iteration_and_continue_filter.cc",
     ],
     deps = [
+        ":stop_and_continue_filter_config_proto_cc_proto",
+        "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/registry",
+        "//source/common/common:scope_tracker",
         "//source/common/network:connection_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -445,6 +488,25 @@ envoy_cc_test_library(
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "address_restore_listener_filter_lib",
+    srcs = [
+        "address_restore_listener_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:upstream_socket_options_filter_state_lib",
+        "//source/common/network:utility_lib",
     ],
 )
 

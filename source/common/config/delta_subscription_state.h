@@ -26,7 +26,8 @@ namespace Config {
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
+                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+                         const bool wildcard);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -103,6 +104,8 @@ private:
   absl::flat_hash_set<std::string> resource_names_;
 
   const std::string type_url_;
+  // Is the subscription is for a wildcard request.
+  const bool wildcard_;
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;

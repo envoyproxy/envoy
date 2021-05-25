@@ -36,6 +36,9 @@ from validate import validate_pb2
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
 
+# Last documented v2 api version
+ENVOY_LAST_V2_VERSION = "1.17.2"
+
 # Namespace prefix for Envoy top-level APIs.
 ENVOY_PREFIX = '.envoy.'
 
@@ -48,16 +51,12 @@ RPC_NAMESPACE_PREFIX = '.google.rpc.'
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 
-# Template for data plane API URLs.
-DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
-    os.environ['ENVOY_BLOB_SHA'])
-
 # Template for formating extension descriptions.
 EXTENSION_TEMPLATE = Template(
     """
 .. _extension_{{extension}}:
 
-This extension may be referenced by the qualified name *{{extension}}*
+This extension may be referenced by the qualified name ``{{extension}}``
 
 .. note::
   {{status}}
@@ -124,6 +123,18 @@ for _k, _v in EXTENSION_DB.items():
     for _cat in _v['categories']:
         EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
 
+V2_LINK_TEMPLATE = Template(
+    """
+This documentation is for the Envoy v3 API.
+
+As of Envoy v1.18 the v2 API has been removed and is no longer supported.
+
+If you are upgrading from v2 API config you may wish to view the v2 API documentation:
+
+    :ref:`{{v2_text}} <{{v2_url}}>`
+
+""")
+
 
 class ProtodocError(Exception):
     """Base error class for the protodoc module."""
@@ -134,7 +145,7 @@ def hide_not_implemented(comment):
     return annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION in comment.annotations
 
 
-def github_url(type_context):
+def github_url(text, type_context):
     """Obtain data plane API Github URL by path from a TypeContext.
 
     Args:
@@ -143,10 +154,7 @@ def github_url(type_context):
     Returns:
         A string with a corresponding data plane API GitHub Url.
     """
-    if type_context.location is not None:
-        return DATA_PLANE_API_URL_FMT % (
-            type_context.source_code_info.name, type_context.location.span[0])
-    return ''
+    return f":repo:`{text} <api/{type_context.source_code_info.name}#L{type_context.location.span[0]}>`"
 
 
 def format_comment_with_annotations(comment, type_name=''):
@@ -160,6 +168,12 @@ def format_comment_with_annotations(comment, type_name=''):
     Returns:
         A string with additional RST from annotations.
     """
+    alpha_warning = ''
+    if annotations.ALPHA_ANNOTATION in comment.annotations:
+        experimental_warning = (
+            '.. warning::\n   This API is alpha and is not covered by the :ref:`threat model <arch_overview_threat_model>`.\n\n'
+        )
+
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
         extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
@@ -169,7 +183,7 @@ def format_comment_with_annotations(comment, type_name=''):
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
     comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return comment + formatted_extension + formatted_extension_category
+    return alpha_warning + comment + formatted_extension + formatted_extension_category
 
 
 def map_lines(f, s):
@@ -260,7 +274,7 @@ def format_extension_category(extension_category):
         category=extension_category, extensions=sorted(extensions))
 
 
-def format_header_from_file(style, source_code_info, proto_name):
+def format_header_from_file(style, source_code_info, proto_name, v2_link):
     """Format RST header based on special file level title
 
     Args:
@@ -281,9 +295,10 @@ def format_header_from_file(style, source_code_info, proto_name):
         formatted_extension = format_extension(extension)
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
-            style, source_code_info.file_level_annotations[
-                annotations.DOC_TITLE_ANNOTATION]) + formatted_extension, stripped_comment
-    return anchor + format_header(style, proto_name) + formatted_extension, stripped_comment
+            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
+        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
+    return anchor + format_header(
+        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
@@ -321,8 +336,7 @@ def format_message_as_json(type_context, msg):
 
     if lines:
         return '.. code-block:: json\n\n  {\n' + ',\n'.join(indent_lines(4, lines)) + '\n  }\n\n'
-    else:
-        return '.. code-block:: json\n\n  {}\n\n'
+    return ""
 
 
 def normalize_field_type_name(field_fqn):
@@ -433,27 +447,27 @@ def strip_leading_space(s):
 
 def file_cross_ref_label(msg_name):
     """File cross reference label."""
-    return 'envoy_api_file_%s' % msg_name
+    return 'envoy_v3_api_file_%s' % msg_name
 
 
 def message_cross_ref_label(msg_name):
     """Message cross reference label."""
-    return 'envoy_api_msg_%s' % msg_name
+    return 'envoy_v3_api_msg_%s' % msg_name
 
 
 def enum_cross_ref_label(enum_name):
     """Enum cross reference label."""
-    return 'envoy_api_enum_%s' % enum_name
+    return 'envoy_v3_api_enum_%s' % enum_name
 
 
 def field_cross_ref_label(field_name):
     """Field cross reference label."""
-    return 'envoy_api_field_%s' % field_name
+    return 'envoy_v3_api_field_%s' % field_name
 
 
 def enum_value_cross_ref_label(enum_value_name):
     """Enum value cross reference label."""
-    return 'envoy_api_enum_value_%s' % enum_value_name
+    return 'envoy_v3_api_enum_value_%s' % enum_value_name
 
 
 def format_anchor(label):
@@ -649,6 +663,10 @@ class RstFormatVisitor(visitor.Visitor):
 
     def __init__(self):
         r = runfiles.Create()
+
+        with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
+            self.v2_mapping = json.load(f)
+
         with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
             # Load as YAML, emit as JSON and then parse as proto to provide type
             # checking.
@@ -660,8 +678,7 @@ class RstFormatVisitor(visitor.Visitor):
         normal_enum_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
         header = format_header('-', 'Enum %s' % normal_enum_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_enum_type, _github_url) + '\n\n'
+        proto_link = github_url(f"[{normal_enum_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
         if hide_not_implemented(leading_comment):
@@ -676,12 +693,12 @@ class RstFormatVisitor(visitor.Visitor):
         normal_msg_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(message_cross_ref_label(normal_msg_type))
         header = format_header('-', normal_msg_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_msg_type, _github_url) + '\n\n'
+        proto_link = github_url(f"[{normal_msg_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'message')
         if hide_not_implemented(leading_comment):
             return ''
+
         return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
             type_context, msg_proto) + format_message_as_definition_list(
                 type_context, msg_proto,
@@ -691,6 +708,13 @@ class RstFormatVisitor(visitor.Visitor):
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
+
+        v2_link = ""
+        if file_proto.name in self.v2_mapping:
+            v2_filepath = f"envoy_api_file_{self.v2_mapping[file_proto.name]}"
+            v2_text = v2_filepath.split('/', 1)[1]
+            v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
+            v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
 
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
@@ -705,7 +729,7 @@ class RstFormatVisitor(visitor.Visitor):
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
-            '=', type_context.source_code_info, file_proto.name)
+            '=', type_context.source_code_info, file_proto.name, v2_link)
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
         # toctrees.
@@ -717,7 +741,7 @@ class RstFormatVisitor(visitor.Visitor):
                 warnings += (
                     '.. warning::\n   This API is work-in-progress and is '
                     'subject to breaking changes.\n\n')
-        debug_proto = format_proto_as_block_comment(file_proto)
+        # debug_proto = format_proto_as_block_comment(file_proto)
         return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 

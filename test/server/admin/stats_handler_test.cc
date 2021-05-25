@@ -33,6 +33,12 @@ public:
                                      true /*pretty_print*/);
   }
 
+  void shutdownThreading() {
+    tls_.shutdownGlobalThreading();
+    store_->shutdownThreading();
+    tls_.shutdownThread();
+  }
+
   Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -189,7 +195,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
@@ -289,7 +295,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
@@ -391,7 +397,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
@@ -502,7 +508,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,

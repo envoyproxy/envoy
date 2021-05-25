@@ -68,7 +68,7 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
 
   if (is_kill_request && is_correct_direction && isKillRequestEnabled()) {
     // Crash Envoy.
-    raise(SIGABRT);
+    RELEASE_ASSERT(false, "KillRequestFilter is crashing Envoy!!!");
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -81,7 +81,7 @@ Http::FilterHeadersStatus KillRequestFilter::encodeHeaders(Http::ResponseHeaderM
 
   if (isKillRequest(headers) && isKillRequestEnabled()) {
     // Crash Envoy.
-    raise(SIGABRT);
+    RELEASE_ASSERT(false, "KillRequestFilter is crashing Envoy!!!");
   }
 
   return Http::FilterHeadersStatus::Continue;

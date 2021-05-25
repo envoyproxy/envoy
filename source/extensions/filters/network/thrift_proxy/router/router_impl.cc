@@ -241,15 +241,15 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    metadata->methodName());
   switch (metadata->messageType()) {
   case MessageType::Call:
-    incClusterScopeCounter(request_call_);
+    incClusterScopeCounter({upstream_rq_call_});
     break;
 
   case MessageType::Oneway:
-    incClusterScopeCounter(request_oneway_);
+    incClusterScopeCounter({upstream_rq_oneway_});
     break;
 
   default:
-    incClusterScopeCounter(request_invalid_type_);
+    incClusterScopeCounter({upstream_rq_invalid_type_});
     break;
   }
 
@@ -316,6 +316,10 @@ FilterStatus Router::messageEnd() {
 
   upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
                                              upstream_request_buffer_);
+
+  request_size_ += transport_buffer.length();
+  recordClusterScopeHistogram({upstream_rq_size_}, Stats::Histogram::Unit::Bytes, request_size_);
+
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
@@ -323,6 +327,8 @@ FilterStatus Router::messageEnd() {
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
+
+  response_size_ += data.length();
 
   if (upstream_request_->upgrade_response_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "reading upgrade response: {} bytes", *callbacks_, data.length());
@@ -351,28 +357,32 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
     if (status == ThriftFilters::ResponseStatus::Complete) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
+      recordClusterScopeHistogram({upstream_resp_size_}, Stats::Histogram::Unit::Bytes,
+                                  response_size_);
+
       switch (callbacks_->responseMetadata()->messageType()) {
       case MessageType::Reply:
-        incClusterScopeCounter(response_reply_);
+        incClusterScopeCounter({upstream_resp_reply_});
         if (callbacks_->responseSuccess()) {
-          incClusterScopeCounter(response_reply_success_);
+          incClusterScopeCounter({upstream_resp_reply_success_});
         } else {
-          incClusterScopeCounter(response_reply_error_);
+          incClusterScopeCounter({upstream_resp_reply_error_});
         }
         break;
 
       case MessageType::Exception:
-        incClusterScopeCounter(response_exception_);
+        incClusterScopeCounter({upstream_resp_exception_});
         break;
 
       default:
-        incClusterScopeCounter(response_invalid_type_);
+        incClusterScopeCounter({upstream_resp_invalid_type_});
         break;
       }
       upstream_request_->onResponseComplete();
       cleanup();
       return;
     } else if (status == ThriftFilters::ResponseStatus::Reset) {
+      // Note: invalid responses are not accounted in the response size histogram.
       ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
       upstream_request_->resetStream();
       return;
@@ -503,6 +513,7 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
     upgrade_response_ =
         protocol_->attemptUpgrade(*transport_, *conn_state_, parent_.upstream_request_buffer_);
     if (upgrade_response_ != nullptr) {
+      parent_.request_size_ += parent_.upstream_request_buffer_.length();
       conn_data_->connection().write(parent_.upstream_request_buffer_, false);
       return;
     }
@@ -522,9 +533,14 @@ void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
   }
 }
 
-void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
+void Router::UpstreamRequest::onRequestComplete() {
+  Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
+  downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
+  request_complete_ = true;
+}
 
 void Router::UpstreamRequest::onResponseComplete() {
+  chargeResponseTiming();
   response_complete_ = true;
   conn_state_ = nullptr;
   conn_data_.reset();
@@ -541,6 +557,8 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
     parent_.callbacks_->resetDownstreamConnection();
     return;
   }
+
+  chargeResponseTiming();
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -574,6 +592,20 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
+
+void Router::UpstreamRequest::chargeResponseTiming() {
+  if (charged_response_timing_ || !request_complete_) {
+    return;
+  }
+  charged_response_timing_ = true;
+  Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
+  const std::chrono::milliseconds response_time =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+  const uint64_t count = response_time.count();
+  parent_.recordClusterScopeHistogram({parent_.upstream_rq_time_},
+                                      Stats::Histogram::Unit::Milliseconds, count);
 }
 
 } // namespace Router

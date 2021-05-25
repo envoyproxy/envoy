@@ -7,12 +7,14 @@
 #include "common/quic/quic_io_handle_wrapper.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::ByMove;
 using testing::Return;
 
 namespace Envoy {
@@ -117,6 +119,85 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
 
   EXPECT_CALL(os_sys_calls_, supportsMmsg());
   wrapper_->supportsMmsg();
+}
+
+TEST(QuicIoHandleWrapper, DelegateWithMocks) {
+  Network::MockIoHandle mock_io;
+  QuicIoHandleWrapper wrapper(mock_io);
+  Buffer::OwnedImpl buffer;
+  Event::MockDispatcher dispatcher;
+  Event::FileReadyCb cb;
+  Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
+  {
+    EXPECT_CALL(mock_io, fdDoNotUse());
+    wrapper.fdDoNotUse();
+
+    EXPECT_CALL(mock_io, read(_, _))
+        .WillOnce(testing::Return(ByMove(Api::ioCallUint64ResultNoError())));
+    wrapper.read(buffer, 5);
+
+    EXPECT_CALL(mock_io, write(_)).WillOnce(Return(ByMove(Api::ioCallUint64ResultNoError())));
+    wrapper.write(buffer);
+
+    EXPECT_CALL(mock_io, recv(_, _, _)).WillOnce(Return(ByMove(Api::ioCallUint64ResultNoError())));
+    wrapper.recv(nullptr, 10, 0);
+
+    EXPECT_CALL(mock_io, bind(_)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    wrapper.bind(nullptr);
+
+    EXPECT_CALL(mock_io, listen(_)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    wrapper.listen(0);
+
+    EXPECT_CALL(mock_io, accept(_, _));
+    wrapper.accept(nullptr, nullptr);
+
+    EXPECT_CALL(mock_io, connect(_)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    wrapper.connect(nullptr);
+
+    EXPECT_CALL(mock_io, setOption(_, _, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    wrapper.setOption(0, 0, nullptr, 0);
+
+    EXPECT_CALL(mock_io, ioctl(_, _, _, _, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    wrapper.ioctl(0, nullptr, 0, nullptr, 0, nullptr);
+
+    EXPECT_CALL(mock_io, setBlocking(_)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    wrapper.setBlocking(false);
+
+    EXPECT_CALL(mock_io, createFileEvent_(_, _, _, _));
+    wrapper.initializeFileEvent(dispatcher, cb, trigger, 0);
+
+    EXPECT_CALL(mock_io, duplicate);
+    wrapper.duplicate();
+
+    EXPECT_CALL(mock_io, activateFileEvents(_));
+    wrapper.activateFileEvents(0);
+
+    EXPECT_CALL(mock_io, enableFileEvents(_));
+    wrapper.enableFileEvents(0);
+
+    EXPECT_CALL(mock_io, resetFileEvents());
+    wrapper.resetFileEvents();
+
+    EXPECT_CALL(mock_io, shutdown(_));
+    wrapper.shutdown(0);
+
+    EXPECT_CALL(mock_io, lastRoundTripTime()).Times(0);
+    wrapper.lastRoundTripTime();
+  }
+
+  wrapper.close();
+
+  {
+    EXPECT_CALL(mock_io, read(_, _)).Times(0);
+    wrapper.read(buffer, 5);
+
+    EXPECT_CALL(mock_io, write(_)).Times(0);
+    wrapper.write(buffer);
+
+    EXPECT_CALL(mock_io, recv(_, _, _)).Times(0);
+    ASSERT_DEBUG_DEATH(wrapper.recv(nullptr, 10, 0), "recv called after close");
+  }
 }
 
 } // namespace Quic

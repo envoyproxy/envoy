@@ -51,10 +51,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
-using testing::AssertionFailure;
-using testing::AssertionResult;
-using testing::AssertionSuccess;
 using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
@@ -5375,6 +5371,16 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get_("x-envoy-expected-rq-timeout-ms"));
     EXPECT_EQ("5m", headers.get_("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10000)));
+    Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                           {"grpc-timeout", "6666666666666H"}};
+    FilterUtility::finalTimeout(route, headers, true, true, false, false);
+    EXPECT_EQ("10000", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("10000m", headers.get_("grpc-timeout"));
   }
   {
     NiceMock<MockRouteEntry> route;

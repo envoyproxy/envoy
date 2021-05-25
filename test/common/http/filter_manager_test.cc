@@ -367,6 +367,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionEncodingTrailers) {
                         "match-trailer", "match"));
       }));
 
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
         ResponseHeaderMapPtr headers{new TestResponseHeaderMapImpl{
@@ -397,6 +398,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionEncodingTrailers) {
   EXPECT_CALL(*filter, encodeHeaders(_, _));
   EXPECT_CALL(*filter, encodeData(_, _));
   EXPECT_CALL(*filter, encodeTrailers(_));
+  EXPECT_CALL(*filter, encodeComplete());
   filter_manager_->decodeHeaders(*grpc_headers, true);
   EXPECT_CALL(*filter, onDestroy());
   filter_manager_->destroyFilters();
@@ -409,6 +411,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   std::shared_ptr<MockStreamFilter> filter(new MockStreamFilter());
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
         ResponseHeaderMapPtr headers{new TestResponseHeaderMapImpl{
@@ -438,6 +441,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(*filter, onMatchCallback(_));
   filter_manager_->decodeHeaders(*grpc_headers, true);
@@ -532,6 +536,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*decoder_filter, onLocalReply(_));
     EXPECT_CALL(*stream_filter, onLocalReply(_));
     EXPECT_CALL(*encoder_filter, onLocalReply(_));
+    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty());
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                                absl::nullopt, "details");

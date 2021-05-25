@@ -12,7 +12,7 @@ namespace Filesystem {
 
 struct MemFileInfo {
   absl::Mutex lock_;
-  std::string data_ GUARDED_BY(lock_);
+  std::string data_ ABSL_GUARDED_BY(lock_);
 };
 
 class MemfileImpl : public FileSharedImpl {

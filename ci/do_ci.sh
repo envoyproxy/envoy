@@ -7,9 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
-        "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
-  build_setup_args="-nofetch"
+          "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
+          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+    build_setup_args="-nofetch"
 fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
@@ -218,11 +218,20 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
+  # Temporariliy exclude some extensions from the envoy binary to address build failures
+  # due to long command line. Tests will still run.
+  BAZEL_BUILD_OPTIONS+=(
+    "--test_env=HEAPCHECK="
+    "--//source/extensions/filters/network/rocketmq_proxy:enabled=False"
+    "--//source/extensions/filters/http/admission_control:enabled=False"
+    "--//source/extensions/filters/http/dynamo:enabled=False"
+    "--//source/extensions/filters/http/header_to_metadata:enabled=False"
+    "--//source/extensions/filters/http/on_demand:enabled=False")
   setup_gcc_toolchain
 
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  # Disable //test/config_test:example_configs_test so it does not fail because of excluded extensions above
+  echo "Testing ${TEST_TARGETS[*]} -//test/config_test:example_configs_test"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}" -//test/config_test:example_configs_test
 
   echo "bazel release build with gcc..."
   bazel_binary_build fastbuild
@@ -468,11 +477,7 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "tooling" ]]; then
   echo "Run pytest tooling tests..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_pytest -- --cov-collect  /tmp/.coverage-envoy
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:pytest_python_coverage -- --cov-collect  /tmp/.coverage-envoy
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_runner -- --cov-collect  /tmp/.coverage-envoy
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/base:pytest_utils -- --cov-collect  /tmp/.coverage-envoy
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:python_coverage -- --fail-under=95 /tmp/.coverage-envoy /source/generated/tooling
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" wasm-cc

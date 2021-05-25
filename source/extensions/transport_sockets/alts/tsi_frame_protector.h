@@ -4,6 +4,8 @@
 
 #include "extensions/transport_sockets/alts/grpc_tsi.h"
 
+#include "grpc/slice_buffer.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -20,11 +22,12 @@ public:
 
   /**
    * Wrapper for tsi_frame_protector_protect
-   * @param input supplies the input data to protect, the method will drain it when it is processed.
+   * @param input_slice supplies the input data to protect. Its ownership will
+   * be transferred.
    * @param output supplies the buffer where the protected data will be stored.
    * @return tsi_result the status.
    */
-  tsi_result protect(Buffer::Instance& input, Buffer::Instance& output);
+  tsi_result protect(const grpc_slice& input_slice, Buffer::Instance& output);
 
   /**
    * Wrapper for tsi_frame_protector_unprotect

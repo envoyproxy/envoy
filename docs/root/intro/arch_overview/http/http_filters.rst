@@ -41,13 +41,20 @@ decoder/encoder filters):
     - A
     - B
     # The last configured filter has to be a terminal filter, as determined by the
-    # NamedHttpFilterConfigFactory::isTerminalFilter() function. This is most likely the router
+    # NamedHttpFilterConfigFactory::isTerminalFilterByProto(config, context) function. This is most likely the router
     # filter.
     - C
 
 The connection manager will invoke decoder filters in the order: ``A``, ``B``, ``C``.
 On the other hand, the connection manager will invoke encoder filters in the **reverse**
 order: ``C``, ``B``, ``A``.
+
+Conditional Filter Configuration
+--------------------------------
+
+There is some support for having the filter configuration used change based on the incoming
+request. See the :ref:`composite filter <config_http_filters_composite>` for details on how to
+configure a match tree that can resolve filter configuration to use for a given request.
 
 .. _arch_overview_http_filters_route_mutation:
 
