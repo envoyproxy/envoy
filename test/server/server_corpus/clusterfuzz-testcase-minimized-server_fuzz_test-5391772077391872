@@ -1,0 +1,12 @@
+node {
+  id: "`"
+  cluster: "8"
+}
+dynamic_resources {
+  cds_config {
+    api_config_source {
+      api_type: AGGREGATED_DELTA_GRPC
+      transport_api_version: V3
+    }
+  }
+}

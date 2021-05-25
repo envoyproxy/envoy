@@ -107,7 +107,29 @@ bool validateLbSubsetConfig(const envoy::config::bootstrap::v3::Bootstrap& input
   return true;
 }
 
+// Check for an invalid api_config_source is specified for a dynamic resource.
+// A source is considered invalid if is not supported by
+// SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource()
+bool validateDynamicResources(const envoy::config::bootstrap::v3::Bootstrap& input) {
+  if (input.has_dynamic_resources() && input.dynamic_resources().has_cds_config() &&
+      input.dynamic_resources().cds_config().has_api_config_source()) {
+    auto api_type = input.dynamic_resources().cds_config().api_config_source().api_type();
+    // corresponds to SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource()
+    // in source/common/config/subscription_factory_impl.cc
+    if (api_type != envoy::config::core::v3::ApiConfigSource::REST &&
+        api_type != envoy::config::core::v3::ApiConfigSource::GRPC &&
+        api_type != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+      return false;
+    }
+  }
+  return true;
+}
+
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
+
+  if (!validateDynamicResources(input)) {
+    return;
+  }
 
   if (!validateLbSubsetConfig(input)) {
     return;
