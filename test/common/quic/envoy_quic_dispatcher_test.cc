@@ -255,7 +255,7 @@ protected:
   Server::ListenerStats listener_stats_;
   Server::PerHandlerListenerStats per_worker_stats_;
   Server::ConnectionHandlerImpl connection_handler_;
-  RealEnvoyQuicCryptoServerStreamFactory crypto_stream_factory_;
+  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
   const quic::QuicConnectionId connection_id_;
 };

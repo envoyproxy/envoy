@@ -77,7 +77,7 @@ public:
   bool encryption_established() const override { return true; }
 };
 
-class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactory {
+class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
  std::unique_ptr<quic::QuicCryptoClientStreamBase> createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id,
                          quic::QuicSession* session,

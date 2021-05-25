@@ -20,7 +20,7 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
     Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
     Network::Socket& listen_socket,
-    EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory)
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length),

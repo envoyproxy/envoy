@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Quic {
 
-class RealEnvoyQuicCryptoServerStreamFactory : public EnvoyQuicCryptoServerStreamFactory {
+class EnvoyQuicCryptoServerStreamFactoryImpl : public EnvoyQuicCryptoServerStreamFactoryInterface {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::quic::v3::CryptoServerStreamConfig>();
@@ -21,7 +21,7 @@ public:
                                     quic::QuicCryptoServerStreamBase::Helper* helper) override;
 };
 
-DECLARE_FACTORY(RealEnvoyQuicCryptoServerStreamFactory);
+DECLARE_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl);
 
 } // namespace Quic
 } // namespace Envoy

@@ -122,9 +122,9 @@ private:
   quic::QuicReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
 };
 
-class EnvoyQuicTestCryptoServerStreamFactory : public EnvoyQuicCryptoServerStreamFactory {
+class EnvoyQuicTestCryptoServerStreamFactory : public EnvoyQuicCryptoServerStreamFactoryInterface {
 public:
-  EnvoyQuicTestCryptoServerStreamFactory() : EnvoyQuicCryptoServerStreamFactory() {}
+  EnvoyQuicTestCryptoServerStreamFactory() : EnvoyQuicCryptoServerStreamFactoryInterface() {}
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
   std::string name() const override { return "quic.test_crypto_server_stream"; }

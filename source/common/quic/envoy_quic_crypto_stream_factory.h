@@ -21,7 +21,7 @@
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicCryptoServerStreamFactory : public Config::TypedFactory {
+class EnvoyQuicCryptoServerStreamFactoryInterface : public Config::TypedFactory {
 public:
   std::string category() const override { return "envoy.quic.server.crypto_stream"; }
 
@@ -33,9 +33,9 @@ public:
                                     quic::QuicCryptoServerStreamBase::Helper* helper) PURE;
 };
 
-class EnvoyQuicCryptoClientStreamFactory {
+class EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
- virtual ~EnvoyQuicCryptoClientStreamFactory() {}
+ virtual ~EnvoyQuicCryptoClientStreamFactoryInterface() {}
 
   // Return an Envoy specific quic crypto client stream object.
   virtual std::unique_ptr<quic::QuicCryptoClientStreamBase>

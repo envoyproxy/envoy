@@ -10,7 +10,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactory& crypto_stream_factory)
+    uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,

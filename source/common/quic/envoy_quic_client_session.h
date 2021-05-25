@@ -37,7 +37,7 @@ public:
                          std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         EnvoyQuicCryptoClientStreamFactory& crypto_stream_factory);
+                         EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory);
 
   ~EnvoyQuicClientSession() override;
 
@@ -94,7 +94,7 @@ private:
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
   const absl::string_view host_name_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
-  EnvoyQuicCryptoClientStreamFactory& crypto_stream_factory_;
+  EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
 };
 
 } // namespace Quic

@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Quic {
 
-class RealEnvoyQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactory {
+class EnvoyQuicCryptoClientStreamFactoryImpl : public EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
  std::unique_ptr<quic::QuicCryptoClientStreamBase>
   createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id,

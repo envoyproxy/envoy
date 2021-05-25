@@ -43,7 +43,7 @@ public:
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory);
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
 
   ~EnvoyQuicServerSession() override;
 
@@ -108,7 +108,7 @@ private:
 
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-  EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory_;
+  EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
 };
 
 } // namespace Quic

@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Quic {
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase>
-RealEnvoyQuicCryptoClientStreamFactory::createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id,
+EnvoyQuicCryptoClientStreamFactoryImpl::createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id,
                        quic::QuicSession* session,
                        std::unique_ptr<quic::ProofVerifyContext> verify_context,
                        quic::QuicCryptoClientConfig* crypto_config,

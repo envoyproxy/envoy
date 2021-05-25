@@ -333,7 +333,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
   quic_listener_.reset();
-  RealEnvoyQuicCryptoServerStreamFactory crypto_stream_factory;
+  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory;
   EnvoyQuicProofSourceFactoryImpl proof_source_factory;
   EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
                               0, 1, *dispatcher_, connection_handler_, listen_socket_,

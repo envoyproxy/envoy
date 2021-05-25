@@ -44,7 +44,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // TODO(alyssawilk) actually set this up properly.
   quic::QuicConfig quic_config_;
   // Hard code with real crypto stream for now.
-  RealEnvoyQuicCryptoClientStreamFactory crypto_stream_factory_;
+  EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
 };
 
 std::unique_ptr<Network::ClientConnection>

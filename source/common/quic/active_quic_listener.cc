@@ -30,7 +30,7 @@ ActiveQuicListener::ActiveQuicListener(
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
     bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory, EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory, EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
                          quic_config, std::move(options), kernel_worker_routing, enabled,
@@ -42,7 +42,7 @@ ActiveQuicListener::ActiveQuicListener(
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory, EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory, EnvoyQuicProofSourceFactoryInterface& proof_source_factory)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
@@ -253,7 +253,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     crypto_stream = config.crypto_stream();
   }
   crypto_server_stream_factory_ =
-      Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactory>(crypto_stream);
+      Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactoryInterface>(crypto_stream);
 
   // Initialize proof source factory.
   envoy::config::listener::v3::QuicProofSource proof_source;

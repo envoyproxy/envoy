@@ -32,7 +32,7 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory,
+                     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory);
 
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
@@ -40,7 +40,7 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory,
+                     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory);
 
   ~ActiveQuicListener() override;
@@ -80,7 +80,7 @@ private:
   // The number of runs of the event loop in which at least one CHLO was buffered.
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
-  EnvoyQuicCryptoServerStreamFactory& crypto_server_stream_factory_;
+  EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -101,7 +101,7 @@ public:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
-  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactory>>
+  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
       crypto_server_stream_factory_;
    std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
