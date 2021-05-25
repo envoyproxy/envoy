@@ -241,12 +241,12 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 
   // Reduce load a little to allow the connection to be accepted.
   updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
+                               0);
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   }
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
-                               0);
   EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
