@@ -80,6 +80,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@com_google_absl//absl/strings",
+        "@com_google_googleapis//google/api/expr/v1alpha1:value_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
         "//include/envoy/server:lifecycle_notifier_interface",

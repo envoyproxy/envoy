@@ -293,12 +293,6 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   return status;
 }
 
-FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
-  ENVOY_LOG(trace, "encodeTrailers");
-  response_trailers_ = &trailers;
-  return FilterTrailersStatus::Continue;
-}
-
 FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "encodeData({}): end_stream = {}", data.length(), end_stream);
   const auto status = onData(encoding_state_, data, end_stream);

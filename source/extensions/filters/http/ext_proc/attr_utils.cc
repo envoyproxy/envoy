@@ -30,6 +30,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using google::api::expr::v1alpha1::Value;
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using AttrMap = ProtobufWkt::Map<std::string, ProtobufWkt::Value>;
 
@@ -37,25 +38,25 @@ static const std::string HttpProtocolStrings[] = {"Http 1.0", "Http 1.1", "Http 
 
 #define PROPERTY_TOKENS(_f)                                                                        \
   _f(METADATA) _f(REQUEST) _f(RESPONSE) _f(CONNECTION) _f(UPSTREAM) _f(SOURCE) _f(DESTINATION)     \
-  _f(FILTER_STATE)
+      _f(FILTER_STATE)
 
 #define REQUEST_TOKENS(_f)                                                                         \
   _f(PATH) _f(URL_PATH) _f(HOST) _f(SCHEME) _f(METHOD) _f(HEADERS) _f(REFERER) _f(USERAGENT)       \
-  _f(TIME) _f(ID) _f(PROTOCOL) _f(DURATION) _f(SIZE) _f(TOTAL_SIZE)
+      _f(TIME) _f(ID) _f(PROTOCOL) _f(DURATION) _f(SIZE) _f(TOTAL_SIZE)
 
 #define RESPONSE_TOKENS(_f)                                                                        \
   _f(CODE) _f(CODE_DETAILS) _f(FLAGS) _f(GRPC_STATUS) _f(HEADERS) _f(TRAILERS) _f(SIZE)            \
-  _f(TOTAL_SIZE)
+      _f(TOTAL_SIZE)
 
 #define CONNECTION_TOKENS(_f)                                                                      \
   _f(ID) _f(MTLS) _f(REQUESTED_SERVER_NAME) _f(TLS_VERSION) _f(SUBJECT_LOCAL_CERTIFICATE)          \
-  _f(SUBJECT_PEER_CERTIFICATE) _f(DNS_SAN_LOCAL_CERTIFICATE) _f(DNS_SAN_PEER_CERTIFICATE)          \
-  _f(URI_SAN_LOCAL_CERTIFICATE) _f(URI_SAN_PEER_CERTIFICATE) _f(TERMINATION_DETAILS)
+      _f(SUBJECT_PEER_CERTIFICATE) _f(DNS_SAN_LOCAL_CERTIFICATE) _f(DNS_SAN_PEER_CERTIFICATE)      \
+          _f(URI_SAN_LOCAL_CERTIFICATE) _f(URI_SAN_PEER_CERTIFICATE) _f(TERMINATION_DETAILS)
 
 #define UPSTREAM_TOKENS(_f)                                                                        \
   _f(ADDRESS) _f(PORT) _f(TLS_VERSION) _f(SUBJECT_LOCAL_CERTIFICATE) _f(SUBJECT_PEER_CERTIFICATE)  \
-  _f(DNS_SAN_LOCAL_CERTIFICATE) _f(DNS_SAN_PEER_CERTIFICATE) _f(URI_SAN_LOCAL_CERTIFICATE)         \
-  _f(URI_SAN_PEER_CERTIFICATE) _f(LOCAL_ADDRESS) _f(TRANSPORT_FAILURE_REASON)
+      _f(DNS_SAN_LOCAL_CERTIFICATE) _f(DNS_SAN_PEER_CERTIFICATE) _f(URI_SAN_LOCAL_CERTIFICATE)     \
+          _f(URI_SAN_PEER_CERTIFICATE) _f(LOCAL_ADDRESS) _f(TRANSPORT_FAILURE_REASON)
 
 static inline std::string downCase(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -83,7 +84,8 @@ static absl::flat_hash_map<std::string, ResponseToken> response_tokens = {RESPON
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), ConnectionToken::_t},
-static absl::flat_hash_map<std::string, ConnectionToken> connection_tokens = {CONNECTION_TOKENS(_PAIR)};
+static absl::flat_hash_map<std::string, ConnectionToken> connection_tokens = {
+    CONNECTION_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), UpstreamToken::_t},
@@ -156,11 +158,34 @@ const std::string CONNECTION_URI_SAN_LOCAL_CERTIFICATE_TOKEN = "uri_san_local_ce
 const std::string CONNECTION_URI_SAN_PEER_CERTIFICATE_TOKEN = "uri_san_peer_certificate";
 const std::string CONNECTION_TERMINATION_DETAILS_TOKEN = "termination_details";
 
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders> referer_handle = Http::CustomHeaders::get().Referer;
+Value ExprValueUtil::stringValue(const std::string& str) {
+  Value val;
+  val.set_string_value(str);
+  return val;
+}
+
+Value ExprValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
+  if (str.has_value()) {
+    return ExprValueUtil::stringValue(str.value());
+  }
+  return ExprValueUtil::nullValue();
+}
+
+const Value ExprValueUtil::nullValue() {
+  static const auto* v = []() -> Value* {
+    auto* vv = new Value();
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
+    return vv;
+  }();
+  return *v;
+}
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle = Http::CustomHeaders::get().Referer;
 
 ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& AttrUtils::build() {
-  for (const std::string &s : specified_) {
-    findValue(absl::string_view(s));
+  for (const std::string& s : specified_) {
+    auto [root_tok, sub_tok] = tokenizePath(absl::string_view(s));
+    findValue(root_tok, sub_tok);
   }
   return attributes_;
 }
@@ -175,53 +200,47 @@ std::tuple<absl::string_view, absl::string_view> AttrUtils::tokenizePath(absl::s
 
   auto root_tok = path.substr(0, root_token_str_end);
   absl::string_view sub_tok;
-  if (root_token_str_end+1 < path.size()) {
-    sub_tok = path.substr(root_token_str_end+1, std::min(path.find('\0'), path.size() - root_token_str_end -1));
+  if (root_token_str_end + 1 < path.size()) {
+    sub_tok = path.substr(root_token_str_end + 1,
+                          std::min(path.find('\0'), path.size() - root_token_str_end - 1));
   }
   return std::tuple(root_tok, sub_tok);
 }
 
-void AttrUtils::findValue(absl::string_view path) {
-  auto [root_tok, sub_tok] = tokenizePath(path);
+Value AttrUtils::findValue(absl::string_view root_tok, absl::string_view sub_tok) {
   auto root_id = property_tokens.find(root_tok);
   if (root_id == property_tokens.end()) {
-    ENVOY_LOG(debug, "The attribute '{}' is not a valid ext_proc attribute token", path);
+    ENVOY_LOG(debug, "The attribute '{}.{}' is not a valid ext_proc attribute", root_tok, sub_tok);
     return;
   }
 
   switch (root_id->second) {
   case PropertyToken::REQUEST:
-    AttrUtils::requestSet(sub_tok);
-    break;
+    return AttrUtils::requestSet(sub_tok);
   case PropertyToken::RESPONSE:
-    AttrUtils::responseSet(sub_tok);
-    break;
+    return AttrUtils::responseSet(sub_tok);
   case PropertyToken::CONNECTION:
-    AttrUtils::connectionSet(sub_tok);
-    break;
+    return AttrUtils::connectionSet(sub_tok);
   case PropertyToken::UPSTREAM:
-    AttrUtils::upstreamSet(sub_tok);
-    break;
+    return AttrUtils::upstreamSet(sub_tok);
   case PropertyToken::SOURCE:
-    AttrUtils::sourceSet(sub_tok);
-    break;
+    return AttrUtils::sourceSet(sub_tok);
   case PropertyToken::DESTINATION:
-    AttrUtils::destinationSet(sub_tok);
-    break;
+    return AttrUtils::destinationSet(sub_tok);
   case PropertyToken::METADATA:
     if (sub_tok.empty()) {
-      AttrUtils::metadataSet();
+      return AttrUtils::metadataSet();
     }
-    break;
+    return ExprValueUtil::nullValue();
   case PropertyToken::FILTER_STATE:
     if (sub_tok.empty()) {
-      AttrUtils::filterStateSet();
+      return AttrUtils::filterStateSet();
     }
-    break;
+    return ExprValueUtil::nullValue();
   }
 }
 
-void AttrUtils::requestSet(absl::string_view path){
+Value AttrUtils::requestSet(absl::string_view path) {
   auto attr_fields = getOrInsert(REQUEST_TOKEN);
 
   auto part_token = request_tokens.find(path);
@@ -234,78 +253,89 @@ void AttrUtils::requestSet(absl::string_view path){
   int end;
 
   switch (part_token->second) {
-    case RequestToken::PATH:
-      if (headers != nullptr) {
-        attr_fields[REQUEST_PATH_TOKEN] = ValueUtil::stringValue(std::string(headers->getPathValue()));
+  case RequestToken::PATH:
+    if (headers != nullptr) {
+      attr_fields[REQUEST_PATH_TOKEN] =
+          ExprValueUtil::stringValue(std::string(headers->getPathValue()));
+    }
+    break;
+  case RequestToken::URL_PATH:
+    if (headers != nullptr && headers->Path() != nullptr && headers->Path()->value() != nullptr) {
+      end = std::max(path.find('\0'), path.find('?'));
+      attr_fields[REQUEST_URL_PATH_TOKEN] = ExprValueUtil::stringValue(
+          std::string(headers->Path()->value().getStringView().substr(0, end)));
+    }
+    break;
+  case RequestToken::HOST:
+    if (headers != nullptr) {
+      attr_fields[REQUEST_HOST_TOKEN] =
+          ExprValueUtil::stringValue(std::string(headers->getHostValue()));
+    }
+    break;
+  case RequestToken::SCHEME:
+    if (headers != nullptr) {
+      attr_fields[REQUEST_SCHEME_TOKEN] =
+          ExprValueUtil::stringValue(std::string(headers->getSchemeValue()));
+    }
+    break;
+  case RequestToken::METHOD:
+    if (headers != nullptr) {
+      attr_fields[REQUEST_METHOD_TOKEN] =
+          ExprValueUtil::stringValue(std::string(headers->getMethodValue()));
+    }
+    break;
+  case RequestToken::HEADERS:
+    ENVOY_LOG(debug, "ignoring unimplemented attribute request.headers");
+    break;
+  case RequestToken::REFERER:
+    if (headers != nullptr) {
+      attr_fields[REQUEST_REFERER_TOKEN] =
+          ExprValueUtil::stringValue(std::string(headers->getInlineValue(referer_handle.handle())));
+    }
+    break;
+  case RequestToken::USERAGENT:
+    if (headers != nullptr) {
+      attr_fields[REQUEST_USERAGENT_TOKEN] =
+          ExprValueUtil::stringValue(std::string(headers->getUserAgentValue()));
+    }
+    break;
+  case RequestToken::TIME:
+    attr_fields[REQUEST_TIME_TOKEN] = ExprValueUtil::stringValue(getTs());
+    break;
+  case RequestToken::ID:
+    if (headers != nullptr) {
+      attr_fields[REQUEST_ID_TOKEN] =
+          ExprValueUtil::stringValue(std::string(headers->getRequestIdValue()));
+    }
+    break;
+  case RequestToken::PROTOCOL:
+    attr_fields[REQUEST_PROTOCOL_TOKEN] = ExprValueUtil::optionalStringValue(
+        HttpProtocolStrings[static_cast<int>(info_.protocol().value())]);
+    break;
+  case RequestToken::DURATION:
+    if (info_.requestComplete().has_value()) {
+      attr_fields[REQUEST_DURATION_TOKEN] = ExprValueUtil::stringValue(
+          formatDuration(absl::FromChrono(info_.requestComplete().value())));
+    }
+    break;
+  case RequestToken::SIZE:
+    if (headers != nullptr && headers->ContentLength() != nullptr) {
+      int64_t length;
+      if (absl::SimpleAtoi(headers->ContentLength()->value().getStringView(), &length)) {
+        attr_fields[REQUEST_SIZE_TOKEN] = ExprValueUtil::int64Value(length);
       }
-      break;
-    case RequestToken::URL_PATH:
-      if (headers != nullptr && headers->Path() != nullptr && headers->Path()->value() != nullptr) {
-        end = std::max(path.find('\0'), path.find('?'));
-        attr_fields[REQUEST_URL_PATH_TOKEN] = ValueUtil::stringValue(std::string(headers->Path()->value().getStringView().substr(0, end)));
-      }
-      break;
-    case RequestToken::HOST:
-      if (headers != nullptr) {
-        attr_fields[REQUEST_HOST_TOKEN] = ValueUtil::stringValue(std::string(headers->getHostValue()));
-      }
-      break;
-    case RequestToken::SCHEME:
-      if (headers != nullptr) {
-        attr_fields[REQUEST_SCHEME_TOKEN] = ValueUtil::stringValue(std::string(headers->getSchemeValue()));
-      }
-      break;
-    case RequestToken::METHOD:
-      if (headers != nullptr) {
-        attr_fields[REQUEST_METHOD_TOKEN] = ValueUtil::stringValue(std::string(headers->getMethodValue()));
-      }
-      break;
-    case RequestToken::HEADERS:
-      ENVOY_LOG(debug, "ignoring unimplemented attribute request.headers");
-      break;
-    case RequestToken::REFERER:
-      if (headers != nullptr) {
-        attr_fields[REQUEST_REFERER_TOKEN] = ValueUtil::stringValue(std::string(headers->getInlineValue(referer_handle.handle())));
-      }
-      break;
-    case RequestToken::USERAGENT:
-      if (headers != nullptr) {
-        attr_fields[REQUEST_USERAGENT_TOKEN] = ValueUtil::stringValue(std::string(headers->getUserAgentValue()));
-      }
-      break;
-    case RequestToken::TIME:
-        attr_fields[REQUEST_TIME_TOKEN] = ValueUtil::stringValue(getTs());
-      break;
-    case RequestToken::ID:
-      if (headers != nullptr) {
-        attr_fields[REQUEST_ID_TOKEN] = ValueUtil::stringValue(std::string(headers->getRequestIdValue()));
-      }
-      break;
-    case RequestToken::PROTOCOL:
-        attr_fields[REQUEST_PROTOCOL_TOKEN] = ValueUtil::optionalStringValue(HttpProtocolStrings[static_cast<int>(info_.protocol().value())]);
-      break;
-    case RequestToken::DURATION:
-      if (info_.requestComplete().has_value()) {
-        attr_fields[REQUEST_DURATION_TOKEN] = ValueUtil::stringValue(formatDuration(absl::FromChrono(info_.requestComplete().value())));
-      }
-      break;
-    case RequestToken::SIZE:
-      if (headers != nullptr && headers->ContentLength() != nullptr) {
-        int64_t length;
-        if (absl::SimpleAtoi(headers->ContentLength()->value().getStringView(), &length)) {
-          attr_fields[REQUEST_SIZE_TOKEN] = ValueUtil::numberValue(length);
-        }
-      } else {
-          attr_fields[REQUEST_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived());
-      }
-      break;
-    case RequestToken::TOTAL_SIZE:
-      attr_fields[REQUEST_TOTAL_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived() + headers != nullptr ? headers->byteSize() : 0);
-      break;
+    } else {
+      attr_fields[REQUEST_SIZE_TOKEN] = ExprValueUtil::uint64Value(info_.bytesReceived());
+    }
+    break;
+  case RequestToken::TOTAL_SIZE:
+    attr_fields[REQUEST_TOTAL_SIZE_TOKEN] = ExprValueUtil::uint64Value(
+        info_.bytesReceived() + headers != nullptr ? headers->byteSize() : 0);
+    break;
   }
 }
 
-void AttrUtils::responseSet(absl::string_view path) {
+Value AttrUtils::responseSet(absl::string_view path) {
   auto attr_fields = getOrInsert(RESPONSE_TOKEN);
 
   auto part_token = response_tokens.find(path);
@@ -315,37 +345,38 @@ void AttrUtils::responseSet(absl::string_view path) {
   }
 
   switch (part_token->second) {
-    case ResponseToken::CODE:
-      if (info_.responseCode().has_value()) {
-        attr_fields[RESPONSE_CODE_TOKEN] = ValueUtil::numberValue(info_.responseCode().value());
-      }
-      break;
-    case ResponseToken::CODE_DETAILS:
-      attr_fields[RESPONSE_CODE_DETAILS_TOKEN] = ValueUtil::optionalStringValue(info_.responseCodeDetails());
-      break;
-    case ResponseToken::FLAGS:
-      attr_fields[RESPONSE_FLAGS_TOKEN] = ValueUtil::numberValue(info_.responseFlags());
-      break;
-    case ResponseToken::GRPC_STATUS:
-      ENVOY_LOG(debug, "ignoring unimplemented attribute response.grpc_status");
-      // attr_fields[RESPONSE_GRPC_STATUS_TOKEN] = getGrpcStatus();
-      break;
-    case ResponseToken::HEADERS:
-      ENVOY_LOG(debug, "ignoring unimplemented attribute response.headers");
-      break;
-    case ResponseToken::TRAILERS:
-      ENVOY_LOG(debug, "ignoring unimplemented attribute response.trailers");
-      break;
-    case ResponseToken::SIZE:
-      attr_fields[RESPONSE_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesSent());
+  case ResponseToken::CODE:
+    if (info_.responseCode().has_value()) {
+      attr_fields[RESPONSE_CODE_TOKEN] = ExprValueUtil::uint64Value(info_.responseCode().value());
+    }
+    break;
+  case ResponseToken::CODE_DETAILS:
+    attr_fields[RESPONSE_CODE_DETAILS_TOKEN] =
+        ExprValueUtil::optionalStringValue(info_.responseCodeDetails());
+    break;
+  case ResponseToken::FLAGS:
+    attr_fields[RESPONSE_FLAGS_TOKEN] = ExprValueUtil::uint64Value(info_.responseFlags());
+    break;
+  case ResponseToken::GRPC_STATUS:
+    ENVOY_LOG(debug, "ignoring unimplemented attribute response.grpc_status");
+    // attr_fields[RESPONSE_GRPC_STATUS_TOKEN] = getGrpcStatus();
+    break;
+  case ResponseToken::HEADERS:
+    ENVOY_LOG(debug, "ignoring unimplemented attribute response.headers");
+    break;
+  case ResponseToken::TRAILERS:
+    ENVOY_LOG(debug, "ignoring unimplemented attribute response.trailers");
+    break;
+  case ResponseToken::SIZE:
+    attr_fields[RESPONSE_SIZE_TOKEN] = ExprValueUtil::uint64Value(info_.bytesSent());
 
-    case ResponseToken::TOTAL_SIZE:
-      attr_fields[RESPONSE_TOTAL_SIZE_TOKEN] = ValueUtil::numberValue(info_.bytesReceived());
-      break;
+  case ResponseToken::TOTAL_SIZE:
+    attr_fields[RESPONSE_TOTAL_SIZE_TOKEN] = ExprValueUtil::uint64Value(info_.bytesReceived());
+    break;
   }
 }
 
-void AttrUtils::destinationSet(absl::string_view path){
+Value AttrUtils::destinationSet(absl::string_view path) {
   auto attr_fields = getOrInsert(DESTINATION_TOKEN);
 
   auto addr = info_.downstreamAddressProvider().localAddress();
@@ -353,18 +384,18 @@ void AttrUtils::destinationSet(absl::string_view path){
     return;
   }
   if (path == DESTINATION_ADDRESS_TOKEN) {
-    attr_fields[DESTINATION_ADDRESS_TOKEN] = ValueUtil::stringValue(addr->asString());
+    attr_fields[DESTINATION_ADDRESS_TOKEN] = ExprValueUtil::stringValue(addr->asString());
   } else if (path == DESTINATION_PORT_TOKEN) {
     if (addr->ip() == nullptr) {
       return;
     }
-    attr_fields[DESTINATION_PORT_TOKEN] = ValueUtil::numberValue(addr->ip()->port());
+    attr_fields[DESTINATION_PORT_TOKEN] = ExprValueUtil::uint64Value(addr->ip()->port());
   } else {
     ENVOY_LOG(debug, "Unable to find ext_proc destination attribute: '{}'", path);
   }
 }
 
-void AttrUtils::sourceSet(absl::string_view path){
+Value AttrUtils::sourceSet(absl::string_view path) {
   if (!attributes_.contains(SOURCE_TOKEN)) {
     attributes_[SOURCE_TOKEN] = ProtobufWkt::Struct();
   }
@@ -378,18 +409,18 @@ void AttrUtils::sourceSet(absl::string_view path){
     return;
   }
   if (path == SOURCE_ADDRESS_TOKEN) {
-    attr_fields[SOURCE_ADDRESS_TOKEN] = ValueUtil::stringValue(addr->asString());
+    attr_fields[SOURCE_ADDRESS_TOKEN] = ExprValueUtil::stringValue(addr->asString());
   } else if (path == SOURCE_PORT_TOKEN) {
     if (addr->ip() == nullptr) {
       return;
     }
-    attr_fields[SOURCE_PORT_TOKEN] = ValueUtil::numberValue(addr->ip()->port());
+    attr_fields[SOURCE_PORT_TOKEN] = ExprValueUtil::uint64Value(addr->ip()->port());
   } else {
     ENVOY_LOG(debug, "Unable to find ext_proc source attribute: '{}'", path);
   }
 }
 
-void AttrUtils::upstreamSet(absl::string_view path){
+Value AttrUtils::upstreamSet(absl::string_view path) {
   auto attr_fields = getOrInsert(UPSTREAM_TOKEN);
 
   auto part_token = upstream_tokens.find(path);
@@ -401,63 +432,75 @@ void AttrUtils::upstreamSet(absl::string_view path){
   auto upstreamHost = info_.upstreamHost();
   auto upstreamSsl = info_.upstreamSslConnection();
   switch (part_token->second) {
-    case UpstreamToken::ADDRESS:
-      if (upstreamHost != nullptr && upstreamHost->address() != nullptr) {
-        attr_fields[UPSTREAM_ADDRESS_TOKEN] = ValueUtil::stringValue(upstreamHost->address()->asString());
-      }
-      break;
-    case UpstreamToken::PORT:
-      if (upstreamHost != nullptr && upstreamHost->address() != nullptr && upstreamHost->address()->ip() != nullptr) {
-        attr_fields[UPSTREAM_PORT_TOKEN] = ValueUtil::numberValue(upstreamHost->address()->ip()->port());
-      }
-      break;
-    case UpstreamToken::TLS_VERSION:
-      if (upstreamSsl != nullptr) {
-        attr_fields[UPSTREAM_TLS_VERSION_TOKEN] = ValueUtil::stringValue(upstreamSsl->tlsVersion());
-      }
-      break;
-    case UpstreamToken::SUBJECT_LOCAL_CERTIFICATE:
-      if (upstreamSsl != nullptr) {
-        attr_fields[UPSTREAM_SUBJECT_LOCAL_CERTIFICATE_TOKEN] = ValueUtil::stringValue(upstreamSsl->subjectLocalCertificate());
-      }
-      break;
-    case UpstreamToken::SUBJECT_PEER_CERTIFICATE:
-      if (upstreamSsl != nullptr) {
-        attr_fields[UPSTREAM_SUBJECT_LOCAL_CERTIFICATE_TOKEN] = ValueUtil::stringValue(upstreamSsl->subjectPeerCertificate());
-      }
-      break;
-    case UpstreamToken::DNS_SAN_LOCAL_CERTIFICATE:
-      if (upstreamSsl != nullptr) {
-        attr_fields[UPSTREAM_DNS_SAN_LOCAL_CERTIFICATE_TOKEN] = ValueUtil::stringValue(upstreamSsl->dnsSansLocalCertificate().front());
-      }
-      break;
-    case UpstreamToken::DNS_SAN_PEER_CERTIFICATE:
-      if (upstreamSsl != nullptr) {
-        attr_fields[UPSTREAM_DNS_SAN_PEER_CERTIFICATE_TOKEN] = ValueUtil::stringValue(upstreamSsl->dnsSansPeerCertificate().front());
-      }
-      break;
-    case UpstreamToken::URI_SAN_LOCAL_CERTIFICATE:
-      if (upstreamSsl != nullptr) {
-        attr_fields[UPSTREAM_URI_SAN_LOCAL_CERTIFICATE_TOKEN] = ValueUtil::stringValue(upstreamSsl->uriSanLocalCertificate().front());
-      }
-      break;
-    case UpstreamToken::URI_SAN_PEER_CERTIFICATE:
-      if (upstreamSsl != nullptr) {
-        attr_fields[UPSTREAM_URI_SAN_PEER_CERTIFICATE_TOKEN] = ValueUtil::stringValue(upstreamSsl->uriSanPeerCertificate().front());
-      }
-      break;
-    case UpstreamToken::LOCAL_ADDRESS:
-      if (info_.upstreamLocalAddress() != nullptr) {
-        attr_fields[UPSTREAM_LOCAL_ADDRESS_TOKEN] = ValueUtil::stringValue(info_.upstreamLocalAddress()->asString());
-      }
-      break;
-    case UpstreamToken::TRANSPORT_FAILURE_REASON:
-      attr_fields[UPSTREAM_TRANSPORT_FAILURE_REASON_TOKEN] = ValueUtil::stringValue(info_.upstreamTransportFailureReason());
-      break;
+  case UpstreamToken::ADDRESS:
+    if (upstreamHost != nullptr && upstreamHost->address() != nullptr) {
+      attr_fields[UPSTREAM_ADDRESS_TOKEN] =
+          ExprValueUtil::stringValue(upstreamHost->address()->asString());
+    }
+    break;
+  case UpstreamToken::PORT:
+    if (upstreamHost != nullptr && upstreamHost->address() != nullptr &&
+        upstreamHost->address()->ip() != nullptr) {
+      attr_fields[UPSTREAM_PORT_TOKEN] =
+          ExprValueUtil::uint64Value(upstreamHost->address()->ip()->port());
+    }
+    break;
+  case UpstreamToken::TLS_VERSION:
+    if (upstreamSsl != nullptr) {
+      attr_fields[UPSTREAM_TLS_VERSION_TOKEN] =
+          ExprValueUtil::stringValue(upstreamSsl->tlsVersion());
+    }
+    break;
+  case UpstreamToken::SUBJECT_LOCAL_CERTIFICATE:
+    if (upstreamSsl != nullptr) {
+      attr_fields[UPSTREAM_SUBJECT_LOCAL_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(upstreamSsl->subjectLocalCertificate());
+    }
+    break;
+  case UpstreamToken::SUBJECT_PEER_CERTIFICATE:
+    if (upstreamSsl != nullptr) {
+      attr_fields[UPSTREAM_SUBJECT_LOCAL_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(upstreamSsl->subjectPeerCertificate());
+    }
+    break;
+  case UpstreamToken::DNS_SAN_LOCAL_CERTIFICATE:
+    if (upstreamSsl != nullptr) {
+      attr_fields[UPSTREAM_DNS_SAN_LOCAL_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(upstreamSsl->dnsSansLocalCertificate().front());
+    }
+    break;
+  case UpstreamToken::DNS_SAN_PEER_CERTIFICATE:
+    if (upstreamSsl != nullptr) {
+      attr_fields[UPSTREAM_DNS_SAN_PEER_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(upstreamSsl->dnsSansPeerCertificate().front());
+    }
+    break;
+  case UpstreamToken::URI_SAN_LOCAL_CERTIFICATE:
+    if (upstreamSsl != nullptr) {
+      attr_fields[UPSTREAM_URI_SAN_LOCAL_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(upstreamSsl->uriSanLocalCertificate().front());
+    }
+    break;
+  case UpstreamToken::URI_SAN_PEER_CERTIFICATE:
+    if (upstreamSsl != nullptr) {
+      attr_fields[UPSTREAM_URI_SAN_PEER_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(upstreamSsl->uriSanPeerCertificate().front());
+    }
+    break;
+  case UpstreamToken::LOCAL_ADDRESS:
+    if (info_.upstreamLocalAddress() != nullptr) {
+      attr_fields[UPSTREAM_LOCAL_ADDRESS_TOKEN] =
+          ExprValueUtil::stringValue(info_.upstreamLocalAddress()->asString());
+    }
+    break;
+  case UpstreamToken::TRANSPORT_FAILURE_REASON:
+    attr_fields[UPSTREAM_TRANSPORT_FAILURE_REASON_TOKEN] =
+        ExprValueUtil::stringValue(info_.upstreamTransportFailureReason());
+    break;
   }
 }
 
-void AttrUtils::connectionSet(absl::string_view path){
+Value AttrUtils::connectionSet(absl::string_view path) {
   auto attr_fields = getOrInsert(CONNECTION_TOKEN);
 
   auto part_token = connection_tokens.find(path);
@@ -465,85 +508,101 @@ void AttrUtils::connectionSet(absl::string_view path){
     ENVOY_LOG(debug, "Unable to find ext_proc connection attribute: '{}'", path);
     return;
   }
-  
+
   auto connId = info_.connectionID();
   auto downstreamSsl = info_.downstreamSslConnection();
 
   switch (part_token->second) {
-    case ConnectionToken::ID:
-      if (connId.has_value()) {
-        attr_fields[CONNECTION_ID_TOKEN] = ValueUtil::numberValue(connId.value());
-      }
-      break;
-    case ConnectionToken::MTLS:
-      return;
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_MTLS_TOKEN] = ValueUtil::boolValue(downstreamSsl->peerCertificatePresented());
-      }
-      break;
-    case ConnectionToken::REQUESTED_SERVER_NAME:
-      attr_fields[CONNECTION_REQUESTED_SERVER_NAME_TOKEN] = ValueUtil::stringValue(info_.requestedServerName());
-      break;
-    case ConnectionToken::TLS_VERSION:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_TLS_VERSION_TOKEN] = ValueUtil::stringValue(downstreamSsl->tlsVersion());
-      }
-      break;
-    case ConnectionToken::SUBJECT_LOCAL_CERTIFICATE:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_SUBJECT_LOCAL_CERTIFICATE_TOKEN] = ValueUtil::stringValue(downstreamSsl->subjectLocalCertificate());
-      }
-      break;
-    case ConnectionToken::SUBJECT_PEER_CERTIFICATE:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_SUBJECT_PEER_CERTIFICATE_TOKEN] = ValueUtil::stringValue(downstreamSsl->subjectPeerCertificate());
-      }
-      break;
-    case ConnectionToken::DNS_SAN_LOCAL_CERTIFICATE:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_DNS_SAN_LOCAL_CERTIFICATE_TOKEN] = ValueUtil::stringValue(std::string(downstreamSsl->dnsSansLocalCertificate().front()));
-      }
-      break;
-    case ConnectionToken::DNS_SAN_PEER_CERTIFICATE:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_DNS_SAN_PEER_CERTIFICATE_TOKEN] = ValueUtil::stringValue(std::string(downstreamSsl->dnsSansPeerCertificate().front()));
-      }
-      break;
-    case ConnectionToken::URI_SAN_LOCAL_CERTIFICATE:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_URI_SAN_LOCAL_CERTIFICATE_TOKEN] = ValueUtil::stringValue(std::string(downstreamSsl->uriSanLocalCertificate().front()));
-      }
-      break;
-    case ConnectionToken::URI_SAN_PEER_CERTIFICATE:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_URI_SAN_PEER_CERTIFICATE_TOKEN] = ValueUtil::stringValue(std::string(downstreamSsl->uriSanPeerCertificate().front()));
-      }
-      break;
-    case ConnectionToken::TERMINATION_DETAILS:
-      if (downstreamSsl != nullptr) {
-        attr_fields[CONNECTION_TERMINATION_DETAILS_TOKEN] = ValueUtil::optionalStringValue(info_.connectionTerminationDetails());
-      }
+  case ConnectionToken::ID:
+    if (connId.has_value()) {
+      attr_fields[CONNECTION_ID_TOKEN] = ExprValueUtil::uint64Value(connId.value());
+    }
+    break;
+  case ConnectionToken::MTLS:
+    return;
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_MTLS_TOKEN] =
+          ExprValueUtil::boolValue(downstreamSsl->peerCertificatePresented());
+    }
+    break;
+  case ConnectionToken::REQUESTED_SERVER_NAME:
+    attr_fields[CONNECTION_REQUESTED_SERVER_NAME_TOKEN] =
+        ExprValueUtil::stringValue(info_.requestedServerName());
+    break;
+  case ConnectionToken::TLS_VERSION:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_TLS_VERSION_TOKEN] =
+          ExprValueUtil::stringValue(downstreamSsl->tlsVersion());
+    }
+    break;
+  case ConnectionToken::SUBJECT_LOCAL_CERTIFICATE:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_SUBJECT_LOCAL_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(downstreamSsl->subjectLocalCertificate());
+    }
+    break;
+  case ConnectionToken::SUBJECT_PEER_CERTIFICATE:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_SUBJECT_PEER_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(downstreamSsl->subjectPeerCertificate());
+    }
+    break;
+  case ConnectionToken::DNS_SAN_LOCAL_CERTIFICATE:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_DNS_SAN_LOCAL_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(std::string(downstreamSsl->dnsSansLocalCertificate().front()));
+    }
+    break;
+  case ConnectionToken::DNS_SAN_PEER_CERTIFICATE:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_DNS_SAN_PEER_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(std::string(downstreamSsl->dnsSansPeerCertificate().front()));
+    }
+    break;
+  case ConnectionToken::URI_SAN_LOCAL_CERTIFICATE:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_URI_SAN_LOCAL_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(std::string(downstreamSsl->uriSanLocalCertificate().front()));
+    }
+    break;
+  case ConnectionToken::URI_SAN_PEER_CERTIFICATE:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_URI_SAN_PEER_CERTIFICATE_TOKEN] =
+          ExprValueUtil::stringValue(std::string(downstreamSsl->uriSanPeerCertificate().front()));
+    }
+    break;
+  case ConnectionToken::TERMINATION_DETAILS:
+    if (downstreamSsl != nullptr) {
+      attr_fields[CONNECTION_TERMINATION_DETAILS_TOKEN] =
+          ExprValueUtil::optionalStringValue(info_.connectionTerminationDetails());
+    }
   }
 }
 
-void AttrUtils::metadataSet() {
-    if (!attributes_.contains(METADATA_TOKEN)) {
-      attributes_[METADATA_TOKEN] = ProtobufWkt::Struct();
-      (*attributes_[METADATA_TOKEN].mutable_fields())[METADATA_FILTER_METADATA_TOKEN] = ValueUtil::structValue(ProtobufWkt::Struct());
-      for (auto const& [k, s]: info_.dynamicMetadata().filter_metadata()) {
-        (*((*attributes_[METADATA_TOKEN].mutable_fields())[METADATA_FILTER_METADATA_TOKEN].mutable_struct_value())->mutable_fields())[k] = ValueUtil::structValue(s);
-      }
+Value AttrUtils::metadataSet() {
+  if (!attributes_.contains(METADATA_TOKEN)) {
+    attributes_[METADATA_TOKEN] = ProtobufWkt::Struct();
+    (*attributes_[METADATA_TOKEN].mutable_fields())[METADATA_FILTER_METADATA_TOKEN] =
+        ExprValueUtil::structValue(ProtobufWkt::Struct());
+    for (auto const& [k, s] : info_.dynamicMetadata().filter_metadata()) {
+      (*((*attributes_[METADATA_TOKEN].mutable_fields())[METADATA_FILTER_METADATA_TOKEN]
+             .mutable_struct_value())
+            ->mutable_fields())[k] = ExprValueUtil::structValue(s);
     }
-
+  }
 }
 
 // todo(eas): there are two issues here
-// 1. FilterState seems to be an opaque data store and therefore does not have an iterator implemented on it,
+// 1. FilterState seems to be an opaque data store and therefore does not have an iterator
+// implemented on it,
 //   it seems incorrect to just attach all of this data, need to check with envoy maintainers.
-// 2. Encoding as a [`ProtobufWkt::Value`](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#value)
-//   is problematic. In the [attribute docs](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes)
-//   it is indicated that the filter state values should be binary data, but `Value` only allows the following:
-//   [null, number, string, bool, struct, list] where struct is simply a `map<string, value>`.
+// 2. Encoding as a
+// [`ProtobufWkt::Value`](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#value)
+//   is problematic. In the [attribute
+//   docs](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes) it
+//   is indicated that the filter state values should be binary data, but `Value` only allows the
+//   following: [null, number, string, bool, struct, list] where struct is simply a `map<string,
+//   value>`.
 void AttrUtils::filterStateSet() {
   ENVOY_LOG(debug, "ignoring unimplemented attribute filter_state");
 }
@@ -567,34 +626,38 @@ ProtobufWkt::Map<std::string, ProtobufWkt::Value>& AttrUtils::getOrInsert(std::s
 
 // todo(eas): this seems to result in a nullptr exception when empty headers are used.
 ProtobufWkt::Value AttrUtils::getGrpcStatus() {
-  Http::ResponseHeaderMap& hs = response_headers_ != nullptr ? *response_headers_ : *Envoy::Http::StaticEmptyHeaders::get().response_headers;
-  Http::ResponseTrailerMap& ts = response_trailers_ != nullptr ? *response_trailers_ : *Envoy::Http::StaticEmptyHeaders::get().response_trailers;
+  Http::ResponseHeaderMap& hs = response_headers_ != nullptr
+                                    ? *response_headers_
+                                    : *Envoy::Http::StaticEmptyHeaders::get().response_headers;
+  Http::ResponseTrailerMap& ts = response_trailers_ != nullptr
+                                     ? *response_trailers_
+                                     : *Envoy::Http::StaticEmptyHeaders::get().response_trailers;
 
   if (!Envoy::Grpc::Common::hasGrpcContentType(hs)) {
-    return ValueUtil::nullValue();
+    return ExprValueUtil::nullValue();
   }
 
   auto const& optional_status = Envoy::Grpc::Common::getGrpcStatus(ts, hs, info_);
 
   if (optional_status.has_value()) {
-    return ValueUtil::numberValue(optional_status.value());
+    return ExprValueUtil::uint64Value(optional_status.value());
   }
-  return ValueUtil::nullValue();
+  return ExprValueUtil::nullValue();
 }
-void AttrUtils::setRequestHeaders(Http::RequestHeaderMap* request_headers){
+void AttrUtils::setRequestHeaders(Http::RequestHeaderMap* request_headers) {
   request_headers_ = request_headers;
 }
-void AttrUtils::setRequestTrailers(Http::RequestTrailerMap* request_trailers){
+void AttrUtils::setRequestTrailers(Http::RequestTrailerMap* request_trailers) {
   request_trailers_ = request_trailers;
 }
-void AttrUtils::setResponseHeaders(Http::ResponseHeaderMap* response_headers){
+void AttrUtils::setResponseHeaders(Http::ResponseHeaderMap* response_headers) {
   response_headers_ = response_headers;
 }
-void AttrUtils::setResponseTrailers(Http::ResponseTrailerMap* response_trailers){
+void AttrUtils::setResponseTrailers(Http::ResponseTrailerMap* response_trailers) {
   response_trailers_ = response_trailers;
 }
 
-} // ExternalProcessing
-} // HttpFilters
-} // Extensions
-} // Envoy
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
