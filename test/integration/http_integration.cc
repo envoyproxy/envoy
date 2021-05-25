@@ -254,13 +254,13 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
         envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
-  } else {
 #ifdef ENVOY_ENABLE_QUIC
+  } else {
     if (http2_options->has_initial_stream_window_size() &&
         http2_options->initial_stream_window_size().value() < quic::kStreamReceiveWindowLimit) {
       // Set http3 stream flow control window only if the configured http2 stream flow control
       // window is smaller than the upper limit of flow control window supported by QUICHE which is
-      // also the default for http3 stream.
+      // also the default for http3 streams.
       http3_options.mutable_quic_protocol_options()
           ->mutable_initial_stream_window_size()
           ->set_value(http2_options->initial_stream_window_size().value());
