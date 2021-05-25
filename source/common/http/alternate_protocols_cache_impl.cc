@@ -1,6 +1,6 @@
 #include "common/http/alternate_protocols_cache_impl.h"
 
-#include "common/common/assert.h"
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Http {
@@ -12,9 +12,12 @@ AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   const std::vector<AlternateProtocol>& protocols) {
-  // TODO(RyanTheOptimist): Figure out the best place to enforce this limit.
-  ASSERT(protocols.size() < 10);
   protocols_[origin] = protocols;
+  static const size_t max_protocols = 10;
+  if (protocols.size() > max_protocols) {
+    ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
+    protocols_[origin].erase(protocols_[origin].begin() + max_protocols);
+  }
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>

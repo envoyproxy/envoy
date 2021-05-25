@@ -95,6 +95,26 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) 
   EXPECT_EQ(protocols2_, protocols.ref());
 }
 
+TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterTruncation) {
+  AlternateProtocolsCacheImpl::AlternateProtocol protocol = protocol1_;
+
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> expected_protocols;
+  for (size_t i = 0; i < 10; ++i) {
+    protocol.port_++;
+    expected_protocols.push_back(protocol);
+  }
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> full_protocols = expected_protocols;
+  protocol.port_++;
+  full_protocols.push_back(protocol);
+
+  protocols_.setAlternatives(origin1_, full_protocols);
+  OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
+      protocols_.findAlternatives(origin1_);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(10, protocols->size());
+  EXPECT_EQ(expected_protocols, protocols.ref());
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
