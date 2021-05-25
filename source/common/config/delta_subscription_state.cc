@@ -63,7 +63,6 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     } else if (!names_added_.empty()) {
       // switch to explicit mode if we requested some extra names
       mode_ = WildcardMode::Explicit;
-      names_added_.emplace("*");
     }
     break;
 
@@ -212,8 +211,12 @@ DeltaSubscriptionState::getNextRequestAckless() {
       }
     }
     // We are not clearing the names_added_ set. If we are in implicit wildcard subscription mode,
-    // then the set should be empty. If we are in explicit wildcard mode then the set will contain
-    // the names we explicitly requested.
+    // then the set should already be empty. If we are in explicit wildcard mode then the set will
+    // contain the names we explicitly requested, but we need to add * to the list to make sure it's
+    // sent too.
+    if (mode_ == WildcardMode::Explicit) {
+      names_added_.insert("*");
+    }
     names_removed_.clear();
   }
   std::copy(names_added_.begin(), names_added_.end(),
