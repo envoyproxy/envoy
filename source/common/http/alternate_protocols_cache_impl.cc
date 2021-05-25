@@ -1,5 +1,7 @@
 #include "common/http/alternate_protocols_cache_impl.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Http {
 
