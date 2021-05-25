@@ -307,6 +307,12 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   // Verifies stream is reset.
   ASSERT_TRUE(response->waitForReset());
   ASSERT_FALSE(response->complete());
+
+  // The cluster should have received the reset.
+  // The downstream codec should send one.
+  std::string counter =
+      absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".rx_reset");
+  test_server_->waitForCounterEq(counter, 1);
 }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {

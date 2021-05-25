@@ -242,6 +242,9 @@ protected:
   void testMaxStreamDuration();
   void testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect);
   Http::CodecType downstreamProtocol() const { return downstream_protocol_; }
+  std::string downstreamProtocolStatsRoot() const;
+  // Return the upstream protocol part of the stats root.
+  std::string upstreamProtocolStatsRoot() const;
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);
 

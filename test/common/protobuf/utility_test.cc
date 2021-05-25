@@ -2016,4 +2016,100 @@ TEST(TypeUtilTest, TypeUrlHelperFunction) {
       TypeUtil::descriptorFullNameToTypeUrl("envoy.config.filter.http.ip_tagging.v2.IPTagging"));
 }
 
+class StructUtilTest : public ProtobufUtilityTest {
+protected:
+  ProtobufWkt::Struct updateSimpleStruct(const ProtobufWkt::Value& v0,
+                                         const ProtobufWkt::Value& v1) {
+    ProtobufWkt::Struct obj, with;
+    (*obj.mutable_fields())["key"] = v0;
+    (*with.mutable_fields())["key"] = v1;
+    StructUtil::update(obj, with);
+    EXPECT_EQ(obj.fields().size(), 1);
+    return obj;
+  }
+};
+
+TEST_F(StructUtilTest, StructUtilUpdateScalars) {
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::stringValue("v1"));
+    EXPECT_EQ(obj.fields().at("key").string_value(), "v1");
+  }
+
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::numberValue(0), ValueUtil::numberValue(1));
+    EXPECT_EQ(obj.fields().at("key").number_value(), 1);
+  }
+
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::boolValue(false), ValueUtil::boolValue(true));
+    EXPECT_EQ(obj.fields().at("key").bool_value(), true);
+  }
+
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::nullValue(), ValueUtil::nullValue());
+    EXPECT_EQ(obj.fields().at("key").kind_case(), ProtobufWkt::Value::KindCase::kNullValue);
+  }
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateDifferentKind) {
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::numberValue(1));
+    auto& val = obj.fields().at("key");
+    EXPECT_EQ(val.kind_case(), ProtobufWkt::Value::KindCase::kNumberValue);
+    EXPECT_EQ(val.number_value(), 1);
+  }
+
+  {
+    const auto obj =
+        updateSimpleStruct(ValueUtil::structValue(MessageUtil::keyValueStruct("subkey", "v0")),
+                           ValueUtil::stringValue("v1"));
+    auto& val = obj.fields().at("key");
+    EXPECT_EQ(val.kind_case(), ProtobufWkt::Value::KindCase::kStringValue);
+    EXPECT_EQ(val.string_value(), "v1");
+  }
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateList) {
+  ProtobufWkt::Struct obj, with;
+  auto& list = *(*obj.mutable_fields())["key"].mutable_list_value();
+  list.add_values()->set_string_value("v0");
+
+  auto& with_list = *(*with.mutable_fields())["key"].mutable_list_value();
+  with_list.add_values()->set_number_value(1);
+  const auto v2 = MessageUtil::keyValueStruct("subkey", "str");
+  *with_list.add_values()->mutable_struct_value() = v2;
+
+  StructUtil::update(obj, with);
+  ASSERT_THAT(obj.fields().size(), 1);
+  const auto& list_vals = list.values();
+  EXPECT_TRUE(ValueUtil::equal(list_vals[0], ValueUtil::stringValue("v0")));
+  EXPECT_TRUE(ValueUtil::equal(list_vals[1], ValueUtil::numberValue(1)));
+  EXPECT_TRUE(ValueUtil::equal(list_vals[2], ValueUtil::structValue(v2)));
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateNewKey) {
+  ProtobufWkt::Struct obj, with;
+  (*obj.mutable_fields())["key0"].set_number_value(1);
+  (*with.mutable_fields())["key1"].set_number_value(1);
+  StructUtil::update(obj, with);
+
+  const auto& fields = obj.fields();
+  EXPECT_TRUE(ValueUtil::equal(fields.at("key0"), ValueUtil::numberValue(1)));
+  EXPECT_TRUE(ValueUtil::equal(fields.at("key1"), ValueUtil::numberValue(1)));
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateRecursiveStruct) {
+  ProtobufWkt::Struct obj, with;
+  *(*obj.mutable_fields())["tags"].mutable_struct_value() =
+      MessageUtil::keyValueStruct("tag0", "1");
+  *(*with.mutable_fields())["tags"].mutable_struct_value() =
+      MessageUtil::keyValueStruct("tag1", "1");
+  StructUtil::update(obj, with);
+
+  ASSERT_EQ(obj.fields().at("tags").kind_case(), ProtobufWkt::Value::KindCase::kStructValue);
+  const auto& tags = obj.fields().at("tags").struct_value().fields();
+  EXPECT_TRUE(ValueUtil::equal(tags.at("tag0"), ValueUtil::stringValue("1")));
+  EXPECT_TRUE(ValueUtil::equal(tags.at("tag1"), ValueUtil::stringValue("1")));
+}
+
 } // namespace Envoy

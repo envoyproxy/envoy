@@ -69,16 +69,16 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
 }
 
 void FakeStream::postToConnectionThread(std::function<void()> cb) {
-  parent_.connection().dispatcher().post(cb);
+  parent_.postToConnectionThread(cb);
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
-  parent_.connection().dispatcher().post([this, headers_copy]() -> void {
+  postToConnectionThread([this, headers_copy]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -95,10 +95,10 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
                           parent_.connection().addressProvider().localAddress()->asString());
   }
 
-  parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
+  postToConnectionThread([this, headers_copy, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -108,10 +108,10 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
 }
 
 void FakeStream::encodeData(absl::string_view data, bool end_stream) {
-  parent_.connection().dispatcher().post([this, data, end_stream]() -> void {
+  postToConnectionThread([this, data, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -122,10 +122,10 @@ void FakeStream::encodeData(absl::string_view data, bool end_stream) {
 }
 
 void FakeStream::encodeData(uint64_t size, bool end_stream) {
-  parent_.connection().dispatcher().post([this, size, end_stream]() -> void {
+  postToConnectionThread([this, size, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -137,10 +137,10 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
   std::shared_ptr<Buffer::Instance> data_copy = std::make_shared<Buffer::OwnedImpl>(data);
-  parent_.connection().dispatcher().post([this, data_copy, end_stream]() -> void {
+  postToConnectionThread([this, data_copy, end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -152,10 +152,10 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
 void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
   std::shared_ptr<Http::ResponseTrailerMap> trailers_copy(
       Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers));
-  parent_.connection().dispatcher().post([this, trailers_copy]() -> void {
+  postToConnectionThread([this, trailers_copy]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -165,10 +165,10 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
 }
 
 void FakeStream::encodeResetStream() {
-  parent_.connection().dispatcher().post([this]() -> void {
+  postToConnectionThread([this]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -178,10 +178,10 @@ void FakeStream::encodeResetStream() {
 }
 
 void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) {
-  parent_.connection().dispatcher().post([this, &metadata_map_vector]() -> void {
+  postToConnectionThread([this, &metadata_map_vector]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -191,10 +191,10 @@ void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vect
 }
 
 void FakeStream::readDisable(bool disable) {
-  parent_.connection().dispatcher().post([this, disable]() -> void {
+  postToConnectionThread([this, disable]() -> void {
     {
       absl::MutexLock lock(&lock_);
-      if (saw_reset_) {
+      if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
       }
@@ -389,7 +389,7 @@ void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
 void FakeHttpConnection::encodeGoAway() {
   ASSERT(type_ >= Http::CodecType::HTTP2);
 
-  shared_connection_.connection().dispatcher().post([this]() { codec_->goAway(); });
+  postToConnectionThread([this]() { codec_->goAway(); });
 }
 
 void FakeHttpConnection::encodeProtocolError() {
@@ -398,7 +398,7 @@ void FakeHttpConnection::encodeProtocolError() {
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
   ASSERT(codec != nullptr);
-  shared_connection_.connection().dispatcher().post([codec]() {
+  postToConnectionThread([codec]() {
     Http::Status status = codec->protocolErrorForTest();
     ASSERT(Http::getStatusCode(status) == Http::StatusCode::CodecProtocolError);
   });
@@ -427,6 +427,14 @@ AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
     return AssertionFailure() << "Timed out waiting for half close.";
   }
   return AssertionSuccess();
+}
+
+void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
+  ++pending_cbs_;
+  dispatcher_.post([this, cb]() {
+    cb();
+    --pending_cbs_;
+  });
 }
 
 AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
@@ -506,7 +514,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)), config_(config),
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == Http::CodecType::HTTP3),
-      filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
+      filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))),
+      stats_scope_(stats_store_.createScope("test_server_scope")) {
   ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
             config.udp_fake_upstream_.has_value(), FakeHttpConnection::typeToString(http_type_));
   if (config.udp_fake_upstream_.has_value() &&
@@ -686,8 +695,7 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   auto* const connection_wrapper = new_connections_.front().get();
   // Skip the thread safety check if the network connection has already been freed since there's no
   // alternate way to get access to the dispatcher.
-  ASSERT(!connection_wrapper->connected() ||
-         connection_wrapper->connection().dispatcher().isThreadSafe());
+  ASSERT(!connection_wrapper->connected() || connection_wrapper->dispatcher().isThreadSafe());
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
   if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
@@ -778,7 +786,7 @@ void FakeRawConnection::initialize() {
     ENVOY_LOG(warn, "FakeRawConnection::initialize: network connection is already disconnected");
     return;
   }
-  ASSERT(shared_connection_.connection().dispatcher().isThreadSafe());
+  ASSERT(shared_connection_.dispatcher().isThreadSafe());
   shared_connection_.connection().addReadFilter(filter);
 }
 
