@@ -91,7 +91,7 @@ elif [[ $$OS_ID == 'centos' ]]; then
     curl -sLO https://github.com/ninja-build/ninja/archive/refs/tags/v"$$VERSION".tar.gz \
       && echo "$$SHA256" v"$$VERSION".tar.gz | sha256sum --check
     tar xvf v"$$VERSION".tar.gz
-    ./v"$$VERSION"/configure.py --bootstrap
+    ./ninja-"$$VERSION"/configure.py --bootstrap
 fi
 
 export PATH="$$PWD:$$PATH"
