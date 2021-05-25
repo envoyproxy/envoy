@@ -75,6 +75,7 @@ docker run --rm \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_REMOTE_CACHE \
        -e ENVOY_STDLIB \
+       -e LLVM_ROOT \
        -e BUILD_REASON \
        -e BAZEL_REMOTE_INSTANCE \
        -e GCP_SERVICE_ACCOUNT_KEY \
