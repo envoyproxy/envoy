@@ -9,6 +9,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
+namespace {
+
 void truncate(std::string& str, absl::optional<uint32_t> max_length) {
   if (!max_length) {
     return;
@@ -16,6 +18,8 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 
   str = str.substr(0, max_length.value());
 }
+
+} // namespace
 
 ReqWithoutQuery::ReqWithoutQuery(const std::string& main_header,
                                  const std::string& alternative_header,
