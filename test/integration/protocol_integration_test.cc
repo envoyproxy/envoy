@@ -527,9 +527,8 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
   Stats::Store& stats = test_server_->server().stats();
   if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
-    Stats::CounterSharedPtr counter =
-        TestUtility::findCounter(stats,
-                                 absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"));
+    Stats::CounterSharedPtr counter = TestUtility::findCounter(
+        stats, absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"));
     ASSERT_NE(nullptr, counter);
     EXPECT_EQ(1L, counter->value());
   }
