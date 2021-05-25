@@ -30,8 +30,8 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
     return engine(mode);
   }
 
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<RoleBasedAccessControlRouteSpecificFilterConfig>(
-          HttpFilterNames::get().Rbac, route);
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>(HttpFilterNames::get().Rbac, route);
 
   if (route_local) {
     return route_local->engine(mode);

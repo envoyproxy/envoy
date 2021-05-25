@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "common/http/utility.h"
+
 #include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -89,7 +90,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   // Check for per route filter config.
   const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<ProxyPerRouteConfig>(
-          HttpFilterNames::get().DynamicForwardProxy, route);
+      HttpFilterNames::get().DynamicForwardProxy, route);
 
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();
