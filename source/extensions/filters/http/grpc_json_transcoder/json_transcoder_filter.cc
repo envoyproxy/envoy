@@ -424,9 +424,8 @@ void JsonTranscoderFilter::initPerRouteConfig() {
     return;
   }
 
-  const std::string& name = HttpFilterNames::get().GrpcJsonTranscoder;
-  const auto* entry = decoder_callbacks_->route()->routeEntry();
-  const auto* route_local = entry->mostSpecificPerFilterConfigTyped<JsonTranscoderConfig>(name);
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(
+          HttpFilterNames::get().GrpcJsonTranscoder, decoder_callbacks_->route());
 
   per_route_config_ = route_local ? route_local : &config_;
 }

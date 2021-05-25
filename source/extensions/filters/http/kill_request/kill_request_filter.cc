@@ -53,11 +53,8 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
 
   // Route-level configuration overrides filter-level configuration.
   if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
-    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().KillRequest;
-    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
-
-    const auto* per_route_kill_settings =
-        route_entry->mostSpecificPerFilterConfigTyped<KillSettings>(name);
+    const auto* per_route_kill_settings = Http::Utility::resolveMostSpecificPerFilterConfig<KillSettings>(
+          Extensions::HttpFilters::HttpFilterNames::get().KillRequest, decoder_callbacks_->route());
 
     if (per_route_kill_settings) {
       is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::REQUEST;
