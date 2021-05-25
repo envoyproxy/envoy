@@ -402,17 +402,18 @@ TEST_F(ODCDTest, TestCallbackWithExistingCluster) {
   EXPECT_EQ(callback_call_count_, 1);
 }
 
-/*
-// Check that we handle the expired callback gracefully, when trying to discover an already known
-// cluster. It should not call into ODCDS in such case.
-TEST_F(ODCDTest, TestExpiredCallbackWithExistingCluster) {
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
-  ClusterDiscoveryCallbackPtr null_cb;
-  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(0);
-  auto handle =
-      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(null_cb), timeout_);
+// Checks that the cluster manager detects that a thread has requested a cluster that some other
+// thread already did earlier, so it does not start another discovery process.
+TEST_F(ODCDTest, TestMainThreadDiscoveryInProgressDetection) {
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto cb1 = createCallback();
+  auto cb2 = createCallback();
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  auto cdm = cluster_manager_->createAndSwapClusterDiscoveryManager("another_fake_thread");
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
 }
-*/
 
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {
 public:

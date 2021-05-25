@@ -1144,6 +1144,16 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
       });
 }
 
+ClusterDiscoveryManager
+ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::string thread_name) {
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
+  ClusterDiscoveryManager cdm(std::move(thread_name), cluster_manager);
+
+  cluster_manager.cdm_.swap(cdm);
+
+  return cdm;
+}
+
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");

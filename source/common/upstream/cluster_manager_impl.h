@@ -377,11 +377,21 @@ protected:
                                             ThreadLocalClusterUpdateParams&& params);
 
   /**
-   * Notifies cluster discovery managers in each worker thread that
-   * the discovery process for the cluster with a passed name has
-   * timed out.
+   * Notifies cluster discovery managers in each worker thread that the discovery process for the
+   * cluster with a passed name has timed out.
+   *
+   * It's protected, so the tests can use it.
    */
   void notifyExpiredDiscovery(absl::string_view name);
+
+  /**
+   * Creates a new discovery manager in current thread and swaps it with the one in thread local
+   * cluster manager. This could be used to simulate requesting a cluster from a different
+   * thread. Used for tests only.
+   *
+   * Protected, so tests can use it.
+   */
+  ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name);
 
 private:
   /**

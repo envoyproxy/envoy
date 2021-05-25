@@ -70,6 +70,13 @@ ClusterDiscoveryManager::addCallback(std::string name, ClusterDiscoveryCallbackP
   return {std::move(handle), discovery_in_progress, std::move(invoker)};
 }
 
+void ClusterDiscoveryManager::swap(ClusterDiscoveryManager& other) {
+  thread_name_.swap(other.thread_name_);
+  pending_clusters_.swap(other.pending_clusters_);
+  callbacks_.swap(other.callbacks_);
+  callbacks_handle_.swap(other.callbacks_handle_);
+}
+
 void ClusterDiscoveryManager::invokeCallbackFromItem(absl::string_view name,
                                                      CallbackListItemWeakPtr item_weak_ptr,
                                                      ClusterDiscoveryStatus cluster_status) {

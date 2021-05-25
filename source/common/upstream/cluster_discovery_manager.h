@@ -93,6 +93,11 @@ public:
    */
   AddedCallbackData addCallback(std::string name, ClusterDiscoveryCallbackPtr callback);
 
+  /**
+   * Swaps this manager with another. Used for tests only.
+   */
+  void swap(ClusterDiscoveryManager& other);
+
 private:
   /**
    * An item in the callbacks list. It contains the iterator to itself inside the callbacks
@@ -160,7 +165,7 @@ private:
    */
   bool eraseFromList(absl::string_view name, CallbackListIterator it);
 
-  const std::string thread_name_;
+  std::string thread_name_;
   absl::flat_hash_map<std::string, CallbackList> pending_clusters_;
   std::unique_ptr<ClusterUpdateCallbacks> callbacks_;
   ClusterUpdateCallbacksHandlePtr callbacks_handle_;
