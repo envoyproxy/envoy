@@ -514,7 +514,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)), config_(config),
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == FakeHttpConnection::Type::HTTP3),
-      filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
+      filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))),
+      stats_scope_(stats_store_.createScope("test_server_scope")) {
   ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
             config.udp_fake_upstream_.has_value(), FakeHttpConnection::typeToString(http_type_));
   if (config.udp_fake_upstream_.has_value() &&

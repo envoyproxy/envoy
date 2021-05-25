@@ -662,15 +662,15 @@ public:
   void cleanUp();
 
   Http::Http1::CodecStats& http1CodecStats() {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, stats_store_);
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
   }
 
   Http::Http2::CodecStats& http2CodecStats() {
-    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
   }
 
   Http::Http3::CodecStats& http3CodecStats() {
-    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, stats_store_);
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
   }
 
   // Write into the outbound buffer of the network connection at the specified index.
@@ -835,6 +835,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
+  Stats::ScopePtr stats_scope_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
