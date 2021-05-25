@@ -1,3 +1,5 @@
+#include "extensions/filters/http/kill_request/kill_request_filter.h"
+
 #include <csignal>
 #include <string>
 
@@ -6,7 +8,6 @@
 
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/kill_request/kill_request_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
