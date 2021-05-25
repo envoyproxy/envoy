@@ -171,12 +171,11 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
     // TODO(lambdai): refactor nested if.
     auto internal_listener_manager = getInternalListenerManagerForTest();
     if (internal_listener_manager.has_value()) {
-
-      auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
-          std::move(io_handle_server), address, source_address);
       // It's either in main thread or the worker is not yet started.
       auto internal_listener = internal_listener_manager.value().get().findByAddress(address);
       if (internal_listener.has_value()) {
+        auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
+            std::move(io_handle_server), address, source_address);
         // TODO: also check if disabled
         internal_listener.value().get().onAccept(std::move(accepted_socket));
         FANCY_LOG(info, "lambdai: find internal listener {} ", address->asStringView());

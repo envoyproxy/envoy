@@ -10,6 +10,34 @@
 namespace Envoy {
 namespace Server {
 
+ActiveStreamSocket::ActiveStreamSocket(ActiveStreamListenerBase& listener,
+                                       Network::ConnectionSocketPtr&& socket,
+                                       bool hand_off_restored_destination_connections)
+    : listener_(listener), socket_(std::move(socket)),
+      hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
+      iter_(accept_filters_.end()),
+      stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+          listener_.dispatcher().timeSource(), socket_->addressProviderSharedPtr(),
+          StreamInfo::FilterState::LifeSpan::Connection)) {
+  listener_.stats_.downstream_pre_cx_active_.inc();
+}
+ActiveStreamSocket::~ActiveStreamSocket() {
+  accept_filters_.clear();
+  listener_.stats_.downstream_pre_cx_active_.dec();
+
+  // If the underlying socket is no longer attached, it means that it has been transferred to
+  // an active connection. In this case, the active connection will decrement the number
+  // of listener connections.
+  // TODO(mattklein123): In general the way we account for the number of listener connections
+  // is incredibly fragile. Revisit this by potentially merging ActiveTcpSocket and
+  // ActiveTcpConnection, having a shared object which does accounting (but would require
+  // another allocation, etc.).
+  if (socket_ != nullptr) {
+    listener_.decNumConnections();
+  }
+}
+Event::Dispatcher& ActiveStreamSocket::dispatcher() { return listener_.dispatcher(); }
+
 ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
                                                    Event::Dispatcher& dispatcher,
                                                    Network::ListenerPtr&& listener,
@@ -52,7 +80,7 @@ void ActiveStreamSocket::unlink() {
     removed->timer_->disableTimer();
   }
   // Emit logs if a connection is not established.
-  if (!connected_) {
+  if (!connected_ && stream_info_ != nullptr) {
     ActiveStreamListenerBase::emitLogs(*listener_.config_, *stream_info_);
   }
   listener_.dispatcher().deferredDelete(std::move(removed));

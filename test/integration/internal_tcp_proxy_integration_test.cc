@@ -13,6 +13,7 @@
 #include "common/network/utility.h"
 
 #include "extensions/filters/network/common/factory_base.h"
+#include "extensions/io_socket/user_space/io_handle_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
@@ -24,15 +25,8 @@
 
 #include "gtest/gtest.h"
 
-// tmp start
-#include "extensions/io_socket/user_space/io_handle_impl.h"
-
-using testing::_;
-using testing::AtLeast;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::MatchesRegex;
-using testing::NiceMock;
 
 namespace Envoy {
 

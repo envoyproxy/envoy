@@ -28,15 +28,10 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
-using testing::HasSubstr;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {
