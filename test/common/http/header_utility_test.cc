@@ -114,6 +114,34 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHostConnectLegacy) {
   }
 }
 
+// Host's trailing dot from host header get removed.
+TEST_F(HeaderUtilityTest, RemoveTrailingDotFromHost) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost", "localhost"},      // w/o dot
+      {"localhost.", "localhost"},     // name w/ dot
+      {"", ""},                        // empty
+      {"192.168.1.1", "192.168.1.1"},  // ipv4
+      {"abc.com", "abc.com"},          // dns w/o dot
+      {"abc.com.", "abc.com"},         // dns w/ dot
+      {"abc.com:443", "abc.com:443"},  // dns port w/o dot
+      {"abc.com.:443", "abc.com:443"}, // dns port w/ dot
+      {"[fc00::1]", "[fc00::1]"},      // ipv6
+      {":", ":"},                      // malformed string #1
+      {"]:", "]:"},                    // malformed string #2
+      {":abc", ":abc"},                // malformed string #3
+      {".", ""},                       // malformed string #4
+      {"..", "."},                     // malformed string #5
+      {".123", ".123"},                // malformed string #6
+      {".:.", ".:"}                    // malformed string #7
+  };
+
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first);
+    HeaderUtility::stripTrailingHostDot(headers_);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
 TEST(GetAllOfHeaderAsStringTest, All) {
   const LowerCaseString test_header("test");
   {

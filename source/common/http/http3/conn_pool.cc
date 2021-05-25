@@ -44,8 +44,9 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
   Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
-  quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher, transport_socket_factory,
-                                                              time_source, source_address);
+  quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      dispatcher, transport_socket_factory, time_source, source_address,
+      host->cluster().perConnectionBufferLimitBytes());
   setQuicConfigFromClusterConfig(host_->cluster(), quic_info_->quic_config_);
 }
 

@@ -1502,6 +1502,51 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   EXPECT_EQ(header_map_none.getHostValue(), "host:9999");
 }
 
+// maybeNormalizeHost() removes trailing dot of host from host header.
+TEST_F(ConnectionManagerUtilityTest, RemoveTrailingDot) {
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 0);
+  EXPECT_EQ(header_map.getHostValue(), "host");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::None));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_with_port;
+  original_headers_with_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_with_port(original_headers_with_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_with_port, config_, 443);
+  EXPECT_EQ(header_map_with_port.getHostValue(), "host:443");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::MatchingHost));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_strip_port;
+  original_headers_strip_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_strip_port(original_headers_strip_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_strip_port, config_, 443);
+  EXPECT_EQ(header_map_strip_port.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_no_dot;
+  original_headers_no_dot.setHost("host");
+
+  TestRequestHeaderMapImpl header_map_no_dot(original_headers_no_dot);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_no_dot, config_, 0);
+  EXPECT_EQ(header_map_no_dot.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(false));
+  TestRequestHeaderMapImpl original_headers_none;
+  original_headers_none.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map_none(original_headers_none);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
+  EXPECT_EQ(header_map_none.getHostValue(), "host.");
+}
+
 // maybeNormalizePath() does not touch escaped slashes when configured to KEEP_UNCHANGED.
 TEST_F(ConnectionManagerUtilityTest, KeepEscapedSlashesWhenConfigured) {
   ON_CALL(config_, pathWithEscapedSlashesAction())
