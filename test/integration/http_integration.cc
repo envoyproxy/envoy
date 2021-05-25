@@ -341,7 +341,7 @@ void HttpIntegrationTest::initialize() {
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
   auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr);
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, 0);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
@@ -1503,6 +1503,30 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+}
+
+std::string HttpIntegrationTest::downstreamProtocolStatsRoot() const {
+  switch (downstreamProtocol()) {
+  case Http::CodecClient::Type::HTTP1:
+    return "http1";
+  case Http::CodecClient::Type::HTTP2:
+    return "http2";
+  case Http::CodecClient::Type::HTTP3:
+    return "http3";
+  }
+  return "invalid";
+}
+
+std::string HttpIntegrationTest::upstreamProtocolStatsRoot() const {
+  switch (upstreamProtocol()) {
+  case FakeHttpConnection::Type::HTTP1:
+    return "http1";
+  case FakeHttpConnection::Type::HTTP2:
+    return "http2";
+  case FakeHttpConnection::Type::HTTP3:
+    return "http3";
+  }
+  return "invalid";
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

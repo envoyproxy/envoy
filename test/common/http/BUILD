@@ -214,7 +214,8 @@ envoy_cc_test(
     ],
     shard_count = 3,
     deps = [
-        ":ip_detection_extensions_lib",
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
@@ -239,7 +240,8 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
-        ":ip_detection_extensions_lib",
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
@@ -497,11 +499,19 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test_library(
-    name = "ip_detection_extensions_lib",
-    srcs = ["ip_detection_extensions.cc"],
-    hdrs = ["ip_detection_extensions.h"],
+    name = "custom_header_extension_lib",
+    srcs = ["custom_header_extension.cc"],
+    hdrs = ["custom_header_extension.h"],
     deps = [
         "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xff_extension_lib",
+    srcs = ["xff_extension.cc"],
+    hdrs = ["xff_extension.h"],
+    deps = [
         "//source/extensions/http/original_ip_detection/xff:xff_lib",
     ],
 )

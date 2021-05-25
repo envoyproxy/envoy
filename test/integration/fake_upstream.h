@@ -265,7 +265,8 @@ class SharedConnectionWrapper : public Network::ConnectionCallbacks,
 public:
   using DisconnectCallback = std::function<void()>;
 
-  SharedConnectionWrapper(Network::Connection& connection) : connection_(connection) {
+  SharedConnectionWrapper(Network::Connection& connection)
+      : connection_(connection), dispatcher_(connection_.dispatcher()) {
     connection_.addConnectionCallbacks(*this);
   }
 
@@ -284,6 +285,8 @@ public:
 
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   bool connected() {
     absl::MutexLock lock(&lock_);
@@ -355,6 +358,7 @@ public:
 
 private:
   Network::Connection& connection_;
+  Event::Dispatcher& dispatcher_;
   absl::Mutex lock_;
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
@@ -370,6 +374,7 @@ public:
   virtual ~FakeConnectionBase() {
     absl::MutexLock lock(&lock_);
     ASSERT(initialized_);
+    ASSERT(pending_cbs_ == 0);
   }
 
   ABSL_MUST_USE_RESULT
@@ -395,16 +400,20 @@ public:
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
 
+  void postToConnectionThread(std::function<void()> cb);
+
 protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : shared_connection_(shared_connection), lock_(shared_connection.lock()),
-        time_system_(time_system) {}
+        dispatcher_(shared_connection_.dispatcher()), time_system_(time_system) {}
 
   SharedConnectionWrapper& shared_connection_;
   absl::Mutex& lock_; // TODO(mattklein123): Use the shared connection lock and figure out better
                       // guarded by annotations.
+  Event::Dispatcher& dispatcher_;
   bool initialized_ ABSL_GUARDED_BY(lock_){};
   bool half_closed_ ABSL_GUARDED_BY(lock_){};
+  std::atomic<uint64_t> pending_cbs_{};
   Event::TestTimeSystem& time_system_;
 };
 
@@ -653,15 +662,15 @@ public:
   void cleanUp();
 
   Http::Http1::CodecStats& http1CodecStats() {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, stats_store_);
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
   }
 
   Http::Http2::CodecStats& http2CodecStats() {
-    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
   }
 
   Http::Http3::CodecStats& http3CodecStats() {
-    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, stats_store_);
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
   }
 
   // Write into the outbound buffer of the network connection at the specified index.
@@ -826,6 +835,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
+  Stats::ScopePtr stats_scope_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

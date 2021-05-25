@@ -1,5 +1,5 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
-#include "test/common/http/ip_detection_extensions.h"
+#include "test/common/http/custom_header_extension.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
