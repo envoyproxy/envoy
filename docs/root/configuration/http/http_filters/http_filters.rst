@@ -41,6 +41,7 @@ HTTP filters
   rate_limit_filter
   rbac_filter
   router_filter
+  set_metadata_filter
   squash_filter
   tap_filter
   wasm_filter

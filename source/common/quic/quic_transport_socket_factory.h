@@ -96,9 +96,7 @@ public:
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
-  void initialize() override {
-    // TODO(14829) fallback_factory_ needs to call onSecretUpdated() upon SDS update.
-  }
+  void initialize() override {}
 
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
   // code does not create transport sockets.
@@ -118,10 +116,8 @@ public:
   }
 
 protected:
-  void onSecretUpdated() override {
-    // fallback_factory_ will update the stats.
-    // TODO(14829) Client transport socket factory may also need to update quic crypto.
-  }
+  // fallback_factory_ will update the context.
+  void onSecretUpdated() override {}
 
 private:
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.
