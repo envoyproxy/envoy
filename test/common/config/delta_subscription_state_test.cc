@@ -37,10 +37,10 @@ protected:
       : timer_(new Event::MockTimer(&dispatcher_)),
         should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
     if (should_use_unified_) {
-      unified_state_ = std::make_unique<Envoy::Config::UnifiedMux::DeltaSubscriptionState>(
+      state_ = std::make_unique<Envoy::Config::UnifiedMux::DeltaSubscriptionState>(
           type_url, callbacks_, std::chrono::milliseconds(0U), dispatcher_, wildcard);
     } else {
-      legacy_state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
+      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
           type_url, callbacks_, local_info_, dispatcher_, wildcard);
     }
     updateSubscriptionInterest(initial_resources, {});
@@ -53,26 +53,26 @@ protected:
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
                                   const absl::flat_hash_set<std::string>& cur_removed) {
     if (should_use_unified_) {
-      unified_state_->updateSubscriptionInterest(cur_added, cur_removed);
+      std::get<1>(state_)->updateSubscriptionInterest(cur_added, cur_removed);
     } else {
-      legacy_state_->updateSubscriptionInterest(cur_added, cur_removed);
+      std::get<0>(state_)->updateSubscriptionInterest(cur_added, cur_removed);
     }
   }
 
   std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest> getNextRequestAckless() {
     if (should_use_unified_) {
-      return unified_state_->getNextRequestAckless();
+      return std::get<1>(state_)->getNextRequestAckless();
     }
     return std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryRequest>(
-        legacy_state_->getNextRequestAckless());
+        std::get<0>(state_)->getNextRequestAckless());
   }
 
   UpdateAck
   handleResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& response_proto) {
     if (should_use_unified_) {
-      return unified_state_->handleResponse(response_proto);
+      return std::get<1>(state_)->handleResponse(response_proto);
     }
-    return legacy_state_->handleResponse(response_proto);
+    return std::get<0>(state_)->handleResponse(response_proto);
   }
 
   UpdateAck deliverDiscoveryResponse(
@@ -112,17 +112,17 @@ protected:
 
   void markStreamFresh() {
     if (should_use_unified_) {
-      unified_state_->markStreamFresh();
+      std::get<1>(state_)->markStreamFresh();
     } else {
-      legacy_state_->markStreamFresh();
+      std::get<0>(state_)->markStreamFresh();
     }
   }
 
   bool subscriptionUpdatePending() {
     if (should_use_unified_) {
-      return unified_state_->subscriptionUpdatePending();
+      return std::get<1>(state_)->subscriptionUpdatePending();
     }
-    return legacy_state_->subscriptionUpdatePending();
+    return std::get<0>(state_)->subscriptionUpdatePending();
   }
 
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
@@ -130,8 +130,9 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* timer_;
   // We start out interested in three resources: name1, name2, and name3.
-  std::unique_ptr<Envoy::Config::DeltaSubscriptionState> legacy_state_;
-  std::unique_ptr<Envoy::Config::UnifiedMux::DeltaSubscriptionState> unified_state_;
+  absl::variant<std::unique_ptr<Envoy::Config::DeltaSubscriptionState>,
+                std::unique_ptr<Envoy::Config::UnifiedMux::DeltaSubscriptionState>>
+      state_;
   bool should_use_unified_;
 };
 
