@@ -108,6 +108,8 @@ struct ActiveStreamSocket : public Network::ListenerFilterManager,
   bool connected_{false};
 };
 
+using ActiveInternalSocket = ActiveStreamSocket;
+
 class ActiveStreamListenerBase : public ActiveListenerImplBase {
 public:
   ActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
@@ -126,6 +128,24 @@ public:
 
   virtual Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
+
+  void onSocketAccepted(std::unique_ptr<ActiveStreamSocket> active_socket) {
+    // Create and run the filters
+    config_->filterChainFactory().createListenerFilterChain(*active_socket);
+    active_socket->continueFilterChain(true);
+
+    // Move active_socket to the sockets_ list if filter iteration needs to continue later.
+    // Otherwise we let active_socket be destructed when it goes out of scope.
+    if (active_socket->iter_ != active_socket->accept_filters_.end()) {
+      active_socket->startTimer();
+      LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
+    } else {
+      // If active_socket is about to be destructed, emit logs if a connection is not created.
+      if (!active_socket->connected_) {
+        emitLogs(*config_, *active_socket->stream_info_);
+      }
+    }
+  }
 
   Network::ConnectionHandler& parent_;
   Event::Dispatcher& dispatcher_;
@@ -199,8 +219,6 @@ protected:
       connections_by_context_;
   bool is_deleting_{false};
 };
-
-using ActiveInternalSocket = ActiveStreamSocket;
 
 } // namespace Server
 } // namespace Envoy

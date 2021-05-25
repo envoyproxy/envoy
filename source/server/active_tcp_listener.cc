@@ -75,48 +75,6 @@ void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   config_ = &config;
 }
 
-// void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
-//                                          const ProtobufWkt::Struct& value) {
-//   stream_info_->setDynamicMetadata(name, value);
-// }
-
-// void ActiveTcpSocket::newConnection() {
-//   connected_ = true;
-
-//   // Check if the socket may need to be redirected to another listener.
-//   Network::BalancedConnectionHandlerOptRef new_listener;
-
-//   if (hand_off_restored_destination_connections_ &&
-//       socket_->addressProvider().localAddressRestored()) {
-//     // Find a listener associated with the original destination address.
-//     new_listener =
-//         listener_.parent_.getBalancedHandlerByAddress(*socket_->addressProvider().localAddress());
-//   }
-//   if (new_listener.has_value()) {
-//     // Hands off connections redirected by iptables to the listener associated with the
-//     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
-//     // prevent further redirection.
-//     // Leave the new listener to decide whether to execute re-balance.
-//     // Note also that we must account for the number of connections properly across both
-//     listeners.
-//     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting
-//     better. listener_.decNumConnections();
-//     new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
-//   } else {
-//     // Set default transport protocol if none of the listener filters did it.
-//     if (socket_->detectedTransportProtocol().empty()) {
-//       socket_->setDetectedTransportProtocol("raw_buffer");
-//     }
-//     // TODO(lambdai): add integration test
-//     // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
-//     // Erase accept filter states because accept filters may not get the opportunity to clean up.
-//     // Particularly the assigned events need to reset before assigning new events in the follow
-//     up. accept_filters_.clear();
-//     // Create a new connection on this listener.
-//     listener_.newConnection(std::move(socket_), std::move(stream_info_));
-//   }
-// }
-
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   if (listenerConnectionLimitReached()) {
     ENVOY_LOG(trace, "closing connection: listener connection limit reached for {}",
@@ -155,28 +113,7 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
   auto active_socket = std::make_unique<ActiveStreamSocket>(
       *this, std::move(socket), hand_off_restored_destination_connections);
 
-  // Create and run the filters.
-  config_->filterChainFactory().createListenerFilterChain(*active_socket);
-  active_socket->continueFilterChain(true);
-
-  // Move active_socket to the sockets_ list if filter iteration needs to continue later.
-  // Otherwise we let active_socket be destructed when it goes out of scope.
-  if (active_socket->iter_ != active_socket->accept_filters_.end()) {
-    active_socket->startTimer();
-    LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
-  } else {
-    // If active_socket is about to be destructed, emit logs if a connection is not created.
-    if (!active_socket->connected_) {
-      if (active_socket->stream_info_ != nullptr) {
-        emitLogs(*config_, *active_socket->stream_info_);
-      } else {
-        // If the active_socket is not connected, this socket is not promoted to active connection.
-        // Thus the stream_info_ is owned by this active socket.
-        ENVOY_BUG(active_socket->stream_info_ != nullptr,
-                  "the unconnected active socket must have stream info.");
-      }
-    }
-  }
+  onSocketAccepted(std::move(active_socket));
 }
 
 Network::BalancedConnectionHandlerOptRef

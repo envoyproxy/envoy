@@ -101,7 +101,9 @@ public:
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
   Network::BalancedConnectionHandlerOptRef
-  getBalancedHandlerByAddress(const Network::Address::Instance&) override;
+  getBalancedHandlerByAddress(const Network::Address::Instance&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   void pauseListening() override {
     if (listener_ != nullptr) {
