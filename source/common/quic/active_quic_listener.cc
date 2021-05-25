@@ -229,7 +229,7 @@ size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names)
-    : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names), 
+    : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
@@ -317,7 +317,8 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
 
   return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
                                               config, quic_config_, std::move(options),
-                                              kernel_worker_routing, enabled_, quic_stat_names_, packets_to_read_to_connection_count_ratio_);
+                                              kernel_worker_routing, enabled_, quic_stat_names_,
+                                              packets_to_read_to_connection_count_ratio_);
 } // namespace Quic
 
 } // namespace Quic
