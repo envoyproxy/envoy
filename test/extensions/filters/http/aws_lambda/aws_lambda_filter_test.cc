@@ -533,7 +533,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
 }
 
 /**
- * encodeData() data in JSON mode should use respect content-type header.
+ * encodeData() data in JSON mode should respect content-type header.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeContentTypeHeader) {
   setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/});

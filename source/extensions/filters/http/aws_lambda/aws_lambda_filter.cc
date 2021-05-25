@@ -333,8 +333,8 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
     return;
   }
 
-  // Use JSON as the default content-type. If the JSON response headers has a
-  // content-type key, it will override.
+  // Use JSON as the default content-type. If the response headers have a different content-type
+  // set, that will be used instead.
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   for (auto&& kv : json_resp.headers()) {
