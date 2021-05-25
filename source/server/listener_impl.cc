@@ -33,7 +33,7 @@
 
 #include "extensions/filters/listener/well_known_names.h"
 
-#if defined(ENVOY_ENABLE_QUIC)
+#ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/active_quic_listener.h"
 #include "common/quic/udp_gso_batch_writer.h"
 #endif
@@ -413,7 +413,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 
   udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(config_.udp_listener_config());
   if (config_.udp_listener_config().has_quic_options()) {
-#if defined(ENVOY_ENABLE_QUIC)
+#ifdef ENVOY_ENABLE_QUIC
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
