@@ -132,47 +132,6 @@ TEST(Base64Test, BinaryBufferEncode) {
   EXPECT_EQ("AAECAwgKCQCqvN4=", Base64::encode(buffer, 30));
 }
 
-TEST(Base64Test, CompletePadding) {
-  struct CompletePaddingBase64UrlTestCases {
-    std::string base64, base64_with_padding;
-  };
-
-  // For base64 encoding, there are only three length needed to test
-  // - 3n bytes => 4n bytes, no padding needed
-  // - 3n + 1 bytes => 4n + 2 bytes, 2 padding needed
-  // - 3n + 2 bytes => 4n + 3 bytes, 1 padding needed
-  CompletePaddingBase64UrlTestCases testCases[3] = {
-      // Payload text(3n bytes):
-      {"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG8iLCJpYXQiOjE1MTYyMzkwMjJ"
-       "9",
-       // No padding added.
-       "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG8iLCJpYXQiOjE1MTYyMzkwMjJ"
-       "9"},
-      // Payload text(3n + 1 bytes):
-      {"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2"
-       "MjM5MDIyfQ",
-       // 2 padding added.
-       "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2"
-       "MjM5MDIyfQ=="},
-      // Payload text(3n + 2 bytes):
-      {"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lZSIsImlhdCI6MTUx"
-       "NjIzOTAyMn0",
-       // 1 padding added.
-       "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lZSIsImlhdCI6MTUx"
-       "NjIzOTAyMn0="}};
-  for (auto& tc : testCases) {
-    // Ensure these two base64 binaries are equivalent after decoding.
-    EXPECT_EQ(Base64::decodeWithoutPadding(tc.base64),
-              Base64::decodeWithoutPadding(tc.base64_with_padding));
-    // Ensure the `base64_with_padding` is correctly padded.
-    EXPECT_NE(Base64::decode(tc.base64_with_padding), "");
-
-    std::string base64_padded = tc.base64;
-    Base64::completePadding(base64_padded);
-    EXPECT_EQ(base64_padded, tc.base64_with_padding);
-  }
-}
-
 TEST(Base64UrlTest, EncodeString) {
   EXPECT_EQ("", Base64Url::encode("", 0));
   EXPECT_EQ("AAA", Base64Url::encode("\0\0", 2));

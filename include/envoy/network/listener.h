@@ -330,6 +330,11 @@ public:
    * Posts ``data`` to be delivered on this worker.
    */
   virtual void post(Network::UdpRecvData&& data) PURE;
+
+  /**
+   * An estimated number of UDP packets this callback expects to process in current read event.
+   */
+  virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };
 
 using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;
