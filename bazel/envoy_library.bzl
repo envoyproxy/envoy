@@ -88,6 +88,7 @@ EXTENSION_CATEGORIES = [
     "envoy.matching.common_inputs",
     "envoy.matching.input_matchers",
     "envoy.quic.server.crypto_stream",
+    "envoy.quic.proof_source",
     "envoy.rate_limit_descriptors",
     "envoy.request_id",
     "envoy.resource_monitors",

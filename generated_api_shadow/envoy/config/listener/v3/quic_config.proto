@@ -19,14 +19,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC listener config]
 
+// Configuration specific to QUIC crypto stream.
 message QuicCryptoStream {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   google.protobuf.Any typed_config = 2;
 }
 
+// Configuration specific to QUIC proof source.
+message QuicProofSource {
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  google.protobuf.Any typed_config = 2;
+}
+
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -45,5 +53,11 @@ message QuicProtocolOptions {
   // to enabled.
   core.v3.RuntimeFeatureFlag enabled = 4;
 
+  // The crypto server stream implementation used for this listener.
+  // If not specified the :ref:`QUICHE defaul one<envoy_v3_api_field_extensions.quic.v3.CryptoServerStreamConfig>` will be used.
   QuicCryptoStream crypto_stream = 5;
+
+  // The proof source implementation used for this listener.
+  // If not specified the :ref:`defaul one<envoy_v3_api_field_extensions.quic.v3.ProofSourceConfig>` will be used.
+  QuicProofSource proof_source = 6;
 }

@@ -186,6 +186,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
+        "//source/extensions/quic:envoy_quic_proof_source_factory_impl_lib",
         "//source/server:configuration_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",

@@ -44,6 +44,7 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/udp_gso_batch_writer.h"
 #include "extensions/quic/envoy_quic_crypto_server_stream.h"
+#include "extensions/quic/envoy_quic_proof_source_factory_impl.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -272,6 +273,10 @@ protected:
       name: "envoy.quic.quiche_crypto_server_stream"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.v3.CryptoServerStreamConfig
+    proof_source:
+      name: "envoy.quic.filter_chain_proof_source"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.v3.ProofSourceConfig
 )EOF",
                        connection_window_size_, stream_window_size_);
   }
@@ -329,12 +334,13 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   options->emplace_back(std::move(option));
   quic_listener_.reset();
   RealEnvoyQuicCryptoServerStreamFactory crypto_stream_factory;
+  EnvoyQuicProofSourceFactoryImpl proof_source_factory;
   EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
                               0, 1, *dispatcher_, connection_handler_, listen_socket_,
                               listener_config_, quic_config_, options, false,
                               ActiveQuicListenerFactoryPeer::runtimeEnabled(
                                   static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              crypto_stream_factory),
+                              crypto_stream_factory, proof_source_factory),
                           Network::CreateListenerException, "Failed to apply socket options.");
 }
 

@@ -346,6 +346,7 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_utils_lib",
+        ":envoy_quic_proof_source_factory_interface",
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
@@ -411,6 +412,7 @@ envoy_cc_library(
             ":codec_lib",
             ":quic_transport_socket_factory_lib",
             "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
+            "//source/extensions/quic:envoy_quic_proof_source_factory_impl_lib",
         ],
     }),
 )
@@ -462,5 +464,15 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:typed_config_interface",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_proof_source_factory_interface",
+    hdrs = ["envoy_quic_proof_source_factory_interface.h"],
+    deps = [
+        "//source/server:connection_handler_lib",
+        "//include/envoy/config:typed_config_interface",
+        "@com_googlesource_quiche//:quic_core_crypto_proof_source_lib",
     ],
 )
