@@ -20,7 +20,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
                          Network::TransportSocketFactory& transport_socket_factory,
                          TimeSource& time_source,
-                         Network::Address::InstanceConstSharedPtr server_addr);
+                         Network::Address::InstanceConstSharedPtr server_addr,
+                         uint32_t buffer_limit);
 
   // Returns the most recent crypto config from transport_socket_factory_;
   std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
@@ -42,6 +43,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
   // TODO(alyssawilk) actually set this up properly.
   quic::QuicConfig quic_config_;
+  // The cluster buffer limits.
+  const uint32_t buffer_limit_;
   // This arguably should not be shared across connections but as Envoy doesn't
   // support push promise it's really moot point.
   quic::QuicClientPushPromiseIndex push_promise_index_;
