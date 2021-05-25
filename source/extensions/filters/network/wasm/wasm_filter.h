@@ -51,7 +51,7 @@ private:
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 } // namespace Wasm
 } // namespace NetworkFilters

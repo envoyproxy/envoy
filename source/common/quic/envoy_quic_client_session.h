@@ -79,8 +79,7 @@ protected:
   // quic::QuicSpdySession
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
-   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream()
-      override;
+  std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;

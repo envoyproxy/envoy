@@ -1505,6 +1505,30 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
   }
 }
 
+std::string HttpIntegrationTest::downstreamProtocolStatsRoot() const {
+  switch (downstreamProtocol()) {
+  case Http::CodecClient::Type::HTTP1:
+    return "http1";
+  case Http::CodecClient::Type::HTTP2:
+    return "http2";
+  case Http::CodecClient::Type::HTTP3:
+    return "http3";
+  }
+  return "invalid";
+}
+
+std::string HttpIntegrationTest::upstreamProtocolStatsRoot() const {
+  switch (upstreamProtocol()) {
+  case FakeHttpConnection::Type::HTTP1:
+    return "http1";
+  case FakeHttpConnection::Type::HTTP2:
+    return "http2";
+  case FakeHttpConnection::Type::HTTP3:
+    return "http3";
+  }
+  return "invalid";
+}
+
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
   if (version_ == Network::Address::IpVersion::v4) {
     return "listener.127.0.0.1_0." + stat_name;

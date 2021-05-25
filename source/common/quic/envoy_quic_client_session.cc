@@ -15,7 +15,8 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
-      host_name_(server_id.host()), crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory) {}
+      host_name_(server_id.host()), crypto_config_(crypto_config),
+      crypto_stream_factory_(crypto_stream_factory) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -131,10 +132,8 @@ size_t EnvoyQuicClientSession::WriteHeadersOnHeadersStream(
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
-      server_id(), this,
-      crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
+      server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
       this, /*has_application_state = */ version().UsesHttp3());
-
 }
 
 } // namespace Quic

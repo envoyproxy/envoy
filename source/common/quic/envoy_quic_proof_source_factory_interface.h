@@ -24,13 +24,14 @@ namespace Quic {
 // A factory interface to provide quic::ProofSource.
 class EnvoyQuicProofSourceFactoryInterface : public Config::TypedFactory {
 public:
- virtual ~EnvoyQuicProofSourceFactoryInterface() = default;
+  virtual ~EnvoyQuicProofSourceFactoryInterface() = default;
 
-  std::string category() const override { return "envoy.quic.proof_source";}
+  std::string category() const override { return "envoy.quic.proof_source"; }
 
- virtual std::unique_ptr<quic::ProofSource> createQuicProofSource(Network::Socket& listen_socket,
-                       Network::FilterChainManager& filter_chain_manager,
-                       Server::ListenerStats& listener_stats) PURE;
+  virtual std::unique_ptr<quic::ProofSource>
+  createQuicProofSource(Network::Socket& listen_socket,
+                        Network::FilterChainManager& filter_chain_manager,
+                        Server::ListenerStats& listener_stats) PURE;
 };
 
 } // namespace Quic

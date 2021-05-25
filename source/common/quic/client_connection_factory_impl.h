@@ -7,8 +7,8 @@
 #include "common/quic/envoy_quic_proof_verifier.h"
 #include "common/quic/envoy_quic_utils.h"
 
-#include "extensions/transport_sockets/tls/ssl_socket.h"
 #include "extensions/quic/envoy_quic_crypto_client_stream.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
@@ -43,6 +43,9 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
   // TODO(alyssawilk) actually set this up properly.
   quic::QuicConfig quic_config_;
+  // This arguably should not be shared across connections but as Envoy doesn't
+  // support push promise it's really moot point.
+  quic::QuicClientPushPromiseIndex push_promise_index_;
   // Hard code with real crypto stream for now.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
 };

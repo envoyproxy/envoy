@@ -7,6 +7,7 @@ import "envoy/config/core/v4alpha/protocol.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -40,7 +41,7 @@ message QuicProofSource {
 }
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.QuicProtocolOptions";
@@ -59,11 +60,21 @@ message QuicProtocolOptions {
   // to enabled.
   core.v4alpha.RuntimeFeatureFlag enabled = 4;
 
+  // A multiplier to number of connections which is used to determine how many packets to read per
+  // event loop. A reasonable number should allow the listener to process enough payload but not
+  // starve TCP and other UDP sockets and also prevent long event loop duration.
+  // The default value is 32. This means if there are N QUIC connections, the total number of
+  // packets to read in each read event will be 32 * N.
+  // The actual number of packets to read in total by the UDP listener is also
+  // bound by 6000, regardless of this field or how many connections there are.
+  google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5
+      [(validate.rules).uint32 = {gte: 1}];
+
   // The crypto server stream implementation used for this listener.
   // If not specified the :ref:`QUICHE defaul one<envoy_v3_api_field_extensions.quic.v3.CryptoServerStreamConfig>` will be used.
-  QuicCryptoStream crypto_stream = 5;
+  QuicCryptoStream crypto_stream = 6;
 
   // The proof source implementation used for this listener.
   // If not specified the :ref:`defaul one<envoy_v3_api_field_extensions.quic.v3.ProofSourceConfig>` will be used.
-  QuicProofSource proof_source = 6;
+  QuicProofSource proof_source = 7;
 }

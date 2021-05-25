@@ -35,16 +35,15 @@ public:
 
 class EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
- virtual ~EnvoyQuicCryptoClientStreamFactoryInterface() {}
+  virtual ~EnvoyQuicCryptoClientStreamFactoryInterface() {}
 
   // Return an Envoy specific quic crypto client stream object.
   virtual std::unique_ptr<quic::QuicCryptoClientStreamBase>
-  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id,
-                         quic::QuicSession* session,
-                         std::unique_ptr<quic::ProofVerifyContext> verify_context,
-                         quic::QuicCryptoClientConfig* crypto_config,
-                         quic::QuicCryptoClientStream::ProofHandler* proof_handler,
-                         bool has_application_state) PURE;
+  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
+                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                                    quic::QuicCryptoClientConfig* crypto_config,
+                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
+                                    bool has_application_state) PURE;
 };
 
 } // namespace Quic

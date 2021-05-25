@@ -32,6 +32,7 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     uint32_t packets_to_read_to_connection_count_ratio,
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory);
 
@@ -40,6 +41,7 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     uint32_t packets_to_read_to_connection_count_ratio,
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory);
 
@@ -59,6 +61,7 @@ public:
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
   void onDataWorker(Network::UdpRecvData&& data) override;
   uint32_t destination(const Network::UdpRecvData& data) const override;
+  size_t numPacketsExpectedPerEventLoop() const override;
 
   // ActiveListenerImplBase
   void pauseListening() override;
@@ -80,6 +83,7 @@ private:
   // The number of runs of the event loop in which at least one CHLO was buffered.
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
+  uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
 };
 
@@ -103,12 +107,12 @@ private:
 
   std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
       crypto_server_stream_factory_;
-   std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
-      proof_source_factory_;
+  std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
   absl::once_flag install_bpf_once_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
+  const uint32_t packets_to_read_to_connection_count_ratio_;
 };
 
 } // namespace Quic
