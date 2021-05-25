@@ -390,10 +390,9 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
                                port_names, validator_config, allow_lds_rejection);
 }
 
-void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
-                                                        std::string* response,
-                                                        bool disconnect_after_headers_complete,
-                                                        Network::TransportSocketPtr transport_socket) {
+void BaseIntegrationTest::sendRawHttpAndWaitForResponse(
+    int port, const char* raw_http, std::string* response, bool disconnect_after_headers_complete,
+    Network::TransportSocketPtr transport_socket) {
   auto connection = createConnectionDriver(
       port, raw_http,
       [response, disconnect_after_headers_complete](Network::ClientConnection& client,
@@ -402,7 +401,8 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
         if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
           client.close(Network::ConnectionCloseType::NoFlush);
         }
-      }, std::move(transport_socket));
+      },
+      std::move(transport_socket));
 
   connection->run();
 }
