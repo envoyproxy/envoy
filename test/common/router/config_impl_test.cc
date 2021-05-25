@@ -1809,8 +1809,9 @@ response_headers_to_add:
 )EOF";
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+            std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+                          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
   filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
