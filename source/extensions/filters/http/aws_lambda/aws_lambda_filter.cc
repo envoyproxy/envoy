@@ -124,7 +124,8 @@ absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
     return absl::nullopt;
   }
 
-  const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(HttpFilterNames::get().AwsLambda, decoder_callbacks_->route());
+  const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(
+      HttpFilterNames::get().AwsLambda, decoder_callbacks_->route());
   if (!settings) {
     return absl::nullopt;
   }

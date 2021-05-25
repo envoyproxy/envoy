@@ -50,7 +50,7 @@ void BufferFilter::initConfig() {
   }
 
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<BufferFilterSettings>(
-          HttpFilterNames::get().Buffer, callbacks_->route());
+      HttpFilterNames::get().Buffer, callbacks_->route());
 
   settings_ = route_local ? route_local : settings_;
 }
