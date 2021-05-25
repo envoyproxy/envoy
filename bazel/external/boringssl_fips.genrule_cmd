@@ -12,8 +12,8 @@ if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
 fi
 
 # The build currently works on Ubuntu and CentOS, but requires different configuration
-OS_ID=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
-OS_VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
+OS_ID=$$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+OS_VERSION=$$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
 
 # Bazel magic.
 ROOT=$$(dirname $(rootpath boringssl/BUILDING.md))/..
