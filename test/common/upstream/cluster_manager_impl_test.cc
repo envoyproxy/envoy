@@ -276,9 +276,9 @@ TEST_F(ODCDTest, TestClusterRediscovered) {
   EXPECT_EQ(callback_call_count_, 1);
 }
 
-// Check if requesting an unknown cluster calls into ODCDS, even after the failed discovery of the
-// cluster. Also make sure that the callback is called on the failed discovery.
-TEST_F(ODCDTest, TestClusterRediscoveredAfterFail) {
+// Check if requesting an unknown cluster calls into ODCDS, even after the expired discovery of the
+// cluster. Also make sure that the callback is called on the expired discovery.
+TEST_F(ODCDTest, TestClusterRediscoveredAfterExpiration) {
   auto cb = createCallback(ClusterDiscoveryStatus::Timeout);
   EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
   auto handle =
@@ -289,6 +289,34 @@ TEST_F(ODCDTest, TestClusterRediscoveredAfterFail) {
   cb = createCallback();
   handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check if requesting an unknown cluster calls into ODCDS, even after
+// the discovery found out that the cluster is missing in the
+// management server. Also make sure that the callback is called on
+// the failed discovery.
+TEST_F(ODCDTest, TestClusterRediscoveredAfterMissing) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Missing);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyMissingCluster("cluster_foo");
+  EXPECT_EQ(callback_call_count_, 1);
+  handle.reset();
+  cb = createCallback();
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check that we do nothing if we get a notification about irrelevant
+// missing cluster.
+TEST_F(ODCDTest, TestIrrelevantNotifyMissingCluster) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Timeout);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyMissingCluster("cluster_bar");
+  EXPECT_EQ(callback_call_count_, 0);
 }
 
 // Check that the callback is not called when some other cluster is added.
