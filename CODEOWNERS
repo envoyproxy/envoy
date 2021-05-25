@@ -183,6 +183,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/http/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/network/ext_authz @esmet @gsagula @dio
+# HTTP Bandwidth Limit
+/*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @rgs1 @alyssawilk @antoniovicente
 /*/extensions/http/original_ip_detection/xff @rgs1 @alyssawilk @antoniovicente
