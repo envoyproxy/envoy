@@ -38,6 +38,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* aws_lambda: if `payload_passthrough` is set to ``false``, the downstream response content-type header will now be set from the content-type entry in the JSON response's headers map, if present.
 * http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
 * http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
 * listener: fix the crash which could happen when the ongoing filter chain only listener update is followed by the listener removal or full listener update.
