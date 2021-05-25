@@ -304,6 +304,11 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+    // TODO(alyssawilk) debug and enable.
+    return;
+  }
+
   config_helper_.addFilter(
       fmt::format(R"EOF(
   name: pause-filter{}

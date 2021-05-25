@@ -77,7 +77,7 @@ public:
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
     // Unix domain socket is not supported.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return absl::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
@@ -113,6 +113,7 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
+  // TODO(#2557) Implement this.
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
 
   // Network::FilterManagerConnection

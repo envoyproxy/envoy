@@ -269,6 +269,7 @@ protected:
     enabled:
       default_value: true
       runtime_key: quic.enabled
+    packets_to_read_to_connection_count_ratio: 50
 )EOF",
                        connection_window_size_, stream_window_size_);
   }
@@ -331,7 +332,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
                               listener_config_, quic_config_, options, false,
                               ActiveQuicListenerFactoryPeer::runtimeEnabled(
                                   static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              quic_stat_names_),
+                              quic_stat_names_, 32u),
                           Network::CreateListenerException, "Failed to apply socket options.");
 }
 
@@ -345,6 +346,10 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
+              quic_listener_->numPacketsExpectedPerEventLoop());
+  }
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
   ASSERT(session != nullptr);
@@ -392,7 +397,15 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
-  maybeConfigureMocks(count);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    maybeConfigureMocks(count + 1);
+    // Create 1 session to increase number of packet to read in the next read event.
+    sendCHLO(quic::test::TestConnectionId());
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  } else {
+    maybeConfigureMocks(count);
+  }
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= count; ++i) {
@@ -410,6 +423,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
+              quic_listener_->numPacketsExpectedPerEventLoop());
+  }
+
   readFromClientSockets();
 }
 
