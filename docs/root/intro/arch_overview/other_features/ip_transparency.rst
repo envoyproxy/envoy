@@ -74,7 +74,15 @@ Here is an example config for setting up the socket:
             name: envoy.transport_sockets.raw_buffer
       ...
 
-Note: If you are wrapping a TLS socket, the header will be sent before the TLS handshake occurs.
+There are several things to consider if you plan to use this socket in conjunction with the
+:ref:`HTTP connection manager <config_http_conn_man>`. There will be a performance hit as there will be no upstream connection
+re-use among downstream clients. Every client that connects to Envoy will get a new connection to the upstream server.
+This is due to the nature of Proxy Protocol being a connection based protocol. Downstream client info is only forwarded to the
+upstream at the start of a connection before any other data has been sent (Note: this includes before a TLS handshake occurs).
+If possible, using the :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header should be preferred as Envoy
+will be able to re-use upstream connections with this method. Due to the disconnect between Envoy's handling of downstream and upstream
+connections, it is a good idea to enforce short :ref:`idle timeouts <faq_configuration_timeouts>` on upstream connections as
+Envoy will not inherently close a corresponding upstream connections when a downstream connection is closed.
 
 Some drawbacks to Proxy Protocol:
 
