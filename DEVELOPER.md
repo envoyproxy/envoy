@@ -9,8 +9,6 @@ To generate a coverage report, there is a [coverage build script](https://github
 
 If you plan to contribute to Envoy, you may find it useful to install the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/main/support/README.md), which helps automate parts of the development process, particularly those involving code review.
 
-If you want to set up a local development environment with Visual Studio Code, please see [vscode setup](https://github.com/envoyproxy/envoy/blob/main/tools/vscode/README.md).
-
 Below is a list of additional documentation to aid the development process:
 
 - [General build and installation documentation](https://www.envoyproxy.io/docs/envoy/latest/start/start)
@@ -20,6 +18,8 @@ Below is a list of additional documentation to aid the development process:
 - [Managing external dependencies with Bazel](https://github.com/envoyproxy/envoy/blob/main/bazel/EXTERNAL_DEPS.md)
 
 - [Guide to Envoy Bazel rules (managing `BUILD` files)](https://github.com/envoyproxy/envoy/blob/main/bazel/DEVELOPER.md)
+
+- [Guide to setup development environment with Visual Studio Code](https://github.com/envoyproxy/envoy/blob/main/tools/vscode/README.md)
 
 - [Using Docker for building and testing](https://github.com/envoyproxy/envoy/tree/main/ci)
 
