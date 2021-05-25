@@ -173,21 +173,25 @@ void InternalTcpProxyIntegrationTest::initialize() {
   ASSERT(worker_dispatcher_ != nullptr);
 }
 
+// The internal connection clients are driven by the dispatcher.
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, InternalTcpProxyIntegrationTest,
                          testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
-using ChainedProxyInternalTcpProxyIntegrationTest = InternalTcpProxyIntegrationTest;
 
+// There are two tcp proxies in this test suite.
+//
+// The first tcp proxy is owned by the tcp listener. This tcp proxy handles the data from test main
+// thread and create upstream internal connection to the internal listener.
+//
+// The second tcp proxy is owned by the internal listener. This tcp proxy relay the data to the fake
+// upstream.
+using ChainedProxyInternalTcpProxyIntegrationTest = InternalTcpProxyIntegrationTest;
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, ChainedProxyInternalTcpProxyIntegrationTest,
                          testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
-// Test upstream writing before downstream downstream does.
-TEST_P(InternalTcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
+// TODO(lambdai): enable it when the io_handle_client can be gracefully destroyed in the worker
+// thread.
+TEST_P(InternalTcpProxyIntegrationTest, DISABLED_TcpProxyUpstreamWritesFirst) {
   initialize();
-
-  // IntegrationTcpClientPtr tcp_client = std::make_unique<IntegrationTcpClient>(
-  //     *dispatcher, *mock_buffer_factory_,
-  //     std::make_shared<Network::Address::EnvoyInternalInstance>("hello"), enableHalfClose(),
-  //     nullptr, nullptr);
 
   // lambda-expression cannot captures a structured binding so we must use tie() here.
   Network::IoHandlePtr io_handle_client;
@@ -214,13 +218,7 @@ TEST_P(InternalTcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
-  // tcp_client->waitForData("hello");
-  // // Make sure inexact matches work also on data already received.
-  // tcp_client->waitForData("ello", false);
 
-  // // Make sure length based wait works for the data already received
-  // ASSERT_TRUE(tcp_client->waitForData(5));
-  // ASSERT_TRUE(tcp_client->waitForData(4));
   Buffer::OwnedImpl buffer;
   Thread::MutexBasicLockable dispatcher_mutex;
 
@@ -236,33 +234,7 @@ TEST_P(InternalTcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
     post_complete.wait(dispatcher_mutex);
     ENVOY_LOG_MISC(debug, "current buffer: {}", buffer.toString());
   }
-
-  // tmp start
   ASSERT_TRUE(fake_upstream_connection->write("", true));
-  // ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
-  // ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-
-  // // Drain part of the received message
-  // tcp_client->clearData(2);
-  // tcp_client->waitForData("llo");
-  // ASSERT_TRUE(tcp_client->waitForData(3));
-
-  // ASSERT_TRUE(tcp_client->write("hello"));
-  // ASSERT_TRUE(fake_upstream_connection->waitForData(5));
-
-  // ASSERT_TRUE(fake_upstream_connection->write("", true));
-  // tcp_client->waitForHalfClose();
-  // ASSERT_TRUE(tcp_client->write("", true));
-  // ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
-  // ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  // // Any time an associated connection is destroyed, it increments both counters.
-  // test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  // test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
-
-  // IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
-  // FakeRawConnectionPtr fake_upstream_connection2;
-  // ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
-  // tcp_client2->close();
 }
 
 // Test upstream writing before downstream downstream does.
