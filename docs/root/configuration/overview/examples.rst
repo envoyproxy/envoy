@@ -311,9 +311,10 @@ specially, and omit them entirely from the native configuration tree. Ordinarily
 must adhere strictly to the proto schemas defined for Envoy configuration. This allows content to
 be declared that is explicitly handled as a non-represented type.
 
-One potential use for this mechanism is to avoid extra interpolation or pre-processing overhead when
-dynamically generating YAML configuration for Envoy. Dynamic YAML anchors may be provided at the head
-of the stream, followed by a "template" that aliases those values.
+This lets you split your file into two parts: one in which we have YAML content not subject to
+parsing according to the schema and another part that is parsed. YAML anchors in the first part
+may be referenced by aliases in the second part. This mechanism can simplify setups that need to
+re-use or dynamically generate configuration fragments.
 
 See the following example:
 
