@@ -61,7 +61,6 @@
 
 using testing::_;
 using testing::HasSubstr;
-using testing::Return;
 
 namespace quic {
 namespace {

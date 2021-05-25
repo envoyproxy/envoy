@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "http_tracer_interface",
     hdrs = ["http_tracer.h"],
     deps = [
-        ":trace_reason_interface",
+        ":trace_driver_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/http:header_map_interface",
     ],
@@ -30,4 +30,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "trace_reason_interface",
     hdrs = ["trace_reason.h"],
+)
+
+envoy_cc_library(
+    name = "trace_driver_interface",
+    hdrs = ["trace_driver.h"],
+    deps = [
+        ":trace_reason_interface",
+        "//include/envoy/stream_info:stream_info_interface",
+    ],
 )

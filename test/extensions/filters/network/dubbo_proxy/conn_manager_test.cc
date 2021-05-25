@@ -432,14 +432,12 @@ TEST_F(ConnectionManagerTest, OnDataHandlesProtocolErrorOnWrite) {
 
   // Start the read buffer
   writePartialHessianRequestMessage(buffer_, false, false, 0x0F, true);
-  uint64_t len = buffer_.length();
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
       .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  len -= buffer_.length();
 
   // Disable sniffing
   writeInvalidRequestMessage(write_buffer_);
