@@ -335,12 +335,6 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
-#ifdef ENVOY_ENABLE_QUIC
-  void setQuicStatNames(Quic::QuicStatNames& quic_stat_names) {
-    quic_stat_names_ = quic_stat_names;
-  }
-#endif
-
   SystemTime last_updated_;
 
 private:
@@ -436,7 +430,7 @@ private:
   Init::WatcherImpl local_init_watcher_;
 
 #ifdef ENVOY_ENABLE_QUIC
-  OptRef<Quic::QuicStatNames> quic_stat_names_;
+  Quic::QuicStatNames& quic_stat_names_;
 #endif
 
   // to access ListenerManagerImpl::factory_.

@@ -206,6 +206,10 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+#endif
+
   Instance& server_;
   ListenerComponentFactory& factory_;
 

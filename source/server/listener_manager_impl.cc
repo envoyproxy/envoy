@@ -435,10 +435,6 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
                                        workers_started_, hash, server_.options().concurrency());
   }
 
-#ifdef ENVOY_ENABLE_QUIC
-  new_listener->setQuicStatNames(quic_stat_names_);
-#endif
-
   ListenerImpl& new_listener_ref = *new_listener;
 
   bool added = false;
