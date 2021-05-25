@@ -409,6 +409,11 @@ std::vector<ActionsParameter> all_actions = {
     // called, same for the next callback
     ActionsParameter({Action::ProcessFoo, Action::AddNewToFoo, Action::DestroyNext},
                      {"previous", "self", "last"}, OtherActionsExecution::WithinFirstAction),
+    // when processing foo, destroy next and try to invoke next;
+    // expect the invoke to be noop, and processing to not call the
+    // next callback
+    ActionsParameter({Action::ProcessFoo, Action::DestroyNext, Action::InvokeNext},
+                     {"previous", "self", "last"}, OtherActionsExecution::WithinFirstAction),
 };
 
 class ClusterDiscoveryTest : public ActionExecutorTest {};
