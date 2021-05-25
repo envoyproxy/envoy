@@ -26,9 +26,9 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
 
   const MonotonicTime now = time_source_.monotonicTime();
   protocols.erase(std::remove_if(protocols.begin(), protocols.end(),
-                 [now](const AlternateProtocol& protocol) {
-                   return (now > protocol.expiration_);
-                 }),
+                                 [now](const AlternateProtocol& protocol) {
+                                   return (now > protocol.expiration_);
+                                 }),
                   protocols.end());
 
   if (protocols.empty()) {
