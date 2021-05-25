@@ -13,18 +13,24 @@ namespace Extensions {
 namespace HttpFilters {
 namespace LocalRateLimitFilter {
 
+const std::string& PerConnectionRateLimiter::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "per_connection_local_rate_limiter");
+}
+
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher, Stats::Scope& scope,
     Runtime::Loader& runtime, const bool per_route)
     : status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
+      fill_interval_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0))),
+      max_tokens_(config.token_bucket().max_tokens()),
+      tokens_per_fill_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1)),
+      descriptors_(config.descriptors()),
+      rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
       rate_limiter_(Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
-          std::chrono::milliseconds(
-              PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0)),
-          config.token_bucket().max_tokens(),
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1), dispatcher,
-          config.descriptors())),
+          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_)),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
@@ -84,7 +90,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     populateDescriptors(descriptors, headers);
   }
 
-  if (config->requestAllowed(descriptors)) {
+  if (requestAllowed(descriptors)) {
     config->stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -107,6 +113,34 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
 
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+bool Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
+  const auto* config = getConfig();
+  return config->rateLimitPerConnection()
+             ? getPerConnectionRateLimiter().requestAllowed(request_descriptors)
+             : config->requestAllowed(request_descriptors);
+}
+
+const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
+  const auto* config = getConfig();
+  ASSERT(config->rateLimitPerConnection());
+
+  if (!decoder_callbacks_->streamInfo().filterState()->hasData<PerConnectionRateLimiter>(
+          PerConnectionRateLimiter::key())) {
+    decoder_callbacks_->streamInfo().filterState()->setData(
+        PerConnectionRateLimiter::key(),
+        std::make_unique<PerConnectionRateLimiter>(
+            config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
+            decoder_callbacks_->dispatcher(), config->descriptors()),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  return decoder_callbacks_->streamInfo()
+      .filterState()
+      ->getDataReadOnly<PerConnectionRateLimiter>(PerConnectionRateLimiter::key())
+      .value();
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
