@@ -1,7 +1,5 @@
 #pragma once
 
-#include <optional>
-
 #include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
@@ -105,9 +103,10 @@ public:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
-  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
+  absl::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
       crypto_server_stream_factory_;
-  std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
+  absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
+      proof_source_factory_;
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
   absl::once_flag install_bpf_once_;
