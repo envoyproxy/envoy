@@ -91,6 +91,7 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) 
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols2_.size(), protocols->size());
   EXPECT_EQ(protocols2_, protocols.ref());
 }
 
