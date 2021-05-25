@@ -8,7 +8,7 @@ Bandwidth limit
 * This filter should be configured with the name ``envoy.filters.http.bandwidth_limit``.
 
 The HTTP Bandwidth limit filter limits the size of data flow to the max bandwidth set in the ``limit_kbps``
-when the request's route or virtual host has a per filter
+when the request's route, virtual host or filter chain has a
 :ref:`bandwidth limit configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit>`.
 
 If the bandwidth limit has been exhausted the filter stops further transfer until more bandwidth gets allocated
@@ -41,16 +41,16 @@ The HTTP bandwidth limit filter outputs statistics in the ``<stat_prefix>.http_b
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  decode_enabled, Counter, Total number of request streams for which the bandwidth limiter was consulted
-  decode_pending, GAUGE, Number of request streams which the currently pending transfer in bandwidth limiter
-  decode_incoming_size, GAUGE, Size in bytes of incoming request data to bandwidth limiter
-  decode_allowed_size, GAUGE, Size in bytes of outgoing request data from bandwidth limiter
-  decode_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the request stream transfer
-  encode_enabled, Counter, Total number of response streams for which the bandwidth limiter was consulted
-  encode_pending, GAUGE, Number of response streams which the currently pending transfer in bandwidth limiter
-  encode_incoming_size, GAUGE, Size in bytes of incoming response data to bandwidth limiter
-  encode_allowed_size, GAUGE, Size in bytes of outgoing response data from bandwidth limiter
-  encode_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the response stream transfer
+  request_enabled, Counter, Total number of request streams for which the bandwidth limiter was consulted
+  request_pending, GAUGE, Number of request streams which are currently pending transfer in bandwidth limiter
+  request_incoming_size, GAUGE, Size in bytes of incoming request data to bandwidth limiter
+  request_allowed_size, GAUGE, Size in bytes of outgoing request data from bandwidth limiter
+  request_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the request stream transfer
+  response_enabled, Counter, Total number of response streams for which the bandwidth limiter was consulted
+  response_pending, GAUGE, Number of response streams which are currently pending transfer in bandwidth limiter
+  response_incoming_size, GAUGE, Size in bytes of incoming response data to bandwidth limiter
+  response_allowed_size, GAUGE, Size in bytes of outgoing response data from bandwidth limiter
+  response_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the response stream transfer
 
 .. _config_http_filters_bandwidth_limit_runtime:
 

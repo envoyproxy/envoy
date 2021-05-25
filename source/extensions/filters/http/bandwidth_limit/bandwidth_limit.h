@@ -31,16 +31,16 @@ namespace BandwidthLimitFilter {
  * All bandwidth limit stats. @see stats_macros.h
  */
 #define ALL_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE, HISTOGRAM)                                       \
-  COUNTER(decode_enabled)                                                                          \
-  COUNTER(encode_enabled)                                                                          \
-  GAUGE(decode_pending, Accumulate)                                                                \
-  GAUGE(encode_pending, Accumulate)                                                                \
-  GAUGE(decode_incoming_size, Accumulate)                                                          \
-  GAUGE(encode_incoming_size, Accumulate)                                                          \
-  GAUGE(decode_allowed_size, Accumulate)                                                           \
-  GAUGE(encode_allowed_size, Accumulate)                                                           \
-  HISTOGRAM(decode_transfer_duration, Milliseconds)                                                \
-  HISTOGRAM(encode_transfer_duration, Milliseconds)
+  COUNTER(request_enabled)                                                                         \
+  COUNTER(response_enabled)                                                                        \
+  GAUGE(request_pending, Accumulate)                                                               \
+  GAUGE(response_pending, Accumulate)                                                              \
+  GAUGE(request_incoming_size, Accumulate)                                                         \
+  GAUGE(response_incoming_size, Accumulate)                                                        \
+  GAUGE(request_allowed_size, Accumulate)                                                          \
+  GAUGE(response_allowed_size, Accumulate)                                                         \
+  HISTOGRAM(request_transfer_duration, Milliseconds)                                               \
+  HISTOGRAM(response_transfer_duration, Milliseconds)
 
 /**
  * Struct definition for all bandwidth limit stats. @see stats_macros.h
@@ -139,10 +139,10 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   FilterConfigSharedPtr config_;
-  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> decode_limiter_;
-  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> encode_limiter_;
-  Stats::TimespanPtr decode_latency_;
-  Stats::TimespanPtr encode_latency_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> request_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
+  Stats::TimespanPtr request_latency_;
+  Stats::TimespanPtr response_latency_;
 };
 
 } // namespace BandwidthLimitFilter

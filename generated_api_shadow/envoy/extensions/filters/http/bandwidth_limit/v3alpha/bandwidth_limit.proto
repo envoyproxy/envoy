@@ -29,13 +29,13 @@ message BandwidthLimit {
     DISABLED = 0;
 
     // Filter enabled only for incoming traffic.
-    DECODE = 1;
+    REQUEST = 1;
 
     // Filter enabled only for outgoing traffic.
-    ENCODE = 2;
+    RESPONSE = 2;
 
     // Filter enabled for both incoming and outgoing traffic.
-    DECODE_AND_ENCODE = 3;
+    REQUEST_AND_RESPONSE = 3;
   }
 
   // The human readable prefix to use when emitting stats.
