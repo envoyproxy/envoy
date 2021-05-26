@@ -752,7 +752,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
       host_end += 1; // advance to :
     }
   } else {
-    host_end = request_host.rfind(":");
+    host_end = request_host.rfind(':');
   }
 
   if (host_end != absl::string_view::npos) {

@@ -778,7 +778,7 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   // Start position of the host
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
   // Start position of the path
-  const auto path_pos = uri.find("/", host_pos);
+  const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
     host = uri.substr(host_pos);

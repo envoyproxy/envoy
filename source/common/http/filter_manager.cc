@@ -545,6 +545,12 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       (*entry)->handle_->decodeComplete();
     }
 
+    // Skip processing metadata after sending local reply
+    if (state_.local_complete_ && std::next(entry) != decoder_filters_.end()) {
+      maybeContinueDecoding(continue_data_entry);
+      return;
+    }
+
     const bool new_metadata_added = processNewlyAddedMetadata();
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
@@ -558,8 +564,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    if ((!continue_iteration || state_.local_complete_) &&
-        std::next(entry) != decoder_filters_.end()) {
+    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
