@@ -217,6 +217,8 @@ TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
   EXPECT_EQ("foo.x", encodeDecode(".foo..x"));
   EXPECT_EQ("foo.x", encodeDecode("..foo.x"));
   EXPECT_EQ("foo.x", encodeDecode("..foo..x"));
+  EXPECT_EQ("foo.x", encodeDecode("foo.x."));
+  EXPECT_EQ("foo.x", encodeDecode("foo.x.."));
 }
 
 TEST_F(StatNameTest, TestSuccessfulDoubleLookup) {
