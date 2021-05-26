@@ -132,10 +132,9 @@ message ClientConfig {
     // Name of the xDS resource
     string name = 2;
 
-    // This is the :ref:`version_info <envoy_api_field_service.discovery.v3.
-    // DiscoveryResponse.version_info>` in the last processed xDS discovery
-    // response. If there are only static bootstrap listeners, this
-    // field will be ""
+    // This is the :ref:`version_info <envoy_api_field_service.discovery.v4alpha.DiscoveryResponse.version_info>`
+    // in the last processed xDS discovery response. If there are only
+    // static bootstrap listeners, this field will be ""
     string version_info = 3;
 
     // The xDS resource config. Actual content depends on the type
