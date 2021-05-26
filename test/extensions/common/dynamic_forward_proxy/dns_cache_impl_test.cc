@@ -111,6 +111,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
 
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -315,6 +316,7 @@ TEST_F(DnsCacheImplTest, TTL) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
   checkStats(3 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
              2 /* added */, 1 /* removed */, 1 /* num hosts */);
 }
