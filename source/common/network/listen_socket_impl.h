@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
 #include "common/network/socket_impl.h"
+#include "common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {
@@ -56,8 +57,17 @@ public:
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_->isOpen(), "");
       setPrebindSocketOptions();
+    } else {
+      // If the tcp listener does not bind to port, we test that the ip family is supported.
+      if (auto ip = address->ip(); ip != nullptr) {
+        RELEASE_ASSERT(
+            Network::SocketInterfaceSingleton::get().ipFamilySupported(ip->ipv4() ? AF_INET
+                                                                                  : AF_INET6),
+            fmt::format(
+                "Creating listen socket address {} but the address familiy is not supported",
+                address->asStringView()));
+      }
     }
-
     setupSocket(options, bind_to_port);
   }
 
