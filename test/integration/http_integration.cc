@@ -53,7 +53,6 @@ namespace Envoy {
 namespace {
 
 using testing::HasSubstr;
-using testing::StartsWith;
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
