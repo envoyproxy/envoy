@@ -210,21 +210,29 @@ bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
            headers.Method()->value() == Http::Headers::get().MethodValues.Connect));
 }
 
-void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
-  headers_to_add.iterate([&headers](const HeaderEntry& header) -> HeaderMap::Iterate {
-    HeaderString k;
-    k.setCopy(header.key().getStringView());
-    HeaderString v;
-    v.setCopy(header.value().getStringView());
-    headers.addViaMove(std::move(k), std::move(v));
-    return HeaderMap::Iterate::Continue;
-  });
-}
-
 bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
+}
+
+void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
+  auto host = headers.getHostValue();
+  // If the host ends in a period, remove it.
+  auto dot_index = host.rfind('.');
+  if (dot_index == std::string::npos) {
+    return;
+  } else if (dot_index == (host.size() - 1)) {
+    host.remove_suffix(1);
+    headers.setHost(host);
+    return;
+  }
+  // If the dot is just before a colon, it must be preceding the port number.
+  // IPv6 addresses may contain colons or dots, but the dot will never directly
+  // precede the colon, so this check should be sufficient to detect a trailing port number.
+  if (host[dot_index + 1] == ':') {
+    headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
+  }
 }
 
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,

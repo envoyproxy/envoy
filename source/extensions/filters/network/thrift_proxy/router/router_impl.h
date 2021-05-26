@@ -190,6 +190,8 @@ public:
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
+        upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
+        upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
         passthrough_supported_(false) {}
 
   ~Router() override = default;
@@ -299,6 +301,8 @@ private:
   const Stats::StatName upstream_resp_exception_;
   const Stats::StatName upstream_resp_invalid_type_;
   const Stats::StatName upstream_rq_time_;
+  const Stats::StatName upstream_rq_size_;
+  const Stats::StatName upstream_resp_size_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};
@@ -309,6 +313,8 @@ private:
   Buffer::OwnedImpl upstream_request_buffer_;
 
   bool passthrough_supported_ : 1;
+  uint64_t request_size_{};
+  uint64_t response_size_{};
 };
 
 } // namespace Router

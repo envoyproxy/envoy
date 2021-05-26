@@ -29,6 +29,8 @@
 #include "common/common/cleanup.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
+#include "common/http/alternate_protocols_cache_impl.h"
+#include "common/http/alternate_protocols_cache_manager_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
@@ -58,7 +60,10 @@ public:
         router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
         dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), options_(options) {}
+        singleton_manager_(singleton_manager), options_(options),
+        alternate_protocols_cache_manager_factory_(singleton_manager,
+                                                   main_thread_dispatcher.timeSource(), tls_),
+        alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -66,6 +71,8 @@ public:
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
+                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                       alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state) override;
@@ -101,6 +108,8 @@ protected:
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
   const Server::Options& options_;
+  Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
+  Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocols_cache_manager_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.

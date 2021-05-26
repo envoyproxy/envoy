@@ -60,8 +60,8 @@ void Filter::onDestroy() {
   }
 }
 
-FilterHeadersStatus Filter::onHeaders(ProcessorState& state, Http::HeaderMap& headers,
-                                      bool end_stream) {
+FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -75,7 +75,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state, Http::HeaderMap& he
   state.setHeaders(&headers);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
+  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
   state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
@@ -101,10 +101,20 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
-Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data,
-                                      bool end_stream) {
+FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     state.setCompleteBodyAvailable(true);
+  }
+
+  if (state.bodyReplaced()) {
+    ENVOY_LOG(trace, "Clearing body chunk because CONTINUE_AND_REPLACE was returned");
+    data.drain(data.length());
+    return FilterDataStatus::Continue;
+  }
+
+  if (processing_complete_) {
+    ENVOY_LOG(trace, "Continuing (processing complete)");
+    return FilterDataStatus::Continue;
   }
 
   bool just_added_trailers = false;
@@ -192,17 +202,17 @@ Http::FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& d
 
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "decodeData({}): end_stream = {}", data.length(), end_stream);
-  if (processing_complete_) {
-    ENVOY_LOG(trace, "decodeData: Continue (complete)");
-    return FilterDataStatus::Continue;
-  }
-
   const auto status = onData(decoding_state_, data, end_stream);
   ENVOY_LOG(trace, "decodeData returning {}", status);
   return status;
 }
 
 FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& trailers) {
+  if (processing_complete_) {
+    ENVOY_LOG(trace, "trailers: Continue");
+    return FilterTrailersStatus::Continue;
+  }
+
   bool body_delivered = state.completeBodyAvailable();
   state.setCompleteBodyAvailable(true);
   state.setTrailersAvailable(true);
@@ -243,11 +253,6 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 
 FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
   ENVOY_LOG(trace, "decodeTrailers");
-  if (processing_complete_) {
-    ENVOY_LOG(trace, "decodeTrailers: Continue");
-    return FilterTrailersStatus::Continue;
-  }
-
   const auto status = onTrailers(decoding_state_, trailers);
   ENVOY_LOG(trace, "encodeTrailers returning {}", status);
   return status;
@@ -271,11 +276,6 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
 FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "encodeData({}): end_stream = {}", data.length(), end_stream);
-  if (processing_complete_) {
-    ENVOY_LOG(trace, "encodeData: Continue (complete)");
-    return FilterDataStatus::Continue;
-  }
-
   const auto status = onData(encoding_state_, data, end_stream);
   ENVOY_LOG(trace, "encodeData returning {}", status);
   return status;
@@ -283,11 +283,6 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
 
 FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   ENVOY_LOG(trace, "encodeTrailers");
-  if (processing_complete_) {
-    ENVOY_LOG(trace, "encodeTrailers: Continue");
-    return FilterTrailersStatus::Continue;
-  }
-
   const auto status = onTrailers(encoding_state_, trailers);
   ENVOY_LOG(trace, "encodeTrailers returning {}", status);
   return status;
@@ -308,7 +303,7 @@ void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
-  MutationUtils::buildHttpHeaders(trailers, *trailers_req->mutable_trailers());
+  MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
   state.setCallbackState(ProcessorState::CallbackState::TrailersCallback);
   state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
   ENVOY_LOG(debug, "Sending trailers message");
@@ -459,7 +454,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [&response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      MutationUtils::applyHeaderMutations(response.headers(), headers);
+      MutationUtils::applyHeaderMutations(response.headers(), headers, false);
     }
   };
 
