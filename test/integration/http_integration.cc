@@ -341,7 +341,7 @@ void HttpIntegrationTest::initialize() {
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
   auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr);
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, 0);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
@@ -1149,7 +1149,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 
     if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
-      EXPECT_TRUE(response->complete());
+      ASSERT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
       ASSERT_TRUE(response->waitForReset());
@@ -1198,7 +1198,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
 
     if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
-      EXPECT_TRUE(response->complete());
+      ASSERT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
       ASSERT_TRUE(response->waitForReset());

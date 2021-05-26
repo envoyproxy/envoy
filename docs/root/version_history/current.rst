@@ -38,6 +38,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* aws_lambda: if `payload_passthrough` is set to ``false``, the downstream response content-type header will now be set from the content-type entry in the JSON response's headers map, if present.
 * http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
 * http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
 * listener: fix the crash which could happen when the ongoing filter chain only listener update is followed by the listener removal or full listener update.
@@ -62,11 +63,13 @@ Removed Config or Runtime
 
 New Features
 ------------
-* crash support: restore crash context when continuing to processing requests or responses as a result of an asynchronous callback that invokes a filter directly. This is unlike the call stacks that go through the various network layers, to eventually reach the filter. For  a concrete example see: ``Envoy::Extensions::HttpFilters::Cache::CacheFilter::getHeaders`` which posts a callback on the dispatcher that will invoke the filter directly.
+* bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
+* crash support: restore crash context when continuing to processing requests or responses as a result of an asynchronous callback that invokes a filter directly. This is unlike the call stacks that go through the various network layers, to eventually reach the filter. For a concrete example see: ``Envoy::Extensions::HttpFilters::Cache::CacheFilter::getHeaders`` which posts a callback on the dispatcher that will invoke the filter directly.
 * http: a new field `is_optional` is added to `extensions.filters.network.http_connection_manager.v3.HttpFilter`. When
   value is `true`, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter
   in the typed per filter config. For more information, please reference
   :ref:`HttpFilter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>`.
+* http: added :ref:`stripping trailing host dot from host header<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_trailing_host_dot>` support.
 * http: added support for :ref:`original IP detection extensions<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`.
   Two initial extensions were added, the :ref:`custom header <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension and the
   :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` extension.

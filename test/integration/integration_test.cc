@@ -1399,40 +1399,6 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
 }
 
-// Test that delay closed connections are eventually force closed when the timeout triggers.
-TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
-  config_helper_.setBufferLimits(1024, 1024);
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        // 200ms.
-        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
-      });
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  // The delayed close timeout should trigger since client is not closing the connection.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
-  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
-            1);
-}
-
 // Test that if the route cache is cleared, it doesn't cause problems.
 TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
   config_helper_.addFilter("{ name: clear-route-cache, typed_config: { \"@type\": "

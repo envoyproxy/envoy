@@ -527,14 +527,8 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
   Stats::Store& stats = test_server_->server().stats();
   if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    Stats::CounterSharedPtr counter =
-        TestUtility::findCounter(stats, "cluster.cluster_0.http2.tx_reset");
-    ASSERT_NE(nullptr, counter);
-    EXPECT_EQ(1L, counter->value());
-  } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(alyssawilk) http3 stats.
-    Stats::CounterSharedPtr counter =
-        TestUtility::findCounter(stats, "cluster.cluster_0.upstream_rq_tx_reset");
+    Stats::CounterSharedPtr counter = TestUtility::findCounter(
+        stats, absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"));
     ASSERT_NE(nullptr, counter);
     EXPECT_EQ(1L, counter->value());
   }
@@ -1569,8 +1563,11 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-  // Send one very large 2048 kB (2 MB) header with limit 1024 kB (1 MB) and 100 headers.
-  testLargeRequestHeaders(2048, 1, 1024, 100);
+  // Send one very large 600 kB header with limit 500 kB and 100 headers.
+  // The limit and the header size are set in such a way to accommodate for flow control limits.
+  // If the headers are too large and the flow control blocks the response is truncated and the test
+  // flakes.
+  testLargeRequestHeaders(600, 1, 500, 100);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
@@ -2003,15 +2000,22 @@ name: encode-headers-return-stop-all-filter
 
 // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
 // combine set-cookie headers
-TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
+TEST_P(ProtocolIntegrationTest, MultipleCookiesAndSetCookies) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},  {":path", "/dynamo/url"},
+                                                 {":scheme", "http"}, {":authority", "host"},
+                                                 {"cookie", "a=b"},   {"cookie", "c=d"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"}, {"set-cookie", "foo"}, {"set-cookie", "bar"}};
 
-  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(),
+              "a=b; c=d");
+  }
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -2020,6 +2024,42 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
   ASSERT_EQ(out.size(), 2);
   ASSERT_EQ(out[0]->value().getStringView(), "foo");
   ASSERT_EQ(out[1]->value().getStringView(), "bar");
+}
+
+// Test that delay closed connections are eventually force closed when the timeout triggers.
+TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
+  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // 200ms.
+        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
+        hcm.mutable_drain_timeout()->set_seconds(1);
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->set_seconds(1);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  // The delayed close timeout should trigger since client is not closing the connection.
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
+            1);
 }
 
 // Resets the downstream stream immediately and verifies that we clean up everything.
@@ -2303,6 +2343,61 @@ TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   ASSERT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verify that host's trailing dot is removed and matches the domain for routing request.
+TEST_P(ProtocolIntegrationTest, EnableStripTrailingHostDot) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.set_strip_trailing_host_dot(true);
+        // clear existing domains and add new domain.
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        virtual_host->clear_domains();
+        virtual_host->add_domains("host");
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host."}});
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verify that host's trailing dot is not removed and thus fails to match configured domains for
+// routing request.
+TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.set_strip_trailing_host_dot(false);
+        // clear existing domains and add new domain.
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        virtual_host->clear_domains();
+        virtual_host->add_domains("host");
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host."}});
+  // Expect local reply as request host fails to match configured domains.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 }
 
 } // namespace Envoy
