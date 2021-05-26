@@ -209,6 +209,7 @@ public:
   // Continue
   WasmResult continueStream(WasmStreamType stream_type) override;
   WasmResult closeStream(WasmStreamType stream_type) override;
+  void failStream(WasmStreamType stream_type) override;
   WasmResult sendLocalResponse(uint32_t response_code, absl::string_view body_text,
                                Pairs additional_headers, uint32_t grpc_status,
                                absl::string_view details) override;

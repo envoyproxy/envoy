@@ -32,13 +32,13 @@ The following Envoy filters can be configured to consume dynamic metadata emitte
 
 Shared Dynamic Metadata
 -----------------------
-Dynamic metadata that is set by multiple filters is placed in the common key namespace `envoy.common`. Refer to the corresponding rules when setting this metadata.
+Dynamic metadata that is set by multiple filters is placed in the common key namespace ``envoy.common``. Refer to the corresponding rules when setting this metadata.
 
 .. csv-table::
   :header: Name, Type, Description, Rules
   :widths: 1, 1, 3, 3
 
-  access_log_hint, boolean, Whether access loggers should log the request., "When this metadata is already set: A `true` value should not be overwritten by a `false` value, while a `false` value can be overwritten by a `true` value."
+  access_log_hint, boolean, Whether access loggers should log the request., "When this metadata is already set: A ``true`` value should not be overwritten by a ``false`` value, while a ``false`` value can be overwritten by a ``true`` value."
 
 The following Envoy filters emit shared dynamic metadata.
 

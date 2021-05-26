@@ -1,3 +1,4 @@
+#include "common/http/alternate_protocols_cache.h"
 #include "common/http/conn_pool_grid.h"
 
 #include "test/common/http/common.h"
@@ -93,17 +94,33 @@ public:
 };
 
 namespace {
-class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testing::Test {
+class ConnectivityGridTestBase : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  ConnectivityGridTest()
+  ConnectivityGridTestBase(bool use_alternate_protocols)
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
+        alternate_protocols_(simTime()),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
-              state_, simTime(), std::chrono::milliseconds(300), options_),
+              state_, simTime(), maybeCreateAlternateProtocolsCache(use_alternate_protocols),
+              std::chrono::milliseconds(300), options_),
         host_(grid_.host()) {
     grid_.info_ = &info_;
     grid_.encoder_ = &encoder_;
+  }
+
+  OptRef<AlternateProtocolsCache> maybeCreateAlternateProtocolsCache(bool use_alternate_protocols) {
+    if (!use_alternate_protocols) {
+      return makeOptRefFromPtr<AlternateProtocolsCache>(nullptr);
+    }
+    return alternate_protocols_;
+  }
+
+  void addHttp3AlternateProtocol() {
+    AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
+    const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+        {"h3-29", "", origin.port_}};
+    alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
   }
 
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
@@ -113,6 +130,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
+  AlternateProtocolsCache alternate_protocols_;
   ConnectivityGridForTest grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
@@ -123,12 +141,27 @@ public:
   NiceMock<MockRequestEncoder> encoder_;
 };
 
+// Tests of the Grid in which no alternate protocols cache is configured.
+class ConnectivityGridTest : public ConnectivityGridTestBase {
+public:
+  ConnectivityGridTest() : ConnectivityGridTestBase(false) {}
+};
+
+// Tests of the Grid in which an alternate protocols cache is configured.
+class ConnectivityGridWithAlternateProtocolsCacheTest : public ConnectivityGridTestBase {
+public:
+  ConnectivityGridWithAlternateProtocolsCacheTest() : ConnectivityGridTestBase(true) {}
+};
+
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
   EXPECT_EQ(grid_.first(), nullptr);
 
-  EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr);
+  EXPECT_LOG_CONTAINS("trace",
+                      "No alternate protocols cache. Attempting HTTP/3 to host 'hostname'.",
+                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
   EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_EQ(grid_.second(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_.callbacks(), nullptr);
@@ -424,10 +457,11 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 
 // Test that when HTTP/3 is broken then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
+  addHttp3AlternateProtocol();
   grid_.markHttp3Broken();
   EXPECT_EQ(grid_.first(), nullptr);
 
-  EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'first', skipping.",
+  EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'hostname', skipping.",
                       EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
   EXPECT_NE(grid_.first(), nullptr);
   EXPECT_NE(grid_.second(), nullptr);
@@ -437,6 +471,122 @@ TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
   EXPECT_TRUE(grid_.isHttp3Broken());
+}
+
+// Test the HTTP/3 pool successfully connecting when HTTP/3 is available.
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, Success) {
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr);
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_EQ(grid_.second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_.callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  EXPECT_FALSE(grid_.isHttp3Broken());
+}
+
+// Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3) {
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  EXPECT_LOG_CONTAINS("trace",
+                      "No alternate protocols available for host 'hostname', skipping HTTP/3.",
+                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_.callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithExpiredHttp3) {
+  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+      {"h3-29", "", origin.port_}};
+  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+  simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
+
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  EXPECT_LOG_CONTAINS("trace",
+                      "No alternate protocols available for host 'hostname', skipping HTTP/3.",
+                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_.callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test that when the alternate protocol specifies a different host, then the HTTP/3 pool is
+// skipped.
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingHostname) {
+  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+      {"h3-29", "otherhostname", origin.port_}};
+  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
+                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_.callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test that when the alternate protocol specifies a different port, then the HTTP/3 pool is
+// skipped.
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingPort) {
+  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+      {"h3-29", "", origin.port_ + 1}};
+  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
+                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_.callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test that when the alternate protocol specifies an invalid ALPN, then the HTTP/3 pool is skipped.
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheTest, SuccessWithoutHttp3NoMatchingAlpn) {
+  AlternateProtocolsCache::Origin origin("https", "hostname", 9000);
+  const std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {
+      {"http/2", "", origin.port_}};
+  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
+                      EXPECT_NE(grid_.newStream(decoder_, callbacks_), nullptr));
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_.callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
 }
 
 #ifdef ENVOY_ENABLE_QUICHE

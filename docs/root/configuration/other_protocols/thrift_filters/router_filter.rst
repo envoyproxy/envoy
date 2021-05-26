@@ -26,7 +26,7 @@ The filter outputs generic routing error statistics in the *thrift.<stat_prefix>
 
 
 The filter is also responsible for cluster-level statistics derived from routed upstream clusters.
-Since these stats utilize the underlying cluster scope, we prefix with the `thrift` namespace.
+Since these stats utilize the underlying cluster scope, we prefix with the ``thrift`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description

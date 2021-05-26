@@ -17,12 +17,12 @@ namespace Http {
 // See https://tools.ietf.org/html/rfc7838 for HTTP Alternate Services and
 // https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04 for the
 // "HTTPS" DNS resource record.
-class AlternateProtocols {
+class AlternateProtocolsCache {
 public:
   // Represents an HTTP origin to be connected too.
   struct Origin {
   public:
-    Origin(absl::string_view scheme, absl::string_view hostname, int port);
+    Origin(absl::string_view scheme, absl::string_view hostname, uint32_t port);
 
     bool operator==(const Origin& other) const {
       return std::tie(scheme_, hostname_, port_) ==
@@ -53,13 +53,13 @@ public:
 
     std::string scheme_;
     std::string hostname_;
-    int port_{};
+    uint32_t port_{};
   };
 
   // Represents an alternative protocol that can be used to connect to an origin.
   struct AlternateProtocol {
   public:
-    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, int port);
+    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port);
 
     bool operator==(const AlternateProtocol& other) const {
       return std::tie(alpn_, hostname_, port_) ==
@@ -70,10 +70,10 @@ public:
 
     std::string alpn_;
     std::string hostname_;
-    int port_;
+    uint32_t port_;
   };
 
-  explicit AlternateProtocols(TimeSource& time_source);
+  explicit AlternateProtocolsCache(TimeSource& time_source);
 
   // Sets the possible alternative protocols which can be used to connect to the
   // specified origin. Expires after the specified expiration time.
@@ -82,8 +82,8 @@ public:
 
   // Returns the possible alternative protocols which can be used to connect to the
   // specified origin, or nullptr if not alternatives are found. The returned pointer
-  // is owned by the AlternateProtocols and is valid until the next operation on
-  // AlternateProtocols.
+  // is owned by the AlternateProtocolsCache and is valid until the next operation on
+  // AlternateProtocolsCache.
   OptRef<const std::vector<AlternateProtocol>> findAlternatives(const Origin& origin);
 
   // Returns the number of entries in the map.

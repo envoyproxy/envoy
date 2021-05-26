@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
+#include "common/config/datasource.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
@@ -22,10 +23,15 @@ Tracing::HttpTracerSharedPtr LightstepTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::LightstepConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   auto opts = std::make_unique<lightstep::LightStepTracerOptions>();
-  const auto access_token_file = context.serverFactoryContext().api().fileSystem().fileReadToEnd(
-      proto_config.access_token_file());
-  const auto access_token_sv = StringUtil::rtrim(access_token_file);
-  opts->access_token.assign(access_token_sv.data(), access_token_sv.size());
+  if (proto_config.has_access_token()) {
+    opts->access_token = Config::DataSource::read(proto_config.access_token(), true,
+                                                  context.serverFactoryContext().api());
+  } else {
+    const auto access_token_file = context.serverFactoryContext().api().fileSystem().fileReadToEnd(
+        proto_config.access_token_file());
+    const auto access_token_sv = StringUtil::rtrim(access_token_file);
+    opts->access_token.assign(access_token_sv.data(), access_token_sv.size());
+  }
   opts->component_name = context.serverFactoryContext().localInfo().clusterName();
 
   Tracing::DriverPtr lightstep_driver = std::make_unique<LightStepDriver>(

@@ -9,14 +9,13 @@ REST-JSON cases, a :ref:`DiscoveryRequest <envoy_v3_api_msg_service.discovery.v3
 :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` received following the
 :ref:`xDS protocol <xds_protocol>`.
 
-Below we describe endpoints for the v2 and v3 transport API versions.
+Below we describe endpoints for the v3 transport API.
 
-.. _v2_grpc_streaming_endpoints:
+.. _v3_grpc_streaming_endpoints:
 
 gRPC streaming endpoints
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. http:post:: /envoy.api.v2.ClusterDiscoveryService/StreamClusters
 .. http:post:: /envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters
 
 See :repo:`cds.proto <api/envoy/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
@@ -37,7 +36,6 @@ is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
 <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
-.. http:post:: /envoy.api.v2.EndpointDiscoveryService/StreamEndpoints
 .. http:post:: /envoy.service.endpoint.v3.EndpointDiscoveryService/StreamEndpoints
 
 See :repo:`eds.proto
@@ -59,7 +57,6 @@ is set in the :ref:`eds_cluster_config
 <envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` field of the :ref:`Cluster
 <envoy_v3_api_msg_config.cluster.v3.Cluster>` config.
 
-.. http:post:: /envoy.api.v2.ListenerDiscoveryService/StreamListeners
 .. http:post:: /envoy.service.listener.v3.ListenerDiscoveryService/StreamListeners
 
 See :repo:`lds.proto
@@ -81,7 +78,6 @@ is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
 <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
-.. http:post:: /envoy.api.v2.RouteDiscoveryService/StreamRoutes
 .. http:post:: /envoy.service.route.v3.RouteDiscoveryService/StreamRoutes
 
 See :repo:`rds.proto
@@ -105,7 +101,6 @@ is set in the :ref:`rds
 of the :ref:`HttpConnectionManager
 <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
 
-.. http:post:: /envoy.api.v2.ScopedRoutesDiscoveryService/StreamScopedRoutes
 .. http:post:: /envoy.service.route.v3.ScopedRoutesDiscoveryService/StreamScopedRoutes
 
 See :repo:`srds.proto
@@ -130,7 +125,6 @@ is set in the :ref:`scoped_routes
 field of the :ref:`HttpConnectionManager
 <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
 
-.. http:post:: /envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets
 .. http:post:: /envoy.service.secret.v3.SecretDiscoveryService/StreamSecrets
 
 See :repo:`sds.proto
@@ -152,7 +146,6 @@ for the service definition. This is used by Envoy as a client when
 is set inside a :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` message. This message
 is used in various places such as the :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`.
 
-.. http:post:: /envoy.service.discovery.v2.RuntimeDiscoveryService/StreamRuntime
 .. http:post:: /envoy.service.runtime.v3.RuntimeDiscoveryService/StreamRuntime
 
 See :repo:`rtds.proto
@@ -177,7 +170,6 @@ field.
 REST endpoints
 ^^^^^^^^^^^^^^
 
-.. http:post:: /v2/discovery:clusters
 .. http:post:: /v3/discovery:clusters
 
 See :repo:`cds.proto
@@ -197,7 +189,6 @@ is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
 <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
-.. http:post:: /v2/discovery:endpoints
 .. http:post:: /v3/discovery:endpoints
 
 See :repo:`eds.proto
@@ -217,7 +208,6 @@ is set in the :ref:`eds_cluster_config
 <envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` field of the :ref:`Cluster
 <envoy_v3_api_msg_config.cluster.v3.Cluster>` config.
 
-.. http:post:: /v2/discovery:listeners
 .. http:post:: /v3/discovery:listeners
 
 See :repo:`lds.proto
@@ -237,7 +227,6 @@ is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
 <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
-.. http:post:: /v2/discovery:routes
 .. http:post:: /v3/discovery:routes
 
 See :repo:`rds.proto
@@ -295,7 +284,6 @@ ADS is only available for gRPC streaming (not REST) and is described more fully
 in :ref:`xDS <xds_protocol_ads>`
 document. The gRPC endpoint is:
 
-.. http:post:: /envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources
 .. http:post:: /envoy.service.discovery.v3.AggregatedDiscoveryService/StreamAggregatedResources
 
 See :repo:`discovery.proto
@@ -315,7 +303,7 @@ is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
 <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
 
-When this is set, any of the configuration sources :ref:`above <v2_grpc_streaming_endpoints>` can
+When this is set, any of the configuration sources :ref:`above <v3_grpc_streaming_endpoints>` can
 be set to use the ADS channel. For example, a LDS config could be changed from
 
 .. code-block:: yaml

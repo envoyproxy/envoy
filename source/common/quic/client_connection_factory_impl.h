@@ -19,7 +19,7 @@ namespace Quic {
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
                          Network::TransportSocketFactory& transport_socket_factory,
-                         Stats::Scope& stats_scope, TimeSource& time_source,
+                         TimeSource& time_source,
                          Network::Address::InstanceConstSharedPtr server_addr);
 
   EnvoyQuicConnectionHelper conn_helper_;
@@ -28,7 +28,10 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // given connection pool.
   quic::QuicServerId server_id_;
   quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
+  // TODO(danzh) move this into client transport socket factory so that it can
+  // be updated with SDS.
   std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  quic::QuicConfig quic_config_;
 };
 
 std::unique_ptr<Network::ClientConnection>

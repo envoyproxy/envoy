@@ -137,6 +137,9 @@ public:
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
+  // A cluster that uses the startTls transport socket.
+  static envoy::config::cluster::v3::Cluster buildStartTlsCluster(const std::string& address,
+                                                                  int port);
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
@@ -314,6 +317,11 @@ public:
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
+
+  // Adjust the upstream route with larger timeout if running tsan. This is the duration between
+  // whole request being processed and whole response received.
+  static void adjustUpstreamTimeoutForTsan(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm);
 
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
