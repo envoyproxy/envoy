@@ -77,6 +77,7 @@ BAZEL_BUILD_OPTIONS+=(
     "--action_env=ENVOY_BLOB_SHA"
     "--action_env=EXTENSION_DB_PATH")
 
+# TODO(phlax): move this to format_pre checks
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:validate_extensions
 
 # Generate RST for the lists of trusted/untrusted extensions in

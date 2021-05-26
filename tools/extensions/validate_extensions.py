@@ -86,11 +86,14 @@ EXTENSION_STATUS_VALUES = [
     "wip",
 ]
 
+# TODO(phlax): remove this
 BUILDOZER_PATH = os.path.abspath(
     "external/com_github_bazelbuild_buildtools/buildozer/buildozer_/buildozer")
 
+# TODO(phlax): remove this
 ENVOY_SRCDIR = os.getenv('ENVOY_SRCDIR', '/source')
 
+# TODO(phlax): remove this
 if not os.path.exists(ENVOY_SRCDIR):
     raise SystemExit(
         "Envoy source must either be located at /source, or ENVOY_SRCDIR env var must be set")
@@ -110,6 +113,7 @@ class ExtensionDbError(Exception):
     pass
 
 
+# TODO(phlax): remove this
 def is_missing(value):
     return value == '(missing)'
 
@@ -131,6 +135,7 @@ def num_robust_to_downstream_network_filters(db):
     ])
 
 
+# TODO(phlax): remove this
 def get_extension_metadata(target):
     if not BUILDOZER_PATH:
         raise ExtensionDbError('Buildozer not found!')
@@ -153,6 +158,7 @@ def get_extension_metadata(target):
     }
 
 
+# TODO(phlax): remove this
 def compare_old_and_new(old_db, new_db):
     returns = 0
 
@@ -171,6 +177,7 @@ def compare_old_and_new(old_db, new_db):
     return returns
 
 
+# TODO(phlax): remove this
 def generate_old_extension_db():
     extension_db = {}
     # Include all extensions from source/extensions/extensions_build_config.bzl
@@ -195,6 +202,7 @@ def generate_old_extension_db():
     return extension_db
 
 
+# TODO(phlax): move this to a checker class, remove `compare_old_and_new` and add pytests
 def validate_extensions():
     returns = 0
     with open("source/extensions/extensions_metadata.yaml") as f:
