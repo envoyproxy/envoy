@@ -28,17 +28,22 @@ message FilterConfig {
   // If true, Envoy will assume that the upstream doesn't understand gRPC frames and
   // strip the gRPC frame from the request, and add it back in to the response. This will
   // hide the gRPC semantics from the upstream, allowing it to receive and respond with a
-  // simple binary encoded protobuf.
+  // simple binary encoded protobuf. In order to calculate the `Content-Length` header value, Envoy
+  // will buffer the upstream response unless
+  // :ref:`envoy_api_field_extensions.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header`
+  // is set, in which case Envoy will use the value of an upstream header to calculate the content
+  // length.
   bool withhold_grpc_frames = 2;
 
   // When
   // :ref:`envoy_api_field_extensions.http.grpc_http1_reverse_bridge.v3.FilterConfig.withhold_grpc_frames`
-  // is true, this option controls how envoy will calculate the upstream response size. When this
-  // is empty, envoy will buffer the upstream response to calculate its size. When this field is
-  // true, envoy can stream the response to the downstream and it will use the value of the response
-  // header with this name to set the `Content-Length` header. This allows the upstream to use
-  // chunked transfer encoding. If this option is specified, the upstream must set this header. If
-  // the header is repeated, only the first value will be used.
+  // is true, this option controls how Envoy calculates the `Content-Length`. When
+  // response_size_header is empty, Envoy will buffer the upstream response to calculate its size.
+  // When response_size_header is set to a non-empty string, Envoy will stream the response to the
+  // downstream and it will use the value of the response header with this name to set the
+  // `Content-Length` header and gRPC frame size. If this option is specified, the upstream must
+  // set the header with this name. If the header with this name is repeated, only the first value
+  // will be used.
   string response_size_header = 3;
 }
 
