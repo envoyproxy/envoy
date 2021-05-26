@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.on_demand.v3;
 
+import "envoy/config/core/v3/config_source.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -11,11 +13,39 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/on_demand/v3;on_demandv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: OnDemand]
-// IP tagging :ref:`configuration overview <config_http_filters_on_demand>`.
+// [#protodoc-title: On Demand Discovery]
+// On Demand Discovery :ref:`configuration overview <config_http_filters_on_demand>`.
 // [#extension: envoy.filters.http.on_demand]
 
+// On Demand Discovery filter config.
 message OnDemand {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.on_demand.v2.OnDemand";
+
+  // An optional configuration for on-demand cluster discovery
+  // service. If not specified, the on-demand cluster discovery will
+  // be disabled. When it's specified, the filter will pause a request
+  // to an unknown cluster and will begin a cluster discovery
+  // process. When the discovery is finished (successfully or not),
+  // the request will be resumed for further processing.
+  config.core.v3.ConfigSource odcds_config = 1;
+
+  // xdstp:// resource locator for on-demand cluster collection.
+  // [#not-implemented-hide:]
+  string resources_locator = 2;
+}
+
+// Per-route configuration for On Demand Discovery.
+message PerRouteConfig {
+  // An optional configuration for on-demand cluster discovery
+  // service. If not specified, the on-demand cluster discovery will
+  // be disabled. When it's specified, the filter will pause a request
+  // to an unknown cluster and will begin a cluster discovery
+  // process. When the discovery is finished (successfully or not),
+  // the request will be resumed for further processing.
+  config.core.v3.ConfigSource odcds_config = 1;
+
+  // xdstp:// resource locator for on-demand cluster collection.
+  // [#not-implemented-hide:]
+  string resources_locator = 2;
 }

@@ -1,17 +1,41 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
+#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
+class OnDemandFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  explicit OnDemandFilterConfig(Upstream::OdCdsApiHandlePtr odcds);
+  OnDemandFilterConfig(
+      const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
+      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
+  OnDemandFilterConfig(
+      const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
+      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  Upstream::OdCdsApiHandle* odcds() const { return odcds_.get(); }
+
+private:
+  Upstream::OdCdsApiHandlePtr odcds_;
+};
+
+using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;
+
 class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
-  OnDemandRouteUpdate() = default;
+  OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
   void onRouteConfigUpdateCompletion(bool route_exists);
+  void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
+  void handleOnDemandCDS(const Router::RouteConstSharedPtr& route);
+  const OnDemandFilterConfig* getConfig(const Router::RouteConstSharedPtr& route);
 
   void setFilterIterationState(Envoy::Http::FilterHeadersStatus status) {
     filter_iteration_state_ = status;
@@ -30,8 +54,10 @@ public:
   void onDestroy() override;
 
 private:
+  OnDemandFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_callback_;
+  Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
 };
