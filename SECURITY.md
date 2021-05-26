@@ -449,22 +449,22 @@ and security team to ensure they still qualify for inclusion on the list.
 
 ### Members
 
-| E-mail                                                | Organization  | End User | Last Review |
-|-------------------------------------------------------|:-------------:|:--------:|:-----------:|
-| envoy-security-team@aspenmesh.io                      | Aspen Mesh    | No       | 12/19       |
-| aws-app-mesh-security@amazon.com                      | AWS           | No       | 12/19       |
-| security@cilium.io                                    | Cilium        | No       | 12/19       |
-| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry | No       | 12/19       |
-| secalert@datawire.io                                  | Datawire      | No       | 12/19       |
-| google-internal-envoy-security@google.com             | Google        | No       | 12/19       |
-| argoprod@us.ibm.com                                   | IBM           | No       | 12/19       |
-| istio-security-vulnerability-reports@googlegroups.com | Istio         | No       | 12/19       |
-| envoy-security@microsoft.com                          | Microsoft     | No       | 2/21        |
-| secalert@redhat.com                                   | Red Hat       | No       | 12/19       |
-| envoy-security@solo.io                                | solo.io       | No       | 12/19       |
-| envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
-| security@vmware.com                                   | VMware        | No       | 12/19       |
-| envoy-security@pinterest.com                          | Pinterest     | Yes      | 12/19       |
-| envoy-security@dropbox.com                            | Dropbox       | Yes      | 01/20       |
-| envoy-security-predisclosure@stripe.com               | Stripe        | Yes      | 01/20       |
-| envoy-security@squareup.com                           | Square        | Yes      | 05/21       |
+| Organization  | End User | Last Review |
+|:-------------:|:--------:|:-----------:|
+| Aspen Mesh    | No       | 12/19       |
+| AWS           | No       | 12/19       |
+| Cilium        | No       | 12/19       |
+| Cloud Foundry | No       | 12/19       |
+| Datawire      | No       | 12/19       |
+| Google        | No       | 12/19       |
+| IBM           | No       | 12/19       |
+| Istio         | No       | 12/19       |
+| Microsoft     | No       | 2/21        |
+| Red Hat       | No       | 12/19       |
+| solo.io       | No       | 12/19       |
+| Tetrate       | No       | 12/19       |
+| VMware        | No       | 12/19       |
+| Pinterest     | Yes      | 12/19       |
+| Dropbox       | Yes      | 01/20       |
+| Stripe        | Yes      | 01/20       |
+| Square        | Yes      | 05/21       |
