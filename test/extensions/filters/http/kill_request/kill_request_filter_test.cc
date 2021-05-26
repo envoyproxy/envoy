@@ -220,7 +220,7 @@ TEST_F(KillRequestFilterTest, PerRouteKillSettingFound) {
   route_level_kill_request.set_kill_request_header("x-custom-kill-request");
 
   // Return valid kill setting on the REQUEST direction
-  KillSettings const kill_settings(route_level_kill_request);
+  const KillSettings kill_settings(route_level_kill_request);
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
           perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
       .WillByDefault(Return(&kill_settings));
