@@ -50,7 +50,7 @@ DnsCacheImpl::~DnsCacheImpl() {
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Event::Dispatcher& main_thread_dispatcher) {
-  if (config.has_dns_resolver() && !config.dns_resolver().resolvers().empty()) {
+  if (config.has_dns_resolver()) {
     const auto& resolver_addrs = config.dns_resolver().resolvers();
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
     resolvers.reserve(resolver_addrs.size());

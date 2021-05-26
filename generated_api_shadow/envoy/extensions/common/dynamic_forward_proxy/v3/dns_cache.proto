@@ -105,6 +105,6 @@ message DnsCacheConfig {
 
   // DNS resolver configuration
   // If specified, DNS cache will perform resolution via the underlying DNS resolvers.
-  // Otherwise, default resolvers from /etc/resolv.conf will be used.
+  // Otherwise, the default system resolvers (e.g., /etc/resolv.conf) will be used.
   config.core.v3.DnsResolver dns_resolver = 9;
 }
