@@ -320,3 +320,17 @@ See the following example:
 
 .. literalinclude:: _include/tagged.yaml
     :language: yaml
+
+.. warning::
+    If you parse Envoy YAML configuration using external loaders, you may need to inform these
+    loaders about the !ignore tag. Compliant YAML loaders will typically expose an interface to
+    allow you to choose how to handle a custom tag.
+
+For example, this will instruct `PyYAML <https://github.com/yaml/pyyaml>` to treat an ignored
+node as a simple scalar when loading:
+.. code-block:: python
+    yaml.SafeLoader.add_constructor('!ignore', yaml.loader.SafeConstructor.construct_scalar)
+
+Alternatively,
+:repo:`this is how Envoy registers the !ignore tag <tools/config_validation/validate_fragment.py>`
+in config validation.
