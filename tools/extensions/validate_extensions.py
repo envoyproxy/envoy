@@ -165,14 +165,8 @@ def compare_old_and_new(old_db, new_db):
     if sorted(old_db.keys()) != sorted(new_db.keys()):
         old_only = set(old_db.keys()) - set(new_db.keys())
         new_only = set(new_db.keys()) - set(old_db.keys())
-        extra_old = (
-            f"only old {old_only}"
-            if old_only
-            else "")
-        extra_new = (
-            f"only new {new_only}"
-            if new_only
-            else "")
+        extra_old = (f"only old {old_only}" if old_only else "")
+        extra_new = (f"only new {new_only}" if new_only else "")
         raise ExtensionDbError(f"Extensions list does not match - {extra_old} {extra_new}")
 
     for k in new_db:
