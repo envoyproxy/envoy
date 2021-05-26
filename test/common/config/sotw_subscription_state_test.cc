@@ -20,18 +20,25 @@ namespace {
 
 class SotwSubscriptionStateTest : public testing::Test {
 protected:
-  SotwSubscriptionStateTest()
-      : state_(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-                   envoy::config::core::v3::ApiVersion::V3),
-               callbacks_, std::chrono::milliseconds(0U), dispatcher_) {
-    state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
+  SotwSubscriptionStateTest(const unsigned int initial_fetch_timeout = 0U) {
+    if (initial_fetch_timeout > 0) {
+      initial_fetch_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+      EXPECT_CALL(*initial_fetch_timeout_timer_,
+                  enableTimer(std::chrono::milliseconds(initial_fetch_timeout), _));
+      ttl_timer_ = new Event::MockTimer(&dispatcher_);
+    }
+    state_ = std::make_unique<UnifiedMux::SotwSubscriptionState>(
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            envoy::config::core::v3::ApiVersion::V3),
+        callbacks_, std::chrono::milliseconds(initial_fetch_timeout), dispatcher_);
+    state_->updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
   }
 
   std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
   getNextDiscoveryRequestAckless() {
-    return state_.getNextRequestAckless();
+    return state_->getNextRequestAckless();
   }
 
   UpdateAck deliverDiscoveryResponse(const std::vector<std::string>& resource_names,
@@ -48,7 +55,7 @@ protected:
       response.add_resources()->PackFrom(*load_assignment);
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(_, version_info));
-    return state_.handleResponse(response);
+    return state_->handleResponse(response);
   }
 
   UpdateAck deliverBadDiscoveryResponse(const std::string& version_info, const std::string& nonce) {
@@ -56,24 +63,41 @@ protected:
     message.set_version_info(version_info);
     message.set_nonce(nonce);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _)).WillOnce(Throw(EnvoyException("oh no")));
-    return state_.handleResponse(message);
+    return state_->handleResponse(message);
   }
 
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::MockTimer* initial_fetch_timeout_timer_;
+  Event::MockTimer* ttl_timer_;
   // We start out interested in three resources: name1, name2, and name3.
-  UnifiedMux::SotwSubscriptionState state_;
+  std::unique_ptr<UnifiedMux::SotwSubscriptionState> state_;
 };
+
+class InitialFetchTimeoutSotwSubscriptionStateTest : public SotwSubscriptionStateTest {
+public:
+  InitialFetchTimeoutSotwSubscriptionStateTest() : SotwSubscriptionStateTest(100L) {}
+};
+
+TEST_F(InitialFetchTimeoutSotwSubscriptionStateTest, InitialFetchTimeoutTimerCreated) {
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, _));
+  initial_fetch_timeout_timer_->invokeCallback();
+}
+
+TEST_F(InitialFetchTimeoutSotwSubscriptionStateTest, InitialFetchTimeoutTimerCanBeCancelled) {
+  EXPECT_CALL(*initial_fetch_timeout_timer_, disableTimer());
+  state_->disableInitFetchTimeoutTimer();
+}
 
 // Basic gaining/losing interest in resources should lead to changes in subscriptions.
 TEST_F(SotwSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
-    state_.updateSubscriptionInterest({"name4"}, {"name1"});
+    state_->updateSubscriptionInterest({"name4"}, {"name1"});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name2", "name3", "name4"));
   }
   {
-    state_.updateSubscriptionInterest({"name1"}, {"name3", "name4"});
+    state_->updateSubscriptionInterest({"name1"}, {"name3", "name4"});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2"));
   }
@@ -83,47 +107,47 @@ TEST_F(SotwSubscriptionStateTest, SubscribeAndUnsubscribe) {
 // all collapse to a single update. However, even if the updates all cancel each other out, there
 // still will be a request generated. All of the following tests explore different such cases.
 TEST_F(SotwSubscriptionStateTest, RemoveThenAdd) {
-  state_.updateSubscriptionInterest({}, {"name3"});
-  state_.updateSubscriptionInterest({"name3"}, {});
+  state_->updateSubscriptionInterest({}, {"name3"});
+  state_->updateSubscriptionInterest({"name3"}, {});
   auto cur_request = getNextDiscoveryRequestAckless();
   EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
 }
 
 TEST_F(SotwSubscriptionStateTest, AddThenRemove) {
-  state_.updateSubscriptionInterest({"name4"}, {});
-  state_.updateSubscriptionInterest({}, {"name4"});
+  state_->updateSubscriptionInterest({"name4"}, {});
+  state_->updateSubscriptionInterest({}, {"name4"});
   auto cur_request = getNextDiscoveryRequestAckless();
   EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
 }
 
 TEST_F(SotwSubscriptionStateTest, AddRemoveAdd) {
-  state_.updateSubscriptionInterest({"name4"}, {});
-  state_.updateSubscriptionInterest({}, {"name4"});
-  state_.updateSubscriptionInterest({"name4"}, {});
+  state_->updateSubscriptionInterest({"name4"}, {});
+  state_->updateSubscriptionInterest({}, {"name4"});
+  state_->updateSubscriptionInterest({"name4"}, {});
   auto cur_request = getNextDiscoveryRequestAckless();
   EXPECT_THAT(cur_request->resource_names(),
               UnorderedElementsAre("name1", "name2", "name3", "name4"));
 }
 
 TEST_F(SotwSubscriptionStateTest, RemoveAddRemove) {
-  state_.updateSubscriptionInterest({}, {"name3"});
-  state_.updateSubscriptionInterest({"name3"}, {});
-  state_.updateSubscriptionInterest({}, {"name3"});
+  state_->updateSubscriptionInterest({}, {"name3"});
+  state_->updateSubscriptionInterest({"name3"}, {});
+  state_->updateSubscriptionInterest({}, {"name3"});
   auto cur_request = getNextDiscoveryRequestAckless();
   EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2"));
 }
 
 TEST_F(SotwSubscriptionStateTest, BothAddAndRemove) {
-  state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
-  state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {"name4"});
-  state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
+  state_->updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
+  state_->updateSubscriptionInterest({"name1", "name2", "name3"}, {"name4"});
+  state_->updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
   auto cur_request = getNextDiscoveryRequestAckless();
   EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name4"));
 }
 
 TEST_F(SotwSubscriptionStateTest, CumulativeUpdates) {
-  state_.updateSubscriptionInterest({"name4"}, {});
-  state_.updateSubscriptionInterest({"name5"}, {});
+  state_->updateSubscriptionInterest({"name4"}, {});
+  state_->updateSubscriptionInterest({"name5"}, {});
   auto cur_request = getNextDiscoveryRequestAckless();
   EXPECT_THAT(cur_request->resource_names(),
               UnorderedElementsAre("name1", "name2", "name3", "name4", "name5"));
@@ -161,15 +185,15 @@ TEST_F(SotwSubscriptionStateTest, AckGenerated) {
 TEST_F(SotwSubscriptionStateTest, CheckUpdatePending) {
   // Note that the test fixture ctor causes the first request to be "sent", so we start in the
   // middle of a stream, with our initially interested resources having been requested already.
-  EXPECT_FALSE(state_.subscriptionUpdatePending());
-  state_.updateSubscriptionInterest({}, {}); // no change
-  EXPECT_FALSE(state_.subscriptionUpdatePending());
-  state_.markStreamFresh();
-  EXPECT_TRUE(state_.subscriptionUpdatePending());  // no change, BUT fresh stream
-  state_.updateSubscriptionInterest({}, {"name3"}); // one removed
-  EXPECT_TRUE(state_.subscriptionUpdatePending());
-  state_.updateSubscriptionInterest({"name3"}, {}); // one added
-  EXPECT_TRUE(state_.subscriptionUpdatePending());
+  EXPECT_FALSE(state_->subscriptionUpdatePending());
+  state_->updateSubscriptionInterest({}, {}); // no change
+  EXPECT_FALSE(state_->subscriptionUpdatePending());
+  state_->markStreamFresh();
+  EXPECT_TRUE(state_->subscriptionUpdatePending());  // no change, BUT fresh stream
+  state_->updateSubscriptionInterest({}, {"name3"}); // one removed
+  EXPECT_TRUE(state_->subscriptionUpdatePending());
+  state_->updateSubscriptionInterest({"name3"}, {}); // one added
+  EXPECT_TRUE(state_->subscriptionUpdatePending());
 }
 
 TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailure) {
@@ -178,7 +202,7 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailure) {
   // the WatchMap, which then calls GrpcSubscriptionImpl(s). It is the GrpcSubscriptionImpl
   // that will decline to pass on an onConfigUpdateFailed(ConnectionFailure).
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
-  state_.handleEstablishmentFailure();
+  state_->handleEstablishmentFailure();
 }
 
 } // namespace
