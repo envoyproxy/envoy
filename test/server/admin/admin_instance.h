@@ -20,14 +20,14 @@ public:
   AdminInstanceTest();
 
   Http::Code runCallback(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                         Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
                          absl::string_view method, absl::string_view body = absl::string_view());
 
   Http::Code getCallback(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+                         Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response);
 
   Http::Code postCallback(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+                          Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response);
 
   std::string address_out_path_;
   std::string cpu_profile_path_;
