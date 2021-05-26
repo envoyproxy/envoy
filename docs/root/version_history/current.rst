@@ -30,6 +30,9 @@ Minor Behavior Changes
   ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
   (do not send 1xx or 204 responses with these headers). Both are true by default.
 * http: serve HEAD requests from cache.
+* http: set the default lazy headermap threshold to 3, which defines the minimal number of headers in a
+  request/response/trailers required for using a dictionary in addition to the list. Setting the
+  `envoy.http.headermap.lazy_map_min_size` runtime feature to a non-negative number will override the default value.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
