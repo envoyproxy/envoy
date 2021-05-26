@@ -20,7 +20,6 @@
 #include "test/test_common/test_runtime.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;

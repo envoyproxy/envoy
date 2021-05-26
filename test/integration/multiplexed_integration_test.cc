@@ -80,8 +80,6 @@ TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
-  // https://github.com/envoyproxy/envoy/issues/16335
-  EXCLUDE_DOWNSTREAM_HTTP3;
   config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
@@ -309,6 +307,12 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   // Verifies stream is reset.
   ASSERT_TRUE(response->waitForReset());
   ASSERT_FALSE(response->complete());
+
+  // The cluster should have received the reset.
+  // The downstream codec should send one.
+  std::string counter =
+      absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".rx_reset");
+  test_server_->waitForCounterEq(counter, 1);
 }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
