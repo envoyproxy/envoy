@@ -120,10 +120,6 @@ Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
-  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    return absl::nullopt;
-  }
-
   const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(
       HttpFilterNames::get().AwsLambda, decoder_callbacks_->route());
   if (!settings) {

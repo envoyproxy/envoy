@@ -113,12 +113,10 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // faults. In other words, runtime is supported only when faults are
   // configured at the filter level.
   fault_settings_ = config_->settings();
-  if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
-    const auto* per_route_settings =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FaultSettings>(
-            Extensions::HttpFilters::HttpFilterNames::get().Fault, decoder_callbacks_->route());
-    fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
-  }
+  const auto* per_route_settings =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FaultSettings>(
+          Extensions::HttpFilters::HttpFilterNames::get().Fault, decoder_callbacks_->route());
+  fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
 
   if (!matchesTargetUpstreamCluster()) {
     return Http::FilterHeadersStatus::Continue;

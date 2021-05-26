@@ -419,11 +419,6 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
 
 void JsonTranscoderFilter::initPerRouteConfig() {
-  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    per_route_config_ = &config_;
-    return;
-  }
-
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(
       HttpFilterNames::get().GrpcJsonTranscoder, decoder_callbacks_->route());
 

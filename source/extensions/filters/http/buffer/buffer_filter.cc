@@ -42,16 +42,10 @@ BufferFilter::BufferFilter(BufferFilterConfigSharedPtr config)
 void BufferFilter::initConfig() {
   ASSERT(!config_initialized_);
   config_initialized_ = true;
-
   settings_ = config_->settings();
-
-  if (!callbacks_->route() || !callbacks_->route()->routeEntry()) {
-    return;
-  }
 
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<BufferFilterSettings>(
       HttpFilterNames::get().Buffer, callbacks_->route());
-
   settings_ = route_local ? route_local : settings_;
 }
 
