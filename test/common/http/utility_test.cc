@@ -880,7 +880,8 @@ public:
 
 // Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<TestConfig>("envoy.filter", nullptr));
+  EXPECT_EQ(nullptr,
+            Utility::resolveMostSpecificPerFilterConfig<TestConfig>("envoy.filter", nullptr));
 }
 
 // Verify that resolveMostSpecificPerFilterConfig indeed returns the most specific per
@@ -893,24 +894,24 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   const Router::RouteSpecificFilterConfig two;
 
   // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(filter_name,
-                                                                        filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 
   // Testing in reverse order, so that the method always returns the last object.
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
       .WillByDefault(Return(&one));
-  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(filter_name,
-                                                              filter_callbacks.route()));
+  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                      filter_name, filter_callbacks.route()));
 
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
       .WillByDefault(Return(&two));
-  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(filter_name,
-                                                              filter_callbacks.route()));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                      filter_name, filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(filter_name,
-                                                                 filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 }
 
 // Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
