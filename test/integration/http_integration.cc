@@ -1150,7 +1150,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
-      EXPECT_TRUE(response->complete());
+      ASSERT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
       ASSERT_TRUE(response->waitForReset());
@@ -1199,7 +1199,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
 
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
-      EXPECT_TRUE(response->complete());
+      ASSERT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
       ASSERT_TRUE(response->waitForReset());
