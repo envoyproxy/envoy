@@ -133,6 +133,8 @@ void PlatformBridgeFilter::setEncoderFilterCallbacks(
 
 void PlatformBridgeFilter::onDestroy() {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::onDestroy", filter_name_);
+  alive_ = false;
+
   // If the filter chain is destroyed before a response is received, treat as cancellation.
   if (!response_filter_base_->stream_complete_ && platform_filter_.on_cancel) {
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_cancel", filter_name_);
@@ -459,6 +461,9 @@ void PlatformBridgeFilter::resumeEncoding() {
 
 void PlatformBridgeFilter::FilterBase::onResume() {
   ENVOY_LOG(debug, "PlatformBridgeFilter({})::onResume", parent_.filter_name_);
+  if (!parent_.isAlive()) {
+    return;
+  }
 
   if (iteration_state_ == IterationState::Ongoing) {
     return;

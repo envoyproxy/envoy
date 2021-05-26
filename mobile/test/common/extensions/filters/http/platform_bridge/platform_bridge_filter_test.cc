@@ -1429,6 +1429,69 @@ platform_filter_name: AsyncResumeEncodingIsNoopAfterPreviousResume
   EXPECT_EQ(invocations.on_resume_response_calls, 0);
 }
 
+TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction) {
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
+  platform_filter.static_context = &invocations;
+  platform_filter.init_filter = [](const void* context) -> const void* {
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
+    invocations->init_filter_calls++;
+    return invocations;
+  };
+  platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
+                                           const void* context) -> envoy_filter_headers_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    EXPECT_EQ(c_headers.length, 1);
+    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_FALSE(end_stream);
+    invocations->on_response_headers_calls++;
+    release_envoy_headers(c_headers);
+    return {kEnvoyFilterHeadersStatusStopIteration, envoy_noheaders};
+  };
+  platform_filter.on_resume_response = [](envoy_headers*, envoy_data*, envoy_headers*, bool,
+                                          const void*) -> envoy_filter_resume_status {
+    ADD_FAILURE() << "on_resume_response should not get called when filter is pending destruction.";
+    return {kEnvoyFilterResumeStatusResumeIteration, nullptr, nullptr, nullptr};
+  };
+  platform_filter.release_filter = [](const void* context) -> void {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->release_filter_calls++;
+  };
+
+  setUpFilter(R"EOF(
+platform_filter_name: AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction
+)EOF",
+              &platform_filter);
+  EXPECT_EQ(invocations.init_filter_calls, 1);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(invocations.on_response_headers_calls, 1);
+
+  Buffer::OwnedImpl response_data = Buffer::OwnedImpl("response body");
+
+  // Simulate posted resume call.
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+  filter_->resumeEncoding();
+
+  // Simulate pending destruction.
+  filter_->onDestroy();
+  EXPECT_EQ(invocations.release_filter_calls, 1);
+
+  // Execute late resume callback.
+  resume_post_cb();
+
+  // Assert late resume attempt was a no-op.
+  EXPECT_EQ(invocations.on_resume_response_calls, 0);
+}
+
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseData) {
   envoy_http_filter platform_filter{};
   filter_invocations invocations{};
