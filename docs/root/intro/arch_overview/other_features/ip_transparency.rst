@@ -82,7 +82,7 @@ upstream at the start of a connection before any other data has been sent (Note:
 If possible, using the :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header should be preferred as Envoy
 will be able to re-use upstream connections with this method. Due to the disconnect between Envoy's handling of downstream and upstream
 connections, it is a good idea to enforce short :ref:`idle timeouts <faq_configuration_timeouts>` on upstream connections as
-Envoy will not inherently close a corresponding upstream connections when a downstream connection is closed.
+Envoy will not inherently close a corresponding upstream connection when a downstream connection is closed.
 
 Some drawbacks to Proxy Protocol:
 
