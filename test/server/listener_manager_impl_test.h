@@ -18,6 +18,7 @@
 #include "test/mocks/server/guard_dog.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_component_factory.h"
+#include "test/test_common/test_runtime.h"
 #include "test/mocks/server/worker.h"
 #include "test/mocks/server/worker_factory.h"
 #include "test/test_common/environment.h"
@@ -53,7 +54,7 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public testing::Test {
+class ListenerManagerImplTest : public testing::Test, public TestScopedRuntime {
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)) {}
 

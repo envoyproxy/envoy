@@ -581,6 +581,8 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "false"}});
   const std::string yaml = R"EOF(
 address:
   envoy_internal_address:
@@ -4726,6 +4728,8 @@ api_listener:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "true"}});
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
 
   InSequence s;
