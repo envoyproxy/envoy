@@ -28,11 +28,28 @@ To simplify build consistency across environments, bazelisk is used.
 Follow `these Envoy instructions <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#installing-bazelisk-as-bazel>`_ to install bazelisk as bazel.
 
 --------------------
+Java requirements
+--------------------
+
+- Java 8
+
+Make sure that Java 8 set on `PATH` and that `JAVA_HOME` is set to the appropriate SDK.
+
+--------------------
 Android requirements
 --------------------
 
 - Android SDK Platform 29
 - Android NDK 21
+
+For local builds, set ``ANDROID_HOME`` and ``ANDROID_NDK_HOME`` to point to the location of these installs. For example,
+
+.. code-block:: bash
+
+  ANDROID_HOME=$HOME/Library/Android/sdk
+  ANDROID_SDK_HOME=$HOME/Library/Android/ndk/21.3.6528147
+
+See `ci/mac_ci_setup.sh` for the specific NDK version used during builds.
 
 ----------------
 iOS requirements
