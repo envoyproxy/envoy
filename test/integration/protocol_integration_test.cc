@@ -1571,7 +1571,8 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
   // Send one very large 600 kB header with limit 500 kB and 100 headers.
   // The limit and the header size are set in such a way to accommodate for flow control limits.
-  // If the headers are too large and the flow control blocks the response is truncated and the test flakes.
+  // If the headers are too large and the flow control blocks the response is truncated and the test
+  // flakes.
   testLargeRequestHeaders(600, 1, 500, 100);
 }
 
