@@ -94,7 +94,7 @@ TEST_F(StatNameTest, SerializeStrings) {
 TEST_F(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
 TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
-  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", ".x"};
+  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`"};
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -207,11 +207,16 @@ TEST_F(StatNameTest, TestLongSequence) {
 }
 
 TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
-  const std::vector<std::string> stat_names = {".x",   "..x",    "...x",    "foo",     "foo.x",
-                                               ".foo", ".foo.x", ".foo..x", "..foo.x", "..foo..x"};
-  for (auto& stat_name : stat_names) {
-    EXPECT_EQ(stat_name, encodeDecode(stat_name));
-  }
+  EXPECT_EQ("x", encodeDecode(".x"));
+  EXPECT_EQ("x", encodeDecode("..x"));
+  EXPECT_EQ("x", encodeDecode("...x"));
+  EXPECT_EQ("foo", encodeDecode("foo"));
+  EXPECT_EQ("foo.x", encodeDecode("foo.x"));
+  EXPECT_EQ("foo", encodeDecode(".foo"));
+  EXPECT_EQ("foo.x", encodeDecode(".foo.x"));
+  EXPECT_EQ("foo.x", encodeDecode(".foo..x"));
+  EXPECT_EQ("foo.x", encodeDecode("..foo.x"));
+  EXPECT_EQ("foo.x", encodeDecode("..foo..x"));
 }
 
 TEST_F(StatNameTest, TestSuccessfulDoubleLookup) {

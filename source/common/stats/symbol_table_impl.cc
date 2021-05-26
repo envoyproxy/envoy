@@ -214,11 +214,13 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
     Thread::LockGuard lock(lock_);
     recent_lookups_.lookup(name);
     for (auto& token : tokens) {
-      // TODO(jmarantz): consider using StatNameDynamicStorage for tokens with
-      // length below some threshold, say 4 bytes. It might be preferable not to
-      // reserve Symbols for every 3 digit number found (for example) in ipv4
-      // addresses.
-      symbols.push_back(toSymbol(token));
+      if (!token.empty()) {
+        // TODO(jmarantz): consider using StatNameDynamicStorage for tokens with
+        // length below some threshold, say 4 bytes. It might be preferable not to
+        // reserve Symbols for every 3 digit number found (for example) in ipv4
+        // addresses.
+        symbols.push_back(toSymbol(token));
+      }
     }
   }
 
