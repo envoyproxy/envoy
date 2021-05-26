@@ -526,15 +526,9 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(512U, response->body().size());
   Stats::Store& stats = test_server_->server().stats();
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
-    Stats::CounterSharedPtr counter =
-        TestUtility::findCounter(stats, "cluster.cluster_0.http2.tx_reset");
-    ASSERT_NE(nullptr, counter);
-    EXPECT_EQ(1L, counter->value());
-  } else if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
-    // TODO(alyssawilk) http3 stats.
-    Stats::CounterSharedPtr counter =
-        TestUtility::findCounter(stats, "cluster.cluster_0.upstream_rq_tx_reset");
+  if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+    Stats::CounterSharedPtr counter = TestUtility::findCounter(
+        stats, absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"));
     ASSERT_NE(nullptr, counter);
     EXPECT_EQ(1L, counter->value());
   }

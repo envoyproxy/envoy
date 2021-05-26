@@ -420,8 +420,6 @@ envoy_cc_test(
     ],
 )
 
-# TODO(alyssawilk): The conn pool grid should work correctly without H3. Circle back and figure
-# out the right way of handling the lack of H3 in the build.
 envoy_cc_test(
     name = "conn_pool_grid_test",
     srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
