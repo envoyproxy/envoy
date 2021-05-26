@@ -246,6 +246,23 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "odcds_integration_test",
+    srcs = ["odcds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":fake_upstream_lib",
+        ":http_integration_lib",
+        "//source/common/common:macros",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "drain_close_integration_test",
     srcs = [
         "drain_close_integration_test.cc",
