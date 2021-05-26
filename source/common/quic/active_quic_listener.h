@@ -28,13 +28,15 @@ public:
                      Network::UdpConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     uint32_t packets_to_read_to_connection_count_ratio);
 
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
                      Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     uint32_t packets_to_read_to_connection_count_ratio);
 
   ~ActiveQuicListener() override;
 
@@ -52,6 +54,7 @@ public:
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
   void onDataWorker(Network::UdpRecvData&& data) override;
   uint32_t destination(const Network::UdpRecvData& data) const override;
+  size_t numPacketsExpectedPerEventLoop() const override;
 
   // ActiveListenerImplBase
   void pauseListening() override;
@@ -73,6 +76,8 @@ private:
   // The number of runs of the event loop in which at least one CHLO was buffered.
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
+
+  uint32_t packets_to_read_to_connection_count_ratio_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -97,6 +102,7 @@ private:
   const uint32_t concurrency_;
   absl::once_flag install_bpf_once_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
+  const uint32_t packets_to_read_to_connection_count_ratio_;
 };
 
 } // namespace Quic

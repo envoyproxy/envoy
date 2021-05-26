@@ -41,8 +41,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
 OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level)
-    : signal_handling_enabled_(true) {
+                         spdlog::level::level_enum default_log_level) {
   std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
