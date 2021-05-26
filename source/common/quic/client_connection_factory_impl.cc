@@ -42,24 +42,15 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
 
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
-    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr)
+    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr,
+    uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
-      transport_socket_factory_(transport_socket_factory), time_source_(time_source) {
+      transport_socket_factory_(transport_socket_factory), time_source_(time_source),
+      buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
 }
-
-namespace {
-// TODO(alyssawilk, danzh2010): This is mutable static info that is required for the QUICHE code.
-// This was preexisting but should either be removed or potentially moved inside
-// PersistentQuicInfoImpl.
-struct StaticInfo {
-  quic::QuicClientPushPromiseIndex push_promise_index_;
-
-  static StaticInfo& get() { MUTABLE_CONSTRUCT_ON_FIRST_USE(StaticInfo); }
-};
-} // namespace
 
 std::unique_ptr<Network::ClientConnection>
 createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
@@ -77,16 +68,13 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
       info_impl->alarm_factory_, quic::ParsedQuicVersionVector{info_impl->supported_versions_[0]},
       local_addr, dispatcher, nullptr);
-  auto& static_info = StaticInfo::get();
 
   ASSERT(!info_impl->supported_versions_.empty());
   // QUICHE client session always use the 1st version to start handshake.
-  // TODO(alyssawilk) pass in ClusterInfo::perConnectionBufferLimitBytes() for
-  // send_buffer_limit instead of using 0.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
-      info_impl->server_id_, std::move(config), &static_info.push_promise_index_, dispatcher,
-      /*send_buffer_limit=*/0);
+      info_impl->server_id_, std::move(config), &info_impl->push_promise_index_, dispatcher,
+      info_impl->buffer_limit_);
   return ret;
 }
 

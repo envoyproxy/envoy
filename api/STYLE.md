@@ -34,6 +34,11 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
+* Use a `[#alpha:]` annotation in comments for messages that are considered alpha
+  and are not subject to the threat model. This is similar to the work-in-progress/alpha tagging
+  of extensions described below, but allows tagging messages that are used as part of the core API
+  as alpha without having to break it into its own file.
+
 * Always use plural field names for `repeated` fields, such as `filters`.
 
 * Due to the fact that we consider JSON/YAML to be first class inputs, we cannot easily change a
@@ -108,11 +113,11 @@ organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
 1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
-   below. Refer to the [Cache filter config](envoy/extensions/filter/http/cache/v3alpha/cache.proto)
+   below. Refer to the [Cache filter config](envoy/extensions/filters/http/cache/v3alpha/cache.proto)
    as an example of `v3alpha`, and the
-   [Buffer filter config](envoy/extensions/filter/http/buffer/v3/buffer.proto) as an example of `v3`.
+   [Buffer filter config](envoy/extensions/filters/http/buffer/v3/buffer.proto) as an example of `v3`.
 1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
-   `api/envoy/extensions/filter/http/foobar/v3/foobar.proto` together with an initial BUILD file:
+   `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
@@ -225,7 +230,7 @@ xDS APIs:
   breaking changes where there is no substantial gain in functionality,
   performance, security or implementation simplification. We will tolerate
   technical debt in the API itself, e.g. in the form of vestigial deprecated
-  fields or reduced ergnomics (such as not using `oneof` when we would prefer
+  fields or reduced ergonomics (such as not using `oneof` when we would prefer
   to), in order to meet this principle.
 
 * Namespaces for extensions, metadata, etc. use a reverse DNS naming scheme,
