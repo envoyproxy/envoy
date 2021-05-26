@@ -14,12 +14,14 @@ namespace OriginalDst {
 
 Network::Address::InstanceConstSharedPtr
 OriginalDstFilter::getOriginalDst(Network::Socket& socket) {
-  if (config_.method_ != 0) {
+  switch (config_.method_) {
+  case Config::OriginalDstMethod::SocketOption:
+    return Network::Utility::getOriginalDst(socket);
+  case Config::OriginalDstMethod::NoOp: {
     ASSERT(socket.addressProvider().localAddress() != nullptr &&
            socket.addressProvider().localAddress()->type() == Network::Address::Type::Ip);
     return socket.addressProvider().localAddress();
-  } else {
-    return Network::Utility::getOriginalDst(socket);
+  }
   }
 }
 
