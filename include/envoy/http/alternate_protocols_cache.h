@@ -64,16 +64,18 @@ public:
   };
 
   /**
-   * Represents an alternative protocol that can be used to connect to an origin.
+   * Represents an alternative protocol that can be used to connect to an origin
+   * with a specified expiration time.
    */
   struct AlternateProtocol {
   public:
-    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port)
-        : alpn_(alpn), hostname_(hostname), port_(port) {}
+    AlternateProtocol(absl::string_view alpn, absl::string_view hostname, uint32_t port,
+                      MonotonicTime expiration)
+        : alpn_(alpn), hostname_(hostname), port_(port), expiration_(expiration) {}
 
     bool operator==(const AlternateProtocol& other) const {
-      return std::tie(alpn_, hostname_, port_) ==
-             std::tie(other.alpn_, other.hostname_, other.port_);
+      return std::tie(alpn_, hostname_, port_, expiration_) ==
+             std::tie(other.alpn_, other.hostname_, other.port_, other.expiration_);
     }
 
     bool operator!=(const AlternateProtocol& other) const { return !this->operator==(other); }
@@ -81,6 +83,7 @@ public:
     std::string alpn_;
     std::string hostname_;
     uint32_t port_;
+    MonotonicTime expiration_;
   };
 
   virtual ~AlternateProtocolsCache() = default;
@@ -90,11 +93,9 @@ public:
    * specified origin. Expires after the specified expiration time.
    * @param origin The origin to set alternate protocols for.
    * @param protocols A list of alternate protocols.
-   * @param expiration The time after which the alternatives are no longer valid.
    */
   virtual void setAlternatives(const Origin& origin,
-                               const std::vector<AlternateProtocol>& protocols,
-                               const MonotonicTime& expiration) PURE;
+                               const std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the
