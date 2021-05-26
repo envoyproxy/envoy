@@ -871,17 +871,16 @@ TEST_P(ServerInstanceImplTest, UserAgentOverrideFromNode) {
   initialize("test/server/test_data/server/node_bootstrap_agent_override.yaml");
   EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
   EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
-  EXPECT_EQ(9, server_->localInfo().node().user_agent_build_version().major_number());
-  EXPECT_EQ(8, server_->localInfo().node().user_agent_build_version().minor_number());
-  EXPECT_EQ(7, server_->localInfo().node().user_agent_build_version().patch());
+  EXPECT_EQ(9, server_->localInfo().node().user_agent_build_version().version().major_number());
+  EXPECT_EQ(8, server_->localInfo().node().user_agent_build_version().version().minor_number());
+  EXPECT_EQ(7, server_->localInfo().node().user_agent_build_version().version().patch());
 }
 
 // Validate deprecated user agent version field from bootstrap Node.
-TEST_P(ServerInstanceImplTest, UserAgentBuildDeprecatedOverrideFromNode) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(UserAgentBuildDeprecatedOverrideFromNode)) {
   initialize("test/server/test_data/server/node_bootstrap_agent_deprecated_override.yaml");
   EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
-  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
-  EXPECT_EQ("test", server_->localInfo().node().user_agent_version());
+  EXPECT_EQ("test", server_->localInfo().node().hidden_envoy_deprecated_build_version());
 }
 
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
