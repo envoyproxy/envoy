@@ -79,15 +79,14 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenNoFilterChainMatched) {
   auto active_listener1 =
       std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener), listener_config_);
 
-  Network::MockConnectionSocket* accepted_socket1 = new NiceMock<Network::MockConnectionSocket>();
+  auto accepted_socket1 = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
   EXPECT_CALL(*accepted_socket1, requestedServerName()).WillRepeatedly(Return("envoy.io"));
 
   EXPECT_CALL(manager_, findFilterChain(_)).WillRepeatedly(Return(nullptr));
 
-  std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info(
-      new StreamInfo::StreamInfoImpl(dispatcher_.timeSource(), nullptr));
-  active_listener1->newConnection(Network::ConnectionSocketPtr{accepted_socket1},
-                                  std::move(stream_info));
+  auto stream_info =
+      std::make_unique<StreamInfo::StreamInfoImpl>(dispatcher_.timeSource(), nullptr);
+  active_listener1->newConnection(std::move(accepted_socket1), std::move(stream_info));
 }
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.

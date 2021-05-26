@@ -284,7 +284,8 @@ void ActiveTcpListener::resumeListening() {
 
 void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
                                       std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-  // populate the SNI into stream info, the network filters needn't do that again.
+  // Set the SNI as early as possible, this ensures that it gets set even if we end up not
+  // instantiating any network filters.
   if (!socket->requestedServerName().empty()) {
     stream_info->setRequestedServerName(socket->requestedServerName());
   }
