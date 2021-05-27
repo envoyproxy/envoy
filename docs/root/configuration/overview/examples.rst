@@ -328,9 +328,10 @@ See the following example:
 
 For example, this will instruct `PyYAML <https://github.com/yaml/pyyaml>` to treat an ignored
 node as a simple scalar when loading:
-.. code-block:: python
+
+.. code-block:: python3
+
     yaml.SafeLoader.add_constructor('!ignore', yaml.loader.SafeConstructor.construct_scalar)
 
-Alternatively,
-:repo:`this is how Envoy registers the !ignore tag <tools/config_validation/validate_fragment.py>`
-in config validation.
+Alternatively, :repo:`this is how <tools/config_validation/validate_fragment.py>`
+Envoy registers the !ignore tag in config validation.
