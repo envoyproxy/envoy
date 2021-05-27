@@ -107,6 +107,7 @@ public:
   MOCK_METHOD(void, onLocalReply, (Code code));
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(bool, enableInternalRedirectsWithBody, (), (const));
 
   ResponseHeaderMapPtr continue_headers_;
@@ -213,6 +214,7 @@ public:
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
+  MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
@@ -305,6 +307,7 @@ public:
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, setEncoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
+  MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
@@ -346,7 +349,7 @@ public:
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
   MOCK_METHOD(void, decodeComplete, ());
   MOCK_METHOD(void, sendLocalReply,
-              (bool is_grpc_request, Code code, absl::string_view body,
+              (Code code, absl::string_view body,
                const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
@@ -582,10 +585,16 @@ public:
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
+  MOCK_METHOD(bool, shouldStripTrailingHostDot, (), (const));
   MOCK_METHOD(Http::StripPortType, stripPortType, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));
   MOCK_METHOD(const LocalReply::LocalReply&, localReply, (), (const));
+  MOCK_METHOD(envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager::PathWithEscapedSlashesAction,
+              pathWithEscapedSlashesAction, (), (const));
+  MOCK_METHOD(const std::vector<Http::OriginalIPDetectionSharedPtr>&, originalIpDetectionExtensions,
+              (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

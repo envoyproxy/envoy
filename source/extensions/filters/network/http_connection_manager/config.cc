@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
@@ -33,8 +34,8 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
+#include "common/tracing/tracer_config_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/codec_impl.h"
@@ -91,6 +92,51 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 };
+
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+    PathWithEscapedSlashesAction
+    getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
+  // The default behavior is to leave escaped slashes unchanged.
+  uint64_t runtime_override = context.runtime().snapshot().getInteger(
+      "http_connection_manager.path_with_escaped_slashes_action", 0);
+  switch (runtime_override) {
+  default:
+    // Also includes runtime override values of 0 and 1
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        KEEP_UNCHANGED;
+  case 2:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        REJECT_REQUEST;
+  case 3:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        UNESCAPE_AND_REDIRECT;
+  case 4:
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        UNESCAPE_AND_FORWARD;
+  }
+}
+
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+    PathWithEscapedSlashesAction
+    getPathWithEscapedSlashesAction(const envoy::extensions::filters::network::
+                                        http_connection_manager::v3::HttpConnectionManager& config,
+                                    Server::Configuration::FactoryContext& context) {
+  envoy::type::v3::FractionalPercent default_fraction;
+  default_fraction.set_numerator(100);
+  default_fraction.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+  if (context.runtime().snapshot().featureEnabled(
+          "http_connection_manager.path_with_escaped_slashes_action_enabled", default_fraction)) {
+    return config.path_with_escaped_slashes_action() ==
+                   envoy::extensions::filters::network::http_connection_manager::v3::
+                       HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT
+               ? getPathWithEscapedSlashesActionRuntimeOverride(context)
+               : config.path_with_escaped_slashes_action();
+  }
+
+  // When action is disabled through runtime the behavior is to keep escaped slashes unchanged.
+  return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      KEEP_UNCHANGED;
+}
 
 } // namespace
 
@@ -260,7 +306,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
-      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
+      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
+      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
+      strip_trailing_host_dot_(config.strip_trailing_host_dot()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -297,6 +345,34 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
   request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+
+  // Check if IP detection extensions were configured, otherwise fall back to XFF.
+  auto ip_detection_extensions = config.original_ip_detection_extensions();
+  if (ip_detection_extensions.empty()) {
+    envoy::extensions::http::original_ip_detection::xff::v3::XffConfig xff_config;
+    xff_config.set_xff_num_trusted_hops(xff_num_trusted_hops_);
+
+    auto* extension = ip_detection_extensions.Add();
+    extension->set_name("envoy.http.original_ip_detection.xff");
+    extension->mutable_typed_config()->PackFrom(xff_config);
+  }
+
+  original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
+  for (const auto& extension_config : ip_detection_extensions) {
+    auto* factory =
+        Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(extension_config);
+    if (!factory) {
+      throw EnvoyException(
+          fmt::format("Original IP detection extension not found: '{}'", extension_config.name()));
+    }
+
+    auto extension = factory->createExtension(extension_config.typed_config(), context_);
+    if (!extension) {
+      throw EnvoyException(fmt::format("Original IP detection extension could not be created: '{}'",
+                                       extension_config.name()));
+    }
+    original_ip_detection_extensions_.push_back(extension);
+  }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
@@ -533,16 +609,22 @@ void HttpConnectionManagerConfig::processFilter(
   }
 
   // Now see if there is a factory that will accept the config.
-  auto& factory =
+  auto* factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
+          proto_config, proto_config.is_optional());
+  // null pointer returned only when the filter is optional, then skip all the processes.
+  if (factory == nullptr) {
+    ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}",
+              proto_config.name());
+    return;
+  }
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.messageValidationVisitor(), factory);
+      proto_config, context_.messageValidationVisitor(), *factory);
   Http::FilterFactoryCb callback =
-      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  dependency_manager.registerFilter(factory.name(), *factory.dependencies());
-  bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
-  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+      factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  dependency_manager.registerFilter(factory->name(), *factory->dependencies());
+  bool is_terminal = factory->isTerminalFilterByProto(*message, context_);
+  Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
       callback, proto_config.name());
@@ -694,7 +776,7 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   if (config.tracing().has_provider()) {
     return &config.tracing().provider();
   }
-  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();

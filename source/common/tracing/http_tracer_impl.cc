@@ -272,7 +272,7 @@ HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& ta
   }
 }
 
-HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
+HttpTracerImpl::HttpTracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& request_headers,

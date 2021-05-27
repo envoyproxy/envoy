@@ -107,12 +107,7 @@ public:
     }
 
     if (!run_alarms_cb_->enabled()) {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.activate_timers_next_event_loop")) {
-        run_alarms_cb_->scheduleCallbackNextIteration();
-      } else {
-        run_alarms_cb_->scheduleCallbackCurrentIteration();
-      }
+      run_alarms_cb_->scheduleCallbackNextIteration();
     }
   }
 
@@ -213,14 +208,12 @@ private:
   // True if the SimulatedTimeSystemHelper is waiting for the scheduler to process expired alarms
   // and call decPending after an update to monotonic time.
   bool pending_dec_ ABSL_GUARDED_BY(mutex_) = false;
-  // Used to randomize the ordering of alarms scheduled for the same time when the runtime feature
-  // envoy.reloadable_features.activate_timers_next_event_loop is enabled. This mimics the trigger
+  // Used to randomize the ordering of alarms scheduled for the same time. This mimics the trigger
   // order of real timers scheduled for the same absolute time is non-deterministic.
   // Each simulated scheduler has it's own TestRandomGenerator with the same seed to improve test
   // failure reproducibility when running against a specific seed by minimizing cross scheduler
   // interactions.
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
-  uint64_t legacy_next_idx_ ABSL_GUARDED_BY(mutex_) = 0;
 };
 
 // Our simulated alarm inherits from TimerImpl so that the same dispatching
@@ -269,24 +262,14 @@ void SimulatedTimeSystemHelper::SimulatedScheduler::enableAlarm(
     absl::MutexLock lock(&mutex_);
     if (duration.count() == 0 && triggered_alarms_.contains(alarm)) {
       return;
-    } else if (Runtime::runtimeFeatureEnabled(
-                   "envoy.reloadable_features.activate_timers_next_event_loop")) {
-      disableAlarmLockHeld(alarm);
-      registered_alarms_.add({monotonic_time_ + duration, random_source_.random(), alarm});
     } else {
       disableAlarmLockHeld(alarm);
-      AlarmSet& alarm_set = (duration.count() != 0) ? registered_alarms_ : triggered_alarms_;
-      alarm_set.add({monotonic_time_ + duration, ++legacy_next_idx_, alarm});
+      registered_alarms_.add({monotonic_time_ + duration, random_source_.random(), alarm});
     }
   }
 
   if (duration.count() == 0) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.activate_timers_next_event_loop")) {
-      run_alarms_cb_->scheduleCallbackNextIteration();
-    } else {
-      run_alarms_cb_->scheduleCallbackCurrentIteration();
-    }
+    run_alarms_cb_->scheduleCallbackNextIteration();
   }
 }
 

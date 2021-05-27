@@ -14,6 +14,8 @@
 
 #include "extensions/request_id/uuid/config.h"
 
+#include "test/common/http/custom_header_extension.h"
+#include "test/common/http/xff_extension.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -105,9 +107,21 @@ public:
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
     ON_CALL(config_, requestIDExtension())
         .WillByDefault(ReturnRef(request_id_extension_to_return_));
+    ON_CALL(config_, pathWithEscapedSlashesAction())
+        .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                  HttpConnectionManager::KEEP_UNCHANGED));
+
+    detection_extensions_.push_back(getXFFExtension(0));
+    ON_CALL(config_, originalIpDetectionExtensions())
+        .WillByDefault(ReturnRef(detection_extensions_));
   }
 
   struct MutateRequestRet {
+    MutateRequestRet() = default;
+    MutateRequestRet(const std::string& downstream_address, bool internal,
+                     Tracing::Reason trace_reason)
+        : downstream_address_(downstream_address), internal_(internal),
+          trace_reason_(trace_reason) {}
     bool operator==(const MutateRequestRet& rhs) const {
       return downstream_address_ == rhs.downstream_address_ && internal_ == rhs.internal_ &&
              trace_reason_ == rhs.trace_reason_;
@@ -116,6 +130,7 @@ public:
     std::string downstream_address_;
     bool internal_;
     Tracing::Reason trace_reason_;
+    absl::optional<OriginalIPRejectRequestOptions> reject_request_{absl::nullopt};
   };
 
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
@@ -123,9 +138,10 @@ public:
   // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol) {
     MutateRequestRet ret;
-    ret.downstream_address_ = ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, connection_, config_, route_config_, local_info_)
-                                  ->asString();
+    const auto result = ConnectionManagerUtility::mutateRequestHeaders(
+        headers, connection_, config_, route_config_, local_info_);
+    ret.downstream_address_ = result.final_remote_address->asString();
+    ret.reject_request_ = result.reject_request;
     ret.trace_reason_ =
         ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
@@ -136,6 +152,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   const std::shared_ptr<MockRequestIDExtension> request_id_extension_;
   const std::shared_ptr<RequestIDExtension> request_id_extension_to_return_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
@@ -364,6 +381,11 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 
 // Verify that xff_num_trusted_hops works when not using remote address.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
+  // Reconfigure XFF detection.
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(1));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
@@ -1380,7 +1402,8 @@ TEST_F(ConnectionManagerUtilityTest, SanitizeEmptyPath) {
   TestRequestHeaderMapImpl original_headers;
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_TRUE(ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(original_headers, header_map);
 }
 
@@ -1478,6 +1501,222 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   TestRequestHeaderMapImpl header_map_none(original_headers_none);
   ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
   EXPECT_EQ(header_map_none.getHostValue(), "host:9999");
+}
+
+// maybeNormalizeHost() removes trailing dot of host from host header.
+TEST_F(ConnectionManagerUtilityTest, RemoveTrailingDot) {
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 0);
+  EXPECT_EQ(header_map.getHostValue(), "host");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::None));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_with_port;
+  original_headers_with_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_with_port(original_headers_with_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_with_port, config_, 443);
+  EXPECT_EQ(header_map_with_port.getHostValue(), "host:443");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::MatchingHost));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_strip_port;
+  original_headers_strip_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_strip_port(original_headers_strip_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_strip_port, config_, 443);
+  EXPECT_EQ(header_map_strip_port.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_no_dot;
+  original_headers_no_dot.setHost("host");
+
+  TestRequestHeaderMapImpl header_map_no_dot(original_headers_no_dot);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_no_dot, config_, 0);
+  EXPECT_EQ(header_map_no_dot.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(false));
+  TestRequestHeaderMapImpl original_headers_none;
+  original_headers_none.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map_none(original_headers_none);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
+  EXPECT_EQ(header_map_none.getHostValue(), "host.");
+}
+
+// maybeNormalizePath() does not touch escaped slashes when configured to KEEP_UNCHANGED.
+TEST_F(ConnectionManagerUtilityTest, KeepEscapedSlashesWhenConfigured) {
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::KEEP_UNCHANGED));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2fabc%5Cqrt");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/xyz%2fabc%5Cqrt");
+}
+
+// maybeNormalizePath() returns REJECT if %2F or %5C was detected and configured to REJECT.
+TEST_F(ConnectionManagerUtilityTest, RejectIfEscapedSlashesPresentAndConfiguredToReject) {
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::REJECT_REQUEST));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2F..//abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+
+  original_headers.setPath("/xyz%5c..//abc");
+  header_map = original_headers;
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+}
+
+// maybeNormalizePath() returns CONTINUE if escaped slashes were NOT present and configured to
+// REJECT.
+TEST_F(ConnectionManagerUtilityTest, RejectIfEscapedSlashesNotPresentAndConfiguredToReject) {
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::REJECT_REQUEST));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%EA/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/xyz%EA/abc");
+}
+
+// maybeNormalizePath() returns REDIRECT if escaped slashes were detected and configured to
+// REDIRECT.
+TEST_F(ConnectionManagerUtilityTest, RedirectIfEscapedSlashesPresentAndConfiguredToRedirect) {
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_REDIRECT));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2F../%5cabc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Redirect,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/../\\abc");
+}
+
+// maybeNormalizePath() returns CONTINUE if escaped slashes were NOT present and configured to
+// REDIRECT.
+TEST_F(ConnectionManagerUtilityTest, ContinueIfEscapedSlashesNotFoundAndConfiguredToRedirect) {
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_REDIRECT));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%30..//abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/xyz%30..//abc");
+}
+
+// maybeNormalizePath() returns CONTINUE if escaped slashes were detected and configured to
+// UNESCAPE_AND_FORWARD.
+TEST_F(ConnectionManagerUtilityTest, ContinueIfEscapedSlashesPresentAndConfiguredToUnescape) {
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_FORWARD));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2F../%5Cabc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/../\\abc");
+}
+
+// maybeNormalizePath() performs both slash unescaping and Chromium URL normalization.
+TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesAndChromiumNormalization) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_FORWARD));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2f../%5Cabc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  // Chromium URL path normalization converts \ to /
+  EXPECT_EQ(header_map.getPathValue(), "//abc");
+}
+
+// maybeNormalizePath() rejects request when chromium normalization fails after unescaping slashes.
+TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesRedirectAndChromiumNormalizationFailure) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_REDIRECT));
+  TestRequestHeaderMapImpl original_headers;
+  // %00 is an invalid sequence in URL path and causes path normalization to fail.
+  original_headers.setPath("/xyz%2f../%5Cabc%00");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+}
+
+// maybeNormalizePath() performs both unescaping and merging slashes when configured.
+TEST_F(ConnectionManagerUtilityTest, UnescapeAndMergeSlashes) {
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_REDIRECT));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2f/..//abc%5C%5c");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Redirect,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  // Envoy does not merge back slashes
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/../abc\\\\");
+}
+
+// maybeNormalizePath() performs all path transformations.
+TEST_F(ConnectionManagerUtilityTest, AllNormalizations) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_FORWARD));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2f..%5c/%2Fabc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/abc");
+}
+
+// maybeNormalizePath() redirects because of escaped slashes after all other transformations.
+TEST_F(ConnectionManagerUtilityTest, RedirectAfterAllOtherNormalizations) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  ON_CALL(config_, pathWithEscapedSlashesAction())
+      .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpConnectionManager::UNESCAPE_AND_REDIRECT));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz%2f..%5c/%2Fabc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Redirect,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/abc");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed
@@ -1583,5 +1822,32 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
     EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
   }
 }
+
+// Test detecting the original IP via a header (no rejection if it fails).
+TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
+  const std::string header_name = "x-cdn-detected-ip";
+  auto detection_extension = getCustomHeaderExtension(header_name);
+  const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {detection_extension};
+
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+
+  // Header is present.
+  {
+    TestRequestHeaderMapImpl headers{{header_name, "2.1.3.4"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "2.1.3.4:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+  }
+
+  // Header missing -- fallbacks to default behavior.
+  {
+    TestRequestHeaderMapImpl headers;
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "10.0.0.3:50000");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

@@ -79,7 +79,7 @@ extensions/filters/common/original_src @snowp @klarose
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
 # HTTP caching extension
-/*/extensions/filters/http/cache @toddmgreer @jmarantz
+/*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
 /*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
 /*/extensions/common/aws @lavignes @mattklein123 @tonya11en
@@ -183,3 +183,10 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/http/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/network/ext_authz @esmet @gsagula @dio
+# HTTP Bandwidth Limit
+/*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
+# Original IP detection
+/*/extensions/http/original_ip_detection/custom_header @rgs1 @alyssawilk @antoniovicente
+/*/extensions/http/original_ip_detection/xff @rgs1 @alyssawilk @antoniovicente
+# set_metadata extension
+/*/extensions/filters/http/set_metadata @aguinet @snowp

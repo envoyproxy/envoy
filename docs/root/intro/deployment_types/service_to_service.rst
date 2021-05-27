@@ -14,7 +14,7 @@ Service to service egress listener
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This is the port used by applications to talk to other services in the infrastructure. For example,
-*http://localhost:9001*. HTTP and gRPC requests use the HTTP/1.1 *host* header or the HTTP/2
+http://localhost:9001. HTTP and gRPC requests use the HTTP/1.1 *host* header or the HTTP/2 or HTTP/3
 *:authority* header to indicate which remote cluster the request is destined for. Envoy handles
 service discovery, load balancing, rate limiting, etc. depending on the details in the
 configuration. Services only need to know about the local Envoy and do not need to concern
@@ -38,7 +38,7 @@ performs buffering, circuit breaking, etc. as needed.
 
 Our default configurations use HTTP/2 for all Envoy to Envoy communication, regardless of whether
 the application uses HTTP/1.1 or HTTP/2 when egressing out of a local Envoy. HTTP/2 provides
-better performance via long lived connections and explicit reset notifications.
+better performance than HTTP/1.1 via long lived connections and explicit reset notifications.
 
 .. image:: /_static/service_to_service_ingress_listener.svg
   :width: 55%
