@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
-using testing::MatchesRegex;
 
 namespace Envoy {
 
@@ -626,17 +625,16 @@ TEST_P(ChainedProxyInternalTcpProxyIntegrationTest, AccessLog) {
 #endif
 
   const std::string ip_regex =
-      (version_ == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
+      (version_ == Network::Address::IpVersion::v4) ? R"EOF(127.0.0.1)EOF" : R"EOF(::1)EOF";
 
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format(
-                  "upstreamlocal={0} upstreamhost={2} downstream={1} sent=5 received=0\r?\n.*",
-                  // Upstream local is not defined for internal connection.
-                  "-", ip_regex,
-                  // Upstream remote address is formatted as internal listener name.
-                  "envoy://test_internal_listener_foo")));
+  EXPECT_THAT(log_result, HasSubstr(fmt::format(
+                              "upstreamlocal={0} upstreamhost={2} downstream={1} sent=5 received=0",
+                              // Upstream local is not defined for internal connection.
+                              "-", ip_regex,
+                              // Upstream remote address is formatted as internal listener name.
+                              "envoy://test_internal_listener_foo")));
 }
 
 // Test that the server shuts down without crashing when connections are open.
