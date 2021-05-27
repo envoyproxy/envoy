@@ -892,21 +892,32 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
 
   const Router::RouteSpecificFilterConfig one;
   const Router::RouteSpecificFilterConfig two;
+  const Router::RouteSpecificFilterConfig three;
 
   // Test when there's nothing on the route
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
                          filter_name, filter_callbacks.route()));
 
   // Testing in reverse order, so that the method always returns the last object.
+  // Testing per-virtualhost typed filter config
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
       .WillByDefault(Return(&one));
   EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
                       filter_name, filter_callbacks.route()));
 
+  // Testing per-route typed filter config
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(&two));
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&two));
+      .WillByDefault(Invoke(
+          [&](const std::string& name) { return filter_callbacks.route_->perFilterConfig(name); }));
   EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
                       filter_name, filter_callbacks.route()));
+
+  // Testing per-route entry typed filter config
+  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
+      .WillByDefault(Return(&three));
+  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                        filter_name, filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
