@@ -144,7 +144,7 @@ NSString *_REQUEST_SCHEME = @"https";
   [gauge subWithAmount:1];
 
   id<Timer> timer = [self.pulseClient timerWithElements:@[ elementFoo, elementBar, elementTimer ]];
-  [timer completeWithDurationWithDurationMs:15];
+  [timer recordDurationWithDurationMs:15];
   id<Distribution> distribution =
       [self.pulseClient distributionWithElements:@[ elementFoo, elementBar, elementDistribution ]];
   [distribution recordValueWithValue:15];

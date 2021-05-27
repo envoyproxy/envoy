@@ -132,10 +132,10 @@ You can view the cumulative stats like quantile data (p50/p90/etc.) and average 
 
   // Add a new duration to the underlying timer distribution
   // Kotlin
-  timer.completeWithDuration(5)
+  timer.recordDuration(5)
 
   // Swift
-  timer.completeWithDuration(durationMs: 5)
+  timer.recordDuration(durationMs: 5)
 
 ----------------
 ``Distribution``

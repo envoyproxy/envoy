@@ -4,8 +4,8 @@ package io.envoyproxy.envoymobile
 interface Timer {
 
   /** Records a new duration to add to the timer. */
-  fun completeWithDuration(durationMs: Int)
+  fun recordDuration(durationMs: Int)
 
   /** Records a new duration to add to the timer along with tags. */
-  fun completeWithDuration(tags: Tags = TagsBuilder().build(), durationMs: Int)
+  fun recordDuration(tags: Tags = TagsBuilder().build(), durationMs: Int)
 }

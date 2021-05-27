@@ -17,11 +17,11 @@ internal class TimerImpl : Timer {
     this.tags = tags
   }
 
-  override fun completeWithDuration(durationMs: Int) {
+  override fun recordDuration(durationMs: Int) {
     envoyEngine.get()?.recordHistogramDuration(series, this.tags.allTags(), durationMs)
   }
 
-  override fun completeWithDuration(tags: Tags, durationMs: Int) {
+  override fun recordDuration(tags: Tags, durationMs: Int) {
     envoyEngine.get()?.recordHistogramDuration(series, tags.allTags(), durationMs)
   }
 }

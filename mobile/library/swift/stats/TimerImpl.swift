@@ -16,14 +16,14 @@ final class TimerImpl: NSObject, Timer {
   }
 
   /// Record a new duration value for the distribution.
-  func completeWithDuration(durationMs: Int) {
+  func recordDuration(durationMs: Int) {
     // TODO(jingwei99) potentially surface error up if engine is nil.
     self.engine?.recordHistogramDuration(
       self.series, tags: self.tags.allTags(), durationMs: numericCast(durationMs))
   }
 
   /// Record a new duration value for the distribution with tags.
-  func completeWithDuration(tags: Tags, durationMs: Int) {
+  func recordDuration(tags: Tags, durationMs: Int) {
     self.engine?.recordHistogramDuration(
       self.series, tags: tags.allTags(), durationMs: numericCast(durationMs))
   }

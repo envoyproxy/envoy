@@ -128,7 +128,7 @@ class PulseClientImplTest {
       tags = TagsBuilder().add("testKey1", "testValue1").add("testKey2", "testValue2").build()
     )
 
-    timer.completeWithDuration(5)
+    timer.recordDuration(5)
 
     val durationCaptor = ArgumentCaptor.forClass(Int::class.java)
     verify(envoyEngine).recordHistogramDuration(

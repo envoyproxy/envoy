@@ -136,7 +136,7 @@ final class PulseClientImplTests: XCTestCase {
       elements: ["test", "stat"],
       tags: TagsBuilder().add(name: "testKey", value: "testValue").build()
     )
-    timer.completeWithDuration(durationMs: 5)
+    timer.recordDuration(durationMs: 5)
 
     XCTAssertEqual(actualSeries, "test.stat")
     XCTAssertEqual(actualTags, ["testKey": "testValue"])
