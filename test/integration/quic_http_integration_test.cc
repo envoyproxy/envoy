@@ -70,7 +70,7 @@ void updateResource(AtomicFileUpdater& updater, double pressure) {
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
   QuicHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
+      : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_([]() {
           if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
@@ -447,7 +447,7 @@ TEST_P(QuicHttpIntegrationTest, NoNewStreamsWhenOverloaded) {
 }
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
-  testAdminDrain(Http::CodecClient::Type::HTTP1);
+  testAdminDrain(Http::CodecType::HTTP1);
 }
 
 TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {

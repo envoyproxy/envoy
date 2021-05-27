@@ -10,7 +10,7 @@ namespace {
 class HTTPTypedPerFilterConfigTest : public testing::Test, public HttpIntegrationTest {
 public:
   HTTPTypedPerFilterConfigTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
 };
 
 TEST_F(HTTPTypedPerFilterConfigTest, RejectUnsupportedTypedPerFilterConfig) {

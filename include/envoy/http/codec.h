@@ -19,6 +19,8 @@
 namespace Envoy {
 namespace Http {
 
+enum class CodecType { HTTP1, HTTP2, HTTP3 };
+
 namespace Http1 {
 struct CodecStats;
 }
