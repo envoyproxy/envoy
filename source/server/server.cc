@@ -414,7 +414,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // If user has set user_agent_name in the bootstrap config, use it.
   // Default to "envoy" if unset.
-  if (bootstrap_.node().user_agent_name().empty() ) {
+  if (bootstrap_.node().user_agent_name().empty()) {
     bootstrap_.mutable_node()->set_user_agent_name("envoy");
   }
 
@@ -422,8 +422,7 @@ void InstanceImpl::initialize(const Options& options,
   // Default to the internal server version.
   if (bootstrap_.node().user_agent_version().empty()) {
     bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
-  }
-  else {
+  } else {
     bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(
         bootstrap_.node().user_agent_version());
   }
