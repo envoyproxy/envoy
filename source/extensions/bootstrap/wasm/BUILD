@@ -16,9 +16,6 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    category = "envoy.bootstrap",
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:bootstrap_extension_config_interface",

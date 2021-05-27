@@ -63,10 +63,7 @@ pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 # files still.
 rm -rf bazel-bin/external/envoy_api_canonical
 
-EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
-rm -rf "${EXTENSION_DB_PATH}"
 GENERATED_RST_DIR="$(realpath "${GENERATED_RST_DIR}")"
-export EXTENSION_DB_PATH
 export GENERATED_RST_DIR
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
@@ -74,11 +71,7 @@ IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 BAZEL_BUILD_OPTIONS+=(
     "--remote_download_outputs=all"
     "--strategy=protodoc=sandboxed,local"
-    "--action_env=ENVOY_BLOB_SHA"
-    "--action_env=EXTENSION_DB_PATH")
-
-# TODO(phlax): move this to format_pre checks
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:validate_extensions
+    "--action_env=ENVOY_BLOB_SHA")
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
