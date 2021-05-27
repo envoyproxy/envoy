@@ -38,19 +38,19 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
   if (!cluster.has_cluster_type()) {
     switch (cluster.type()) {
     case envoy::config::cluster::v3::Cluster::STATIC:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().Static;
+      cluster_type = "envoy.cluster.static";
       break;
     case envoy::config::cluster::v3::Cluster::STRICT_DNS:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().StrictDns;
+      cluster_type = "envoy.cluster.strict_dns";
       break;
     case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().LogicalDns;
+      cluster_type = "envoy.cluster.logical_dns";
       break;
     case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().OriginalDst;
+      cluster_type = "envoy.cluster.original_dst";
       break;
     case envoy::config::cluster::v3::Cluster::EDS:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().Eds;
+      cluster_type = "envoy.cluster.eds";
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
