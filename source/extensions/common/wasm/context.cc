@@ -28,7 +28,6 @@
 
 #include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
-#include "extensions/common/wasm/well_known_names.h"
 #include "extensions/filters/common/expr/context.h"
 
 #include "absl/base/casts.h"
