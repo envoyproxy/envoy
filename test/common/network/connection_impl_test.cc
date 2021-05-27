@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/network/address.h"
+#include "envoy/network/listener.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
@@ -29,6 +30,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -52,6 +54,12 @@ using testing::StrictMock;
 namespace Envoy {
 namespace Network {
 namespace {
+
+class MockInternalListenerManager : public InternalListenerManager {
+public:
+  MOCK_METHOD(InternalListenerCallbacksOptRef, findByAddress,
+              (const Address::InstanceConstSharedPtr&), ());
+};
 
 TEST(RawBufferSocket, TestBasics) {
   TransportSocketPtr raw_buffer_socket(Network::Test::createRawBufferSocket());
@@ -2947,6 +2955,41 @@ TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl("unix://" + path_), Utility::resolveUrl("tcp://1.2.3.4:5"),
       Network::Test::createRawBufferSocket(), nullptr);
+  connection->close(ConnectionCloseType::NoFlush);
+}
+
+class InternalClientConnectionImplTest : public testing::Test {
+protected:
+  InternalClientConnectionImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  StrictMock<MockConnectionCallbacks> client_callbacks_;
+};
+
+// Validate we skip setting source address.
+TEST_F(InternalClientConnectionImplTest, SkipSourceAddress) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "true"}});
+
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+  MockInternalListenerManager internal_listener_manager;
+
+  dispatcher_->registerInternalListenerManager(internal_listener_manager);
+  EXPECT_CALL(internal_listener_manager, findByAddress(address)).WillOnce(Return(absl::nullopt));
+  ClientConnectionPtr connection =
+      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                          Network::Test::createRawBufferSocket(), nullptr);
+  connection->addConnectionCallbacks(client_callbacks_);
+  connection->connect();
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   connection->close(ConnectionCloseType::NoFlush);
 }
 
