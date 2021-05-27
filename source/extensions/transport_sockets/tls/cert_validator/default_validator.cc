@@ -145,11 +145,6 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
 
   const Envoy::Ssl::CertificateValidationContextConfig* cert_validation_config = config_;
   if (cert_validation_config != nullptr) {
-    if (!cert_validation_config->verifySubjectAltNameList().empty()) {
-      verify_subject_alt_name_list_ = cert_validation_config->verifySubjectAltNameList();
-      verify_mode = verify_mode_validation_context;
-    }
-
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::type::matcher::v3::StringMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {

@@ -22,9 +22,6 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
               .value_or(certificate_revocation_list_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      verify_subject_alt_name_list_(
-          config.hidden_envoy_deprecated_verify_subject_alt_name().begin(),
-          config.hidden_envoy_deprecated_verify_subject_alt_name().end()),
       subject_alt_name_matchers_(config.match_subject_alt_names().begin(),
                                  config.match_subject_alt_names().end()),
       verify_certificate_hash_list_(config.verify_certificate_hash().begin(),
@@ -44,7 +41,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
                                        certificateRevocationListPath()));
     }
-    if (!subject_alt_name_matchers_.empty() || !verify_subject_alt_name_list_.empty()) {
+    if (!subject_alt_name_matchers_.empty()) {
       throw EnvoyException("SAN-based verification of peer certificates without "
                            "trusted CA is insecure and not allowed");
     }
