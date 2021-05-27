@@ -60,11 +60,12 @@ envoy_cc_library(
     srcs = ["version.cc"],
     copts = envoy_select_boringssl(
         [
-            "-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\"",
+            "-DENVOY_SSL_VERSION=\\\"BoringSSL\\\"",
             "-DENVOY_SSL_FIPS",
         ],
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     ),
+    external_deps = ["ssl"],
     deps = [
         ":version_includes",
         "//source/common/common:macros",

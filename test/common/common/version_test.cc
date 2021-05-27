@@ -17,6 +17,16 @@ public:
   }
 };
 
+TEST(VersionTest, FipsCompliance) {
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_TRUE(VersionInfoTestPeer::sslFipsCompliant());
+  EXPECT_THAT(VersionInfoTestPeer::sslVersion(), testing::EndsWith("-FIPS"));
+#else
+  EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
+  EXPECT_THAT(VersionInfoTestPeer::sslVersion(), testing::Not(testing::EndsWith("-FIPS")));
+#endif
+}
+
 TEST(VersionTest, BuildVersion) {
   auto build_version = VersionInfo::buildVersion();
   std::string version_string =
@@ -35,11 +45,6 @@ TEST(VersionTest, BuildVersion) {
             fields.at(BuildVersionMetadataKeys::get().RevisionStatus).string_value());
   EXPECT_EQ(VersionInfoTestPeer::buildType(),
             fields.at(BuildVersionMetadataKeys::get().BuildType).string_value());
-#ifdef ENVOY_SSL_FIPS
-  EXPECT_TRUE(VersionInfoTestPeer::sslFipsCompliant());
-#else
-  EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
-#endif
   EXPECT_EQ(VersionInfoTestPeer::sslVersion(),
             fields.at(BuildVersionMetadataKeys::get().SslVersion).string_value());
 }
@@ -51,11 +56,6 @@ TEST(VersionTest, MakeBuildVersionWithLabel) {
   EXPECT_EQ(3, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
   EXPECT_GE(fields.size(), 1);
-#ifdef ENVOY_SSL_FIPS
-  EXPECT_TRUE(VersionInfoTestPeer::sslFipsCompliant());
-#else
-  EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
-#endif
   EXPECT_EQ("foo-bar", fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
 }
 

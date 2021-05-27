@@ -12,6 +12,10 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
+#ifdef ENVOY_SSL_VERSION
+#include "openssl/crypto.h"
+#endif
+
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
 
@@ -37,8 +41,11 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
 }
 
 bool VersionInfo::sslFipsCompliant() {
-#ifdef ENVOY_SSL_FIPS
-  return true;
+#ifdef ENVOY_SSL_VERSION
+  // A return of 0 means FIPS is not enabled. BoringSSL always returns 1 when
+  // FIPS is enabled, but OpenSSL may return other non-zero values to indicate
+  // specific FIPS modes.
+  return FIPS_mode() != 0;
 #else
   return false;
 #endif
@@ -55,7 +62,8 @@ const std::string& VersionInfo::buildType() {
 
 const std::string& VersionInfo::sslVersion() {
 #ifdef ENVOY_SSL_VERSION
-  static const std::string ssl_version = ENVOY_SSL_VERSION;
+  static const std::string ssl_version =
+      fmt::format("{}{}", ENVOY_SSL_VERSION, sslFipsCompliant() ? "-FIPS" : "");
 #else
   static const std::string ssl_version = "no-ssl";
 #endif
