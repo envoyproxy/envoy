@@ -21,6 +21,7 @@ envoy_cc_extension(
         "//test:__subpackages__",
     ],
     security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
@@ -52,6 +53,7 @@ envoy_cc_extension(
         "//test:__subpackages__",
     ],
     security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_proof_source_factory_interface",
