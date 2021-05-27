@@ -468,3 +468,4 @@ and security team to ensure they still qualify for inclusion on the list.
 | Dropbox       | Yes      | 01/20       |
 | Stripe        | Yes      | 01/20       |
 | Square        | Yes      | 05/21       |
+| Apple         | Yes      | 05/21       |
