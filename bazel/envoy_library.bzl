@@ -44,76 +44,6 @@ def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
         **kargs
     )
 
-# All Envoy extensions must be tagged with their security hardening stance with
-# respect to downstream and upstream data plane threats. These are verbose
-# labels intended to make clear the trust that operators may place in
-# extensions.
-EXTENSION_SECURITY_POSTURES = [
-    # This extension is hardened against untrusted downstream traffic. It
-    # assumes that the upstream is trusted.
-    "robust_to_untrusted_downstream",
-    # This extension is hardened against both untrusted downstream and upstream
-    # traffic.
-    "robust_to_untrusted_downstream_and_upstream",
-    # This extension is not hardened and should only be used in deployments
-    # where both the downstream and upstream are trusted.
-    "requires_trusted_downstream_and_upstream",
-    # This is functionally equivalent to
-    # requires_trusted_downstream_and_upstream, but acts as a placeholder to
-    # allow us to identify extensions that need classifying.
-    "unknown",
-    # Not relevant to data plane threats, e.g. stats sinks.
-    "data_plane_agnostic",
-]
-
-# Extension categories as defined by factories
-EXTENSION_CATEGORIES = [
-    "envoy.access_loggers",
-    "envoy.bootstrap",
-    "envoy.clusters",
-    "envoy.compression.compressor",
-    "envoy.compression.decompressor",
-    "envoy.filters.http",
-    "envoy.filters.http.cache",
-    "envoy.filters.listener",
-    "envoy.filters.network",
-    "envoy.filters.udp_listener",
-    "envoy.grpc_credentials",
-    "envoy.guarddog_actions",
-    "envoy.health_checkers",
-    "envoy.http.stateful_header_formatters",
-    "envoy.internal_redirect_predicates",
-    "envoy.io_socket",
-    "envoy.http.original_ip_detection",
-    "envoy.matching.common_inputs",
-    "envoy.matching.input_matchers",
-    "envoy.rate_limit_descriptors",
-    "envoy.request_id",
-    "envoy.resource_monitors",
-    "envoy.retry_host_predicates",
-    "envoy.retry_priorities",
-    "envoy.stats_sinks",
-    "envoy.thrift_proxy.filters",
-    "envoy.tracers",
-    "envoy.transport_sockets.downstream",
-    "envoy.transport_sockets.upstream",
-    "envoy.tls.cert_validator",
-    "envoy.upstreams",
-    "envoy.wasm.runtime",
-    "DELIBERATELY_OMITTED",
-]
-
-EXTENSION_STATUS_VALUES = [
-    # This extension is stable and is expected to be production usable.
-    "stable",
-    # This extension is functional but has not had substantial production burn
-    # time, use only with this caveat.
-    "alpha",
-    # This extension is work-in-progress. Functionality is incomplete and it is
-    # not intended for production use.
-    "wip",
-]
-
 def envoy_cc_extension(
         name,
         security_posture,
@@ -125,18 +55,6 @@ def envoy_cc_extension(
         extra_visibility = [],
         visibility = EXTENSION_CONFIG_VISIBILITY,
         **kwargs):
-    if not category:
-        fail("Category not set for %s" % name)
-    if type(category) == "string":
-        category = (category,)
-    for cat in category:
-        if cat not in EXTENSION_CATEGORIES:
-            fail("Unknown extension category for %s: %s" %
-                 (name, cat))
-    if security_posture not in EXTENSION_SECURITY_POSTURES:
-        fail("Unknown extension security posture: " + security_posture)
-    if status not in EXTENSION_STATUS_VALUES:
-        fail("Unknown extension status: " + status)
     if "//visibility:public" not in visibility:
         visibility = visibility + extra_visibility
 
