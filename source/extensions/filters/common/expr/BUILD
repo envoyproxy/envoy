@@ -50,7 +50,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/stream_info:filter_state_interface",
+        "//include/envoy/stream_info:filter_state_interface_no_include_prefix",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@com_github_google_flatbuffers//:flatbuffers",

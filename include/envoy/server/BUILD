@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["access_log_config.h"],
     deps = [
         ":filter_config_interface",
-        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/access_log:access_log_interface_no_include_prefix",
         "//source/common/protobuf",
     ],
 )
@@ -23,18 +23,18 @@ envoy_cc_library(
     hdrs = ["admin.h"],
     deps = [
         ":config_tracker_interface",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:query_params_interface",
-        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
+        "//include/envoy/http:query_params_interface_no_include_prefix",
+        "//include/envoy/network:listen_socket_interface_no_include_prefix",
     ],
 )
 
 envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
-    deps = ["//include/envoy/http:api_listener_interface"],
+    deps = ["//include/envoy/http:api_listener_interface_no_include_prefix"],
 )
 
 envoy_cc_library(
@@ -42,9 +42,9 @@ envoy_cc_library(
     hdrs = ["configuration.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/http:context_interface",
-        "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/http:context_interface_no_include_prefix",
+        "//include/envoy/ratelimit:ratelimit_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -61,17 +61,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "drain_manager_interface",
     hdrs = ["drain_manager.h"],
-    deps = ["//include/envoy/network:drain_decision_interface"],
+    deps = ["//include/envoy/network:drain_decision_interface_no_include_prefix"],
 )
 
 envoy_cc_library(
     name = "guarddog_interface",
     hdrs = ["guarddog.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/server:watchdog_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/thread:thread_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/server:watchdog_interface_no_include_prefix",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/thread:thread_interface_no_include_prefix",
     ],
 )
 
@@ -80,8 +80,8 @@ envoy_cc_library(
     hdrs = ["guarddog_config.h"],
     deps = [
         ":guarddog_interface",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/protobuf:message_validator_interface_no_include_prefix",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -90,9 +90,9 @@ envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
-        "//include/envoy/common:random_generator_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/upstream:health_checker_interface",
+        "//include/envoy/common:random_generator_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/upstream:health_checker_interface_no_include_prefix",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -101,8 +101,8 @@ envoy_cc_library(
     name = "hot_restart_interface",
     hdrs = ["hot_restart.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/thread:thread_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/thread:thread_interface_no_include_prefix",
         "//source/server:hot_restart_cc_proto",
     ],
 )
@@ -118,21 +118,21 @@ envoy_cc_library(
         ":lifecycle_notifier_interface",
         ":listener_manager_interface",
         ":options_interface",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/common:mutex_tracer",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:context_interface",
-        "//include/envoy/http:query_params_interface",
-        "//include/envoy/init:manager_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/secret:secret_manager_interface",
-        "//include/envoy/server/overload:overload_manager_interface",
-        "//include/envoy/ssl:context_manager_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/tracing:http_tracer_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/access_log:access_log_interface_no_include_prefix",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/common:mutex_tracer_no_include_prefix",
+        "//include/envoy/event:timer_interface_no_include_prefix",
+        "//include/envoy/http:context_interface_no_include_prefix",
+        "//include/envoy/http:query_params_interface_no_include_prefix",
+        "//include/envoy/init:manager_interface_no_include_prefix",
+        "//include/envoy/local_info:local_info_interface_no_include_prefix",
+        "//include/envoy/runtime:runtime_interface_no_include_prefix",
+        "//include/envoy/secret:secret_manager_interface_no_include_prefix",
+        "//include/envoy/server/overload:overload_manager_interface_no_include_prefix",
+        "//include/envoy/ssl:context_manager_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
+        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -141,8 +141,8 @@ envoy_cc_library(
     name = "options_interface",
     hdrs = ["options.h"],
     deps = [
-        "//include/envoy/network:address_interface",
-        "//include/envoy/stats:stats_interface",
+        "//include/envoy/network:address_interface_no_include_prefix",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -152,8 +152,8 @@ envoy_cc_library(
     name = "worker_interface",
     hdrs = ["worker.h"],
     deps = [
-        "//include/envoy/server:guarddog_interface",
-        "//include/envoy/server/overload:overload_manager_interface",
+        "//include/envoy/server:guarddog_interface_no_include_prefix",
+        "//include/envoy/server/overload:overload_manager_interface_no_include_prefix",
     ],
 )
 
@@ -161,7 +161,7 @@ envoy_cc_library(
     name = "watchdog_interface",
     hdrs = ["watchdog.h"],
     deps = [
-        "//include/envoy/thread:thread_interface",
+        "//include/envoy/thread:thread_interface_no_include_prefix",
     ],
 )
 
@@ -175,23 +175,23 @@ envoy_cc_library(
         ":lifecycle_notifier_interface",
         ":options_interface",
         ":process_context_interface",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/grpc:context_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:context_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/init:manager_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/network:drain_decision_interface",
-        "//include/envoy/router:context_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/server/overload:overload_manager_interface",
-        "//include/envoy/singleton:manager_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/tracing:http_tracer_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/access_log:access_log_interface_no_include_prefix",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/grpc:context_interface_no_include_prefix",
+        "//include/envoy/http:codes_interface_no_include_prefix",
+        "//include/envoy/http:context_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/init:manager_interface_no_include_prefix",
+        "//include/envoy/local_info:local_info_interface_no_include_prefix",
+        "//include/envoy/network:drain_decision_interface_no_include_prefix",
+        "//include/envoy/router:context_interface_no_include_prefix",
+        "//include/envoy/runtime:runtime_interface_no_include_prefix",
+        "//include/envoy/server/overload:overload_manager_interface_no_include_prefix",
+        "//include/envoy/singleton:manager_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
+        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
@@ -207,16 +207,16 @@ envoy_cc_library(
         ":factory_context_interface",
         ":lifecycle_notifier_interface",
         ":process_context_interface",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/server:transport_socket_config_interface",
-        "//include/envoy/server/overload:overload_manager_interface",
-        "//include/envoy/singleton:manager_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/tracing:http_tracer_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/access_log:access_log_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/http:codes_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/server:transport_socket_config_interface_no_include_prefix",
+        "//include/envoy/server/overload:overload_manager_interface_no_include_prefix",
+        "//include/envoy/singleton:manager_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
+        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
@@ -228,7 +228,7 @@ envoy_cc_library(
     name = "lifecycle_notifier_interface",
     hdrs = ["lifecycle_notifier.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
     ],
 )
 
@@ -240,9 +240,9 @@ envoy_cc_library(
         ":drain_manager_interface",
         ":filter_config_interface",
         ":guarddog_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
-        "//include/envoy/ssl:context_interface",
+        "//include/envoy/network:filter_interface_no_include_prefix",
+        "//include/envoy/network:listen_socket_interface_no_include_prefix",
+        "//include/envoy/ssl:context_interface_no_include_prefix",
         "//source/common/protobuf",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -260,18 +260,18 @@ envoy_cc_library(
     hdrs = ["transport_socket_config.h"],
     deps = [
         ":factory_context_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/init:manager_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/network:transport_socket_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/secret:secret_manager_interface",
-        "//include/envoy/singleton:manager_interface",
-        "//include/envoy/ssl:context_manager_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/init:manager_interface_no_include_prefix",
+        "//include/envoy/local_info:local_info_interface_no_include_prefix",
+        "//include/envoy/network:transport_socket_interface_no_include_prefix",
+        "//include/envoy/runtime:runtime_interface_no_include_prefix",
+        "//include/envoy/secret:secret_manager_interface_no_include_prefix",
+        "//include/envoy/singleton:manager_interface_no_include_prefix",
+        "//include/envoy/ssl:context_manager_interface_no_include_prefix",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -281,7 +281,7 @@ envoy_cc_library(
     name = "resource_monitor_interface",
     hdrs = ["resource_monitor.h"],
     deps = [
-        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
         "//source/common/protobuf",
     ],
 )
@@ -291,7 +291,7 @@ envoy_cc_library(
     hdrs = ["request_id_extension_config.h"],
     deps = [
         ":filter_config_interface",
-        "//include/envoy/http:request_id_extension_interface",
+        "//include/envoy/http:request_id_extension_interface_no_include_prefix",
         "//source/common/protobuf",
     ],
 )
@@ -302,9 +302,9 @@ envoy_cc_library(
     deps = [
         ":options_interface",
         ":resource_monitor_interface",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/protobuf:message_validator_interface_no_include_prefix",
     ],
 )
 
@@ -313,7 +313,7 @@ envoy_cc_library(
     hdrs = ["tracer_config.h"],
     deps = [
         ":filter_config_interface",
-        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
         "//source/common/protobuf",
     ],
 )
@@ -323,7 +323,7 @@ envoy_cc_library(
     hdrs = ["bootstrap_extension_config.h"],
     deps = [
         ":factory_context_interface",
-        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
     ],
 )
 
@@ -331,10 +331,10 @@ envoy_cc_library(
     name = "fatal_action_interface",
     hdrs = ["fatal_action_config.h"],
     deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/protobuf:message_validator_interface",
-        "//include/envoy/server:instance_interface",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/protobuf:message_validator_interface_no_include_prefix",
+        "//include/envoy/server:instance_interface_no_include_prefix",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -343,7 +343,7 @@ envoy_cc_library(
     name = "platform_interface",
     hdrs = ["platform.h"],
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/thread:thread_interface",
+        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
+        "//include/envoy/thread:thread_interface_no_include_prefix",
     ],
 )

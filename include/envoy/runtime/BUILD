@@ -16,8 +16,8 @@ envoy_cc_library(
         "abseil_optional",
     ],
     deps = [
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/thread_local:thread_local_object",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_object_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/singleton:threadsafe_singleton",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

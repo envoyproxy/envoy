@@ -18,7 +18,7 @@ envoy_cc_library(
     hdrs = ["manager.h"],
     deps = [
         ":instance_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/registry",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/registry:registry_no_include_prefix",
     ],
 )

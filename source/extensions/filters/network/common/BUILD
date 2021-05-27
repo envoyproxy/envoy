@@ -14,7 +14,7 @@ envoy_cc_library(
     # Used by core.  TODO(#9953) clean up.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/extensions/common:utility_lib",
     ],
 )
@@ -25,7 +25,7 @@ envoy_cc_library(
     # Used by core.  TODO(#9953) clean up.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/runtime:runtime_interface_no_include_prefix",
         "//source/common/common:macros",
         "//source/extensions/common:utility_lib",
         "//source/extensions/filters/network:well_known_names",

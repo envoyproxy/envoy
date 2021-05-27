@@ -13,9 +13,9 @@ envoy_cc_library(
     srcs = ["abort_action.cc"],
     hdrs = ["abort_action.h"],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/server:guarddog_config_interface",
-        "//include/envoy/thread:thread_interface",
+        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/server:guarddog_config_interface_no_include_prefix",
+        "//include/envoy/thread:thread_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/thread:terminate_thread_lib",
@@ -29,7 +29,7 @@ envoy_cc_library(
     hdrs = ["abort_action_config.h"],
     deps = [
         ":abort_action_lib",
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",

@@ -22,7 +22,7 @@ envoy_cc_test_library(
     deps = [
         ":listener_filter_fakes",
         ":listener_filter_fuzzer_proto_cc_proto",
-        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:filter_interface_no_include_prefix",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],

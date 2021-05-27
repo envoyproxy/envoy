@@ -22,10 +22,10 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":mutation_utils_lib",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/stats:stats_macros",
+        "//include/envoy/event:timer_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
+        "//include/envoy/stats:stats_macros_no_include_prefix",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@com_google_absl//absl/strings:str_format",
@@ -54,7 +54,7 @@ envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
     deps = [
-        "//include/envoy/grpc:status",
+        "//include/envoy/grpc:status_no_include_prefix",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )
@@ -64,8 +64,8 @@ envoy_cc_library(
     srcs = ["mutation_utils.cc"],
     hdrs = ["mutation_utils.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:header_map_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
@@ -78,9 +78,9 @@ envoy_cc_library(
     hdrs = ["client_impl.h"],
     deps = [
         ":client_interface",
-        "//include/envoy/grpc:async_client_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/grpc:async_client_interface_no_include_prefix",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/common/grpc:typed_async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",

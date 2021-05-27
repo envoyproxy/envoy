@@ -14,7 +14,7 @@ envoy_cc_mock(
     srcs = ["api_listener.cc"],
     hdrs = ["api_listener.h"],
     deps = [
-        "//include/envoy/http:api_listener_interface",
+        "//include/envoy/http:api_listener_interface_no_include_prefix",
     ],
 )
 
@@ -23,7 +23,7 @@ envoy_cc_mock(
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
+        "//include/envoy/http:conn_pool_interface_no_include_prefix",
         "//test/mocks:common_lib",
         "//test/mocks/upstream:host_mocks",
     ],
@@ -41,15 +41,15 @@ envoy_cc_mock(
         ":stream_decoder_mock",
         ":stream_encoder_mock",
         ":stream_mock",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/http:async_client_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/ssl:connection_interface",
-        "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/access_log:access_log_interface_no_include_prefix",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/http:async_client_interface_no_include_prefix",
+        "//include/envoy/http:codec_interface_no_include_prefix",
+        "//include/envoy/http:conn_pool_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/ssl:connection_interface_no_include_prefix",
+        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
         "//source/common/http:conn_manager_config_interface",
         "//source/common/http:filter_manager_lib",
         "//source/common/http:header_map_lib",
@@ -66,7 +66,7 @@ envoy_cc_mock(
     srcs = ["stream.cc"],
     hdrs = ["stream.h"],
     deps = [
-        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:codec_interface_no_include_prefix",
     ],
 )
 
@@ -75,7 +75,7 @@ envoy_cc_mock(
     srcs = ["stream_decoder.cc"],
     hdrs = ["stream_decoder.h"],
     deps = [
-        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:codec_interface_no_include_prefix",
     ],
 )
 
@@ -85,7 +85,7 @@ envoy_cc_mock(
     hdrs = ["stream_encoder.h"],
     deps = [
         ":stream_mock",
-        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:codec_interface_no_include_prefix",
         "//source/common/http:header_utility_lib",
     ],
 )
@@ -95,7 +95,7 @@ envoy_cc_test(
     srcs = ["mocks_test.cc"],
     deps = [
         ":http_mocks",
-        "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
         "//test/test_common:utility_lib",
     ],
 )

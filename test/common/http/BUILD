@@ -156,8 +156,8 @@ envoy_cc_test_library(
     srcs = ["common.cc"],
     hdrs = ["common.h"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:conn_pool_interface_no_include_prefix",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",

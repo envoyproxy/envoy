@@ -13,7 +13,7 @@ envoy_cc_mock(
     srcs = ["connection.cc"],
     hdrs = ["connection.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:connection_interface_no_include_prefix",
         "//source/common/network:filter_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -25,8 +25,8 @@ envoy_cc_mock(
     srcs = ["io_handle.cc"],
     hdrs = ["io_handle.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:io_handle_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/network:io_handle_interface_no_include_prefix",
         "//source/common/buffer:buffer_lib",
     ],
 )
@@ -37,7 +37,7 @@ envoy_cc_mock(
     hdrs = ["socket.h"],
     deps = [
         ":io_handle_mocks",
-        "//include/envoy/network:socket_interface",
+        "//include/envoy/network:socket_interface_no_include_prefix",
     ],
 )
 
@@ -48,13 +48,13 @@ envoy_cc_mock(
     deps = [
         ":connection_mocks",
         ":transport_socket_mocks",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:drain_decision_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:resolver_interface",
-        "//include/envoy/network:transport_socket_interface",
-        "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface_no_include_prefix",
+        "//include/envoy/network:drain_decision_interface_no_include_prefix",
+        "//include/envoy/network:filter_interface_no_include_prefix",
+        "//include/envoy/network:resolver_interface_no_include_prefix",
+        "//include/envoy/network:transport_socket_interface_no_include_prefix",
+        "//include/envoy/server:listener_manager_interface_no_include_prefix",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
@@ -71,7 +71,7 @@ envoy_cc_mock(
     srcs = ["transport_socket.cc"],
     hdrs = ["transport_socket.h"],
     deps = [
-        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/network:transport_socket_interface_no_include_prefix",
         "//source/common/network:utility_lib",
     ],
 )

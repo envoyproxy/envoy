@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["api_impl.cc"],
     hdrs = ["api_impl.h"],
     deps = [
-        "//include/envoy/api:api_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_lib",
@@ -44,7 +44,7 @@ envoy_cc_library(
         "//conditions:default": "posix",
     }),
     deps = [
-        "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/api:os_sys_calls_interface_no_include_prefix",
         "//source/common/singleton:threadsafe_singleton",
     ],
 )

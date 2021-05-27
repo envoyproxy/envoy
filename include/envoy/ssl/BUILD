@@ -14,7 +14,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":ssl_socket_state",
-        "//include/envoy/common:time_interface",
+        "//include/envoy/common:time_interface_no_include_prefix",
     ],
 )
 
@@ -40,9 +40,9 @@ envoy_cc_library(
     deps = [
         ":context_config_interface",
         ":context_interface",
-        "//include/envoy/common:time_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/stats:stats_interface",
+        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
     ],
 )
 
@@ -50,7 +50,7 @@ envoy_cc_library(
     name = "tls_certificate_config_interface",
     hdrs = ["tls_certificate_config.h"],
     deps = [
-        "//include/envoy/ssl/private_key:private_key_interface",
+        "//include/envoy/ssl/private_key:private_key_interface_no_include_prefix",
     ],
 )
 
@@ -80,10 +80,10 @@ envoy_cc_library(
     hdrs = ["handshaker.h"],
     external_deps = ["ssl"],
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:post_io_action_interface",
-        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface_no_include_prefix",
+        "//include/envoy/network:post_io_action_interface_no_include_prefix",
+        "//include/envoy/protobuf:message_validator_interface_no_include_prefix",
     ],
 )

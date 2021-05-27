@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
     deps = [
-        "//include/envoy/server:tracer_config_interface",
+        "//include/envoy/server:tracer_config_interface_no_include_prefix",
         "//source/common/config:utility_lib",
     ],
 )

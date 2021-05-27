@@ -25,8 +25,8 @@ envoy_cc_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
-        "//include/envoy/event:deferred_deletable",
-        "//include/envoy/upstream:upstream_interface",
+        "//include/envoy/event:deferred_deletable_no_include_prefix",
+        "//include/envoy/upstream:upstream_interface_no_include_prefix",
     ],
 )
 

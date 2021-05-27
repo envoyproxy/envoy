@@ -13,8 +13,8 @@ envoy_cc_library(
     hdrs = ["http_tracer.h"],
     deps = [
         ":trace_driver_interface",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/http:header_map_interface",
+        "//include/envoy/access_log:access_log_interface_no_include_prefix",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
     ],
 )
 
@@ -37,6 +37,6 @@ envoy_cc_library(
     hdrs = ["trace_driver.h"],
     deps = [
         ":trace_reason_interface",
-        "//include/envoy/stream_info:stream_info_interface",
+        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
     ],
 )

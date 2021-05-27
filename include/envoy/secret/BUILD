@@ -18,9 +18,9 @@ envoy_cc_library(
     hdrs = ["secret_provider.h"],
     deps = [
         ":secret_callbacks_interface",
-        "//include/envoy/common:callback",
-        "//include/envoy/ssl:certificate_validation_context_config_interface",
-        "//include/envoy/ssl:tls_certificate_config_interface",
+        "//include/envoy/common:callback_no_include_prefix",
+        "//include/envoy/ssl:certificate_validation_context_config_interface_no_include_prefix",
+        "//include/envoy/ssl:tls_certificate_config_interface_no_include_prefix",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -30,7 +30,7 @@ envoy_cc_library(
     hdrs = ["secret_manager.h"],
     deps = [
         ":secret_provider_interface",
-        "//include/envoy/init:target_interface",
+        "//include/envoy/init:target_interface_no_include_prefix",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],

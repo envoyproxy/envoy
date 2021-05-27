@@ -17,9 +17,9 @@ envoy_cc_library(
     srcs = ["echo.cc"],
     hdrs = ["echo.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface_no_include_prefix",
+        "//include/envoy/network:filter_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -36,8 +36,8 @@ envoy_cc_extension(
     security_posture = "unknown",
     deps = [
         ":echo",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/echo/v3:pkg_cc_proto",

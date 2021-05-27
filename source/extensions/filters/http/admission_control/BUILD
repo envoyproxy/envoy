@@ -24,9 +24,9 @@ envoy_cc_extension(
     category = "envoy.filters.http",
     security_posture = "unknown",
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/thread_local:thread_local_object",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/runtime:runtime_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_object_no_include_prefix",
         "//source/common/common:cleanup_lib",
         "//source/common/http:codes_lib",
         "//source/common/runtime:runtime_lib",
@@ -45,7 +45,7 @@ envoy_cc_extension(
     security_posture = "unknown",
     status = "alpha",
     deps = [
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/common/common:enum_to_int",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",

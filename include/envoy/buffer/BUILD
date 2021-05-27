@@ -15,7 +15,7 @@ envoy_cc_library(
         "abseil_inlined_vector",
     ],
     deps = [
-        "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/api:os_sys_calls_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/common:utility_lib",

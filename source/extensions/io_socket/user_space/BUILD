@@ -40,7 +40,7 @@ envoy_cc_library(
     ],
     deps = [
         ":io_handle_lib",
-        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
     ],
 )
 

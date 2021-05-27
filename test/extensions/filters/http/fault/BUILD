@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.fault",
     deps = [
         ":utility_lib",
-        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",

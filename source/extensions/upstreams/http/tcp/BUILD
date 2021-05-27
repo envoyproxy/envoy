@@ -36,9 +36,9 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//include/envoy/http:codes_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/upstream:upstream_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",

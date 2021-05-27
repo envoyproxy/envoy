@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "signer_interface",
     hdrs = ["signer.h"],
     deps = [
-        "//include/envoy/http:message_interface",
+        "//include/envoy/http:message_interface_no_include_prefix",
     ],
 )
 
@@ -48,7 +48,7 @@ envoy_cc_library(
     external_deps = ["abseil_time"],
     deps = [
         ":credentials_provider_interface",
-        "//include/envoy/api:api_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/http:utility_lib",

@@ -22,7 +22,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":network_utility_lib",
-        "//include/envoy/server:options_interface",
+        "//include/envoy/server:options_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:macros",
@@ -44,7 +44,7 @@ envoy_cc_test_library(
     hdrs = ["network_utility.h"],
     deps = [
         ":utility_lib",
-        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:filter_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
@@ -81,7 +81,7 @@ envoy_cc_library(
     srcs = ["printers.cc"],
     hdrs = ["printers.h"],
     deps = [
-        "//include/envoy/network:address_interface",
+        "//include/envoy/network:address_interface_no_include_prefix",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
     ],
@@ -91,7 +91,7 @@ envoy_cc_test_library(
     name = "registry_lib",
     hdrs = ["registry.h"],
     deps = [
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
     ],
 )
 
@@ -115,9 +115,9 @@ envoy_cc_test_library(
         ":resources_lib",
         ":test_time_lib",
         ":thread_factory_for_test_lib",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/network:address_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/http:codec_interface_no_include_prefix",
+        "//include/envoy/network:address_interface_no_include_prefix",
         "//source/common/api:api_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
@@ -251,8 +251,8 @@ envoy_cc_test_library(
     deps = [
         ":global_lib",
         ":only_one_thread_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/event:timer_interface_no_include_prefix",
         "//source/common/common:thread_lib",
     ],
 )

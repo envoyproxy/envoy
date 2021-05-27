@@ -9,8 +9,8 @@ envoy_cc_library(
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
-        "//include/envoy/network:listen_socket_interface",
-        "//include/envoy/server:admin_interface",
+        "//include/envoy/network:listen_socket_interface_no_include_prefix",
+        "//include/envoy/server:admin_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/network:listen_socket_lib",
         "//source/server/admin:config_tracker_lib",
@@ -23,8 +23,8 @@ envoy_cc_library(
     hdrs = ["api.h"],
     deps = [
         ":dispatcher_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
         "//source/common/api:api_lib",
     ],
 )
@@ -34,7 +34,7 @@ envoy_cc_library(
     srcs = ["cluster_manager.cc"],
     hdrs = ["cluster_manager.h"],
     deps = [
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/common/common:utility_lib",
         "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
@@ -52,8 +52,8 @@ envoy_cc_library(
         "dns.h",
     ],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:connection_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/event:dispatcher_lib",
     ],
@@ -64,8 +64,8 @@ envoy_cc_library(
     srcs = ["dns.cc"],
     hdrs = ["dns.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:dns_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/network:dns_interface_no_include_prefix",
     ],
 )
 
@@ -79,10 +79,10 @@ envoy_cc_library(
         ":api_lib",
         ":cluster_manager_lib",
         ":dns_lib",
-        "//include/envoy/server:drain_manager_interface",
-        "//include/envoy/server:instance_interface",
-        "//include/envoy/ssl:context_manager_interface",
-        "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/server:drain_manager_interface_no_include_prefix",
+        "//include/envoy/server:instance_interface_no_include_prefix",
+        "//include/envoy/ssl:context_manager_interface_no_include_prefix",
+        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",

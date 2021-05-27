@@ -15,9 +15,9 @@ envoy_cc_library(
     # This is used by the router, so considered core code.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:address_interface",
-        "//include/envoy/network:connection_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/network:address_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface_no_include_prefix",
         "//source/common/network:address_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

@@ -13,7 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
         "//test/mocks/event:event_mocks",
     ],
 )

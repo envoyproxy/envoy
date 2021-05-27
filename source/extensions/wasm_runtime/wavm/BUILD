@@ -16,7 +16,7 @@ envoy_cc_extension(
     security_posture = "unknown",
     status = "alpha",
     deps = [
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
     ] + envoy_select_wasm_wavm([
         "@proxy_wasm_cpp_host//:wavm_lib",

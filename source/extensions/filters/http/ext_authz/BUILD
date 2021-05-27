@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/stats:stats_macros",
+        "//include/envoy/http:codes_interface_no_include_prefix",
+        "//include/envoy/stats:stats_macros_no_include_prefix",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -44,8 +44,8 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":ext_authz",
-        "//include/envoy/registry",
-        "//include/envoy/stats:stats_macros",
+        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/stats:stats_macros_no_include_prefix",
         "//source/common/config:utility_lib",
         "//source/common/grpc:google_async_client_cache",
         "//source/common/protobuf:utility_lib",

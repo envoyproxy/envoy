@@ -100,7 +100,7 @@ def envoy_cc_library(
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,
-        deps = select_prefix_no_prefix_deps(repository, deps) + [envoy_external_dep_path(dep) for dep in external_deps] + [
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
             repository + "//source/common/common:fmt_lib",
             envoy_external_dep_path("abseil_flat_hash_map"),
@@ -109,7 +109,7 @@ def envoy_cc_library(
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
         ],
-        include_prefix = envoy_include_prefix_transition_to_full_includes(native.package_name()),
+        include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
@@ -131,7 +131,7 @@ def envoy_cc_library(
     # Temporary target with all include_prefix paths for transitioning external consumers of
     # Envoy's source code to full path in the #include directives.
     cc_library(
-        name = name + "_with_include_prefix",
+        name = name + "_no_include_prefix",
         srcs = srcs,
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
@@ -147,7 +147,6 @@ def envoy_cc_library(
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
         ],
-        include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
@@ -224,28 +223,6 @@ def envoy_include_prefix(path):
     if path.startswith("source/") or path.startswith("include/"):
         return "/".join(path.split("/")[1:])
     return None
-
-# Method for adding include_prefix during transition to full #include paths
-def envoy_include_prefix_transition_to_full_includes(path):
-    # First start with removing prefix to the "/include" directory
-    if path.startswith("source/"):
-        return "/".join(path.split("/")[1:])
-    return None
-
-# Transform dependencies in the "//include/..." subpackages to the "_without_include_prefix"
-# variant. This only applies for rules defined in the Envoy main repository
-def select_prefix_no_prefix_deps(repository, deps):
-    # For Envoy repository use targets without include_prefix
-    if repository == "":
-        return deps
-
-    # For external repositories use targets with include_prefix
-    return [select_prefix_no_prefix_dep(dep) for dep in deps]
-
-def select_prefix_no_prefix_dep(dep):
-    if not dep.startswith("//include/"):
-        return dep
-    return dep + "_with_include_prefix"
 
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, external_deps = [], **kwargs):

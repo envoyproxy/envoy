@@ -20,9 +20,9 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/network:filter_interface_no_include_prefix",
+        "//include/envoy/network:listen_socket_interface_no_include_prefix",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -47,8 +47,8 @@ envoy_cc_extension(
     ],
     security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",

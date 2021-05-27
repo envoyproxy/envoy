@@ -13,8 +13,8 @@ envoy_cc_library(
     hdrs = ["overload_manager.h"],
     deps = [
         ":thread_local_overload_state",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -23,9 +23,9 @@ envoy_cc_library(
     name = "thread_local_overload_state",
     hdrs = ["thread_local_overload_state.h"],
     deps = [
-        "//include/envoy/event:scaled_range_timer_manager_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/thread_local:thread_local_object",
+        "//include/envoy/event:scaled_range_timer_manager_interface_no_include_prefix",
+        "//include/envoy/event:timer_interface_no_include_prefix",
+        "//include/envoy/thread_local:thread_local_object_no_include_prefix",
         "//source/common/common:interval_value",
     ],
 )

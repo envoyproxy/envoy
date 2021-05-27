@@ -21,8 +21,8 @@ envoy_cc_extension(
     }),
     security_posture = "unknown",
     deps = [
-        "//include/envoy/ratelimit:ratelimit_interface",
-        "//include/envoy/registry",
+        "//include/envoy/ratelimit:ratelimit_interface_no_include_prefix",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@envoy_api//envoy/extensions/rate_limit_descriptors/expr/v3:pkg_cc_proto",

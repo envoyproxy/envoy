@@ -16,8 +16,8 @@ envoy_cc_library(
     srcs = ["wasm_filter.cc"],
     hdrs = ["wasm_filter.h"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/wasm/v3:pkg_cc_proto",
@@ -33,7 +33,7 @@ envoy_cc_extension(
     status = "alpha",
     deps = [
         ":wasm_filter_lib",
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",

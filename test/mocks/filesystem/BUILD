@@ -13,8 +13,8 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/filesystem:watcher_interface",
+        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
+        "//include/envoy/filesystem:watcher_interface_no_include_prefix",
         "//source/common/common:thread_lib",
     ],
 )

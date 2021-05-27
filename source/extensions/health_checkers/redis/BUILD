@@ -36,8 +36,8 @@ envoy_cc_extension(
     deps = [
         ":redis",
         ":utility",
-        "//include/envoy/registry",
-        "//include/envoy/server:health_checker_config_interface",
+        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/server:health_checker_config_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/extensions/health_checkers:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

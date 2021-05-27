@@ -15,7 +15,7 @@ envoy_extension_package()
 envoy_cc_library(
     name = "bson_interface",
     hdrs = ["bson.h"],
-    deps = ["//include/envoy/buffer:buffer_interface"],
+    deps = ["//include/envoy/buffer:buffer_interface_no_include_prefix"],
 )
 
 envoy_cc_library(
@@ -30,7 +30,7 @@ envoy_cc_library(
     hdrs = ["bson_impl.h"],
     deps = [
         ":bson_interface",
-        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/common:hex_lib",
@@ -46,7 +46,7 @@ envoy_cc_library(
     deps = [
         ":bson_lib",
         ":codec_interface",
-        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -61,15 +61,15 @@ envoy_cc_library(
         ":codec_lib",
         ":mongo_stats_lib",
         ":utility_lib",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/common:time_interface",
-        "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:drain_decision_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//include/envoy/access_log:access_log_interface_no_include_prefix",
+        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface_no_include_prefix",
+        "//include/envoy/network:drain_decision_interface_no_include_prefix",
+        "//include/envoy/network:filter_interface_no_include_prefix",
+        "//include/envoy/runtime:runtime_interface_no_include_prefix",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/stats:stats_macros_no_include_prefix",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -87,7 +87,7 @@ envoy_cc_library(
     srcs = ["mongo_stats.cc"],
     hdrs = ["mongo_stats.h"],
     deps = [
-        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
     ],
@@ -111,7 +111,7 @@ envoy_cc_extension(
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":proxy_lib",
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/mongo_proxy/v3:pkg_cc_proto",

@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["sni_cluster.cc"],
     hdrs = ["sni_cluster.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:connection_interface_no_include_prefix",
+        "//include/envoy/network:filter_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/tcp_proxy",
@@ -30,8 +30,8 @@ envoy_cc_extension(
     security_posture = "unknown",
     deps = [
         ":sni_cluster",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/sni_cluster/v3:pkg_cc_proto",
     ],

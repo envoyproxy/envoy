@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["fault_config.cc"],
     hdrs = ["fault_config.h"],
     deps = [
-        "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
         "//source/common/http:codes_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",

@@ -16,9 +16,9 @@ envoy_cc_library(
     srcs = ["on_demand_update.cc"],
     hdrs = ["on_demand_update.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
@@ -38,7 +38,7 @@ envoy_cc_extension(
     ],
     security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",

@@ -19,8 +19,8 @@ envoy_cc_library(
     name = "stats_interface",
     hdrs = ["stats.h"],
     deps = [
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/stats:stats_macros_no_include_prefix",
     ],
 )
 
@@ -74,7 +74,7 @@ envoy_cc_library(
     ],
     deps = [
         ":protocol_lib",
-        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:filter_interface_no_include_prefix",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -95,11 +95,11 @@ envoy_cc_library(
         ":rocketmq_lib",
         ":stats_interface",
         ":well_known_names",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/tcp:conn_pool_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface_no_include_prefix",
+        "//include/envoy/tcp:conn_pool_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -127,8 +127,8 @@ envoy_cc_extension(
     status = "alpha",
     deps = [
         ":conn_manager_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/common/common:logger_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",

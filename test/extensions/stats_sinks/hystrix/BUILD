@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.stat_sinks.hystrix",
     deps = [
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/stat_sinks/hystrix:config",
         "//test/mocks/server:instance_mocks",

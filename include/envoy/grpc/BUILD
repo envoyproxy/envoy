@@ -14,10 +14,10 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":status",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:async_client_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/http:async_client_interface_no_include_prefix",
+        "//include/envoy/http:header_map_interface_no_include_prefix",
+        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
     ],
@@ -28,7 +28,7 @@ envoy_cc_library(
     hdrs = ["async_client_manager.h"],
     deps = [
         ":async_client_interface",
-        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -37,8 +37,8 @@ envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
     deps = [
-        "//include/envoy/http:context_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//include/envoy/http:context_interface_no_include_prefix",
+        "//include/envoy/upstream:upstream_interface_no_include_prefix",
     ],
 )
 
@@ -49,8 +49,8 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface_no_include_prefix",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -29,7 +29,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/ratelimit:ratelimit_interface",
+        "//include/envoy/ratelimit:ratelimit_interface_no_include_prefix",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
     ],
 )

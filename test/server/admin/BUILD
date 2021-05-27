@@ -27,8 +27,8 @@ envoy_cc_test(
     srcs = ["admin_test.cc"],
     deps = [
         ":admin_instance_lib",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/json:json_object_interface_no_include_prefix",
+        "//include/envoy/runtime:runtime_interface_no_include_prefix",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",

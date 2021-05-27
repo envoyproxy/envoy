@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.stat_sinks.metrics_service",
     deps = [
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/extensions/stat_sinks/metrics_service:config",
         "//test/test_common:utility_lib",
     ],

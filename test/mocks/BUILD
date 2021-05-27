@@ -13,9 +13,9 @@ envoy_cc_test_library(
     srcs = ["common.cc"],
     hdrs = ["common.h"],
     deps = [
-        "//include/envoy/common:conn_pool_interface",
-        "//include/envoy/common:random_generator_interface",
-        "//include/envoy/common:time_interface",
+        "//include/envoy/common:conn_pool_interface_no_include_prefix",
+        "//include/envoy/common:random_generator_interface_no_include_prefix",
+        "//include/envoy/common:time_interface_no_include_prefix",
         "//source/common/common:minimal_logger_lib",
         "//test/test_common:test_time_lib",
     ],

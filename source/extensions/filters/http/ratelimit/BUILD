@@ -18,8 +18,8 @@ envoy_cc_library(
     hdrs = ["ratelimit.h"],
     deps = [
         ":ratelimit_headers_lib",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/ratelimit:ratelimit_interface",
+        "//include/envoy/http:codes_interface_no_include_prefix",
+        "//include/envoy/ratelimit:ratelimit_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
@@ -49,7 +49,7 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":ratelimit_lib",
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",

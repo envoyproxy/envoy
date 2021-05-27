@@ -13,8 +13,8 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/common/matcher:matcher_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",

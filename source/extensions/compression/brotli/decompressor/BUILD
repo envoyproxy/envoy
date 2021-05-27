@@ -15,9 +15,9 @@ envoy_cc_library(
     hdrs = ["brotli_decompressor_impl.h"],
     external_deps = ["brotlidec"],
     deps = [
-        "//include/envoy/compression/decompressor:decompressor_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//include/envoy/compression/decompressor:decompressor_interface_no_include_prefix",
+        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/stats:stats_macros_no_include_prefix",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/compression/brotli/common:brotli_base_lib",
     ],

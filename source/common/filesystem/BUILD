@@ -23,7 +23,7 @@ envoy_cc_win32_library(
     hdrs = ["win32/directory_iterator_impl.h"],
     strip_include_prefix = "win32",
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
     ],
 )
 
@@ -33,7 +33,7 @@ envoy_cc_posix_library(
     hdrs = ["posix/directory_iterator_impl.h"],
     strip_include_prefix = "posix",
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:utility_lib",
     ],
@@ -69,7 +69,7 @@ envoy_cc_library(
     srcs = ["file_shared_impl.cc"],
     hdrs = ["file_shared_impl.h"],
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
@@ -108,8 +108,8 @@ envoy_cc_library(
         "//conditions:default": "inotify",
     }),
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",

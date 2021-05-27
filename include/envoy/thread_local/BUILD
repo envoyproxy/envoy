@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["thread_local.h"],
     deps = [
         ":thread_local_object",
-        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
         "//source/common/common:assert_lib",
     ],
 )

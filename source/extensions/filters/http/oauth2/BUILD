@@ -29,8 +29,8 @@ envoy_cc_library(
     hdrs = ["oauth_client.h"],
     deps = [
         ":oauth_response_cc_proto",
-        "//include/envoy/http:async_client_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/http:async_client_interface_no_include_prefix",
+        "//include/envoy/upstream:cluster_manager_interface_no_include_prefix",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
@@ -45,7 +45,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":oauth_client",
-        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
@@ -68,7 +68,7 @@ envoy_cc_extension(
     status = "alpha",
     deps = [
         ":oauth_lib",
-        "//include/envoy/registry",
+        "//include/envoy/registry:registry_no_include_prefix",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",

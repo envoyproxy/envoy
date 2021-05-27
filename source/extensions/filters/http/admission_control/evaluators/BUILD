@@ -19,7 +19,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/grpc:status",
+        "//include/envoy/grpc:status_no_include_prefix",
         "//source/common/common:enum_to_int",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],

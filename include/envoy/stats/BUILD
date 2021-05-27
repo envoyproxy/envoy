@@ -33,8 +33,8 @@ envoy_cc_library(
     deps = [
         ":refcount_ptr_interface",
         ":symbol_table_interface",
-        "//include/envoy/common:interval_set_interface",
-        "//include/envoy/common:time_interface",
+        "//include/envoy/common:interval_set_interface_no_include_prefix",
+        "//include/envoy/common:time_interface_no_include_prefix",
     ],
 )
 

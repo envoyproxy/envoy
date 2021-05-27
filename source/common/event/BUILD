@@ -35,11 +35,11 @@ envoy_cc_library(
         ":real_time_system_lib",
         ":signal_lib",
         ":scaled_range_timer_manager_lib",
-        "//include/envoy/common:scope_tracker_interface",
-        "//include/envoy/common:time_interface",
-        "//include/envoy/event:signal_interface",
-        "//include/envoy/network:listen_socket_interface",
-        "//include/envoy/network:listener_interface",
+        "//include/envoy/common:scope_tracker_interface_no_include_prefix",
+        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/event:signal_interface_no_include_prefix",
+        "//include/envoy/network:listen_socket_interface_no_include_prefix",
+        "//include/envoy/network:listener_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:watcher_lib",
@@ -64,7 +64,7 @@ envoy_cc_posix_library(
     strip_include_prefix = "posix",
     deps = [
         ":dispatcher_includes",
-        "//include/envoy/event:signal_interface",
+        "//include/envoy/event:signal_interface_no_include_prefix",
         "//source/common/common:thread_lib",
     ],
 )
@@ -76,7 +76,7 @@ envoy_cc_win32_library(
     strip_include_prefix = "win32",
     deps = [
         ":dispatcher_includes",
-        "//include/envoy/event:signal_interface",
+        "//include/envoy/event:signal_interface_no_include_prefix",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",
         "//source/common/network:default_socket_interface_lib",
@@ -99,7 +99,7 @@ envoy_cc_library(
     deps = [
         ":event_impl_base_lib",
         ":timer_lib",
-        "//include/envoy/event:timer_interface",
+        "//include/envoy/event:timer_interface_no_include_prefix",
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
     ],
@@ -119,11 +119,11 @@ envoy_cc_library(
     deps = [
         ":libevent_lib",
         ":libevent_scheduler_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/event:deferred_deletable",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:file_event_interface",
-        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/api:api_interface_no_include_prefix",
+        "//include/envoy/event:deferred_deletable_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/event:file_event_interface_no_include_prefix",
+        "//include/envoy/network:connection_handler_interface_no_include_prefix",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/signal:fatal_error_handler_lib",
@@ -157,8 +157,8 @@ envoy_cc_library(
         ":libevent_lib",
         ":schedulable_cb_lib",
         ":timer_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/event:timer_interface_no_include_prefix",
         "//source/common/common:assert_lib",
     ],
 )
@@ -171,7 +171,7 @@ envoy_cc_library(
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
-        "//include/envoy/event:schedulable_cb_interface",
+        "//include/envoy/event:schedulable_cb_interface_no_include_prefix",
     ],
 )
 
@@ -183,7 +183,7 @@ envoy_cc_library(
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
-        "//include/envoy/event:timer_interface",
+        "//include/envoy/event:timer_interface_no_include_prefix",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
     ],
@@ -193,8 +193,8 @@ envoy_cc_library(
     name = "deferred_task",
     hdrs = ["deferred_task.h"],
     deps = [
-        "//include/envoy/event:deferred_deletable",
-        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:deferred_deletable_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
     ],
 )
 
@@ -203,9 +203,9 @@ envoy_cc_library(
     srcs = ["scaled_range_timer_manager_impl.cc"],
     hdrs = ["scaled_range_timer_manager_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:scaled_range_timer_manager_interface",
-        "//include/envoy/event:timer_interface",
+        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/event:scaled_range_timer_manager_interface_no_include_prefix",
+        "//include/envoy/event:timer_interface_no_include_prefix",
         "//source/common/common:scope_tracker",
     ],
 )
