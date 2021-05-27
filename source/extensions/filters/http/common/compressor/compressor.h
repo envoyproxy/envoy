@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/compression/compressor/compressor.h"
+#include "include/envoy/compression/compressor/compressor.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/stream_info/filter_state.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/stream_info/filter_state.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/runtime/runtime_protos.h"

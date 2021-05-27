@@ -1,7 +1,7 @@
 #include "extensions/internal_redirect/safe_cross_scheme/config.h"
 
-#include "envoy/registry/registry.h"
-#include "envoy/router/internal_redirect.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/router/internal_redirect.h"
 
 namespace Envoy {
 namespace Extensions {

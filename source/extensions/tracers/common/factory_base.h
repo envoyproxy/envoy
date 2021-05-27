@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/tracer_config.h"
+#include "include/envoy/server/tracer_config.h"
 
 namespace Envoy {
 namespace Extensions {

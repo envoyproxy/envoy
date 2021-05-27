@@ -1,8 +1,8 @@
 #include "extensions/access_loggers/wasm/config.h"
 
 #include "envoy/extensions/access_loggers/wasm/v3/wasm.pb.validate.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 #include "common/protobuf/protobuf.h"

@@ -5,8 +5,8 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/http/header_map.h"
-#include "envoy/network/connection.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/network/connection.h"
 #include "envoy/type/matcher/v3/path.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 

@@ -3,12 +3,12 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/random_generator.h"
+#include "include/envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/network/listen_socket.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/network/listen_socket.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
 #include "common/config/utility.h"

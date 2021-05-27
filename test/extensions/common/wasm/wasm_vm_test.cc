@@ -1,4 +1,4 @@
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/stats/isolated_store_impl.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/server/configuration.h"
-#include "envoy/server/listener_manager.h"
+#include "include/envoy/server/configuration.h"
+#include "include/envoy/server/listener_manager.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 

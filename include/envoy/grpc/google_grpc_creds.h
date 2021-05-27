@@ -2,10 +2,10 @@
 
 #include <memory>
 
-#include "envoy/api/api.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/api/api.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/config/typed_config.h"
+#include "include/envoy/config/typed_config.h"
 
 #include "grpcpp/grpcpp.h"
 

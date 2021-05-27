@@ -1,10 +1,10 @@
 #pragma once
 
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "envoy/http/alternate_protocols_cache.h"
-#include "envoy/singleton/instance.h"
-#include "envoy/singleton/manager.h"
-#include "envoy/thread_local/thread_local.h"
+#include "include/envoy/http/alternate_protocols_cache.h"
+#include "include/envoy/singleton/instance.h"
+#include "include/envoy/singleton/manager.h"
+#include "include/envoy/thread_local/thread_local.h"
 
 #include "absl/container/flat_hash_map.h"
 

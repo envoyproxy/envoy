@@ -31,7 +31,7 @@
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
 
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/stats/stats_macros.h"
 #include "common/event/libevent_scheduler.h"
 #include "server/configuration_impl.h"
 #include "test/mocks/event/mocks.h"

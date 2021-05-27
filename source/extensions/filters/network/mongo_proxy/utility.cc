@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "common/json/json_loader.h"
 

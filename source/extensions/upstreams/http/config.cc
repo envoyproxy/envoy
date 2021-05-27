@@ -7,7 +7,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/config/utility.h"
 #include "common/http/http1/settings.h"

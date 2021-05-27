@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "absl/strings/string_view.h"
 #include "xds/core/v3/resource_locator.pb.h"

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/server/guarddog_config.h"
-#include "envoy/thread/thread.h"
+#include "include/envoy/server/guarddog_config.h"
+#include "include/envoy/thread/thread.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 namespace Envoy {

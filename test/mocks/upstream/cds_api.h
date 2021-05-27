@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

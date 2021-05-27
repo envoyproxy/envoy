@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/context_provider.h"
+#include "include/envoy/config/context_provider.h"
 
 #include "common/common/callback_impl.h"
 #include "common/common/thread.h"

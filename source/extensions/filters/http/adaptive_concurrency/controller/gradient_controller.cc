@@ -3,11 +3,11 @@
 #include <atomic>
 #include <chrono>
 
-#include "envoy/common/random_generator.h"
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/stats.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/common/cleanup.h"
 #include "common/protobuf/protobuf.h"

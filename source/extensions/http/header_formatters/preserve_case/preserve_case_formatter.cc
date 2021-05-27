@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Extensions {

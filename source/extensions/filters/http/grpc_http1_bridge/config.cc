@@ -1,6 +1,6 @@
 #include "extensions/filters/http/grpc_http1_bridge/config.h"
 
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 

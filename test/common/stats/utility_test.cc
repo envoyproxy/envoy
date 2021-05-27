@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/null_counter.h"

@@ -8,8 +8,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/platform.h"
-#include "envoy/server/hot_restart.h"
+#include "include/envoy/common/platform.h"
+#include "include/envoy/server/hot_restart.h"
 
 #include "common/common/assert.h"
 #include "common/stats/allocator_impl.h"

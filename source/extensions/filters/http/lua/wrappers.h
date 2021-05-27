@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/http/header_map.h"
-#include "envoy/stream_info/stream_info.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/stream_info/stream_info.h"
 
 #include "common/crypto/utility.h"
 

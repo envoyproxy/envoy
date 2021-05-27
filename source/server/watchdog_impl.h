@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-#include "envoy/server/watchdog.h"
+#include "include/envoy/server/watchdog.h"
 
 namespace Envoy {
 namespace Server {

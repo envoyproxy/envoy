@@ -5,7 +5,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/type/v3/http.pb.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
 #include "common/network/utility.h"

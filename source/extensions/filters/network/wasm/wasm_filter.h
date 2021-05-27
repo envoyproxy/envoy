@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
-#include "envoy/network/filter.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/network/filter.h"
+#include "include/envoy/server/filter_config.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/filters/network/well_known_names.h"

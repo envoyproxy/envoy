@@ -2,12 +2,12 @@
 
 #include <functional>
 
-#include "envoy/common/callback.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/common/callback.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/init/target.h"
-#include "envoy/ssl/certificate_validation_context_config.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "include/envoy/init/target.h"
+#include "include/envoy/ssl/certificate_validation_context_config.h"
+#include "include/envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {
 namespace Secret {

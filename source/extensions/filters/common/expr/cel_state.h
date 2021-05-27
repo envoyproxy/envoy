@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/stream_info/filter_state.h"
+#include "include/envoy/stream_info/filter_state.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"

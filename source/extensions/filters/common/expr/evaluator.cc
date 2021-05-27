@@ -1,6 +1,6 @@
 #include "extensions/filters/common/expr/evaluator.h"
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"

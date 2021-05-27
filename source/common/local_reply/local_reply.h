@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/http/codes.h"
-#include "envoy/http/header_map.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/http/codes.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/stream_info/stream_info_impl.h"
 

@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/init/watcher.h"
+#include "include/envoy/init/watcher.h"
 
 #include "common/common/logger.h"
 

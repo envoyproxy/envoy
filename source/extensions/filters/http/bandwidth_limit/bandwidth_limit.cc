@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/http/codes.h"
+#include "include/envoy/http/codes.h"
 
 #include "common/http/utility.h"
 #include "common/stats/timespan_impl.h"

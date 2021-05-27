@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
-#include "envoy/http/filter.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 

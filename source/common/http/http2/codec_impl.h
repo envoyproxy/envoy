@@ -8,12 +8,12 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/random_generator.h"
-#include "envoy/common/scope_tracker.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "envoy/event/deferred_deletable.h"
-#include "envoy/http/codec.h"
-#include "envoy/network/connection.h"
+#include "include/envoy/event/deferred_deletable.h"
+#include "include/envoy/http/codec.h"
+#include "include/envoy/network/connection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"

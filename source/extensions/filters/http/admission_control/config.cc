@@ -1,9 +1,9 @@
 #include "extensions/filters/http/admission_control/config.h"
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/common/enum_to_int.h"
 

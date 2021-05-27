@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
 

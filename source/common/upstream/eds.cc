@@ -1,7 +1,7 @@
 #include "common/upstream/eds.h"
 
 #include "envoy/api/v2/endpoint.pb.h"
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"

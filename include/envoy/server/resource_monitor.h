@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/common/exception.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/common/exception.h"
+#include "include/envoy/common/pure.h"
 
 namespace Envoy {
 namespace Server {

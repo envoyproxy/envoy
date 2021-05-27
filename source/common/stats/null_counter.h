@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stats/stats.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/stats/metric_impl.h"
 

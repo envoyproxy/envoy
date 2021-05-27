@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/network/dns.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/network/dns.h"
 
 #include "extensions/filters/udp/dns_filter/dns_parser.h"
 

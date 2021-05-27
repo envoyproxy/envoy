@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/common/pure.h"
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/event/dispatcher.h"
 
 #include "extensions/filters/network/common/redis/codec.h"
 

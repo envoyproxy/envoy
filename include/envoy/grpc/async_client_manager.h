@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/grpc/async_client.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/grpc/async_client.h"
+#include "include/envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Grpc {

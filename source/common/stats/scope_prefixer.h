@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/stats/symbol_table_impl.h"
 

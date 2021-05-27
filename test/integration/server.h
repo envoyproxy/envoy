@@ -7,9 +7,9 @@
 #include <string>
 
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/server/options.h"
-#include "envoy/server/process_context.h"
-#include "envoy/stats/stats.h"
+#include "include/envoy/server/options.h"
+#include "include/envoy/server/process_context.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"

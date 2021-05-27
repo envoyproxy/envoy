@@ -3,10 +3,10 @@
 #include <memory>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/common/random_generator.h"
-#include "envoy/common/token_bucket.h"
-#include "envoy/config/grpc_mux.h"
-#include "envoy/config/subscription.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/common/token_bucket.h"
+#include "include/envoy/config/grpc_mux.h"
+#include "include/envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/logger.h"

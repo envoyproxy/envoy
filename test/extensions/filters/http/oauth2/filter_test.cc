@@ -3,8 +3,8 @@
 
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
-#include "envoy/http/async_client.h"
-#include "envoy/http/message.h"
+#include "include/envoy/http/async_client.h"
+#include "include/envoy/http/message.h"
 
 #include "common/common/macros.h"
 #include "common/http/message_impl.h"

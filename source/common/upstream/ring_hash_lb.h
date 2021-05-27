@@ -3,9 +3,9 @@
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 #include "common/upstream/thread_aware_lb_impl.h"

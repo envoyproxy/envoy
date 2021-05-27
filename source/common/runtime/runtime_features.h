@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/runtime/runtime.h"
+#include "include/envoy/runtime/runtime.h"
 
 #include "common/singleton/const_singleton.h"
 

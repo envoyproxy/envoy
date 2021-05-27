@@ -3,8 +3,8 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
-#include "envoy/network/connection.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/network/connection.h"
+#include "include/envoy/registry/registry.h"
 
 #include "extensions/filters/network/rbac/rbac_filter.h"
 #include "extensions/filters/network/well_known_names.h"

@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/config/trace/v3/http_tracer.pb.h"
-#include "envoy/http/codes.h"
+#include "include/envoy/http/codes.h"
 
 namespace Envoy {
 namespace Http {

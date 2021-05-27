@@ -2,7 +2,7 @@
 
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"

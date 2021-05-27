@@ -4,15 +4,15 @@
 #include <string>
 
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/json/json_object.h"
-#include "envoy/local_info/local_info.h"
-#include "envoy/router/rds.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/json/json_object.h"
+#include "include/envoy/local_info/local_info.h"
+#include "include/envoy/router/rds.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/server/filter_config.h"
+#include "include/envoy/thread_local/thread_local.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
 namespace Router {

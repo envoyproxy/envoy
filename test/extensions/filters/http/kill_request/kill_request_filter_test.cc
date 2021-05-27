@@ -1,5 +1,5 @@
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
-#include "envoy/http/metadata_interface.h"
+#include "include/envoy/http/metadata_interface.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"

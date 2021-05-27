@@ -3,8 +3,8 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/network/address.h"
-#include "envoy/tracing/http_tracer.h"
+#include "include/envoy/network/address.h"
+#include "include/envoy/tracing/http_tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 

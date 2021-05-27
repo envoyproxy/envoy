@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/fatal_action_config.h"
+#include "include/envoy/server/fatal_action_config.h"
 
 #include "gmock/gmock.h"
 

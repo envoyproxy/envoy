@@ -4,7 +4,7 @@
 
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"

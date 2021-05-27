@@ -1,6 +1,6 @@
 #include "common/watchdog/abort_action.h"
 
-#include "envoy/thread/thread.h"
+#include "include/envoy/thread/thread.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

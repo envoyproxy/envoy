@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/process_context.h"
+#include "include/envoy/server/process_context.h"
 
 namespace Envoy {
 

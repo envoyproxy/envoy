@@ -1,5 +1,5 @@
-#include "envoy/registry/registry.h"
-#include "envoy/upstream/retry.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/upstream/retry.h"
 
 #include "extensions/retry/host/omit_canary_hosts/config.h"
 

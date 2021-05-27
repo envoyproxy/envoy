@@ -1,10 +1,10 @@
 #pragma once
 
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/extension_config_provider.h"
-#include "envoy/http/filter.h"
-#include "envoy/init/manager.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/config/extension_config_provider.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/init/manager.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "absl/types/optional.h"
 

@@ -1,7 +1,7 @@
 #include "extensions/filters/http/csrf/csrf_filter.h"
 
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"

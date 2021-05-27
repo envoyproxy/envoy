@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/network/connection_impl.h"
 

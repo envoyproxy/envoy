@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
-#include "envoy/network/connection.h"
-#include "envoy/network/filter.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/network/connection.h"
+#include "include/envoy/network/filter.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 

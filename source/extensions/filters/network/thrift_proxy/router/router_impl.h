@@ -5,11 +5,11 @@
 #include <vector>
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
-#include "envoy/router/router.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/tcp/conn_pool.h"
-#include "envoy/upstream/load_balancer.h"
+#include "include/envoy/router/router.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/tcp/conn_pool.h"
+#include "include/envoy/upstream/load_balancer.h"
 
 #include "common/common/logger.h"
 #include "common/http/header_utility.h"

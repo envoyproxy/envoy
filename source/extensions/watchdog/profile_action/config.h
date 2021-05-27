@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
-#include "envoy/server/guarddog_config.h"
+#include "include/envoy/server/guarddog_config.h"
 
 #include "common/protobuf/protobuf.h"
 

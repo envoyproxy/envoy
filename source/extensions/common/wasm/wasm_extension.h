@@ -2,10 +2,10 @@
 
 #include <memory>
 
-#include "envoy/server/lifecycle_notifier.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/server/lifecycle_notifier.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
 #include "common/stats/symbol_table_impl.h"

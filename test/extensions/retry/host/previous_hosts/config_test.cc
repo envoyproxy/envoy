@@ -1,5 +1,5 @@
-#include "envoy/registry/registry.h"
-#include "envoy/upstream/retry.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/upstream/retry.h"
 
 #include "common/network/address_impl.h"
 

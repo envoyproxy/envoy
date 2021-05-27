@@ -2,16 +2,16 @@
 
 #include <string>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/http/request_id_extension.h"
-#include "envoy/local_info/local_info.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "include/envoy/http/request_id_extension.h"
+#include "include/envoy/local_info/local_info.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/thread_local/thread_local.h"
+#include "include/envoy/tracing/http_tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
 #include "common/http/header_map_impl.h"

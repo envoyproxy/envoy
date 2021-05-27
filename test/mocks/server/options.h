@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/server/options.h"
+#include "include/envoy/server/options.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"

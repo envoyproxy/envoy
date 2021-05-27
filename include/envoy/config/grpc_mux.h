@@ -2,10 +2,10 @@
 
 #include <memory>
 
-#include "envoy/common/exception.h"
-#include "envoy/common/pure.h"
-#include "envoy/config/subscription.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/common/exception.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/config/subscription.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
 #include "common/protobuf/protobuf.h"

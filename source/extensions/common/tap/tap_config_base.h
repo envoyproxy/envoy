@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"

@@ -2,8 +2,8 @@
 
 #include <algorithm>
 
-#include "envoy/common/exception.h"
-#include "envoy/grpc/status.h"
+#include "include/envoy/common/exception.h"
+#include "include/envoy/grpc/status.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"

@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/http/header_map.h"
-#include "envoy/http/message.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/http/message.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/non_copyable.h"

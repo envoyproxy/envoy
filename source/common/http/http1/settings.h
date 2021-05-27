@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "envoy/http/codec.h"
-#include "envoy/protobuf/message_validator.h"
+#include "include/envoy/http/codec.h"
+#include "include/envoy/protobuf/message_validator.h"
 
 namespace Envoy {
 namespace Http {

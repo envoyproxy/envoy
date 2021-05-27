@@ -4,7 +4,7 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/secret/secret_provider.h"
+#include "include/envoy/secret/secret_provider.h"
 
 namespace Envoy {
 

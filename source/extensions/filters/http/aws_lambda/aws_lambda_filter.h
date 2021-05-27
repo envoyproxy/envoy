@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/http/filter.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 

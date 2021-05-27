@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/network/drain_decision.h"
+#include "include/envoy/network/drain_decision.h"
 
 namespace Envoy {
 namespace Server {

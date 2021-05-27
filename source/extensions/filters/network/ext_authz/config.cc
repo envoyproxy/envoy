@@ -6,8 +6,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
-#include "envoy/network/connection.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/network/connection.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"

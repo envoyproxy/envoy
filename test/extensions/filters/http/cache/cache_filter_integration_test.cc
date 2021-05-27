@@ -1,7 +1,7 @@
 #include <initializer_list>
 #include <optional>
 
-#include "envoy/common/optref.h"
+#include "include/envoy/common/optref.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/simulated_time_system.h"

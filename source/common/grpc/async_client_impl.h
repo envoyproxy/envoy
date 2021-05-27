@@ -4,7 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/grpc/async_client.h"
+#include "include/envoy/grpc/async_client.h"
 
 #include "common/common/linked_object.h"
 #include "common/grpc/codec.h"

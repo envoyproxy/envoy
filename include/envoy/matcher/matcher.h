@@ -3,11 +3,11 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/typed_config.h"
-#include "envoy/protobuf/message_validator.h"
+#include "include/envoy/config/typed_config.h"
+#include "include/envoy/protobuf/message_validator.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

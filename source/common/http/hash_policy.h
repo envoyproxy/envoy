@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/http/hash_policy.h"
-#include "envoy/stream_info/filter_state.h"
+#include "include/envoy/http/hash_policy.h"
+#include "include/envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace Http {

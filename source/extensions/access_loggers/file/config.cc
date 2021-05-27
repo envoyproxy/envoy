@@ -4,8 +4,8 @@
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.validate.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 #include "common/config/utility.h"

@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
-#include "envoy/http/codes.h"
+#include "include/envoy/http/codes.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"

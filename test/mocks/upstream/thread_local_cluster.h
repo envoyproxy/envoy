@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/upstream/thread_local_cluster.h"
+#include "include/envoy/upstream/thread_local_cluster.h"
 
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/http/mocks.h"

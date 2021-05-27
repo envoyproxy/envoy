@@ -1,6 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/upstream/resource_manager.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/upstream/resource_manager.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/api/api_impl.h"
 #include "common/grpc/context_impl.h"

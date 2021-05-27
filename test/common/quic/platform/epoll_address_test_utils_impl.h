@@ -10,7 +10,7 @@
 
 #include <algorithm>
 
-#include "envoy/network/address.h"
+#include "include/envoy/network/address.h"
 
 #include "test/test_common/environment.h"
 

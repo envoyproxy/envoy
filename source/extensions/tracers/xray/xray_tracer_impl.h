@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/server/tracer_config.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/trace_driver.h"
+#include "include/envoy/server/tracer_config.h"
+#include "include/envoy/thread_local/thread_local.h"
+#include "include/envoy/tracing/trace_driver.h"
 
 #include "extensions/tracers/xray/tracer.h"
 #include "extensions/tracers/xray/xray_configuration.h"

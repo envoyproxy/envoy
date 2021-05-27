@@ -5,9 +5,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/io_error.h"
-#include "envoy/common/platform.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/api/io_error.h"
+#include "include/envoy/common/platform.h"
+#include "include/envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
 

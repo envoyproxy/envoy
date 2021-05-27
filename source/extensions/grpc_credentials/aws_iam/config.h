@@ -2,8 +2,8 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/grpc_credential/v3/aws_iam.pb.h"
-#include "envoy/grpc/google_grpc_creds.h"
-#include "envoy/http/header_map.h"
+#include "include/envoy/grpc/google_grpc_creds.h"
+#include "include/envoy/http/header_map.h"
 
 #include "common/http/message_impl.h"
 

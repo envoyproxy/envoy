@@ -1,6 +1,6 @@
 #include "extensions/filters/http/ext_proc/mutation_utils.h"
 
-#include "envoy/http/header_map.h"
+#include "include/envoy/http/header_map.h"
 
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"

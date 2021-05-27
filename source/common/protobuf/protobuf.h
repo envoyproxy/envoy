@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/descriptor.h"

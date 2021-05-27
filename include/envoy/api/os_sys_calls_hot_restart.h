@@ -5,8 +5,8 @@
 
 #endif
 
-#include "envoy/api/os_sys_calls_common.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/api/os_sys_calls_common.h"
+#include "include/envoy/common/pure.h"
 
 namespace Envoy {
 namespace Api {

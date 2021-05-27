@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/tracing/http_tracer_impl.h"

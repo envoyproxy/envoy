@@ -5,10 +5,10 @@
 #include <string>
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/upstream/resource_manager.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/upstream/resource_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/basic_resource_impl.h"

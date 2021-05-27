@@ -5,7 +5,7 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/thread/thread.h"
+#include "include/envoy/thread/thread.h"
 
 #include "common/common/non_copyable.h"
 #include "common/singleton/threadsafe_singleton.h"

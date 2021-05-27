@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/http/header_map.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"

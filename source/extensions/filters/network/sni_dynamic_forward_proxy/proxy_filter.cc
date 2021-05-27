@@ -1,8 +1,8 @@
 #include "extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
 
-#include "envoy/network/connection.h"
-#include "envoy/network/filter.h"
-#include "envoy/upstream/thread_local_cluster.h"
+#include "include/envoy/network/connection.h"
+#include "include/envoy/network/filter.h"
+#include "include/envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/assert.h"
 #include "common/tcp_proxy/tcp_proxy.h"

@@ -1,5 +1,5 @@
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "extensions/http/original_ip_detection/xff/config.h"
 

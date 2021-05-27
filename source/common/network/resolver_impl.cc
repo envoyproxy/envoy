@@ -1,10 +1,10 @@
 #include "common/network/resolver_impl.h"
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "envoy/network/address.h"
-#include "envoy/network/resolver.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/network/address.h"
+#include "include/envoy/network/resolver.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
 #include "common/network/address_impl.h"

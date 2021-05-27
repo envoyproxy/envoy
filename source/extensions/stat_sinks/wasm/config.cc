@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "envoy/extensions/stat_sinks/wasm/v3/wasm.pb.validate.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/factory_context.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/factory_context.h"
 
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"

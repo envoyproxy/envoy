@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/api.h"
-#include "envoy/common/platform.h"
+#include "include/envoy/api/api.h"
+#include "include/envoy/common/platform.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "grpcpp/grpcpp.h"

@@ -2,7 +2,7 @@
 
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/config/trace/v3/skywalking.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/common/utility.h"
 

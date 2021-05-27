@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/admin.h"
+#include "include/envoy/server/admin.h"
 
 #include "test/mocks/http/mocks.h"
 

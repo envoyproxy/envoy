@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "envoy/access_log/access_log.h"
-#include "envoy/config/typed_config.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/access_log/access_log.h"
+#include "include/envoy/config/typed_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
 

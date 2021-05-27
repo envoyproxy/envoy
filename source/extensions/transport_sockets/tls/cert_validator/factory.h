@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/common/pure.h"
-#include "envoy/ssl/context_config.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/ssl/context_config.h"
 
 #include "common/common/utility.h"
 

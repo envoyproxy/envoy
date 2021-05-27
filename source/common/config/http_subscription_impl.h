@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/common/random_generator.h"
-#include "envoy/config/subscription.h"
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/config/subscription.h"
+#include "include/envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"

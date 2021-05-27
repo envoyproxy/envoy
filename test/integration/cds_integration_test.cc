@@ -1,7 +1,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/grpc/status.h"
+#include "include/envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/protobuf/protobuf.h"

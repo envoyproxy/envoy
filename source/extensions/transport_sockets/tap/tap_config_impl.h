@@ -2,7 +2,7 @@
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/transport.pb.h"
-#include "envoy/event/timer.h"
+#include "include/envoy/event/timer.h"
 
 #include "extensions/common/tap/tap_config_base.h"
 #include "extensions/transport_sockets/tap/tap_config.h"

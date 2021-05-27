@@ -1,6 +1,6 @@
 #include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "common/common/assert.h"
 

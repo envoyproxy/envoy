@@ -2,7 +2,7 @@
 #include <memory>
 
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
-#include "envoy/network/exception.h"
+#include "include/envoy/network/exception.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push

@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/platform.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/common/platform.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/network/address.h"
-#include "envoy/network/io_handle.h"
+#include "include/envoy/network/address.h"
+#include "include/envoy/network/io_handle.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

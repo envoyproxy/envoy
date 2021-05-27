@@ -6,13 +6,13 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/pure.h"
-#include "envoy/network/transport_socket.h"
-#include "envoy/registry/registry.h"
-#include "envoy/ssl/context.h"
-#include "envoy/ssl/context_config.h"
-#include "envoy/ssl/private_key/private_key.h"
-#include "envoy/ssl/ssl_socket_extended_info.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/network/transport_socket.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/ssl/context.h"
+#include "include/envoy/ssl/context_config.h"
+#include "include/envoy/ssl/private_key/private_key.h"
+#include "include/envoy/ssl/ssl_socket_extended_info.h"
 
 #include "common/common/matchers.h"
 #include "common/stats/symbol_table_impl.h"

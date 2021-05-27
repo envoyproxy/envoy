@@ -5,9 +5,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
-#include "envoy/network/connection.h"
+#include "include/envoy/network/connection.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"

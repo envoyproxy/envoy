@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/http/codes.h"
-#include "envoy/http/header_map.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/http/codes.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/thread.h"
 #include "common/stats/symbol_table_impl.h"

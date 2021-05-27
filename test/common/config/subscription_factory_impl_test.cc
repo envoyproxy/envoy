@@ -1,12 +1,12 @@
 #include <memory>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/config/subscription_factory_impl.h"
 #include "common/config/xds_resource.h"

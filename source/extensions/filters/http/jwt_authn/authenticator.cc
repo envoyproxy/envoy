@@ -1,6 +1,6 @@
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
-#include "envoy/http/async_client.h"
+#include "include/envoy/http/async_client.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"

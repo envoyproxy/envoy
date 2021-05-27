@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/http/codec.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/http/codec.h"
 
 #include "common/http/codec_helper.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"

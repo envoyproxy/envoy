@@ -9,9 +9,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/file_event.h"
-#include "envoy/server/instance.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/event/file_event.h"
+#include "include/envoy/server/instance.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/api/os_sys_calls_impl_hot_restart.h"

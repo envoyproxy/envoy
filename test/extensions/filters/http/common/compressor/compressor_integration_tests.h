@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/http/codec.h"
+#include "include/envoy/http/codec.h"
 
 #include "test/integration/http_protocol_integration.h"
 

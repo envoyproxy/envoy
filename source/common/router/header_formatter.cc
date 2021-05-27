@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/router/string_accessor.h"
+#include "include/envoy/router/string_accessor.h"
 
 #include "common/common/fmt.h"
 #include "common/common/logger.h"

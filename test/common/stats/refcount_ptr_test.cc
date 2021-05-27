@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/stats/refcount_ptr.h"
+#include "include/envoy/stats/refcount_ptr.h"
 
 #include "gtest/gtest.h"
 

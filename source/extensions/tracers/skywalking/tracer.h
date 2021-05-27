@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/tracing/trace_driver.h"
+#include "include/envoy/tracing/trace_driver.h"
 
 #include "common/tracing/common_values.h"
 #include "common/tracing/null_span_impl.h"

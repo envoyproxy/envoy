@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/bootstrap_extension_config.h"
+#include "include/envoy/server/bootstrap_extension_config.h"
 
 #include "gmock/gmock.h"
 

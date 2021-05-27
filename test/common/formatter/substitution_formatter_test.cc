@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/stream_info/stream_info.h"
+#include "include/envoy/stream_info/stream_info.h"
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"

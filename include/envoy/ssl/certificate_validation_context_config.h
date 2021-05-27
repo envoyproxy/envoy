@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/api.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/api/api.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 

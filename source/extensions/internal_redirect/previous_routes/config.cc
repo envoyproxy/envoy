@@ -1,7 +1,7 @@
 #include "extensions/internal_redirect/previous_routes/config.h"
 
-#include "envoy/registry/registry.h"
-#include "envoy/router/internal_redirect.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/router/internal_redirect.h"
 
 namespace Envoy {
 namespace Extensions {

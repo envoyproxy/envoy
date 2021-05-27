@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "extensions/filters/http/dynamo/dynamo_filter.h"
 #include "extensions/filters/http/dynamo/dynamo_stats.h"

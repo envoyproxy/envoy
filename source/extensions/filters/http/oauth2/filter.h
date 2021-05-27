@@ -4,15 +4,15 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/callback.h"
-#include "envoy/common/matchers.h"
+#include "include/envoy/common/callback.h"
+#include "include/envoy/common/matchers.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
-#include "envoy/http/header_map.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/stream_info/stream_info.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/server/filter_config.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/stream_info/stream_info.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/matchers.h"

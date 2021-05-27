@@ -7,12 +7,12 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/time.h"
+#include "include/envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/server/configuration.h"
-#include "envoy/server/guarddog.h"
-#include "envoy/server/guarddog_config.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/server/configuration.h"
+#include "include/envoy/server/guarddog.h"
+#include "include/envoy/server/guarddog_config.h"
+#include "include/envoy/stats/scope.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/common/assert.h"

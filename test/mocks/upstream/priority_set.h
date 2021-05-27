@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/common/callback.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/common/callback.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

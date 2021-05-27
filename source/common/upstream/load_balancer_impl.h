@@ -7,12 +7,12 @@
 #include <set>
 #include <vector>
 
-#include "envoy/common/callback.h"
-#include "envoy/common/random_generator.h"
+#include "include/envoy/common/callback.h"
+#include "include/envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/upstream/load_balancer.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/upstream/load_balancer.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"

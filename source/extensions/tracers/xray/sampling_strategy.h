@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/common/pure.h"
-#include "envoy/common/random_generator.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/common/random_generator.h"
 
 #include "common/common/macros.h"
 

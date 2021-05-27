@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/network/connection_balancer.h"
+#include "include/envoy/network/connection_balancer.h"
 
 #include "absl/synchronization/mutex.h"
 

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "envoy/common/random_generator.h"
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/singleton/manager.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/upstream/resource_manager.h"
+#include "include/envoy/singleton/manager.h"
+#include "include/envoy/thread_local/thread_local.h"
+#include "include/envoy/upstream/resource_manager.h"
 
 namespace Envoy {
 namespace Extensions {

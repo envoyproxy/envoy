@@ -4,9 +4,9 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/pure.h"
-#include "envoy/stats/refcount_ptr.h"
-#include "envoy/stats/stats.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/stats/refcount_ptr.h"
+#include "include/envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Stats {

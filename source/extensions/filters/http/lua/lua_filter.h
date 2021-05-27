@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
-#include "envoy/http/filter.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/crypto/utility.h"
 #include "common/http/utility.h"

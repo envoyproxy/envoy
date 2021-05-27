@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/event/signal.h"
+#include "include/envoy/event/signal.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"

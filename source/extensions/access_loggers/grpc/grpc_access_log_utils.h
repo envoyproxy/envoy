@@ -2,7 +2,7 @@
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/stream_info/stream_info.h"
+#include "include/envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Extensions {

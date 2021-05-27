@@ -2,7 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/server/transport_socket_config.h"
+#include "include/envoy/server/transport_socket_config.h"
 
 #include "common/config/utility.h"
 

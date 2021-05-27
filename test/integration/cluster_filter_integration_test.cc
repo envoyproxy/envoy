@@ -1,5 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/network/filter.h"
+#include "include/envoy/network/filter.h"
 
 #include "test/config/utility.h"
 #include "test/integration/integration.h"

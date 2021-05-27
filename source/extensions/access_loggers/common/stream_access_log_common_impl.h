@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/access_log_config.h"
+#include "include/envoy/server/access_log_config.h"
 
 #include "common/formatter/substitution_format_string.h"
 #include "common/formatter/substitution_formatter.h"

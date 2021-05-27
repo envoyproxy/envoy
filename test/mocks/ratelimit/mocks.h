@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/ratelimit/ratelimit.h"
+#include "include/envoy/ratelimit/ratelimit.h"
 
 #include "gmock/gmock.h"
 

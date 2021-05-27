@@ -1,7 +1,7 @@
 #include "server/api_listener_impl.h"
 
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/http/conn_manager_impl.h"
 #include "common/network/resolver_impl.h"

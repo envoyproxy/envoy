@@ -4,10 +4,10 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/typed_metadata.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/registry/registry.h"
-#include "envoy/singleton/manager.h"
+#include "include/envoy/config/typed_metadata.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/singleton/manager.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 
 #include "common/protobuf/protobuf.h"

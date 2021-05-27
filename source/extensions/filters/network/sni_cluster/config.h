@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/filters/network/well_known_names.h"
 

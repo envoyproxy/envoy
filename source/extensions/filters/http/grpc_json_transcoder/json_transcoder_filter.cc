@@ -3,9 +3,9 @@
 #include <memory>
 #include <unordered_set>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
-#include "envoy/http/filter.h"
+#include "include/envoy/http/filter.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"

@@ -3,7 +3,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 
 namespace Envoy {
 

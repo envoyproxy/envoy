@@ -1,8 +1,8 @@
 #include "extensions/filters/listener/http_inspector/http_inspector.h"
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/network/listen_socket.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/network/listen_socket.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

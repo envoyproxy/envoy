@@ -1,7 +1,7 @@
 #include <functional>
 
-#include "envoy/common/scope_tracker.h"
-#include "envoy/thread/thread.h"
+#include "include/envoy/common/scope_tracker.h"
+#include "include/envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"

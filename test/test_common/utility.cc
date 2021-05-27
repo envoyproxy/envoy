@@ -10,14 +10,14 @@
 #include <string>
 #include <vector>
 
-#include "envoy/buffer/buffer.h"
-#include "envoy/common/platform.h"
+#include "include/envoy/buffer/buffer.h"
+#include "include/envoy/common/platform.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/http/codec.h"
+#include "include/envoy/http/codec.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "common/api/api_impl.h"

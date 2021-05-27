@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stats/store.h"
+#include "include/envoy/stats/store.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/stats/symbol_table_impl.h"

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/event/timer.h"
+#include "include/envoy/event/timer.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
-#include "envoy/network/transport_socket.h"
+#include "include/envoy/network/transport_socket.h"
 
 #include "extensions/common/tap/extension_config_base.h"
 #include "extensions/transport_sockets/common/passthrough.h"

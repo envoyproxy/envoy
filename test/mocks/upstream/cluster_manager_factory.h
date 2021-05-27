@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "test/mocks/secret/mocks.h"
 

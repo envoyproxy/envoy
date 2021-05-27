@@ -5,11 +5,11 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/typed_metadata.h"
-#include "envoy/server/transport_socket_config.h"
-#include "envoy/stats/scope.h"
-#include "envoy/upstream/host_description.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/config/typed_metadata.h"
+#include "include/envoy/server/transport_socket_config.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/upstream/host_description.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/common/logger.h"
 #include "common/config/metadata.h"

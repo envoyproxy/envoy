@@ -6,12 +6,12 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
-#include "envoy/http/filter.h"
-#include "envoy/runtime/runtime.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/runtime/runtime.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

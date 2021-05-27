@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/http/filter.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 

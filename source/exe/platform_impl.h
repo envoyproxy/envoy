@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/platform.h"
+#include "include/envoy/server/platform.h"
 
 namespace Envoy {
 

@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/allocator.h"
-#include "envoy/stats/stats.h"
-#include "envoy/stats/tag.h"
+#include "include/envoy/stats/allocator.h"
+#include "include/envoy/stats/stats.h"
+#include "include/envoy/stats/tag.h"
 
 #include "common/common/assert.h"
 #include "common/stats/symbol_table_impl.h"

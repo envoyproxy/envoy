@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/config/config_provider.h"
-#include "envoy/router/router.h"
+#include "include/envoy/config/config_provider.h"
+#include "include/envoy/router/router.h"
 
 namespace Envoy {
 namespace Router {

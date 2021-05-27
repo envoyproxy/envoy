@@ -1,6 +1,6 @@
 #include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/guarddog_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/guarddog_config.h"
 
 #include "extensions/watchdog/profile_action/config.h"
 

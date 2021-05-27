@@ -1,7 +1,7 @@
 #include <cstddef>
 #include <memory>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 #include "common/network/address_impl.h"
 #include "common/quic/quic_io_handle_wrapper.h"

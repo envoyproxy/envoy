@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/typed_config.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/config/typed_config.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/formatter/substitution_formatter.h"
 

@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/http/header_map.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Grpc {

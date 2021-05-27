@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/subscription.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/config/subscription.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
 #include "common/protobuf/protobuf.h"

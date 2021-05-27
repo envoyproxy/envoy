@@ -5,9 +5,9 @@
 #include <string>
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/grpc/async_client.h"
-#include "envoy/grpc/async_client_manager.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/grpc/async_client.h"
+#include "include/envoy/grpc/async_client_manager.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/grpc/typed_async_client.h"
 

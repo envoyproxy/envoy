@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/stats/timespan.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/stats/timespan.h"
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"

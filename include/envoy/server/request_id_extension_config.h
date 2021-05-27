@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/http/request_id_extension.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/http/request_id_extension.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
 

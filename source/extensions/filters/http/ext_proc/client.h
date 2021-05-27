@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/common/pure.h"
-#include "envoy/grpc/status.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/grpc/status.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
 namespace Envoy {

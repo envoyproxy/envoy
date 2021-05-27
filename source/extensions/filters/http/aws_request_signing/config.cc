@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "extensions/common/aws/credentials_provider_impl.h"
 #include "extensions/common/aws/signer_impl.h"

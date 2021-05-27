@@ -6,10 +6,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/pure.h"
-#include "envoy/ssl/certificate_validation_context_config.h"
-#include "envoy/ssl/handshaker.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/ssl/certificate_validation_context_config.h"
+#include "include/envoy/ssl/handshaker.h"
+#include "include/envoy/ssl/tls_certificate_config.h"
 
 #include "absl/types/optional.h"
 

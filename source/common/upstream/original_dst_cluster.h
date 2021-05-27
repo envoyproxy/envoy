@@ -5,10 +5,10 @@
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/secret/secret_manager.h"
-#include "envoy/server/transport_socket_config.h"
-#include "envoy/stats/scope.h"
-#include "envoy/thread_local/thread_local.h"
+#include "include/envoy/secret/secret_manager.h"
+#include "include/envoy/server/transport_socket_config.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"

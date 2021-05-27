@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/stats.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/http/codes.h"
 #include "common/stats/isolated_store_impl.h"

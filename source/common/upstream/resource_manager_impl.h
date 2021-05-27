@@ -5,10 +5,10 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/resource.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/upstream/resource_manager.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/common/resource.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/upstream/resource_manager.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/common/basic_resource_impl.h"

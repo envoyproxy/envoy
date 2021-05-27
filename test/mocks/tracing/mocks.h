@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/tracing/http_tracer.h"
-#include "envoy/tracing/http_tracer_manager.h"
+#include "include/envoy/tracing/http_tracer.h"
+#include "include/envoy/tracing/http_tracer_manager.h"
 
 #include "gmock/gmock.h"
 

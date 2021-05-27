@@ -6,12 +6,12 @@
 #include <vector>
 
 #include "envoy/admin/v3/server_info.pb.h"
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
-#include "envoy/config/typed_config.h"
+#include "include/envoy/config/typed_config.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/common/utility.h"
 

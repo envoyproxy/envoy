@@ -3,7 +3,7 @@
 #include <atomic>
 #include <list>
 
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"

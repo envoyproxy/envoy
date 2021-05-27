@@ -1,10 +1,10 @@
 #include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
-#include "envoy/network/transport_socket.h"
-#include "envoy/registry/registry.h"
-#include "envoy/ssl/context_config.h"
-#include "envoy/ssl/ssl_socket_extended_info.h"
+#include "include/envoy/network/transport_socket.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/ssl/context_config.h"
+#include "include/envoy/ssl/ssl_socket_extended_info.h"
 
 #include "common/config/datasource.h"
 #include "common/config/utility.h"

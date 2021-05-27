@@ -4,7 +4,7 @@
 
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
-#include "envoy/stats/stats.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/json/json_loader.h"

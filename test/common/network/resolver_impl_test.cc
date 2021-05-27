@@ -2,10 +2,10 @@
 #include <list>
 #include <string>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "envoy/network/resolver.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/network/resolver.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/common/thread.h"
 #include "common/network/address_impl.h"

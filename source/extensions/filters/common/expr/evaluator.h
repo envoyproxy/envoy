@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stream_info/stream_info.h"
+#include "include/envoy/stream_info/stream_info.h"
 
 #include "common/http/headers.h"
 #include "common/protobuf/protobuf.h"

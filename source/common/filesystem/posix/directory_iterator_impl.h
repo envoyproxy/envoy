@@ -2,7 +2,7 @@
 
 #include <dirent.h>
 
-#include "envoy/filesystem/filesystem.h"
+#include "include/envoy/filesystem/filesystem.h"
 
 #include "common/api/os_sys_calls_impl.h"
 

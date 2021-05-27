@@ -5,7 +5,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"

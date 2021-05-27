@@ -1,7 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/router/router.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/router/router.h"
 
 #include "common/buffer/buffer_impl.h"
 

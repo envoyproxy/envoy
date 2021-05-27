@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/random_generator.h"
+#include "include/envoy/common/random_generator.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

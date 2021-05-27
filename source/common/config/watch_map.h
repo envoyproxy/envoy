@@ -4,7 +4,7 @@
 #include <string>
 #include <utility>
 
-#include "envoy/config/subscription.h"
+#include "include/envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"

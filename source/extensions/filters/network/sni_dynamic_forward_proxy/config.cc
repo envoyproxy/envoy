@@ -1,7 +1,7 @@
 #include "extensions/filters/network/sni_dynamic_forward_proxy/config.h"
 
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"

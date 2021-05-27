@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
 

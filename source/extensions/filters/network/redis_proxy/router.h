@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 

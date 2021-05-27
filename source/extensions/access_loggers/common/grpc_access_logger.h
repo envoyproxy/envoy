@@ -3,11 +3,11 @@
 #include <memory>
 
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/grpc/async_client_manager.h"
-#include "envoy/singleton/instance.h"
-#include "envoy/stats/scope.h"
-#include "envoy/thread_local/thread_local.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/grpc/async_client_manager.h"
+#include "include/envoy/singleton/instance.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/thread_local/thread_local.h"
 
 #include "common/common/assert.h"
 #include "common/grpc/typed_async_client.h"

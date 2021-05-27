@@ -1,7 +1,7 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/http/conn_pool.h"
+#include "include/envoy/http/conn_pool.h"
 
 #include "common/upstream/conn_pool_map_impl.h"
 

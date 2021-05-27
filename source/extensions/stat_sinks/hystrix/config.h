@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/server/instance.h"
+#include "include/envoy/server/instance.h"
 
 #include "server/configuration_impl.h"
 

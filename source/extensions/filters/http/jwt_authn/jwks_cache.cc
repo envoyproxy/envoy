@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "envoy/common/time.h"
+#include "include/envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/common/logger.h"

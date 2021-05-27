@@ -4,10 +4,10 @@
 #include <list>
 #include <string>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "envoy/network/connection.h"
-#include "envoy/network/listener.h"
+#include "include/envoy/network/connection.h"
+#include "include/envoy/network/listener.h"
 
 #include "absl/strings/string_view.h"
 

@@ -1,6 +1,6 @@
 #include "common/watchdog/abort_action_config.h"
 
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"

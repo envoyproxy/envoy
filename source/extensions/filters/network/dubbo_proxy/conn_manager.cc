@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "common/common/fmt.h"
 

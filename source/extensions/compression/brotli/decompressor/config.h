@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/compression/decompressor/config.h"
+#include "include/envoy/compression/decompressor/config.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.validate.h"
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/network/address.h"
-#include "envoy/network/listen_socket.h"
+#include "include/envoy/network/address.h"
+#include "include/envoy/network/listen_socket.h"
 
 namespace Envoy {
 namespace Extensions {

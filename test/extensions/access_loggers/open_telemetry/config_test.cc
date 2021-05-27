@@ -1,8 +1,8 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/access_log_config.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/access_log_config.h"
+#include "include/envoy/stats/scope.h"
 
 #include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "extensions/access_loggers/open_telemetry/config.h"

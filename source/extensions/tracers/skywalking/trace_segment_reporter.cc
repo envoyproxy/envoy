@@ -1,6 +1,6 @@
 #include "extensions/tracers/skywalking/trace_segment_reporter.h"
 
-#include "envoy/http/header_map.h"
+#include "include/envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Extensions {

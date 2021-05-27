@@ -4,11 +4,11 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/pure.h"
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_matcher.h"
-#include "envoy/stats/tag_producer.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/stats/histogram.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_matcher.h"
+#include "include/envoy/stats/tag_producer.h"
 
 namespace Envoy {
 namespace Event {

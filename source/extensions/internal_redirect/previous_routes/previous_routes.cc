@@ -1,7 +1,7 @@
 #include "extensions/internal_redirect/previous_routes/previous_routes.h"
 
-#include "envoy/router/internal_redirect.h"
-#include "envoy/stream_info/filter_state.h"
+#include "include/envoy/router/internal_redirect.h"
+#include "include/envoy/stream_info/filter_state.h"
 
 #include "absl/container/flat_hash_set.h"
 

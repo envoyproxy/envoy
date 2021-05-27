@@ -2,10 +2,10 @@
 
 #include <memory>
 
-#include "envoy/grpc/async_client_manager.h"
-#include "envoy/server/factory_context.h"
-#include "envoy/singleton/instance.h"
-#include "envoy/thread_local/thread_local.h"
+#include "include/envoy/grpc/async_client_manager.h"
+#include "include/envoy/server/factory_context.h"
+#include "include/envoy/singleton/instance.h"
+#include "include/envoy/thread_local/thread_local.h"
 
 namespace Envoy {
 namespace Grpc {

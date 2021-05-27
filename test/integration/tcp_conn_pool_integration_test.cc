@@ -1,6 +1,6 @@
 #include <list>
 
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"

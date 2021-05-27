@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/http/metadata_interface.h"
+#include "include/envoy/http/metadata_interface.h"
 
 #include "common/http/http2/metadata_encoder.h"
 

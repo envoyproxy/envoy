@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
-#include "envoy/http/filter.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "extensions/common/aws/signer.h"
 #include "extensions/filters/http/common/pass_through_filter.h"

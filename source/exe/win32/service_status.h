@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 namespace Envoy {
 class ServiceStatus : public SERVICE_STATUS {

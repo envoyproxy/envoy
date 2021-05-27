@@ -5,8 +5,8 @@
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/typed_config.h"
-#include "envoy/matcher/matcher.h"
+#include "include/envoy/config/typed_config.h"
+#include "include/envoy/matcher/matcher.h"
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"

@@ -1,5 +1,5 @@
 // NOLINT(namespace-envoy)
-#include "envoy/thread/thread.h"
+#include "include/envoy/thread/thread.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

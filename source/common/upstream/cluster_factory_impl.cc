@@ -1,7 +1,7 @@
 #include "common/upstream/cluster_factory_impl.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/server/options.h"
+#include "include/envoy/server/options.h"
 
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"

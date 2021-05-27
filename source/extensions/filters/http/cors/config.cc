@@ -1,6 +1,6 @@
 #include "extensions/filters/http/cors/config.h"
 
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "extensions/filters/http/cors/cors_filter.h"
 

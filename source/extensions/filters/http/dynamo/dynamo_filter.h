@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/http/filter.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/json/json_loader.h"
 

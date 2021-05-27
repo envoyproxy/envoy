@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 namespace Envoy {
 namespace Grpc {

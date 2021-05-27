@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/compression/compressor/factory.h"
+#include "include/envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "extensions/filters/http/common/compressor/compressor.h"

@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/formatter/substitution_formatter.h"
+#include "include/envoy/formatter/substitution_formatter.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"

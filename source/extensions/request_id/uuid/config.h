@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.validate.h"
-#include "envoy/http/request_id_extension.h"
-#include "envoy/server/request_id_extension_config.h"
+#include "include/envoy/http/request_id_extension.h"
+#include "include/envoy/server/request_id_extension_config.h"
 
 namespace Envoy {
 namespace Extensions {

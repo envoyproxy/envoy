@@ -7,7 +7,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/service/health/v3/hds.pb.validate.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/config/version_converter.h"
 #include "common/protobuf/message_validator_impl.h"

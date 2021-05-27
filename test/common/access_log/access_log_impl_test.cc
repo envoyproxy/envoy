@@ -5,8 +5,8 @@
 
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
-#include "envoy/upstream/cluster_manager.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/upstream/cluster_manager.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/config/utility.h"

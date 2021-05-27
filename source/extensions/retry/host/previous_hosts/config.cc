@@ -1,7 +1,7 @@
 #include "extensions/retry/host/previous_hosts/config.h"
 
-#include "envoy/registry/registry.h"
-#include "envoy/upstream/retry.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/upstream/retry.h"
 
 namespace Envoy {
 namespace Extensions {

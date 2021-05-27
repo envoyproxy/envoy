@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "envoy/server/configuration.h"
+#include "include/envoy/server/configuration.h"
 
 #include "gmock/gmock.h"
 

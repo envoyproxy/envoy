@@ -1,7 +1,7 @@
 #include "extensions/transport_sockets/common/passthrough.h"
 
-#include "envoy/network/connection.h"
-#include "envoy/network/transport_socket.h"
+#include "include/envoy/network/connection.h"
+#include "include/envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/config/typed_config.h"
-#include "envoy/network/socket_interface.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/bootstrap_extension_config.h"
+#include "include/envoy/config/typed_config.h"
+#include "include/envoy/network/socket_interface.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/bootstrap_extension_config.h"
 
 #include "common/singleton/threadsafe_singleton.h"
 

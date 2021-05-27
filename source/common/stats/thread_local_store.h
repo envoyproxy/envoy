@@ -7,8 +7,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/tag.h"
-#include "envoy/thread_local/thread_local.h"
+#include "include/envoy/stats/tag.h"
+#include "include/envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
 #include "common/common/thread_synchronizer.h"

@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/admin/v3/certs.pb.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 
 #include "absl/types/optional.h"
 

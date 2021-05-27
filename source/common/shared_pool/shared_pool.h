@@ -5,8 +5,8 @@
 #include <thread>
 #include <type_traits>
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/singleton/instance.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/singleton/instance.h"
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"

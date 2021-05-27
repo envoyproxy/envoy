@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/registry/registry.h"
-#include "envoy/server/instance.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/instance.h"
 
 #include "server/configuration_impl.h"
 

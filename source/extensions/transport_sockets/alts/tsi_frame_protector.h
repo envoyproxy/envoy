@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "extensions/transport_sockets/alts/grpc_tsi.h"
 

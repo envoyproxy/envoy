@@ -3,7 +3,7 @@
 #include <cstring>
 #include <string>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "test/mocks/upstream/cluster_info.h"
 

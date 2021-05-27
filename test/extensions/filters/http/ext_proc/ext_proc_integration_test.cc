@@ -1,7 +1,7 @@
 #include <algorithm>
 
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
-#include "envoy/network/address.h"
+#include "include/envoy/network/address.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
 #include "extensions/filters/http/ext_proc/config.h"

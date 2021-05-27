@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/stats/symbol_table.h"
-#include "envoy/stats/tag.h"
+#include "include/envoy/stats/symbol_table.h"
+#include "include/envoy/stats/tag.h"
 
 #include "common/stats/symbol_table_impl.h"
 

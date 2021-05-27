@@ -2,8 +2,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
-#include "envoy/server/resource_monitor.h"
-#include "envoy/server/resource_monitor_config.h"
+#include "include/envoy/server/resource_monitor.h"
+#include "include/envoy/server/resource_monitor_config.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/integration/http_protocol_integration.h"

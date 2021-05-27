@@ -4,11 +4,11 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/exception.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/filesystem/filesystem.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/common/exception.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/filesystem/filesystem.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

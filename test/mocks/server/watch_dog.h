@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/watchdog.h"
+#include "include/envoy/server/watchdog.h"
 
 #include "gmock/gmock.h"
 

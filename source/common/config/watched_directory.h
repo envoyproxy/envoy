@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/filesystem/watcher.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/filesystem/watcher.h"
 
 namespace Envoy {
 namespace Config {

@@ -4,9 +4,9 @@
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/router/rds.h"
-#include "envoy/router/route_config_update_receiver.h"
-#include "envoy/server/factory_context.h"
+#include "include/envoy/router/rds.h"
+#include "include/envoy/router/route_config_update_receiver.h"
+#include "include/envoy/server/factory_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/logger.h"

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/event/file_event.h"
+#include "include/envoy/event/file_event.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
-#include "envoy/network/dns.h"
-#include "envoy/network/filter.h"
+#include "include/envoy/network/dns.h"
+#include "include/envoy/network/filter.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/matchers.h"

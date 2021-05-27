@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

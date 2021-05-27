@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/http/metadata_interface.h"
+#include "include/envoy/http/metadata_interface.h"
 
 #include "common/common/assert.h"
 

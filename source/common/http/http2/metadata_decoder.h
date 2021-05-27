@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/http/codec.h"
+#include "include/envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

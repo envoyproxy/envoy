@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/common/pure.h"
-#include "envoy/config/typed_config.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/tracing/http_tracer.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/config/typed_config.h"
+#include "include/envoy/server/filter_config.h"
+#include "include/envoy/tracing/http_tracer.h"
 
 #include "common/protobuf/protobuf.h"
 

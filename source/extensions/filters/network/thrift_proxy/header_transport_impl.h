@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"

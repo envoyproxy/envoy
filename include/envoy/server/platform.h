@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/common/pure.h"
-#include "envoy/filesystem/filesystem.h"
-#include "envoy/thread/thread.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/filesystem/filesystem.h"
+#include "include/envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Server {

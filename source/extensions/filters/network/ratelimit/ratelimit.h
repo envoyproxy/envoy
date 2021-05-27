@@ -6,12 +6,12 @@
 #include <vector>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
-#include "envoy/network/connection.h"
-#include "envoy/network/filter.h"
-#include "envoy/ratelimit/ratelimit.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/network/connection.h"
+#include "include/envoy/network/filter.h"
+#include "include/envoy/ratelimit/ratelimit.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
 

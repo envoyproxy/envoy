@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/network/socket.h"
+#include "include/envoy/network/socket.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"

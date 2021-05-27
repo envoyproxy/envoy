@@ -1,7 +1,7 @@
 #include "common/upstream/load_stats_reporter.h"
 
 #include "envoy/service/load_stats/v3/lrs.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"

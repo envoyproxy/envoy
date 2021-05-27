@@ -6,11 +6,11 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
-#include "envoy/http/filter.h"
-#include "envoy/local_info/local_info.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/local_info/local_info.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"

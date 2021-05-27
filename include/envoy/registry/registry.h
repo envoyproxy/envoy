@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/assert.h"

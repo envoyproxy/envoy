@@ -1,12 +1,12 @@
 #pragma once
 
-#include "envoy/config/config_provider.h"
-#include "envoy/config/config_provider_manager.h"
-#include "envoy/init/manager.h"
-#include "envoy/server/admin.h"
-#include "envoy/server/config_tracker.h"
-#include "envoy/singleton/instance.h"
-#include "envoy/thread_local/thread_local.h"
+#include "include/envoy/config/config_provider.h"
+#include "include/envoy/config/config_provider_manager.h"
+#include "include/envoy/init/manager.h"
+#include "include/envoy/server/admin.h"
+#include "include/envoy/server/config_tracker.h"
+#include "include/envoy/singleton/instance.h"
+#include "include/envoy/thread_local/thread_local.h"
 
 #include "common/common/thread.h"
 #include "common/common/utility.h"

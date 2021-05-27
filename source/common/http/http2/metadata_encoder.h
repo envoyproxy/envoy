@@ -4,7 +4,7 @@
 #include <queue>
 #include <string>
 
-#include "envoy/http/codec.h"
+#include "include/envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"

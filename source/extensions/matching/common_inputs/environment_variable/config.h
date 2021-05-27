@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/matching/common_inputs/environment_variable/v3/input.pb.h"
 #include "envoy/extensions/matching/common_inputs/environment_variable/v3/input.pb.validate.h"
-#include "envoy/matcher/matcher.h"
-#include "envoy/server/factory_context.h"
+#include "include/envoy/matcher/matcher.h"
+#include "include/envoy/server/factory_context.h"
 
 #include "common/protobuf/utility.h"
 

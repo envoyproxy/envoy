@@ -1,6 +1,6 @@
 #include "common/stats/metric_impl.h"
 
-#include "envoy/stats/tag.h"
+#include "include/envoy/stats/tag.h"
 
 #include "common/stats/symbol_table_impl.h"
 

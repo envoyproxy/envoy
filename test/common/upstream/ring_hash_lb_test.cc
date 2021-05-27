@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/router/router.h"
+#include "include/envoy/router/router.h"
 
 #include "common/network/utility.h"
 #include "common/upstream/ring_hash_lb.h"

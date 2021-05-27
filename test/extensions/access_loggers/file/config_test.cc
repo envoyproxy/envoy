@@ -1,6 +1,6 @@
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/event/dispatcher.h"
 
 namespace Envoy {
 namespace Event {

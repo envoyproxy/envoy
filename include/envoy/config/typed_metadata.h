@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/pure.h"
-#include "envoy/config/typed_config.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/config/typed_config.h"
 
 #include "common/protobuf/protobuf.h"
 

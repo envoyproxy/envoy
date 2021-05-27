@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/common/pure.h"
-#include "envoy/common/random_generator.h"
-#include "envoy/common/time.h"
-#include "envoy/tracing/http_tracer.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/common/time.h"
+#include "include/envoy/tracing/http_tracer.h"
 
 #include "extensions/tracers/zipkin/span_context.h"
 #include "extensions/tracers/zipkin/tracer_interface.h"

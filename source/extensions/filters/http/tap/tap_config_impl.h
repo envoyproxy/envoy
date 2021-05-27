@@ -3,7 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/http.pb.h"
-#include "envoy/http/header_map.h"
+#include "include/envoy/http/header_map.h"
 
 #include "common/common/logger.h"
 

@@ -8,7 +8,7 @@
 
 #include <string>
 
-#include "envoy/thread/thread.h"
+#include "include/envoy/thread/thread.h"
 
 #include "common/common/assert.h"
 

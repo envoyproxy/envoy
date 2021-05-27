@@ -1,5 +1,5 @@
-#include "envoy/network/transport_socket.h"
-#include "envoy/server/lifecycle_notifier.h"
+#include "include/envoy/network/transport_socket.h"
+#include "include/envoy/server/lifecycle_notifier.h"
 
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/filters/network/wasm/wasm_filter.h"

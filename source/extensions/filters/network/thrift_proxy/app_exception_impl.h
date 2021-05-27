@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"

@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "common/common/assert.h"
 

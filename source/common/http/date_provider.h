@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/common/pure.h"
-#include "envoy/http/header_map.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {

@@ -20,7 +20,7 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "test/common/quic/test_utils.h"
 
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/stats/stats_macros.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/mocks.h"

@@ -7,7 +7,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

@@ -2,11 +2,11 @@
 
 #include <string>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
-#include "envoy/http/async_client.h"
-#include "envoy/http/message.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/http/async_client.h"
+#include "include/envoy/http/message.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"

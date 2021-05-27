@@ -1,5 +1,5 @@
 #pragma once
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "common/buffer/buffer_impl.h"
 

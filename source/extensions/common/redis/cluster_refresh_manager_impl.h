@@ -4,9 +4,9 @@
 #include <atomic>
 #include <numeric>
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/singleton/instance.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/singleton/instance.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"

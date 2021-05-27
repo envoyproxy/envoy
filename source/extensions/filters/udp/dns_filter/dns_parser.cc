@@ -1,6 +1,6 @@
 #include "extensions/filters/udp/dns_filter/dns_parser.h"
 
-#include "envoy/network/address.h"
+#include "include/envoy/network/address.h"
 
 #include "common/common/safe_memcpy.h"
 #include "common/network/address_impl.h"

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "envoy/common/random_generator.h"
+#include "include/envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
-#include "envoy/local_info/local_info.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/trace_driver.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/local_info/local_info.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/thread_local/thread_local.h"
+#include "include/envoy/tracing/trace_driver.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/async_client_utility.h"

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/network/connection.h"
+#include "include/envoy/network/connection.h"
 
 #include "common/common/logger.h"
 

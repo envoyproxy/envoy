@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/buffer/buffer.h"
-#include "envoy/tcp/conn_pool.h"
+#include "include/envoy/buffer/buffer.h"
+#include "include/envoy/tcp/conn_pool.h"
 
 #include "common/common/logger.h"
 #include "common/upstream/load_balancer_impl.h"

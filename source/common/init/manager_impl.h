@@ -2,7 +2,7 @@
 
 #include <list>
 
-#include "envoy/init/manager.h"
+#include "include/envoy/init/manager.h"
 
 #include "common/common/logger.h"
 #include "common/init/watcher_impl.h"

@@ -4,7 +4,7 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/server/health_checker_config.h"
+#include "include/envoy/server/health_checker_config.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 

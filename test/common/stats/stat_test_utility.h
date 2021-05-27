@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stats/store.h"
+#include "include/envoy/stats/store.h"
 
 #include "common/common/logger.h"
 #include "common/memory/stats.h"

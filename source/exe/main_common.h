@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/event/timer.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/server/platform.h"
+#include "include/envoy/event/timer.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/server/platform.h"
 
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"

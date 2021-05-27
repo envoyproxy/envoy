@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "envoy/server/guarddog.h"
-#include "envoy/server/overload/overload_manager.h"
+#include "include/envoy/server/guarddog.h"
+#include "include/envoy/server/overload/overload_manager.h"
 
 namespace Envoy {
 namespace Server {

@@ -7,8 +7,8 @@
 #include <string>
 #include <type_traits>
 
-#include "envoy/common/optref.h"
-#include "envoy/http/header_map.h"
+#include "include/envoy/common/optref.h"
+#include "include/envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"
 #include "common/common/utility.h"

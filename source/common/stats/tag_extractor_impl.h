@@ -8,7 +8,7 @@
 #include <fmt/core.h>
 #endif
 
-#include "envoy/stats/tag_extractor.h"
+#include "include/envoy/stats/tag_extractor.h"
 
 #include "common/common/regex.h"
 

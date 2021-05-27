@@ -5,9 +5,9 @@
 #include <string>
 
 #include "envoy/admin/v3/server_info.pb.h"
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/network/address.h"
+#include "include/envoy/network/address.h"
 
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"

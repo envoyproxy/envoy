@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"

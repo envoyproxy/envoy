@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/config/utility.h"
 #include "common/http/http3/quic_client_connection_factory.h"

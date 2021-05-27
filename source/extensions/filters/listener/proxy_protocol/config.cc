@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.validate.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 #include "extensions/filters/listener/well_known_names.h"

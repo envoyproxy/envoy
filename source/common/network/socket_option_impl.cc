@@ -1,6 +1,6 @@
 #include "common/network/socket_option_impl.h"
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"

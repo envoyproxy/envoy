@@ -3,7 +3,7 @@
 #include <chrono>
 #include <cstdint>
 
-#include "envoy/stream_info/stream_info.h"
+#include "include/envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace StreamInfo {

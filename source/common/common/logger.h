@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/thread/thread.h"
+#include "include/envoy/thread/thread.h"
 
 #include "common/common/base_logger.h"
 #include "common/common/fancy_logger.h"

@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
-#include "envoy/grpc/status.h"
-#include "envoy/http/header_map.h"
+#include "include/envoy/grpc/status.h"
+#include "include/envoy/http/header_map.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/codes.h"

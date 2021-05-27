@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
-#include "envoy/grpc/async_client_manager.h"
-#include "envoy/local_info/local_info.h"
+#include "include/envoy/grpc/async_client_manager.h"
+#include "include/envoy/local_info/local_info.h"
 
 #include "common/config/utility.h"
 #include "common/grpc/typed_async_client.h"

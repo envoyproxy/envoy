@@ -6,7 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/string_view.h"

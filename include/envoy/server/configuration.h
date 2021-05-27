@@ -8,8 +8,8 @@
 #include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/stats/sink.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/stats/sink.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "absl/types/optional.h"
 

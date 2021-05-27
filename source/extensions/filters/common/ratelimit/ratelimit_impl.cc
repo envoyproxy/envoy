@@ -7,7 +7,7 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"

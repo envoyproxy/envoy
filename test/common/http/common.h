@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/http/conn_pool.h"
+#include "include/envoy/http/conn_pool.h"
 
 #include "common/http/codec_client.h"
 

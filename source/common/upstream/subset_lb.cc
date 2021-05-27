@@ -4,7 +4,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/runtime/runtime.h"
+#include "include/envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
 #include "common/config/metadata.h"

@@ -1,7 +1,7 @@
 #include <openssl/ssl3.h>
 
-#include "envoy/network/transport_socket.h"
-#include "envoy/ssl/handshaker.h"
+#include "include/envoy/network/transport_socket.h"
+#include "include/envoy/ssl/handshaker.h"
 
 #include "common/stream_info/stream_info_impl.h"
 

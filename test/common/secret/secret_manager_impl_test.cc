@@ -1,7 +1,7 @@
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"

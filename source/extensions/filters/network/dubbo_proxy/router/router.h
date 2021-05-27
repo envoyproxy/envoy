@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/router/router.h"
+#include "include/envoy/router/router.h"
 
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 

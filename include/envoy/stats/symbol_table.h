@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"

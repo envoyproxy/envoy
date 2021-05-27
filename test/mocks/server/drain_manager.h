@@ -5,7 +5,7 @@
 #include <list>
 #include <string>
 
-#include "envoy/server/drain_manager.h"
+#include "include/envoy/server/drain_manager.h"
 
 #include "gmock/gmock.h"
 

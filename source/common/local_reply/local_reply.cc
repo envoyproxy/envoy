@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/api.h"
+#include "include/envoy/api/api.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/enum_to_int.h"

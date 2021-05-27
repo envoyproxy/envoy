@@ -2,7 +2,7 @@
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/common/tap/v3/common.pb.h"
-#include "envoy/thread_local/thread_local.h"
+#include "include/envoy/thread_local/thread_local.h"
 
 #include "extensions/common/tap/admin.h"
 #include "extensions/common/tap/tap.h"

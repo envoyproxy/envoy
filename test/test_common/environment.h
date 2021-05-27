@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/network/address.h"
-#include "envoy/server/options.h"
+#include "include/envoy/network/address.h"
+#include "include/envoy/server/options.h"
 
 #include "common/json/json_loader.h"
 

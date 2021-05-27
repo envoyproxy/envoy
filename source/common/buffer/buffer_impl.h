@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"

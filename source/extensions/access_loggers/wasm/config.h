@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/access_log_config.h"
+#include "include/envoy/server/access_log_config.h"
 
 #include "common/config/datasource.h"
 

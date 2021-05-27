@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 

@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
 

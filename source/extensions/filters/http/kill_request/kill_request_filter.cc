@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
-#include "envoy/http/header_map.h"
+#include "include/envoy/http/header_map.h"
 
 #include "common/protobuf/utility.h"
 

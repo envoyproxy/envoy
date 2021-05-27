@@ -4,7 +4,7 @@
 
 #include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.h"
 #include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"

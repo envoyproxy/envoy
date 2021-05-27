@@ -2,8 +2,8 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/http/protocol.h"
-#include "envoy/json/json_object.h"
+#include "include/envoy/http/protocol.h"
+#include "include/envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
 #include "common/json/json_loader.h"

@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/interval_set.h"
-#include "envoy/common/pure.h"
-#include "envoy/stats/tag.h"
+#include "include/envoy/common/interval_set.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
 

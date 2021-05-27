@@ -1,6 +1,6 @@
 #include "test/mocks/network/io_handle.h"
 
-#include "envoy/network/address.h"
+#include "include/envoy/network/address.h"
 
 namespace Envoy {
 namespace Network {

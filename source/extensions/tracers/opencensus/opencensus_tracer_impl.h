@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/api/api.h"
+#include "include/envoy/api/api.h"
 #include "envoy/config/trace/v3/opencensus.pb.h"
-#include "envoy/local_info/local_info.h"
-#include "envoy/tracing/trace_driver.h"
+#include "include/envoy/local_info/local_info.h"
+#include "include/envoy/tracing/trace_driver.h"
 
 #include "common/common/logger.h"
 

@@ -1,6 +1,6 @@
 #include "common/http/matching/inputs.h"
 
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Http {

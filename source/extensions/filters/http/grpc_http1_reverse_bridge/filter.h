@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
-#include "envoy/http/filter.h"
+#include "include/envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/status.h"

@@ -4,10 +4,10 @@
 #include <vector>
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/secret/secret_callbacks.h"
-#include "envoy/secret/secret_provider.h"
-#include "envoy/server/transport_socket_config.h"
-#include "envoy/ssl/context_config.h"
+#include "include/envoy/secret/secret_callbacks.h"
+#include "include/envoy/secret/secret_provider.h"
+#include "include/envoy/server/transport_socket_config.h"
+#include "include/envoy/ssl/context_config.h"
 
 #include "common/common/empty_string.h"
 #include "common/json/json_loader.h"

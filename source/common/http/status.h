@@ -3,7 +3,7 @@
 #include <atomic>
 #include <string>
 
-#include "envoy/http/codes.h"
+#include "include/envoy/http/codes.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"

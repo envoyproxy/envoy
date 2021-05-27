@@ -5,13 +5,13 @@
 #include <string>
 
 #include "envoy/api/v2/auth/secret.pb.h"
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
-#include "envoy/registry/registry.h"
-#include "envoy/secret/secret_manager.h"
-#include "envoy/secret/secret_provider.h"
-#include "envoy/ssl/private_key/private_key.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/secret/secret_manager.h"
+#include "include/envoy/secret/secret_provider.h"
+#include "include/envoy/ssl/private_key/private_key.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"

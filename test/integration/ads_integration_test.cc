@@ -4,7 +4,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/grpc/status.h"
+#include "include/envoy/grpc/status.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/version_converter.h"

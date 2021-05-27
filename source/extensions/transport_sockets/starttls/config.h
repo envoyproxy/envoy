@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/transport_socket_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/transport_socket_config.h"
 
 #include "common/config/utility.h"
 

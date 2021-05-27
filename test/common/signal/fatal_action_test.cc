@@ -1,7 +1,7 @@
 #include <vector>
 
-#include "envoy/common/scope_tracker.h"
-#include "envoy/server/fatal_action_config.h"
+#include "include/envoy/common/scope_tracker.h"
+#include "include/envoy/server/fatal_action_config.h"
 
 #include "common/signal/fatal_action.h"
 #include "common/signal/fatal_error_handler.h"

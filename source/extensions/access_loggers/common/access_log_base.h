@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/access_log/access_log.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/server/access_log_config.h"
+#include "include/envoy/access_log/access_log.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/server/access_log_config.h"
 
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"

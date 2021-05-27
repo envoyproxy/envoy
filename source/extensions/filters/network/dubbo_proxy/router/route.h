@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/typed_config.h"
+#include "include/envoy/config/typed_config.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
-#include "envoy/router/router.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/router/router.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"

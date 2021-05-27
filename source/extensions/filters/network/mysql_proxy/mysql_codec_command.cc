@@ -1,6 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "common/common/logger.h"
 #include "common/common/macros.h"

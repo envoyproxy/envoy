@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/ssl/private_key/private_key.h"
-#include "envoy/ssl/private_key/private_key_config.h"
+#include "include/envoy/ssl/private_key/private_key.h"
+#include "include/envoy/ssl/private_key/private_key_config.h"
 
 namespace Envoy {
 namespace Extensions {

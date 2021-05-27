@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/common/time.h"
+#include "include/envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 

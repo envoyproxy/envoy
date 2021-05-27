@@ -1,6 +1,6 @@
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/common/assert.h"
 

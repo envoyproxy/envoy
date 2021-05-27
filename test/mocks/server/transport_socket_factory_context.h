@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/transport_socket_config.h"
+#include "include/envoy/server/transport_socket_config.h"
 
 #include "common/secret/secret_manager_impl.h"
 

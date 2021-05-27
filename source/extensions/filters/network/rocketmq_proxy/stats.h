@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
 
 namespace Envoy {
 namespace Extensions {

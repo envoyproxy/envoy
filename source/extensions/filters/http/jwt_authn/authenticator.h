@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/filters/http/common/jwks_fetcher.h"
 #include "extensions/filters/http/jwt_authn/extractor.h"

@@ -5,7 +5,7 @@
 // nghttp2 fails to convey the POSIX ssize_t declaration
 // that Microsoft declines to implement. Pick up a valid
 // ssize_t declaration for win32 in our platform.h
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 #include "nghttp2/nghttp2.h"
 

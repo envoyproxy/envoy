@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/event/dispatcher.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
 #include "common/grpc/async_client_impl.h"

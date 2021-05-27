@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/upstream/retry.h"
+#include "include/envoy/upstream/retry.h"
 
 #include "test/integration/test_host_predicate.h"
 

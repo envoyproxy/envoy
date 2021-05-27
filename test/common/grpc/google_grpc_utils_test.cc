@@ -1,4 +1,4 @@
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 #include "common/grpc/google_grpc_utils.h"
 

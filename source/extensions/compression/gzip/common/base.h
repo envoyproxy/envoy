@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "zlib.h"
 

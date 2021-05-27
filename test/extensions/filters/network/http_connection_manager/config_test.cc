@@ -4,7 +4,7 @@
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
-#include "envoy/server/request_id_extension_config.h"
+#include "include/envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/network/address_impl.h"

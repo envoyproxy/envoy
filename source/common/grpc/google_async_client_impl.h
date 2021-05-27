@@ -3,15 +3,15 @@
 #include <memory>
 #include <queue>
 
-#include "envoy/api/api.h"
-#include "envoy/common/platform.h"
+#include "include/envoy/api/api.h"
+#include "include/envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/grpc/async_client.h"
-#include "envoy/stats/scope.h"
-#include "envoy/thread/thread.h"
-#include "envoy/thread_local/thread_local_object.h"
-#include "envoy/tracing/http_tracer.h"
+#include "include/envoy/grpc/async_client.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/thread/thread.h"
+#include "include/envoy/thread_local/thread_local_object.h"
+#include "include/envoy/tracing/http_tracer.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"

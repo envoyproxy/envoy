@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/http/header_map.h"
-#include "envoy/stream_info/filter_state.h"
+#include "include/envoy/http/header_map.h"
+#include "include/envoy/stream_info/filter_state.h"
 
 #include "absl/types/optional.h"
 

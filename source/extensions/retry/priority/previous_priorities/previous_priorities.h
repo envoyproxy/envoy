@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/upstream/retry.h"
+#include "include/envoy/upstream/retry.h"
 
 #include "common/upstream/load_balancer_impl.h"
 

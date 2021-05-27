@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/grpc/status.h"
+#include "include/envoy/grpc/status.h"
 
 namespace Envoy {
 namespace Grpc {

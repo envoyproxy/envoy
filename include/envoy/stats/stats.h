@@ -5,10 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/pure.h"
-#include "envoy/stats/refcount_ptr.h"
-#include "envoy/stats/symbol_table.h"
-#include "envoy/stats/tag.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/stats/refcount_ptr.h"
+#include "include/envoy/stats/symbol_table.h"
+#include "include/envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
 

@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "envoy/http/conn_pool.h"
+#include "include/envoy/http/conn_pool.h"
 
 #include "common/upstream/priority_conn_pool_map_impl.h"
 

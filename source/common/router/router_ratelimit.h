@@ -7,9 +7,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/ratelimit/ratelimit.h"
-#include "envoy/router/router.h"
-#include "envoy/router/router_ratelimit.h"
+#include "include/envoy/ratelimit/ratelimit.h"
+#include "include/envoy/router/router.h"
+#include "include/envoy/router/router_ratelimit.h"
 
 #include "common/config/metadata.h"
 #include "common/http/header_utility.h"

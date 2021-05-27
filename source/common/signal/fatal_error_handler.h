@@ -2,7 +2,7 @@
 
 #include <ostream>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 
 #include "common/signal/fatal_action.h"
 

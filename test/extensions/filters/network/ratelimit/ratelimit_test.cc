@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
-#include "envoy/stats/stats.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
 

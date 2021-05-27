@@ -6,10 +6,10 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "envoy/network/drain_decision.h"
-#include "envoy/network/filter.h"
-#include "envoy/stats/scope.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/network/drain_decision.h"
+#include "include/envoy/network/filter.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 

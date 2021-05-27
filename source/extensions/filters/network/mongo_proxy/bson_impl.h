@@ -4,8 +4,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/buffer/buffer.h"
-#include "envoy/common/exception.h"
+#include "include/envoy/buffer/buffer.h"
+#include "include/envoy/common/exception.h"
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"

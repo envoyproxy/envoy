@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/platform.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/file_event.h"
-#include "envoy/network/dns.h"
+#include "include/envoy/common/platform.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/event/file_event.h"
+#include "include/envoy/network/dns.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"

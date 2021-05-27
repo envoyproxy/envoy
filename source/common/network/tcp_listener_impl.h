@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/common/random_generator.h"
-#include "envoy/runtime/runtime.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/runtime/runtime.h"
 
 #include "common/common/interval_value.h"
 

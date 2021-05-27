@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/stats.h"
+#include "include/envoy/stats/histogram.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"

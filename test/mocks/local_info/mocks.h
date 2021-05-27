@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/local_info/local_info.h"
+#include "include/envoy/local_info/local_info.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/config/mocks.h"

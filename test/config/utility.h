@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/api.h"
+#include "include/envoy/api/api.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -15,7 +15,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
-#include "envoy/http/codes.h"
+#include "include/envoy/http/codes.h"
 
 #include "common/config/api_version.h"
 #include "common/network/address_impl.h"

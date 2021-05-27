@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"

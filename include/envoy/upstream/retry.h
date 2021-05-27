@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/config/typed_config.h"
-#include "envoy/upstream/types.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/config/typed_config.h"
+#include "include/envoy/upstream/types.h"
+#include "include/envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {

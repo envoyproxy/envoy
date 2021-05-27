@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {

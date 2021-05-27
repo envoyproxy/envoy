@@ -4,7 +4,7 @@
 #include <numeric>
 
 #include "envoy/annotations/deprecation.pb.h"
-#include "envoy/protobuf/message_validator.h"
+#include "include/envoy/protobuf/message_validator.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"

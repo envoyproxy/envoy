@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"

@@ -1,5 +1,5 @@
 #include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha/sni_dynamic_forward_proxy.pb.h"
-#include "envoy/network/connection.h"
+#include "include/envoy/network/connection.h"
 
 #include "extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
 #include "extensions/filters/network/well_known_names.h"

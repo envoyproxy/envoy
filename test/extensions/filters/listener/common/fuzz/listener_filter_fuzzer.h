@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/network/filter.h"
+#include "include/envoy/network/filter.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"

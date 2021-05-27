@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

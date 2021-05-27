@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/network/transport_socket.h"
+#include "include/envoy/network/transport_socket.h"
 
 #include "gmock/gmock.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/network/hash_policy.h"
+#include "include/envoy/network/hash_policy.h"
 #include "envoy/type/v3/hash_policy.pb.h"
 
 #include "common/common/hash.h"

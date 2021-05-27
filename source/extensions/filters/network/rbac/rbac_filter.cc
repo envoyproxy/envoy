@@ -1,8 +1,8 @@
 #include "extensions/filters/network/rbac/rbac_filter.h"
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
-#include "envoy/network/connection.h"
+#include "include/envoy/network/connection.h"
 
 #include "extensions/filters/network/well_known_names.h"
 

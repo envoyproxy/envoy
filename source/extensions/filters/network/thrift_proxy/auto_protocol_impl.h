@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/buffer/buffer.h"
+#include "include/envoy/buffer/buffer.h"
 
 #include "common/common/fmt.h"
 

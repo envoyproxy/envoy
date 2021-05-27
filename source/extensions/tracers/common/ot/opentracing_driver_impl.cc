@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"

@@ -5,14 +5,14 @@
 #include <list>
 #include <string>
 
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/sink.h"
-#include "envoy/stats/stats.h"
-#include "envoy/stats/stats_matcher.h"
-#include "envoy/stats/store.h"
-#include "envoy/stats/timespan.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/stats/histogram.h"
+#include "include/envoy/stats/sink.h"
+#include "include/envoy/stats/stats.h"
+#include "include/envoy/stats/stats_matcher.h"
+#include "include/envoy/stats/store.h"
+#include "include/envoy/stats/timespan.h"
+#include "include/envoy/thread_local/thread_local.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/redis_command_stats.h"

@@ -7,9 +7,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/pure.h"
-#include "envoy/stats/store.h"
-#include "envoy/thread_local/thread_local_object.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/stats/store.h"
+#include "include/envoy/thread_local/thread_local_object.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"

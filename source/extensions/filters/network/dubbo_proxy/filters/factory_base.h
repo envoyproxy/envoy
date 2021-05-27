@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 
 #include "common/protobuf/utility.h"
 

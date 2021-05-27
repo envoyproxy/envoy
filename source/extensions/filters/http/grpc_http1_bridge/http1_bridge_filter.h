@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/http/filter.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/grpc/context_impl.h"
 #include "common/runtime/runtime_features.h"

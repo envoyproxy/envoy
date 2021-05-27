@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/stats.h"
+#include "include/envoy/stats/stats.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"

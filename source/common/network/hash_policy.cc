@@ -1,6 +1,6 @@
 #include "common/network/hash_policy.h"
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 #include "envoy/type/v3/hash_policy.pb.h"
 
 #include "common/common/assert.h"

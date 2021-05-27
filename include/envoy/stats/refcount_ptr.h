@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 
 #include "common/common/assert.h"
 

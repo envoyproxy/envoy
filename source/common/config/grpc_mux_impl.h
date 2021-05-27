@@ -5,14 +5,14 @@
 #include <queue>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/common/random_generator.h"
-#include "envoy/common/time.h"
-#include "envoy/config/grpc_mux.h"
-#include "envoy/config/subscription.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/grpc/status.h"
+#include "include/envoy/common/random_generator.h"
+#include "include/envoy/common/time.h"
+#include "include/envoy/config/grpc_mux.h"
+#include "include/envoy/config/subscription.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"

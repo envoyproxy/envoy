@@ -8,9 +8,9 @@
 #include <vector>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/upstream/cluster_manager.h"
+#include "include/envoy/stats/stats_macros.h"
+#include "include/envoy/thread_local/thread_local.h"
+#include "include/envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"

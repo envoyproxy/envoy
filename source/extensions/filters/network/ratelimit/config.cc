@@ -5,7 +5,7 @@
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.validate.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"

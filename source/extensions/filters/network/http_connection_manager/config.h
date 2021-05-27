@@ -7,16 +7,16 @@
 #include <map>
 #include <string>
 
-#include "envoy/config/config_provider_manager.h"
+#include "include/envoy/config/config_provider_manager.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
-#include "envoy/filter/http/filter_config_provider.h"
-#include "envoy/http/filter.h"
-#include "envoy/http/original_ip_detection.h"
-#include "envoy/http/request_id_extension.h"
-#include "envoy/router/route_config_provider_manager.h"
-#include "envoy/tracing/http_tracer_manager.h"
+#include "include/envoy/filter/http/filter_config_provider.h"
+#include "include/envoy/http/filter.h"
+#include "include/envoy/http/original_ip_detection.h"
+#include "include/envoy/http/request_id_extension.h"
+#include "include/envoy/router/route_config_provider_manager.h"
+#include "include/envoy/tracing/http_tracer_manager.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_config.h"

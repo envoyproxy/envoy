@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <memory>
 
-#include "envoy/http/codes.h"
-#include "envoy/http/conn_pool.h"
-#include "envoy/upstream/thread_local_cluster.h"
+#include "include/envoy/http/codes.h"
+#include "include/envoy/http/conn_pool.h"
+#include "include/envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

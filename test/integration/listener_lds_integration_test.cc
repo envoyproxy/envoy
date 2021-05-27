@@ -5,7 +5,7 @@
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "envoy/network/connection.h"
+#include "include/envoy/network/connection.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"

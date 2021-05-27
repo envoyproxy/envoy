@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 // NOLINT(namespace-envoy)
 

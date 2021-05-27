@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/scope_tracker.h"
+#include "include/envoy/common/scope_tracker.h"
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 
 #include "common/http/message_impl.h"

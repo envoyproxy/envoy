@@ -1,7 +1,7 @@
 #include "common/common/regex.h"
 
-#include "envoy/common/exception.h"
-#include "envoy/runtime/runtime.h"
+#include "include/envoy/common/exception.h"
+#include "include/envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "common/common/assert.h"

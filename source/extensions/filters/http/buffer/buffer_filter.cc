@@ -1,8 +1,8 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
-#include "envoy/event/dispatcher.h"
+#include "include/envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
-#include "envoy/http/codes.h"
+#include "include/envoy/http/codes.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"

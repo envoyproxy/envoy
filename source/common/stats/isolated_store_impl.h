@@ -4,8 +4,8 @@
 #include <cstring>
 #include <string>
 
-#include "envoy/stats/stats.h"
-#include "envoy/stats/store.h"
+#include "include/envoy/stats/stats.h"
+#include "include/envoy/stats/store.h"
 
 #include "common/common/utility.h"
 #include "common/stats/allocator_impl.h"

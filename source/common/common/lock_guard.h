@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/thread/thread.h"
+#include "include/envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Thread {

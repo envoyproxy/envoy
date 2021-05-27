@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/http/codec.h"
-#include "envoy/registry/registry.h"
+#include "include/envoy/http/codec.h"
+#include "include/envoy/registry/registry.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

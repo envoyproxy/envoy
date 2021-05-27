@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/os_sys_calls.h"
+#include "include/envoy/api/os_sys_calls.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"

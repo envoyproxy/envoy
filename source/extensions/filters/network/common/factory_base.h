@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
-#include "envoy/server/transport_socket_config.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/server/filter_config.h"
+#include "include/envoy/server/transport_socket_config.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
 

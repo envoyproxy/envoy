@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/server/hot_restart.h"
+#include "include/envoy/server/hot_restart.h"
 
 #include "common/common/thread.h"
 #include "common/stats/allocator_impl.h"

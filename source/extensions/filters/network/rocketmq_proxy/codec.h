@@ -4,8 +4,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/platform.h"
-#include "envoy/network/filter.h"
+#include "include/envoy/common/platform.h"
+#include "include/envoy/network/filter.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/scope.h"
-#include "envoy/stats/timespan.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/timespan.h"
 
 #include "common/stats/symbol_table_impl.h"
 

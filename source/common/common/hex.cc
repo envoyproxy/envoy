@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
+#include "include/envoy/common/exception.h"
 
 #include "common/common/fmt.h"
 #include "common/common/utility.h"

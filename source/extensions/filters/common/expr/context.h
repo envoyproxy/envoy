@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/stream_info/stream_info.h"
+#include "include/envoy/stream_info/stream_info.h"
 
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"

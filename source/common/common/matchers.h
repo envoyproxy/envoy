@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/common/matchers.h"
-#include "envoy/common/regex.h"
+#include "include/envoy/common/matchers.h"
+#include "include/envoy/common/regex.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 #include "envoy/type/matcher/v3/number.pb.h"

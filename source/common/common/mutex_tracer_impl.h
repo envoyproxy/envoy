@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "envoy/common/mutex_tracer.h"
+#include "include/envoy/common/mutex_tracer.h"
 
 #include "common/common/thread_annotations.h"
 

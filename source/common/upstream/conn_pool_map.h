@@ -3,9 +3,9 @@
 #include <functional>
 #include <vector>
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/upstream/resource_manager.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/event/dispatcher.h"
+#include "include/envoy/upstream/resource_manager.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/common/debug_recursion_checker.h"
 

@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "envoy/stats/stats.h"
-#include "envoy/stats/symbol_table.h"
+#include "include/envoy/stats/stats.h"
+#include "include/envoy/stats/symbol_table.h"
 
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"

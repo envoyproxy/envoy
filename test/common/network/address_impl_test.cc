@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/exception.h"
-#include "envoy/common/platform.h"
+#include "include/envoy/common/exception.h"
+#include "include/envoy/common/platform.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/fmt.h"

@@ -1,6 +1,6 @@
 #include "extensions/transport_sockets/tls/ssl_handshaker.h"
 
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"

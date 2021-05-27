@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
-#include "envoy/network/filter.h"
-#include "envoy/network/listen_socket.h"
+#include "include/envoy/network/filter.h"
+#include "include/envoy/network/listen_socket.h"
 
 #include "absl/container/fixed_array.h"
 

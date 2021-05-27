@@ -6,7 +6,7 @@
 
 #include "test/common/quic/platform/quic_port_utils_impl.h"
 
-#include "envoy/network/address.h"
+#include "include/envoy/network/address.h"
 
 #include "common/common/assert.h"
 #include "common/network/utility.h"

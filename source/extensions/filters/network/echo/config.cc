@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/network/echo/v3/echo.pb.h"
 #include "envoy/extensions/filters/network/echo/v3/echo.pb.validate.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/echo/echo.h"

@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 
 #include "common/common/hex.h"
 

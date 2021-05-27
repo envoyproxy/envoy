@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
-#include "envoy/stats/stats.h"
+#include "include/envoy/stats/stats.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"

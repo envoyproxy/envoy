@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/upstreams/http/http/v3/http_connection_pool.pb.h"
-#include "envoy/registry/registry.h"
-#include "envoy/router/router.h"
+#include "include/envoy/registry/registry.h"
+#include "include/envoy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {

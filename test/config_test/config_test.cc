@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 

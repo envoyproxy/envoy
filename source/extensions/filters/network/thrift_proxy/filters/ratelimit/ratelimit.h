@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
-#include "envoy/ratelimit/ratelimit.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
+#include "include/envoy/ratelimit/ratelimit.h"
+#include "include/envoy/stats/scope.h"
+#include "include/envoy/stats/stats_macros.h"
 
 #include "common/stats/symbol_table_impl.h"
 

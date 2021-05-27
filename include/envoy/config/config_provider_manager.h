@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/config_provider.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/config/config_provider.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
 

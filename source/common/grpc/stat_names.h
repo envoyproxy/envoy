@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/grpc/status.h"
+#include "include/envoy/grpc/status.h"
 
 #include "common/stats/symbol_table_impl.h"
 

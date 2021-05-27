@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/upstream/upstream.h"
+#include "include/envoy/runtime/runtime.h"
+#include "include/envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"

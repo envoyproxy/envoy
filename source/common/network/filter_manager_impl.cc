@@ -2,7 +2,7 @@
 
 #include <list>
 
-#include "envoy/network/connection.h"
+#include "include/envoy/network/connection.h"
 
 #include "common/common/assert.h"
 

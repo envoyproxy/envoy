@@ -5,8 +5,8 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/common/pure.h"
-#include "envoy/common/time.h"
+#include "include/envoy/common/pure.h"
+#include "include/envoy/common/time.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 
 #include "absl/types/optional.h"

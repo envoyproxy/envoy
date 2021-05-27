@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/router/string_accessor.h"
+#include "include/envoy/router/string_accessor.h"
 
 namespace Envoy {
 namespace Router {

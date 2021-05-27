@@ -9,7 +9,7 @@
 #include <cstring>
 #include <string>
 
-#include "envoy/common/platform.h"
+#include "include/envoy/common/platform.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"

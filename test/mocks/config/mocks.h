@@ -1,11 +1,11 @@
 #pragma once
 
-#include "envoy/config/config_provider_manager.h"
+#include "include/envoy/config/config_provider_manager.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/config/grpc_mux.h"
-#include "envoy/config/subscription.h"
-#include "envoy/config/typed_config.h"
+#include "include/envoy/config/grpc_mux.h"
+#include "include/envoy/config/subscription.h"
+#include "include/envoy/config/typed_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/callback_impl.h"

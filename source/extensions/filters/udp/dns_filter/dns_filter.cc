@@ -1,6 +1,6 @@
 #include "extensions/filters/udp/dns_filter/dns_filter.h"
 
-#include "envoy/network/listener.h"
+#include "include/envoy/network/listener.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/config/datasource.h"

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.pb.h"
-#include "envoy/router/internal_redirect.h"
+#include "include/envoy/router/internal_redirect.h"
 
 #include "extensions/internal_redirect/safe_cross_scheme/safe_cross_scheme.h"
 #include "extensions/internal_redirect/well_known_names.h"

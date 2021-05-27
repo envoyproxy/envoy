@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/pure.h"
+#include "include/envoy/common/pure.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/protobuf/protobuf.h"

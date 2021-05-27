@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/grpc/context.h"
-#include "envoy/http/header_map.h"
+#include "include/envoy/grpc/context.h"
+#include "include/envoy/http/header_map.h"
 
 #include "common/common/hash.h"
 #include "common/grpc/stat_names.h"

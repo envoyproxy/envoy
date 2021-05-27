@@ -6,7 +6,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/stats/scope.h"
+#include "include/envoy/stats/scope.h"
 
 #include "common/config/utility.h"
 #include "common/filter/http/filter_config_discovery_impl.h"

@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "envoy/config/typed_config.h"
+#include "include/envoy/config/typed_config.h"
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/route.pb.h"
-#include "envoy/server/filter_config.h"
+#include "include/envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
