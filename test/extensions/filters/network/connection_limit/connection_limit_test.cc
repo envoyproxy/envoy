@@ -56,8 +56,10 @@ delay: 0.2s
 )EOF");
 
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onData(buffer, false));
   EXPECT_EQ(1, TestUtility::findGauge(stats_store_,
                                       "connection_limit.connection_limit_stats.active_connections")
                    ->value());
@@ -76,12 +78,15 @@ delay: 0s
 
   // First connection is OK.
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter1(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onData(buffer, false));
 
   // Second connection is OK.
   ActiveFilter active_filter2(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onData(buffer, false));
   EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
                                       "connection_limit.connection_limit_stats.active_connections")
                    ->value());
@@ -90,6 +95,7 @@ delay: 0s
   ActiveFilter active_filter3(config_);
   EXPECT_CALL(active_filter3.read_filter_callbacks_.connection_, close(_));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter3.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter3.filter_.onData(buffer, false));
   EXPECT_EQ(1, TestUtility::findCounter(
                    stats_store_, "connection_limit.connection_limit_stats.limited_connections")
                    ->value());
@@ -108,8 +114,10 @@ delay: 0.2s
 
   // First connection is OK.
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter1(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onData(buffer, false));
 
   // Second connection should be connection limited.
   ActiveFilter active_filter2(config_);
@@ -117,12 +125,14 @@ delay: 0.2s
       &active_filter2.read_filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(200), _));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onData(buffer, false));
   EXPECT_EQ(1, TestUtility::findCounter(
                    stats_store_, "connection_limit.connection_limit_stats.limited_connections")
                    ->value());
   EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
                                       "connection_limit.connection_limit_stats.active_connections")
                    ->value());
+  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
   delay_timer->invokeCallback();
   EXPECT_EQ(1, TestUtility::findGauge(stats_store_,
                                       "connection_limit.connection_limit_stats.active_connections")
@@ -142,14 +152,17 @@ runtime_enabled:
 
   // First connection is OK.
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter1(config_);
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(true));
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onData(buffer, false));
 
   // Second connection should be connection limited but won't be due to filter disable.
   ActiveFilter active_filter2(config_);
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onData(buffer, false));
   EXPECT_EQ(1, TestUtility::findGauge(stats_store_,
                                       "connection_limit.connection_limit_stats.active_connections")
                    ->value());

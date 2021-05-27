@@ -83,10 +83,11 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
 private:
+  void resetTimerState();
   const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  Event::TimerPtr delay_timer_;
-  bool is_rejected_;
+  Event::TimerPtr delay_timer_ = nullptr;
+  bool is_rejected_ = false;
 };
 
 } // namespace ConnectionLimitFilter

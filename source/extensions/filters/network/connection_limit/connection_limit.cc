@@ -48,6 +48,13 @@ bool Config::decrementConnection() {
   return false;
 }
 
+void Filter::resetTimerState() {
+  if (delay_timer_) {
+    delay_timer_->disableTimer();
+    delay_timer_.reset();
+  }
+}
+
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
   if (is_rejected_) {
     return Network::FilterStatus::StopIteration;
@@ -77,6 +84,7 @@ Network::FilterStatus Filter::onNewConnection() {
     absl::optional<std::chrono::milliseconds> duration = config_->delay();
     if (duration.has_value() && duration.value() > std::chrono::milliseconds(0)) {
       delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
+        resetTimerState();
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       });
       delay_timer_->enableTimer(duration.value());
@@ -92,6 +100,7 @@ Network::FilterStatus Filter::onNewConnection() {
 void Filter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    resetTimerState();
     if (config_->decrementConnection()) {
       config_->stats().active_connections_.dec();
     }
