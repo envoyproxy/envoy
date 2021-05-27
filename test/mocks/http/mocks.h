@@ -275,7 +275,7 @@ public:
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
-  testing::NiceMock<MockScopedTrackedObject> scope_;
+  testing::NiceMock<MockScopeTrackedObject> scope_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
@@ -327,7 +327,7 @@ public:
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
-  testing::NiceMock<MockScopedTrackedObject> scope_;
+  testing::NiceMock<MockScopeTrackedObject> scope_;
 };
 
 class MockStreamDecoderFilter : public StreamDecoderFilter {
