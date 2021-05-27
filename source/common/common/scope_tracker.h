@@ -15,7 +15,7 @@ namespace Envoy {
 // registered.
 class ScopeTrackerScopeState {
 public:
-  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::Dispatcher& dispatcher)
+  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::ScopeTracker& tracker)
       : registered_object_(object), tracker_(tracker) {
     tracker_.pushTrackedObject(registered_object_);
   }
