@@ -221,8 +221,14 @@ message CommonTlsContext {
 
   // Configs for fetching TLS certificates via SDS API. Note SDS API allows certificates to be
   // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
+  //
+  // The same number and types of certificates as :ref:`tls_certificates <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificates>`
+  // are valid in the the certificates fetched through this setting.
+  //
+  // If :ref:`tls_certificates <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificates>`
+  // is non-empty, this field is ignored.
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-      [(validate.rules).repeated = {max_items: 1}];
+      [(validate.rules).repeated = {max_items: 2}];
 
   // Certificate provider for fetching TLS certificates.
   // [#not-implemented-hide:]

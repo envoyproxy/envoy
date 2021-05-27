@@ -198,6 +198,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
+  bool shouldStripTrailingHostDot() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -209,6 +210,10 @@ public:
       pathWithEscapedSlashesAction() const override {
     return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         KEEP_UNCHANGED;
+  }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return ip_detection_extensions_;
   }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
@@ -255,6 +260,7 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks

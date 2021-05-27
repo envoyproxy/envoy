@@ -30,7 +30,7 @@
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
 using Envoy::ProtobufUtil::Status;
-using Envoy::ProtobufUtil::error::Code;
+using Envoy::ProtobufUtil::StatusCode;
 using google::api::HttpRule;
 using google::grpc::transcoding::JsonRequestTranslator;
 using JsonRequestTranslatorPtr = std::unique_ptr<JsonRequestTranslator>;
@@ -259,7 +259,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
   const ProtobufWkt::Type* message_type =
       type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
   if (message_type == nullptr) {
-    return ProtobufUtil::Status(Code::NOT_FOUND,
+    return ProtobufUtil::Status(StatusCode::kNotFound,
                                 "Could not resolve type: " + descriptor->full_name());
   }
 
@@ -277,7 +277,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
     *is_http_body = body_type != nullptr &&
                     body_type->name() == google::api::HttpBody::descriptor()->full_name();
   }
-  return Status::OK;
+  return Status();
 }
 
 Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
@@ -302,12 +302,12 @@ Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* 
 
   if (!method_info->response_body_field_path.empty() && !method_info->response_type_is_http_body_) {
     // TODO(euroelessar): Implement https://github.com/envoyproxy/envoy/issues/11136.
-    return Status(Code::UNIMPLEMENTED,
+    return Status(StatusCode::kUnimplemented,
                   "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
                       descriptor->full_name());
   }
 
-  return Status::OK;
+  return Status();
 }
 
 bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
@@ -337,7 +337,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
   if (!method_info) {
-    return ProtobufUtil::Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method.");
+    return ProtobufUtil::Status(StatusCode::kNotFound,
+                                "Could not resolve " + path + " to a method.");
   }
 
   auto status = methodToRequestInfo(method_info, &request_info);
@@ -400,7 +401,7 @@ JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
     ENVOY_LOG(debug, "Cannot resolve input-type: {}", request_type_full_name);
-    return ProtobufUtil::Status(Code::NOT_FOUND,
+    return ProtobufUtil::Status(StatusCode::kNotFound,
                                 "Could not resolve type: " + request_type_full_name);
   }
 
@@ -446,16 +447,16 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   const auto status =
       per_route_config_->createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
   if (!status.ok()) {
-    ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.error_message());
+    ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.message());
 
-    if (status.code() == Code::NOT_FOUND &&
+    if (status.code() == StatusCode::kNotFound &&
         !config_.request_validation_options_.reject_unknown_method()) {
       ENVOY_LOG(debug, "Request is passed through without transcoding because it cannot be mapped "
                        "to a gRPC method.");
       return Http::FilterHeadersStatus::Continue;
     }
 
-    if (status.code() == Code::INVALID_ARGUMENT &&
+    if (status.code() == StatusCode::kInvalidArgument &&
         !config_.request_validation_options_.reject_unknown_query_parameters()) {
       ENVOY_LOG(debug, "Request is passed through without transcoding because it contains unknown "
                        "query parameters.");
@@ -469,11 +470,10 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 
     ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
     error_ = true;
-    decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(http_code),
-                                       status.error_message().ToString(), nullptr, absl::nullopt,
-                                       absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
-                                                    MessageUtil::CodeEnumToString(status.code()),
-                                                    "}"));
+    decoder_callbacks_->sendLocalReply(
+        static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, absl::nullopt,
+        absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
+                     MessageUtil::codeEnumToString(status.code()), "}"));
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -751,10 +751,9 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
     error_ = true;
     decoder_callbacks_->sendLocalReply(
         Http::Code::BadRequest,
-        absl::string_view(request_status.error_message().data(),
-                          request_status.error_message().size()),
+        absl::string_view(request_status.message().data(), request_status.message().size()),
         nullptr, absl::nullopt,
-        absl::StrCat(details, "{", MessageUtil::CodeEnumToString(request_status.code()), "}"));
+        absl::StrCat(details, "{", MessageUtil::codeEnumToString(request_status.code()), "}"));
 
     return true;
   }

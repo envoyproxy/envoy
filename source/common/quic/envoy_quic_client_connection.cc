@@ -10,8 +10,6 @@
 #include "common/quic/envoy_quic_packet_writer.h"
 #include "common/quic/envoy_quic_utils.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Quic {
 
@@ -121,7 +119,10 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connectionSocket()->ioHandle(), *connectionSocket()->addressProvider().localAddress(),
         *this, dispatcher_.timeSource(), true, packets_dropped_);
-    // TODO(danzh): Handle no error when we limit the number of packets read.
+    if (err == nullptr) {
+      connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+      return;
+    }
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
                      err->getErrorDetails());

@@ -24,6 +24,27 @@ protected:
   NiceMock<MockLoader> runtime_;
 };
 
+TEST_F(RuntimeProtosTest, UInt32Test) {
+  envoy::config::core::v3::RuntimeUInt32 uint32_proto;
+  std::string yaml(R"EOF(
+runtime_key: "foo.bar"
+default_value: 99
+)EOF");
+  TestUtility::loadFromYamlAndValidate(yaml, uint32_proto);
+  UInt32 test_uint32(uint32_proto, runtime_);
+
+  EXPECT_EQ("foo.bar", test_uint32.runtimeKey());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("foo.bar", 99));
+  EXPECT_EQ(99, test_uint32.value());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("foo.bar", 99)).WillOnce(Return(1024));
+  EXPECT_EQ(1024, test_uint32.value());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("foo.bar", 99)).WillOnce(Return(1ull << 33));
+  EXPECT_EQ(99, test_uint32.value());
+}
+
 TEST_F(RuntimeProtosTest, PercentBasicTest) {
   envoy::config::core::v3::RuntimePercent percent_proto;
   std::string yaml(R"EOF(

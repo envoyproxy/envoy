@@ -1,9 +1,12 @@
 #include "common/http/filter_manager.h"
 
+#include <functional>
+
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracked_object_stack.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -51,6 +54,14 @@ void ActiveStreamFilterBase::commonContinue() {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
     return;
+  }
+
+  // Set ScopeTrackerScopeState if there's no existing crash context.
+  ScopeTrackedObjectStack encapsulated_object;
+  absl::optional<ScopeTrackerScopeState> state;
+  if (parent_.dispatcher_.trackedObjectStackIsEmpty()) {
+    restoreContextOnContinue(encapsulated_object);
+    state.emplace(&encapsulated_object, parent_.dispatcher_);
   }
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
@@ -230,6 +241,11 @@ const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
 }
 
+void ActiveStreamFilterBase::restoreContextOnContinue(
+    ScopeTrackedObjectStack& tracked_object_stack) {
+  parent_.contextOnContinue(tracked_object_stack);
+}
+
 Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
@@ -366,7 +382,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details);
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
@@ -529,6 +545,12 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       (*entry)->handle_->decodeComplete();
     }
 
+    // Skip processing metadata after sending local reply
+    if (state_.local_complete_ && std::next(entry) != decoder_filters_.end()) {
+      maybeContinueDecoding(continue_data_entry);
+      return;
+    }
+
     const bool new_metadata_added = processNewlyAddedMetadata();
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
@@ -542,8 +564,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    if ((!continue_iteration || state_.local_complete_) &&
-        std::next(entry) != decoder_filters_.end()) {
+    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
@@ -831,9 +852,8 @@ void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = false;
 }
 
-// TODO(alyssawilk) update sendLocalReply interface.
 void FilterManager::sendLocalReply(
-    bool, Code code, absl::string_view body,
+    Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ASSERT(!state_.under_on_local_reply_);
@@ -1301,6 +1321,11 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
   }
 }
 
+void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
+  tracked_object_stack.add(connection_);
+  tracked_object_stack.add(filter_manager_callbacks_.scope());
+}
+
 bool FilterManager::createFilterChain() {
   if (state_.created_filter_chain_) {
     return false;
@@ -1522,8 +1547,7 @@ void ActiveStreamEncoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.sendLocalReply(parent_.state_.is_grpc_request_, code, body, modify_headers, grpc_status,
-                         details);
+  parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
@@ -1541,8 +1565,6 @@ void ActiveStreamEncoderFilter::responseDataTooLarge() {
     // In this case, sendLocalReply will either send a response directly to the encoder, or
     // reset the stream.
     parent_.sendLocalReply(
-        parent_.filter_manager_callbacks_.requestHeaders() &&
-            Grpc::Common::isGrpcRequestHeaders(*parent_.filter_manager_callbacks_.requestHeaders()),
         Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
         nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }
