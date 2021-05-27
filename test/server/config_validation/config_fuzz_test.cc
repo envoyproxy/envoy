@@ -41,8 +41,9 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   options.log_level_ = Fuzz::Runner::logLevel();
 
   try {
-    validateConfig(options, Network::Address::InstanceConstSharedPtr(), component_factory,
-                   Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+    validateConfig(options, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                   component_factory, Thread::threadFactoryForTest(),
+                   Filesystem::fileSystemForTest());
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
   }

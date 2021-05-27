@@ -1152,6 +1152,59 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
   EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
+// Validated that by default we don't remove host's trailing dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(false, config.shouldStripTrailingHostDot());
+}
+
+// Validated that when configured, we remove host's trailing dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_trailing_host_dot: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(true, config.shouldStripTrailingHostDot());
+}
+
+// Validated that when explicitly set false, then we don't remove trailing host dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_trailing_host_dot: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(false, config.shouldStripTrailingHostDot());
+}
+
 // Validated that by default we allow requests with header names containing underscores.
 TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
   const std::string yaml_string = R"EOF(

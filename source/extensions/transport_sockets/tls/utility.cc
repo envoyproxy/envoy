@@ -14,6 +14,31 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+#if BORINGSSL_API_VERSION < 10
+static constexpr absl::string_view SSL_ERROR_NONE_MESSAGE = "NONE";
+static constexpr absl::string_view SSL_ERROR_SSL_MESSAGE = "SSL";
+static constexpr absl::string_view SSL_ERROR_WANT_READ_MESSAGE = "WANT_READ";
+static constexpr absl::string_view SSL_ERROR_WANT_WRITE_MESSAGE = "WANT_WRITE";
+static constexpr absl::string_view SSL_ERROR_WANT_X509_LOOPUP_MESSAGE = "WANT_X509_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_SYSCALL_MESSAGE = "SYSCALL";
+static constexpr absl::string_view SSL_ERROR_ZERO_RETURN_MESSAGE = "ZERO_RETURN";
+static constexpr absl::string_view SSL_ERROR_WANT_CONNECT_MESSAGE = "WANT_CONNECT";
+static constexpr absl::string_view SSL_ERROR_WANT_ACCEPT_MESSAGE = "WANT_ACCEPT";
+static constexpr absl::string_view SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE =
+    "WANT_CHANNEL_ID_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_PENDING_SESSION_MESSAGE = "PENDING_SESSION";
+static constexpr absl::string_view SSL_ERROR_PENDING_CERTIFICATE_MESSAGE = "PENDING_CERTIFICATE";
+static constexpr absl::string_view SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE =
+    "WANT_PRIVATE_KEY_OPERATION";
+static constexpr absl::string_view SSL_ERROR_PENDING_TICKET_MESSAGE = "PENDING_TICKET";
+static constexpr absl::string_view SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE = "EARLY_DATA_REJECTED";
+static constexpr absl::string_view SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE =
+    "WANT_CERTIFICATE_VERIFY";
+static constexpr absl::string_view SSL_ERROR_HANDOFF_MESSAGE = "HANDOFF";
+static constexpr absl::string_view SSL_ERROR_HANDBACK_MESSAGE = "HANDBACK";
+#endif
+static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
+
 Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const std::string& path,
                                                               TimeSource& time_source) {
   Envoy::Ssl::CertificateDetailsPtr certificate_details =
@@ -255,6 +280,9 @@ absl::optional<std::string> Utility::getLastCryptoError() {
 }
 
 absl::string_view Utility::getErrorDescription(int err) {
+#if BORINGSSL_API_VERSION < 10
+  // TODO(davidben): Remove this and the corresponding SSL_ERROR_*_MESSAGE constants when the FIPS
+  // build is updated to a later version.
   switch (err) {
   case SSL_ERROR_NONE:
     return SSL_ERROR_NONE_MESSAGE;
@@ -292,10 +320,15 @@ absl::string_view Utility::getErrorDescription(int err) {
     return SSL_ERROR_HANDOFF_MESSAGE;
   case SSL_ERROR_HANDBACK:
     return SSL_ERROR_HANDBACK_MESSAGE;
-  default:
-    ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
-    return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
   }
+#else
+  const char* description = SSL_error_description(err);
+  if (description) {
+    return description;
+  }
+#endif
+  ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
+  return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
 }
 
 } // namespace Tls
