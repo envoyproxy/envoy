@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
-using testing::_;
 using testing::Ref;
 using testing::Return;
 

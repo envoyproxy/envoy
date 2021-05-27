@@ -7,19 +7,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 py_binary(
-    name = "generate_extension_db",
-    srcs = ["generate_extension_db.py"],
+    name = "validate_extensions",
+    srcs = ["validate_extensions.py"],
     data = [
         "@com_github_bazelbuild_buildtools//buildozer:buildozer",
+        "//source/extensions:extensions_metadata.yaml",
     ] + envoy_all_extensions(),
-    python_version = "PY3",
-    srcs_version = "PY3",
-    visibility = ["//visibility:public"],
 )
 
 py_binary(
     name = "generate_extension_rst",
     srcs = ["generate_extension_rst.py"],
-    data = [":generate_extension_db"],
-    visibility = ["//visibility:public"],
+    data = ["//source/extensions:extensions_metadata.yaml"],
 )

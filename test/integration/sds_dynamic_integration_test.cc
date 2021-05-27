@@ -83,13 +83,11 @@ class SdsDynamicIntegrationBaseTest : public Grpc::BaseGrpcClientIntegrationPara
 public:
   SdsDynamicIntegrationBaseTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam().ip_version),
-        server_cert_("server_cert"), validation_secret_("validation_secret"),
-        client_cert_("client_cert"), test_quic_(GetParam().test_quic) {}
+        test_quic_(GetParam().test_quic) {}
 
   SdsDynamicIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
                                 Network::Address::IpVersion version, const std::string& config)
-      : HttpIntegrationTest(downstream_protocol, version, config), server_cert_("server_cert"),
-        validation_secret_("validation_secret"), client_cert_("client_cert"),
+      : HttpIntegrationTest(downstream_protocol, version, config),
         test_quic_(GetParam().test_quic) {}
 
   Network::Address::IpVersion ipVersion() const override { return GetParam().ip_version; }
@@ -116,9 +114,9 @@ protected:
     setGrpcService(*grpc_service, "sds_cluster", fake_upstreams_.back()->localAddress());
   }
 
-  envoy::extensions::transport_sockets::tls::v3::Secret getServerSecret() {
+  envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name(server_cert_);
+    secret.set_name(server_cert_rsa_);
     auto* tls_certificate = secret.mutable_tls_certificate();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
@@ -181,9 +179,10 @@ protected:
     }
   }
 
-  const std::string server_cert_;
-  const std::string validation_secret_;
-  const std::string client_cert_;
+  const std::string server_cert_rsa_{"server_cert_rsa"};
+  const std::string server_cert_ecdsa_{"server_cert_ecdsa"};
+  const std::string validation_secret_{"validation_secret"};
+  const std::string client_cert_{"client_cert"};
   bool v3_resource_api_{false};
   bool test_quic_;
 };
@@ -232,8 +231,40 @@ public:
     validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
     // Modify the listener ssl cert to use SDS from sds_cluster
-    auto* secret_config = common_tls_context.add_tls_certificate_sds_secret_configs();
-    setUpSdsConfig(secret_config, "server_cert");
+    auto* secret_config_rsa = common_tls_context.add_tls_certificate_sds_secret_configs();
+    setUpSdsConfig(secret_config_rsa, server_cert_rsa_);
+
+    // Add an additional SDS config for an EC cert (the base test has SDS config for an RSA cert).
+    // This is done via the filesystem instead of gRPC to simplify the test setup.
+    if (dual_cert_) {
+      auto* secret_config_ecdsa = common_tls_context.add_tls_certificate_sds_secret_configs();
+
+      secret_config_ecdsa->set_name(server_cert_ecdsa_);
+      auto* config_source = secret_config_ecdsa->mutable_sds_config();
+      constexpr absl::string_view sds_template =
+          R"EOF(
+---
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "{}"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF";
+
+      const std::string sds_content = fmt::format(
+          sds_template, server_cert_ecdsa_,
+          TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsacert.pem"),
+          TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsakey.pem"));
+
+      auto sds_path =
+          TestEnvironment::writeStringToFileForTest("server_cert_ecdsa.sds.yaml", sds_content);
+      config_source->set_path(sds_path);
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    }
   }
 
   void createUpstreams() override {
@@ -281,6 +312,7 @@ public:
 
 protected:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
+  bool dual_cert_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
@@ -290,7 +322,7 @@ class SdsDynamicKeyRotationIntegrationTest : public SdsDynamicDownstreamIntegrat
 protected:
   envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerSecret() {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name(server_cert_);
+    secret.set_name(server_cert_rsa_);
     auto* tls_certificate = secret.mutable_tls_certificate();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::temporaryPath("root/current/servercert.pem"));
@@ -333,8 +365,8 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
                               TestEnvironment::temporaryPath("root/current"));
   waitForSdsUpdateStats(2);
   // The rotation is not a SDS attempt, so no change to these stats.
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   // First request with server_ecdsa{cert,key}.pem.
   testRouterHeaderOnlyRequestAndResponse(&creator);
@@ -365,11 +397,11 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
   // Rotate to an empty directory, this should fail.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/empty"),
                               TestEnvironment::temporaryPath("root/current"));
-  test_server_->waitForCounterEq("sds.server_cert.key_rotation_failed", 1);
+  test_server_->waitForCounterEq("sds.server_cert_rsa.key_rotation_failed", 1);
   waitForSdsUpdateStats(1);
   // The rotation is not a SDS attempt, so no change to these stats.
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   // Requests continue to work with key/cert pair.
   testRouterHeaderOnlyRequestAndResponse(&creator);
@@ -380,7 +412,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
 TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
-    sendSdsResponse(getServerSecret());
+    sendSdsResponse(getServerSecretRsa());
   };
   initialize();
 
@@ -390,8 +422,54 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
   testRouterHeaderOnlyRequestAndResponse(&creator);
 
   // Success
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+}
+
+TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getServerSecretRsa());
+  };
+
+  dual_cert_ = true;
+  initialize();
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions()
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"}),
+      context_manager_, *api_);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  cleanupUpstreamAndDownstream();
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions()
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
+      context_manager_, *api_);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_ecdsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_ecdsa.update_rejected")->value());
+
+  // QUIC ignores the `setTlsVersion` set above and always uses TLS 1.3, and TLS 1.3 ignores the
+  // `setCipherSuites`, so in the QUIC config, this test only uses one of the certs.
+  if (!test_quic_) {
+    EXPECT_EQ(1,
+              test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
+                  ->value());
+    EXPECT_EQ(1,
+              test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-ECDSA-AES128-GCM-SHA256"))
+                  ->value());
+  }
 }
 
 // A test that SDS server send a bad secret for a static listener,
@@ -400,7 +478,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
 TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
-    sendSdsResponse(getWrongSecret(server_cert_));
+    sendSdsResponse(getWrongSecret(server_cert_rsa_));
   };
   initialize();
 
@@ -410,10 +488,10 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
 
   // Failure
-  EXPECT_EQ(0, test_server_->counter("sds.server_cert.update_success")->value());
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_rejected")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
-  sendSdsResponse(getServerSecret());
+  sendSdsResponse(getServerSecretRsa());
 
   // Wait for sds update counter.
   waitForSdsUpdateStats(1);
@@ -424,8 +502,8 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   testRouterHeaderOnlyRequestAndResponse(&creator);
 
   // Success
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_success")->value());
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 }
 
 class SdsDynamicDownstreamCertValidationContextTest : public SdsDynamicDownstreamIntegrationTest {

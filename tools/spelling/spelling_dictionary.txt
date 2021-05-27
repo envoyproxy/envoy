@@ -35,6 +35,7 @@ HEXDIGIT
 LRU
 OWS
 Preconnecting
+RCVBUF
 RTCP
 RTP
 STATNAME
@@ -444,6 +445,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
