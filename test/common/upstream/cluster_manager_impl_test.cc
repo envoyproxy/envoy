@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/resolver_impl.h"
 #include "common/router/context_impl.h"
 
 #include "extensions/transport_sockets/raw_buffer/config.h"
@@ -154,6 +155,10 @@ public:
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
 };
+
+MATCHER_P(CustomDnsResolversSizeEquals, expectedResolvers, "") {
+  return expectedResolvers.size() == arg.size();
+}
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
   const std::string yaml = R"EOF(
@@ -1991,10 +1996,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
       connect_timeout: 0.250s
       type: STRICT_DNS
       lb_policy: ROUND_ROBIN
-      dns_resolvers:
-        - socket_address:
-            address: 1.2.3.4
-            port_value: 80
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -2136,10 +2142,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
     - name: cluster_1
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
       lb_policy: ROUND_ROBIN
       load_assignment:
         cluster_name: cluster_1
@@ -2374,13 +2381,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 }
 
 // Test that default DNS resolver with TCP lookups is used, when there are no DNS custom resolvers
-// configured per cluster and `use_tcp_for_dns_lookups` is set in bootstrap config.
+// configured per cluster and `dns_resolver_options.use_tcp_for_dns_lookups` is set in bootstrap
+// config.
 TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   const std::string yaml = R"EOF(
-  use_tcp_for_dns_lookups: true
-  dns_resolver_options:
-    use_tcp_for_dns_lookups: true
-    no_default_search_domain: true
+  dns_resolution_config:
+    dns_resolver_options:
+      use_tcp_for_dns_lookups: true
+      no_default_search_domain: true
   static_resources:
     clusters:
     - name: cluster_1
@@ -2401,9 +2409,9 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   factory_.tls_.shutdownThread();
 }
 
-// Test that custom DNS resolver with UDP lookups is used, when custom resolver is configured
-// per cluster and `use_tcp_for_dns_lookups` is not specified.
-TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
+// Test that custom DNS resolver is used, when custom resolver is configured
+// per cluster and deprecated field `dns_resolvers` is specified.
+TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -2414,6 +2422,79 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
       - socket_address:
           address: 1.2.3.4
           port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  auto resolvers = envoy::config::core::v3::Address();
+  resolvers.mutable_socket_address()->set_address("1.2.3.4");
+  resolvers.mutable_socket_address()->set_port_value(80);
+  std::vector<Network::Address::InstanceConstSharedPtr> expectedDnsResolvers;
+  expectedDnsResolvers.push_back(Network::Address::resolveProtoAddress(resolvers));
+
+  // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
+  // config, the method `createDnsResolver` is called once.
+  EXPECT_CALL(factory_.dispatcher_,
+              createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolvers), _))
+      .WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver is used, when custom resolver is configured per cluster.
+TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  auto resolvers = envoy::config::core::v3::Address();
+  resolvers.mutable_socket_address()->set_address("1.2.3.4");
+  resolvers.mutable_socket_address()->set_port_value(80);
+  std::vector<Network::Address::InstanceConstSharedPtr> expectedDnsResolvers;
+  expectedDnsResolvers.push_back(Network::Address::resolveProtoAddress(resolvers));
+
+  // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
+  // config, the method `createDnsResolver` is called once.
+  EXPECT_CALL(factory_.dispatcher_,
+              createDnsResolver(CustomDnsResolversSizeEquals(expectedDnsResolvers), _))
+      .WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV3Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver with UDP lookups is used, when custom resolver is configured
+// per cluster and `use_tcp_for_dns_lookups` is not specified.
+TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2464,21 +2545,22 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolverViaDeprecatedField) {
 
 // Test that custom DNS resolver with UDP lookups is used, when custom resolver is configured
 // per cluster and `use_tcp_for_dns_lookups` is specified as true but is overridden
-// by dns_resolver_options.use_tcp_for_dns_lookups which is set as false.
+// by dns_resolution_config.dns_resolver_options.use_tcp_for_dns_lookups which is set as false.
 TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolverDeprecatedFieldOverridden) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
     - name: cluster_1
       use_tcp_for_dns_lookups: true
-      dns_resolver_options:
-        use_tcp_for_dns_lookups: false
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        dns_resolver_options:
+          use_tcp_for_dns_lookups: false
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2498,21 +2580,22 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolverDeprecatedFieldOverrid
 
 // Test that custom DNS resolver with TCP lookups is used, when custom resolver is configured
 // per cluster and `use_tcp_for_dns_lookups` is specified as false but is overridden
-// by dns_resolver_options.use_tcp_for_dns_lookups which is specified as true.
+// by dns_resolution_config.dns_resolver_options.use_tcp_for_dns_lookups which is specified as true.
 TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolverDeprecatedFieldOverridden) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
     - name: cluster_1
       use_tcp_for_dns_lookups: false
-      dns_resolver_options:
-        use_tcp_for_dns_lookups: true
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        dns_resolver_options:
+          use_tcp_for_dns_lookups: true
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2531,20 +2614,22 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolverDeprecatedFieldOverrid
 }
 
 // Test that custom DNS resolver with TCP lookups is used, when custom resolver is configured
-// per cluster and `dns_resolver_options.use_tcp_for_dns_lookups` is enabled for that cluster.
+// per cluster and `dns_resolution_config.dns_resolver_options.use_tcp_for_dns_lookups` is enabled
+// for that cluster.
 TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
     - name: cluster_1
-      dns_resolver_options:
-        use_tcp_for_dns_lookups: true
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        dns_resolver_options:
+          use_tcp_for_dns_lookups: true
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2571,10 +2656,11 @@ TEST_F(ClusterManagerImplTest, DefaultSearchDomainWithCustomDnsResolver) {
     - name: cluster_1
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2599,14 +2685,15 @@ TEST_F(ClusterManagerImplTest, DefaultSearchDomainWithCustomDnsResolverWithConfi
   static_resources:
     clusters:
     - name: cluster_1
-      dns_resolver_options:
-        no_default_search_domain: false
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        dns_resolver_options:
+          no_default_search_domain: false
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2631,14 +2718,15 @@ TEST_F(ClusterManagerImplTest, NoDefaultSearchDomainWithCustomDnsResolver) {
   static_resources:
     clusters:
     - name: cluster_1
-      dns_resolver_options:
-        no_default_search_domain: true
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        dns_resolver_options:
+          no_default_search_domain: true
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -2667,10 +2755,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
     - name: cluster_1
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
       lb_policy: ROUND_ROBIN
       load_assignment:
         cluster_name: cluster_1
@@ -2753,10 +2842,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
     - name: cluster_1
       connect_timeout: 0.250s
       type: STRICT_DNS
-      dns_resolvers:
-      - socket_address:
-          address: 1.2.3.4
-          port_value: 80
+      dns_resolution_config:
+        resolvers:
+          - socket_address:
+              address: 1.2.3.4
+              port_value: 80
       lb_policy: ROUND_ROBIN
       load_assignment:
         cluster_name: cluster_1

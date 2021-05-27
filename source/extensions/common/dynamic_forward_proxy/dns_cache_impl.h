@@ -176,7 +176,7 @@ private:
 
   Event::Dispatcher& main_thread_dispatcher_;
   const Network::DnsLookupFamily dns_lookup_family_;
-  Network::DnsResolverSharedPtr resolver_;
+  const Network::DnsResolverSharedPtr resolver_;
   ThreadLocal::TypedSlot<ThreadLocalHostInfo> tls_slot_;
   Stats::ScopePtr scope_;
   DnsCacheStats stats_;

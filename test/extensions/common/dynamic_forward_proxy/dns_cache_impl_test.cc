@@ -740,7 +740,9 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSetDeprecatedField) {
 
 TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSet) {
   initialize();
-  config_.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
+  config_.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
+      ->set_use_tcp_for_dns_lookups(true);
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
   EXPECT_CALL(dispatcher_, createDnsResolver(_, _))
       .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(resolver_)));
@@ -751,7 +753,9 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSet) {
 
 TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
   initialize();
-  config_.mutable_dns_resolver_options()->set_no_default_search_domain(true);
+  config_.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
+      ->set_no_default_search_domain(true);
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
   EXPECT_CALL(dispatcher_, createDnsResolver(_, _))
       .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(resolver_)));
@@ -812,7 +816,7 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
                             "config specified DNS cache 'foo' with different settings");
 }
 
-TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolverConfig) {
+TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -827,7 +831,7 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolverConfig) {
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
-TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolverConfig) {
+TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -836,7 +840,8 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolverConfig) {
   Stats::IsolatedStoreImpl store;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
-  envoy::config::core::v3::Address* dns_resolvers = config.mutable_dns_resolver()->add_resolvers();
+  envoy::config::core::v3::Address* dns_resolvers =
+      config.mutable_dns_resolution_config()->add_resolvers();
   dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
   dns_resolvers->mutable_socket_address()->set_port_value(8080);
 

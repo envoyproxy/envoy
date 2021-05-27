@@ -8,6 +8,7 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/resolver.pb.h"
 #include "envoy/config/core/v3/udp_socket_config.pb.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/file_event.h"

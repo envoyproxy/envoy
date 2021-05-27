@@ -463,18 +463,3 @@ message ControlPlane {
   // the Envoy is connected to.
   string identifier = 1;
 }
-
-// Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
-message DnsResolverOptions {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.core.v3.DnsResolverOptions";
-
-  // Use TCP for all DNS queries instead of the default protocol UDP.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple's API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 1;
-
-  // Do not use the default search domains; only query hostnames as-is or as aliases.
-  bool no_default_search_domain = 2;
-}

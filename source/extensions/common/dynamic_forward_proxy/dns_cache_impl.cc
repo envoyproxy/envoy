@@ -21,7 +21,8 @@ DnsCacheImpl::DnsCacheImpl(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      tls_slot_(tls), scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
+      resolver_(selectDnsResolver(config, main_thread_dispatcher)), tls_slot_(tls),
+      scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, loader, config.name(), config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
@@ -31,15 +32,6 @@ DnsCacheImpl::DnsCacheImpl(
               config, refresh_interval_.count(), random)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  if (config.has_dns_resolver_options()) {
-    dns_resolver_options.CopyFrom(config.dns_resolver_options());
-  } else {
-    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
-    // utilize config.use_tcp_for_dns_lookups() if `config.dns_resolver_options` is not set.
-    dns_resolver_options.set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
-  }
-  resolver_ = main_thread_dispatcher.createDnsResolver({}, dns_resolver_options);
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
 }
 
@@ -58,17 +50,24 @@ DnsCacheImpl::~DnsCacheImpl() {
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Event::Dispatcher& main_thread_dispatcher) {
-  if (config.has_dns_resolver()) {
-    const auto& resolver_addrs = config.dns_resolver().resolvers();
-    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-    resolvers.reserve(resolver_addrs.size());
-    for (const auto& resolver_addr : resolver_addrs) {
-      resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+  if (config.has_dns_resolution_config()) {
+    dns_resolver_options.CopyFrom(config.dns_resolution_config().dns_resolver_options());
+    if (!config.dns_resolution_config().resolvers().empty()) {
+      const auto& resolver_addrs = config.dns_resolution_config().resolvers();
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
     }
-    return main_thread_dispatcher.createDnsResolver(resolvers, config.use_tcp_for_dns_lookups());
+  } else {
+    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
+    // compatible utilize config.use_tcp_for_dns_lookups() if `config.dns_resolution_config`
+    // is not set.
+    dns_resolver_options.set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
   }
-
-  return main_thread_dispatcher.createDnsResolver({}, config.use_tcp_for_dns_lookups());
+  return main_thread_dispatcher.createDnsResolver(resolvers, dns_resolver_options);
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {

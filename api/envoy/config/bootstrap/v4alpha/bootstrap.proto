@@ -9,6 +9,7 @@ import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/event_service_config.proto";
 import "envoy/config/core/v4alpha/extension.proto";
+import "envoy/config/core/v4alpha/resolver.proto";
 import "envoy/config/core/v4alpha/socket_option.proto";
 import "envoy/config/listener/v4alpha/listener.proto";
 import "envoy/config/metrics/v4alpha/stats.proto";
@@ -222,12 +223,11 @@ message Bootstrap {
   // :ref:`stats sinks <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 
-  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
-  // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolvers>` and
-  // :ref:`dns_resolver_options <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolver_options>`
-  // are specified.
-  core.v4alpha.DnsResolverOptions dns_resolver_options = 30;
+  // DNS resolution configuration which includes the underlying dns resolver addresses and options.
+  // This may be overridden on a per-cluster basis in cds_config, when
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // is specified.
+  core.v4alpha.DnsResolutionConfig dns_resolution_config = 30;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
