@@ -722,9 +722,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
       const uint16_t tls_version = SSL_version(client_ssl_socket);
       if (SSL3_VERSION <= tls_version && tls_version <= TLS1_2_VERSION) {
-        // Prior to TLS 1.3, the session should be resumable. With TLS 1.3,
-        // tickets come after the handshake and the SSL_SESSION on the client is
-        // a dummy object.
+        // Prior to TLS 1.3, one should be able to resume the session. With TLS
+        // 1.3, tickets come after the handshake and the SSL_SESSION on the
+        // client is a dummy object.
         SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
         EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
       }
