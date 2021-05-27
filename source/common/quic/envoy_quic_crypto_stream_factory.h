@@ -35,7 +35,7 @@ public:
 
 class EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
-  virtual ~EnvoyQuicCryptoClientStreamFactoryInterface() {}
+  virtual ~EnvoyQuicCryptoClientStreamFactoryInterface() = default;
 
   // Return an Envoy specific quic crypto client stream object.
   virtual std::unique_ptr<quic::QuicCryptoClientStreamBase>
