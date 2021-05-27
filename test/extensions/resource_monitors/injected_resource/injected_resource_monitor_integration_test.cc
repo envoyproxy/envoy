@@ -121,7 +121,7 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
                                                          std::chrono::milliseconds(1000)));
 
   // Reduce load a little to allow the connection to be accepted.
-  updateResource(file_updater_1_, 0.9);
+  updateResource(file_updater_1_, 0.8);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                0);
   EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
