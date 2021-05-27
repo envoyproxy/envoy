@@ -35,21 +35,19 @@ void RouterImpl::onBelowWriteBufferLowWatermark() {
 }
 
 void RouterImpl::onEvent(Network::ConnectionEvent event) {
-  switch (event) {
+  switch (event)
   case Network::ConnectionEvent::RemoteClose: {
     ENVOY_LOG(error, "Connection to upstream: {} is closed by remote peer",
               upstream_host_->address()->asString());
     // Send local reply to downstream
     active_message_->onError("Connection to upstream is closed by remote peer");
     break;
-  }
-  case Network::ConnectionEvent::LocalClose: {
+  case Network::ConnectionEvent::LocalClose:
     ENVOY_LOG(error, "Connection to upstream: {} has been closed",
               upstream_host_->address()->asString());
     // Send local reply to downstream
     active_message_->onError("Connection to upstream has been closed");
     break;
-  }
   default:
     // Ignore other events for now
     ENVOY_LOG(trace, "Ignore event type");
