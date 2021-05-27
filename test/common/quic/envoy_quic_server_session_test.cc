@@ -124,8 +124,6 @@ private:
 
 class EnvoyQuicTestCryptoServerStreamFactory : public EnvoyQuicCryptoServerStreamFactoryInterface {
 public:
-  EnvoyQuicTestCryptoServerStreamFactory() : EnvoyQuicCryptoServerStreamFactoryInterface() {}
-
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
   std::string name() const override { return "quic.test_crypto_server_stream"; }
 
@@ -142,8 +140,8 @@ public:
       return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
     case quic::PROTOCOL_UNSUPPORTED:
       ASSERT(false, "Unknown handshake protocol");
-      return nullptr;
     }
+    return nullptr;
   }
 };
 

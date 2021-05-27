@@ -461,6 +461,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_crypto_stream_factory_lib",
     hdrs = ["envoy_quic_crypto_stream_factory.h"],
+    tags = ["nofips"],
     deps = [
         "//include/envoy/config:typed_config_interface",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
@@ -470,6 +471,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_proof_source_factory_interface",
     hdrs = ["envoy_quic_proof_source_factory_interface.h"],
+    tags = ["nofips"],
     deps = [
         "//include/envoy/config:typed_config_interface",
         "//source/server:connection_handler_lib",
