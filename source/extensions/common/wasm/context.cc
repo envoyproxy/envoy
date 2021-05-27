@@ -1123,7 +1123,7 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
 void Context::onGrpcCreateInitialMetadata(uint32_t /* token */,
                                           Http::RequestHeaderMap& initial_metadata) {
   if (grpc_initial_metadata_) {
-    initial_metadata = std::move(*grpc_initial_metadata_);
+    Http::HeaderMapImpl::copyFrom(initial_metadata, *grpc_initial_metadata_);
     grpc_initial_metadata_.reset();
   }
 }
