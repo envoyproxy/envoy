@@ -412,29 +412,25 @@ void InstanceImpl::initialize(const Options& options,
     server_compilation_settings_stats_->fips_mode_.set(1);
   }
 
-  // Check to see if bootstrap has set user_agent_name. If yes, use that.
-  // If not, use "envoy"
-  if (bootstrap_.node().user_agent_name().empty()) {
+  // If user has set user_agent_name in the bootstrap config, use it.
+  // Default to "envoy" if unset.
+  if (bootstrap_.node().user_agent_name().empty() ) {
     bootstrap_.mutable_node()->set_user_agent_name("envoy");
-  } else {
-    bootstrap_.mutable_node()->set_user_agent_name(bootstrap_.node().user_agent_name());
   }
 
-  // Check to see if bootstrap has set user_agent_version. If yes, use that.
-  // If not, use the internal server version
+  // If user has set user_agent_version in the bootstrap config, use it.
+  // Default to the internal server version.
   if (bootstrap_.node().user_agent_version().empty()) {
     bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
-  } else {
+  }
+  else {
     bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(
         bootstrap_.node().user_agent_version());
   }
 
-  // Check to see if bootstrap has set user_agent_build_version. If yes, use that.
-  // If not, use the internal server version
-  if (bootstrap_.node().user_agent_build_version().has_version()) {
-    *bootstrap_.mutable_node()->mutable_user_agent_build_version() =
-        bootstrap_.node().user_agent_build_version();
-  } else {
+  // If user has set user_agent_build_version in the bootstrap config, use it.
+  // Default to the internal server version.
+  if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }
 
