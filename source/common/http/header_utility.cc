@@ -216,6 +216,25 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
+void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
+  auto host = headers.getHostValue();
+  // If the host ends in a period, remove it.
+  auto dot_index = host.rfind('.');
+  if (dot_index == std::string::npos) {
+    return;
+  } else if (dot_index == (host.size() - 1)) {
+    host.remove_suffix(1);
+    headers.setHost(host);
+    return;
+  }
+  // If the dot is just before a colon, it must be preceding the port number.
+  // IPv6 addresses may contain colons or dots, but the dot will never directly
+  // precede the colon, so this check should be sufficient to detect a trailing port number.
+  if (host[dot_index + 1] == ':') {
+    headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
+  }
+}
+
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
                                                           absl::optional<uint32_t> listener_port) {
   if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&

@@ -89,7 +89,7 @@ TEST_P(AdsIntegrationTest, TestPrimaryClusterWarmClusterInitialization) {
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V3);
   auto loopback = Network::Test::getLoopbackAddressString(ipVersion());
-  addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+  addFakeUpstream(Http::CodecType::HTTP2);
   auto port = fake_upstreams_.back()->localAddress()->ip()->port();
 
   // This cluster will be blocked since endpoint name cannot be resolved.
@@ -1055,7 +1055,7 @@ class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
@@ -1075,7 +1075,7 @@ public:
       ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ads_cluster->set_name("ads_cluster");
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
   }
 };
@@ -1096,7 +1096,7 @@ class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
@@ -1125,7 +1125,7 @@ public:
       eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       eds_config->mutable_ads();
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
   }
 };
@@ -1282,7 +1282,7 @@ class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParam
                                           public HttpIntegrationTest {
 public:
   AdsClusterFromFileIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
@@ -1323,7 +1323,7 @@ public:
       eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       eds_config->mutable_ads();
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
   }
 

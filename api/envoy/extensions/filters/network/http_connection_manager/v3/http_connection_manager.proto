@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 47]
+// [#next-free-field: 48]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -702,6 +702,16 @@ message HttpConnectionManager {
   // <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.PathNormalizationOptions>`
   // for details.
   PathNormalizationOptions path_normalization_options = 43;
+
+  // Determines if trailing dot of the host should be removed from host/authority header before any
+  // processing of request by HTTP filters or routing.
+  // This affects the upstream host header.
+  // Without setting this option, incoming requests with host `example.com.` will not match against
+  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
+  // When the incoming request contains a host/authority header that includes a port number,
+  // setting this option will strip a trailing dot, if present, from the host section,
+  // leaving the port as is (e.g. host value `example.com.:443` will be updated to `example.com:443`).
+  bool strip_trailing_host_dot = 47;
 }
 
 // The configuration to customize local reply returned by Envoy.
