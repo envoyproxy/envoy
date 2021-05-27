@@ -329,6 +329,10 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
     return;
   }
 
+  // Use JSON as the default content-type. If the response headers have a different content-type
+  // set, that will be used instead.
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+
   for (auto&& kv : json_resp.headers()) {
     // ignore H2 pseudo-headers (if any)
     if (kv.first[0] == ':') {
@@ -344,7 +348,6 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
   if (json_resp.status_code() != 0) {
     headers.setStatus(json_resp.status_code());
   }
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   if (!json_resp.body().empty()) {
     if (json_resp.is_base64_encoded()) {
       body.add(Base64::decode(json_resp.body()));

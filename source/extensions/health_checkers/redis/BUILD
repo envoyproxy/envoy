@@ -39,7 +39,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//include/envoy/server:health_checker_config_interface",
         "//source/common/common:assert_lib",
-        "//source/extensions/health_checkers:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/health_checkers/redis/v3:pkg_cc_proto",

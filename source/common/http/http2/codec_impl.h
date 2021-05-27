@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
@@ -17,6 +18,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/common/statusor.h"
@@ -229,7 +231,7 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.addressProvider().localAddress();
     }
@@ -237,6 +239,7 @@ protected:
     void setFlushTimeout(std::chrono::milliseconds timeout) override {
       stream_idle_timeout_ = timeout;
     }
+    void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
@@ -258,8 +261,8 @@ protected:
     }
 
     void setWriteBufferWatermarks(uint32_t high_watermark) {
-      pending_recv_data_.setWatermarks(high_watermark);
-      pending_send_data_.setWatermarks(high_watermark);
+      pending_recv_data_->setWatermarks(high_watermark);
+      pending_send_data_->setWatermarks(high_watermark);
     }
 
     // If the receive buffer encounters watermark callbacks, enable/disable reads on this stream.
@@ -293,19 +296,14 @@ protected:
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
 
+    Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
     // never called. The watermark value is set to the size of the stream window. As a result this
     // watermark can never overflow because the peer can never send more bytes than the stream
     // window without triggering protocol error and this buffer is drained after each DATA frame was
     // dispatched through the filter chain. See source/docs/flow_control.md for more information.
-    Buffer::WatermarkBuffer pending_recv_data_{
-        [this]() -> void { this->pendingRecvBufferLowWatermark(); },
-        [this]() -> void { this->pendingRecvBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
-    Buffer::WatermarkBuffer pending_send_data_{
-        [this]() -> void { this->pendingSendBufferLowWatermark(); },
-        [this]() -> void { this->pendingSendBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
+    Buffer::InstancePtr pending_recv_data_;
+    Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;

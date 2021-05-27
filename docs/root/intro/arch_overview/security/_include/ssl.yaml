@@ -29,7 +29,6 @@ static_resources:
                 filename: certs/cacert.pem
   clusters:
   - name: some_service
-    connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
