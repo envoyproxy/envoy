@@ -1467,6 +1467,44 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
   ASSERT_EQ(&internal_listener_cb_enabled.value().get(), &internal_listener_cb.value().get());
 }
 
+TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
+  InSequence s;
+  uint64_t old_listener_tag = 1;
+  uint64_t new_listener_tag = 2;
+  Network::Address::InstanceConstSharedPtr local_address{
+      new Network::Address::EnvoyInternalInstance("server_internal_address")};
+
+  TestListener* internal_listener = addInternalListener(
+      old_listener_tag, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address));
+  handler_->addListener(absl::nullopt, *internal_listener);
+
+  ASSERT_NE(internal_listener, nullptr);
+
+  auto overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  TestListener* new_test_listener =
+      addInternalListener(new_listener_tag, "test_internal_listener", std::chrono::milliseconds(),
+                          false, overridden_filter_chain_manager);
+
+  handler_->addListener(old_listener_tag, *new_test_listener);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+
+  auto internal_listener_cb = handler_->findByAddress(local_address);
+
+  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
+  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+  internal_listener_cb.value().get().onAccept(Network::ConnectionSocketPtr{connection});
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  testing::MockFunction<void()> completion;
+  handler_->removeFilterChains(old_listener_tag, {}, completion.AsStdFunction());
+  EXPECT_CALL(completion, Call());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
