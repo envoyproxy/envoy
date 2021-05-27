@@ -671,11 +671,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     six = dict(
         project_name = "Six",
         project_desc = "Python 2 and 3 compatibility library",
-        project_url = "https://pypi.org/project/six",
+        project_url = "https://github.com/benjaminp/six",
         version = "1.12.0",
-        sha256 = "d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73",
-        urls = ["https://files.pythonhosted.org/packages/dd/bf/4138e7bfb757de47d1f4b6994648ec67a51efe58fa907c1e11e350cddfca/six-{version}.tar.gz"],
-        release_date = "2018-12-09",
+        sha256 = "0ce7aef70d066b8dda6425c670d00c25579c3daad8108b3e3d41bef26003c852",
+        urls = ["https://github.com/benjaminp/six/archive/{version}.tar.gz"],
+        release_date = "2018-12-10",
         use_category = ["other"],
     ),
     org_llvm_llvm = dict(
