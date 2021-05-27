@@ -27,6 +27,7 @@ message QuicCryptoStream {
 
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
+  // [#extension-category: envoy.quic.server.crypto_stream]
   google.protobuf.Any typed_config = 2;
 }
 
@@ -37,6 +38,7 @@ message QuicProofSource {
 
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
+  // [#extension-category: envoy.quic.proof_source]
   google.protobuf.Any typed_config = 2;
 }
 
@@ -71,10 +73,10 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {gte: 1}];
 
   // The crypto server stream implementation used for this listener.
-  // If not specified the :ref:`QUICHE defaul one<envoy_v3_api_field_extensions.quic.v3.CryptoServerStreamConfig>` will be used.
+  // If not specified the :ref:`QUICHE defaul one<envoy_v3_api_msg_extensions.quic.v3.CryptoServerStreamConfig>` will be used.
   QuicCryptoStream crypto_stream = 6;
 
   // The proof source implementation used for this listener.
-  // If not specified the :ref:`defaul one<envoy_v3_api_field_extensions.quic.v3.ProofSourceConfig>` will be used.
+  // If not specified the :ref:`defaul one<envoy_v3_api_msg_extensions.quic.v3.ProofSourceConfig>` will be used.
   QuicProofSource proof_source = 7;
 }
