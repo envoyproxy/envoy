@@ -63,16 +63,87 @@ public:
   virtual ~DispatcherBase() = default;
 
   /**
-   * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
-   * can be used for any file like interface (files, sockets, etc.).
-   * @param fd supplies the fd to watch.
-   * @param cb supplies the callback to fire when the file is ready.
-   * @param trigger specifies whether to edge or level trigger.
-   * @param events supplies a logical OR of FileReadyType events that the file event should
-   *               initially listen on.
+   * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context
+   * of the dispatcher event loop which may be on a different thread than the caller.
    */
-  virtual FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
-                                       uint32_t events) PURE;
+  virtual void post(PostCb callback) PURE;
+
+  /**
+   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
+   * current thread of execution is on the same thread upon which the dispatcher loop is running.
+   */
+  virtual bool isThreadSafe() const PURE;
+
+  /**
+   * Runs the event loop. This will not return until exit() is called either from within a callback
+   * or from a different thread.
+   * @param type specifies whether to run in blocking mode (run() will not return until exit() is
+   *              called) or non-blocking mode where only active events will be executed and then
+   *              run() will return.
+   */
+  enum class RunType {
+    Block,       // Runs the event-loop until there are no pending events.
+    NonBlock,    // Checks for any pending events to activate, executes them,
+                 // then exits. Exits immediately if there are no pending or
+                 // active events.
+    RunUntilExit // Runs the event-loop until loopExit() is called, blocking
+                 // until there are pending or active events.
+  };
+  virtual void run(RunType type) PURE;
+
+  /**
+   * Exits the event loop.
+   */
+  virtual void exit() PURE;
+
+  /**
+   * Shutdown the dispatcher by clear dispatcher thread deletable.
+   */
+  virtual void shutdown() PURE;
+};
+
+class DeferredDeleter {
+public:
+  virtual ~DeferredDeleter() = default;
+
+  /**
+   * Clears any items in the deferred deletion queue.
+   */
+  virtual void clearDeferredDeleteList() PURE;
+
+  /**
+   * Submits an item for deferred delete. @see DeferredDeletable.
+   */
+  virtual void deferredDelete(DeferredDeletablePtr&& to_delete) PURE;
+};
+
+class ScopeTracker {
+public:
+  virtual ~ScopeTracker() = default;
+
+  /**
+   * Appends a tracked object to the current stack of tracked objects operating
+   * in the dispatcher.
+   *
+   * It's recommended to use ScopeTrackerScopeState to manage the object's tracking. If directly
+   * invoking, there needs to be a subsequent call to popTrackedObject().
+   */
+  virtual void pushTrackedObject(const ScopeTrackedObject* object) PURE;
+
+  /**
+   * Removes the top of the stack of tracked object and asserts that it was expected.
+   */
+  virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
+
+  /**
+   * Whether the tracked object stack is empty.
+   */
+  virtual bool trackedObjectStackIsEmpty() const PURE;
+};
+
+class TimerProvider {
+public:
+  virtual ~TimerProvider() = default;
 
   /**
    * Allocates a timer. @see Timer for docs on how to use the timer.
@@ -95,39 +166,6 @@ public:
   virtual Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum, TimerCb cb) PURE;
 
   /**
-   * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
-   * callback.
-   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
-   * event loop.
-   */
-  virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
-
-  /**
-   * Appends a tracked object to the current stack of tracked objects operating
-   * in the dispatcher.
-   *
-   * It's recommended to use ScopeTrackerScopeState to manage the object's tracking. If directly
-   * invoking, there needs to be a subsequent call to popTrackedObject().
-   */
-  virtual void pushTrackedObject(const ScopeTrackedObject* object) PURE;
-
-  /**
-   * Removes the top of the stack of tracked object and asserts that it was expected.
-   */
-  virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
-
-  /**
-   * Whether the tracked object stack is empty.
-   */
-  virtual bool trackedObjectStackIsEmpty() const PURE;
-
-  /**
-   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
-   * current thread of execution is on the same thread upon which the dispatcher loop is running.
-   */
-  virtual bool isThreadSafe() const PURE;
-
-  /**
    * Returns a recently cached MonotonicTime value.
    */
   virtual MonotonicTime approximateMonotonicTime() const PURE;
@@ -136,7 +174,7 @@ public:
 /**
  * Abstract event dispatching loop.
  */
-class Dispatcher : public DispatcherBase {
+class Dispatcher : public DispatcherBase, public DeferredDeleter, public ScopeTracker, public TimerProvider {
 public:
   /**
    * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
@@ -170,9 +208,25 @@ public:
                                const absl::optional<std::string>& prefix = absl::nullopt) PURE;
 
   /**
-   * Clears any items in the deferred deletion queue.
+   * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
+   * can be used for any file like interface (files, sockets, etc.).
+   * @param fd supplies the fd to watch.
+   * @param cb supplies the callback to fire when the file is ready.
+   * @param trigger specifies whether to edge or level trigger.
+   * @param events supplies a logical OR of FileReadyType events that the file event should
+   *               initially listen on.
    */
-  virtual void clearDeferredDeleteList() PURE;
+  virtual FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
+                                       uint32_t events) PURE;
+
+  /**
+   * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
+   * callback.
+   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
+   * event loop.
+   */
+  virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
+
 
   /**
    * Wraps an already-accepted socket in an instance of Envoy's server Network::Connection.
@@ -243,15 +297,6 @@ public:
   virtual Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) PURE;
-  /**
-   * Submits an item for deferred delete. @see DeferredDeletable.
-   */
-  virtual void deferredDelete(DeferredDeletablePtr&& to_delete) PURE;
-
-  /**
-   * Exits the event loop.
-   */
-  virtual void exit() PURE;
 
   /**
    * Listens for a signal event. Only a single dispatcher in the process can listen for signals.
@@ -264,33 +309,10 @@ public:
   virtual SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) PURE;
 
   /**
-   * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context
-   * of the dispatcher event loop which may be on a different thread than the caller.
-   */
-  virtual void post(PostCb callback) PURE;
-
-  /**
    * Post the deletable to this dispatcher. The deletable objects are guaranteed to be destroyed on
    * the dispatcher's thread before dispatcher destroy. This is safe cross thread.
    */
   virtual void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) PURE;
-
-  /**
-   * Runs the event loop. This will not return until exit() is called either from within a callback
-   * or from a different thread.
-   * @param type specifies whether to run in blocking mode (run() will not return until exit() is
-   *              called) or non-blocking mode where only active events will be executed and then
-   *              run() will return.
-   */
-  enum class RunType {
-    Block,       // Runs the event-loop until there are no pending events.
-    NonBlock,    // Checks for any pending events to activate, executes them,
-                 // then exits. Exits immediately if there are no pending or
-                 // active events.
-    RunUntilExit // Runs the event-loop until loopExit() is called, blocking
-                 // until there are pending or active events.
-  };
-  virtual void run(RunType type) PURE;
 
   /**
    * Returns a factory which connections may use for watermark buffer creation.
@@ -302,11 +324,6 @@ public:
    * Updates approximate monotonic time to current value.
    */
   virtual void updateApproximateMonotonicTime() PURE;
-
-  /**
-   * Shutdown the dispatcher by clear dispatcher thread deletable.
-   */
-  virtual void shutdown() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;
