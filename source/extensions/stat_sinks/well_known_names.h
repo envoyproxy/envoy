@@ -18,6 +18,8 @@ public:
   const std::string Statsd = "envoy.stat_sinks.statsd";
   // DogStatsD compatible statsd sink
   const std::string DogStatsd = "envoy.stat_sinks.dog_statsd";
+  // Graphite Statsd sink (with Graphite-formatted tags)
+  const std::string GraphiteStatsd = "envoy.stat_sinks.graphite_statsd";
   // MetricsService sink
   const std::string MetricsService = "envoy.stat_sinks.metrics_service";
   // Hystrix sink

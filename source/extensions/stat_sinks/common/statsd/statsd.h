@@ -16,6 +16,8 @@
 #include "common/common/macros.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "extensions/stat_sinks/common/statsd/tag_formats.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -42,14 +44,16 @@ public:
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt);
+                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                const Statsd::TagFormat tag_format = DefaultTagFormat);
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt)
+                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                const Statsd::TagFormat tag_format = DefaultTagFormat)
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
-        buffer_size_(buffer_size.value_or(0)) {
+        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -91,6 +95,7 @@ private:
   // Prefix for all flushed stats.
   const std::string prefix_;
   const uint64_t buffer_size_;
+  const Statsd::TagFormat tag_format_;
 };
 
 /**

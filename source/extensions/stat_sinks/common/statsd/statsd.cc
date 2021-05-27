@@ -46,10 +46,11 @@ void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance& data) {
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
-                             const std::string& prefix, absl::optional<uint64_t> buffer_size)
+                             const std::string& prefix, absl::optional<uint64_t> buffer_size,
+                             const Statsd::TagFormat tag_format)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
-      buffer_size_(buffer_size.value_or(0)) {
+      buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
@@ -61,19 +62,57 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      const std::string counter_str =
-          absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_, "|c",
-                       buildTagStr(counter.counter_.get().tags()));
-      writeBuffer(buffer, writer, counter_str);
+      switch (tag_format_.tag_position) {
+      case Statsd::TagPosition::TagAfterValue: {
+        const std::string counter_str = absl::StrCat(
+            // metric name
+            prefix_, ".", getName(counter.counter_.get()),
+            // value and type
+            ":", counter.delta_, "|c",
+            // tags
+            buildTagStr(counter.counter_.get().tags()));
+        writeBuffer(buffer, writer, counter_str);
+      } break;
+
+      case Statsd::TagPosition::TagAfterName: {
+        const std::string counter_str = absl::StrCat(
+            // metric name
+            prefix_, ".", getName(counter.counter_.get()),
+            // tags
+            buildTagStr(counter.counter_.get().tags()),
+            // value and type
+            ":", counter.delta_, "|c");
+        writeBuffer(buffer, writer, counter_str);
+      } break;
+      }
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      const std::string gauge_str =
-          absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
-                       buildTagStr(gauge.get().tags()));
-      writeBuffer(buffer, writer, gauge_str);
+      switch (tag_format_.tag_position) {
+      case Statsd::TagPosition::TagAfterValue: {
+        const std::string gauge_str = absl::StrCat(
+            // metric name
+            prefix_, ".", getName(gauge.get()),
+            // value and type
+            ":", gauge.get().value(), "|g",
+            // tags
+            buildTagStr(gauge.get().tags()));
+        writeBuffer(buffer, writer, gauge_str);
+      } break;
+
+      case Statsd::TagPosition::TagAfterName: {
+        const std::string gauge_str = absl::StrCat(
+            // metric name
+            prefix_, ".", getName(gauge.get()),
+            // tags
+            buildTagStr(gauge.get().tags()),
+            // value and type
+            ":", gauge.get().value(), "|g");
+        writeBuffer(buffer, writer, gauge_str);
+      } break;
+      }
     }
   }
 
@@ -115,10 +154,29 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
-  const std::string message(absl::StrCat(prefix_, ".", getName(histogram), ":",
-                                         std::chrono::milliseconds(value).count(), "|ms",
-                                         buildTagStr(histogram.tags())));
-  tls_->getTyped<Writer>().write(message);
+  switch (tag_format_.tag_position) {
+  case Statsd::TagPosition::TagAfterValue: {
+    const std::string message = absl::StrCat(
+        // metric name
+        prefix_, ".", getName(histogram),
+        // value and type
+        ":", std::chrono::milliseconds(value).count(), "|ms",
+        // tags
+        buildTagStr(histogram.tags()));
+    tls_->getTyped<Writer>().write(message);
+  } break;
+
+  case Statsd::TagPosition::TagAfterName: {
+    const std::string message = absl::StrCat(
+        // metric name
+        prefix_, ".", getName(histogram),
+        // tags
+        buildTagStr(histogram.tags()),
+        // value and type
+        ":", std::chrono::milliseconds(value).count(), "|ms");
+    tls_->getTyped<Writer>().write(message);
+  } break;
+  }
 }
 
 const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
@@ -137,9 +195,9 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   std::vector<std::string> tag_strings;
   tag_strings.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
-    tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
+    tag_strings.emplace_back(tag.name_ + tag_format_.assign + tag.value_);
   }
-  return "|#" + absl::StrJoin(tag_strings, ",");
+  return tag_format_.start + absl::StrJoin(tag_strings, tag_format_.separator);
 }
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
@@ -220,6 +278,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   current_slice_mem_ += StringUtil::itoa(current_slice_mem_, 30, value);
   *current_slice_mem_++ = '|';
   *current_slice_mem_++ = stat_type;
+
   *current_slice_mem_++ = '\n';
 
   ASSERT(static_cast<uint64_t>(current_slice_mem_ - snapped_current) < max_size);

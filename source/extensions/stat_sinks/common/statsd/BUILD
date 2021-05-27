@@ -11,7 +11,10 @@ envoy_extension_package()
 envoy_cc_library(
     name = "statsd_lib",
     srcs = ["statsd.cc"],
-    hdrs = ["statsd.h"],
+    hdrs = [
+        "statsd.h",
+        "tag_formats.h",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",
