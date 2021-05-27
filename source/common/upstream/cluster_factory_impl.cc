@@ -90,7 +90,7 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
   if ((cluster.has_dns_resolution_config() &&
-       !cluster.dns_resolution_config().resolvers().empty()) or
+       !cluster.dns_resolution_config().resolvers().empty()) ||
       !cluster.dns_resolvers().empty()) {
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
