@@ -155,7 +155,7 @@ public class MainActivity extends Activity {
     gauge.add(10);
     gauge.sub(1);
 
-    timer.completeWithDuration(15);
+    timer.recordDuration(15);
     distribution.recordValue(15);
   }
 }

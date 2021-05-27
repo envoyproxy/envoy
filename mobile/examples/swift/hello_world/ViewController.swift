@@ -125,7 +125,7 @@ final class ViewController: UITableViewController {
 
     let timer = pulseClient.timer(elements: ["foo", "bar", "timer"])
     let distribution = pulseClient.distribution(elements: ["foo", "bar", "distribution"])
-    timer.completeWithDuration(durationMs: 15)
+    timer.recordDuration(durationMs: 15)
     distribution.recordValue(value: 15)
   }
   // MARK: - UITableView

@@ -4,8 +4,8 @@ import Foundation
 @objc
 public protocol Timer: AnyObject {
   /// Record a new duration to add to the timer.
-  func completeWithDuration(durationMs: Int)
+  func recordDuration(durationMs: Int)
 
   /// Record a new duration to add to the timer along with tags.
-  func completeWithDuration(tags: Tags, durationMs: Int)
+  func recordDuration(tags: Tags, durationMs: Int)
 }
