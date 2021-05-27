@@ -20,7 +20,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
-    deps = [":codec_interface"],
+    deps = [":codec_interface_no_include_prefix"],
 )
 
 envoy_cc_library(
@@ -28,7 +28,7 @@ envoy_cc_library(
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":message_interface",
+        ":message_interface_no_include_prefix",
         "//include/envoy/event:dispatcher_interface_no_include_prefix",
         "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
         "//source/common/protobuf",
@@ -40,9 +40,9 @@ envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
-        ":header_map_interface",
-        ":metadata_interface",
-        ":protocol_interface",
+        ":header_map_interface_no_include_prefix",
+        ":metadata_interface_no_include_prefix",
+        ":protocol_interface_no_include_prefix",
         "//include/envoy/buffer:buffer_interface_no_include_prefix",
         "//include/envoy/grpc:status_no_include_prefix",
         "//include/envoy/network:address_interface_no_include_prefix",
@@ -61,7 +61,7 @@ envoy_cc_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
-        ":codec_interface",
+        ":codec_interface_no_include_prefix",
         "//include/envoy/common:conn_pool_interface_no_include_prefix",
         "//include/envoy/event:deferred_deletable_no_include_prefix",
         "//include/envoy/upstream:upstream_interface_no_include_prefix",
@@ -72,7 +72,7 @@ envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
     deps = [
-        ":codes_interface",
+        ":codes_interface_no_include_prefix",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -82,8 +82,8 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":codec_interface",
-        ":header_map_interface",
+        ":codec_interface_no_include_prefix",
+        ":header_map_interface_no_include_prefix",
         "//include/envoy/access_log:access_log_interface_no_include_prefix",
         "//include/envoy/common:scope_tracker_interface_no_include_prefix",
         "//include/envoy/event:dispatcher_interface_no_include_prefix",
@@ -101,7 +101,7 @@ envoy_cc_library(
     name = "hash_policy_interface",
     hdrs = ["hash_policy.h"],
     deps = [
-        ":header_map_interface",
+        ":header_map_interface_no_include_prefix",
         "//include/envoy/network:address_interface_no_include_prefix",
         "//include/envoy/stream_info:filter_state_interface_no_include_prefix",
     ],
@@ -114,7 +114,7 @@ envoy_cc_library(
         "abseil_inlined_vector",
     ],
     deps = [
-        ":header_formatter_interface",
+        ":header_formatter_interface_no_include_prefix",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
     ],
@@ -124,7 +124,7 @@ envoy_cc_library(
     name = "message_interface",
     hdrs = ["message.h"],
     deps = [
-        ":header_map_interface",
+        ":header_map_interface_no_include_prefix",
         "//include/envoy/buffer:buffer_interface_no_include_prefix",
     ],
 )
@@ -149,7 +149,7 @@ envoy_cc_library(
     name = "request_id_extension_interface",
     hdrs = ["request_id_extension.h"],
     deps = [
-        ":header_map_interface",
+        ":header_map_interface_no_include_prefix",
         "//include/envoy/tracing:trace_reason_interface_no_include_prefix",
     ],
 )
@@ -166,8 +166,8 @@ envoy_cc_library(
     name = "original_ip_detection_interface",
     hdrs = ["original_ip_detection.h"],
     deps = [
-        ":codes_interface",
-        ":header_map_interface",
+        ":codes_interface_no_include_prefix",
+        ":header_map_interface_no_include_prefix",
         "//include/envoy/config:typed_config_interface_no_include_prefix",
         "//include/envoy/network:address_interface_no_include_prefix",
         "//include/envoy/server:factory_context_interface_no_include_prefix",

@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["connection.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":ssl_socket_state",
+        ":ssl_socket_state_no_include_prefix",
         "//include/envoy/common:time_interface_no_include_prefix",
     ],
 )
@@ -28,9 +28,9 @@ envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
     deps = [
-        ":certificate_validation_context_config_interface",
-        ":handshaker_interface",
-        ":tls_certificate_config_interface",
+        ":certificate_validation_context_config_interface_no_include_prefix",
+        ":handshaker_interface_no_include_prefix",
+        ":tls_certificate_config_interface_no_include_prefix",
     ],
 )
 
@@ -38,8 +38,8 @@ envoy_cc_library(
     name = "context_manager_interface",
     hdrs = ["context_manager.h"],
     deps = [
-        ":context_config_interface",
-        ":context_interface",
+        ":context_config_interface_no_include_prefix",
+        ":context_interface_no_include_prefix",
         "//include/envoy/common:time_interface_no_include_prefix",
         "//include/envoy/config:typed_config_interface_no_include_prefix",
         "//include/envoy/stats:stats_interface_no_include_prefix",

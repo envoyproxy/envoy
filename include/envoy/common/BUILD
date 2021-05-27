@@ -71,7 +71,7 @@ envoy_cc_library(
     name = "regex_interface",
     hdrs = ["regex.h"],
     deps = [
-        ":matchers_interface",
+        ":matchers_interface_no_include_prefix",
     ],
 )
 
@@ -79,7 +79,7 @@ envoy_cc_library(
     name = "token_bucket_interface",
     hdrs = ["token_bucket.h"],
     deps = [
-        ":time_interface",
+        ":time_interface_no_include_prefix",
     ],
 )
 

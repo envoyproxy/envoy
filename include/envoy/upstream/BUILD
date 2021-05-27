@@ -15,10 +15,10 @@ envoy_cc_library(
         "abseil_node_hash_map",
     ],
     deps = [
-        ":health_checker_interface",
-        ":load_balancer_interface",
-        ":thread_local_cluster_interface",
-        ":upstream_interface",
+        ":health_checker_interface_no_include_prefix",
+        ":load_balancer_interface_no_include_prefix",
+        ":thread_local_cluster_interface_no_include_prefix",
+        ":upstream_interface_no_include_prefix",
         "//include/envoy/access_log:access_log_interface_no_include_prefix",
         "//include/envoy/common:random_generator_interface_no_include_prefix",
         "//include/envoy/config:grpc_mux_interface_no_include_prefix",
@@ -44,7 +44,7 @@ envoy_cc_library(
     name = "health_checker_interface",
     hdrs = ["health_checker.h"],
     deps = [
-        ":upstream_interface",
+        ":upstream_interface_no_include_prefix",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
@@ -58,8 +58,8 @@ envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
     deps = [
-        ":health_check_host_monitor_interface",
-        ":outlier_detection_interface",
+        ":health_check_host_monitor_interface_no_include_prefix",
+        ":outlier_detection_interface_no_include_prefix",
         "//include/envoy/network:address_interface_no_include_prefix",
         "//include/envoy/network:transport_socket_interface_no_include_prefix",
         "//include/envoy/stats:primitive_stats_macros_no_include_prefix",
@@ -72,7 +72,7 @@ envoy_cc_library(
     name = "load_balancer_interface",
     hdrs = ["load_balancer.h"],
     deps = [
-        ":upstream_interface",
+        ":upstream_interface_no_include_prefix",
         "//include/envoy/router:router_interface_no_include_prefix",
         "//include/envoy/upstream:types_interface_no_include_prefix",
     ],
@@ -126,8 +126,8 @@ envoy_cc_library(
     name = "thread_local_cluster_interface",
     hdrs = ["thread_local_cluster.h"],
     deps = [
-        ":load_balancer_interface",
-        ":upstream_interface",
+        ":load_balancer_interface_no_include_prefix",
+        ":upstream_interface_no_include_prefix",
     ],
 )
 
@@ -144,10 +144,10 @@ envoy_cc_library(
     hdrs = ["upstream.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":health_check_host_monitor_interface",
-        ":load_balancer_type_interface",
-        ":locality_lib",
-        ":resource_manager_interface",
+        ":health_check_host_monitor_interface_no_include_prefix",
+        ":load_balancer_type_interface_no_include_prefix",
+        ":locality_lib_no_include_prefix",
+        ":resource_manager_interface_no_include_prefix",
         "//include/envoy/common:callback_no_include_prefix",
         "//include/envoy/config:subscription_interface_no_include_prefix",
         "//include/envoy/config:typed_metadata_interface_no_include_prefix",
@@ -167,12 +167,12 @@ envoy_cc_library(
     name = "cluster_factory_interface",
     hdrs = ["cluster_factory.h"],
     deps = [
-        ":cluster_manager_interface",
-        ":health_check_host_monitor_interface",
-        ":load_balancer_type_interface",
-        ":locality_lib",
-        ":resource_manager_interface",
-        ":upstream_interface",
+        ":cluster_manager_interface_no_include_prefix",
+        ":health_check_host_monitor_interface_no_include_prefix",
+        ":load_balancer_type_interface_no_include_prefix",
+        ":locality_lib_no_include_prefix",
+        ":resource_manager_interface_no_include_prefix",
+        ":upstream_interface_no_include_prefix",
         "//include/envoy/common:callback_no_include_prefix",
         "//include/envoy/config:typed_config_interface_no_include_prefix",
         "//include/envoy/config:typed_metadata_interface_no_include_prefix",

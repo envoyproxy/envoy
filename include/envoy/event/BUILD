@@ -22,13 +22,13 @@ envoy_cc_library(
     name = "dispatcher_interface",
     hdrs = ["dispatcher.h"],
     deps = [
-        ":deferred_deletable",
-        ":dispatcher_thread_deletable",
-        ":file_event_interface",
-        ":scaled_timer",
-        ":schedulable_cb_interface",
-        ":signal_interface",
-        ":timer_interface",
+        ":deferred_deletable_no_include_prefix",
+        ":dispatcher_thread_deletable_no_include_prefix",
+        ":file_event_interface_no_include_prefix",
+        ":scaled_timer_no_include_prefix",
+        ":schedulable_cb_interface_no_include_prefix",
+        ":signal_interface_no_include_prefix",
+        ":timer_interface_no_include_prefix",
         "//include/envoy/common:scope_tracker_interface_no_include_prefix",
         "//include/envoy/common:time_interface_no_include_prefix",
         "//include/envoy/filesystem:watcher_interface_no_include_prefix",
@@ -61,8 +61,8 @@ envoy_cc_library(
     name = "scaled_range_timer_manager_interface",
     hdrs = ["scaled_range_timer_manager.h"],
     deps = [
-        ":scaled_timer",
-        ":timer_interface",
+        ":scaled_timer_no_include_prefix",
+        ":timer_interface_no_include_prefix",
     ],
 )
 
@@ -80,7 +80,7 @@ envoy_cc_library(
     name = "timer_interface",
     hdrs = ["timer.h"],
     deps = [
-        ":schedulable_cb_interface",
+        ":schedulable_cb_interface_no_include_prefix",
         "//include/envoy/common:time_interface_no_include_prefix",
     ],
 )

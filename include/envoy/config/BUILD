@@ -23,7 +23,7 @@ envoy_cc_library(
     name = "config_provider_manager_interface",
     hdrs = ["config_provider_manager.h"],
     deps = [
-        ":config_provider_interface",
+        ":config_provider_interface_no_include_prefix",
         "//include/envoy/server:filter_config_interface_no_include_prefix",
         "//source/common/protobuf",
     ],
@@ -48,7 +48,7 @@ envoy_cc_library(
     name = "grpc_mux_interface",
     hdrs = ["grpc_mux.h"],
     deps = [
-        ":subscription_interface",
+        ":subscription_interface_no_include_prefix",
         "//include/envoy/stats:stats_macros_no_include_prefix",
         "//source/common/common:cleanup_lib",
         "//source/common/protobuf",
@@ -59,7 +59,7 @@ envoy_cc_library(
     name = "subscription_factory_interface",
     hdrs = ["subscription_factory.h"],
     deps = [
-        ":subscription_interface",
+        ":subscription_interface_no_include_prefix",
         "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -89,7 +89,7 @@ envoy_cc_library(
     name = "typed_metadata_interface",
     hdrs = ["typed_metadata.h"],
     deps = [
-        ":typed_config_interface",
+        ":typed_config_interface_no_include_prefix",
         "//source/common/protobuf",
     ],
 )

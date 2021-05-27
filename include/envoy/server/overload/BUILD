@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "overload_manager_interface",
     hdrs = ["overload_manager.h"],
     deps = [
-        ":thread_local_overload_state",
+        ":thread_local_overload_state_no_include_prefix",
         "//include/envoy/event:dispatcher_interface_no_include_prefix",
         "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
         "//source/common/singleton:const_singleton",

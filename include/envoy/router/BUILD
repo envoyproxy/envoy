@@ -17,7 +17,7 @@ envoy_cc_library(
     name = "rds_interface",
     hdrs = ["rds.h"],
     deps = [
-        ":router_interface",
+        ":router_interface_no_include_prefix",
         "//include/envoy/http:filter_interface_no_include_prefix",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -27,7 +27,7 @@ envoy_cc_library(
     name = "route_config_provider_manager_interface",
     hdrs = ["route_config_provider_manager.h"],
     deps = [
-        ":rds_interface",
+        ":rds_interface_no_include_prefix",
         "//include/envoy/event:dispatcher_interface_no_include_prefix",
         "//include/envoy/json:json_object_interface_no_include_prefix",
         "//include/envoy/local_info:local_info_interface_no_include_prefix",
@@ -46,7 +46,7 @@ envoy_cc_library(
     hdrs = ["route_config_update_receiver.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":rds_interface",
+        ":rds_interface_no_include_prefix",
         "//include/envoy/common:time_interface_no_include_prefix",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -59,7 +59,7 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":internal_redirect_interface",
+        ":internal_redirect_interface_no_include_prefix",
         "//include/envoy/access_log:access_log_interface_no_include_prefix",
         "//include/envoy/common:conn_pool_interface_no_include_prefix",
         "//include/envoy/common:matchers_interface_no_include_prefix",
@@ -86,7 +86,7 @@ envoy_cc_library(
     name = "scopes_interface",
     hdrs = ["scopes.h"],
     deps = [
-        ":router_interface",
+        ":router_interface_no_include_prefix",
         "//include/envoy/config:config_provider_interface_no_include_prefix",
         "//include/envoy/http:header_map_interface_no_include_prefix",
     ],

@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":status",
+        ":status_no_include_prefix",
         "//include/envoy/buffer:buffer_interface_no_include_prefix",
         "//include/envoy/http:async_client_interface_no_include_prefix",
         "//include/envoy/http:header_map_interface_no_include_prefix",
@@ -27,7 +27,7 @@ envoy_cc_library(
     name = "async_client_manager_interface",
     hdrs = ["async_client_manager.h"],
     deps = [
-        ":async_client_interface",
+        ":async_client_interface_no_include_prefix",
         "//include/envoy/stats:stats_interface_no_include_prefix",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
