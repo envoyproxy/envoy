@@ -14,7 +14,8 @@
 
 #include "extensions/request_id/uuid/config.h"
 
-#include "test/common/http/ip_detection_extensions.h"
+#include "test/common/http/custom_header_extension.h"
+#include "test/common/http/xff_extension.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"

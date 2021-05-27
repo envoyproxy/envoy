@@ -10,7 +10,7 @@ namespace {
 class HTTPTypedPerFilterConfigTest : public testing::Test, public HttpIntegrationTest {
 public:
   HTTPTypedPerFilterConfigTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
 };
 
 TEST_F(HTTPTypedPerFilterConfigTest, RejectUnsupportedTypedPerFilterConfig) {
@@ -58,7 +58,7 @@ TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFi
 
         auto* filter = hcm.mutable_http_filters()->Add();
         filter->set_name("filter.unknown");
-        filter->set_is_optional("true");
+        filter->set_is_optional(true);
         // keep router the last
         auto size = hcm.http_filters_size();
         hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
