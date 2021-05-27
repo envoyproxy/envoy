@@ -522,6 +522,7 @@ TEST_F(EdsTest, EndpointMetadataWithTransportSocket) {
   // Update metadata.
   dynamic_cast<HostImpl*>(hosts[0].get())->metadata(metadata_sharedptr);
 
+  // Transport socket factory should point to tls, which implements secure transport.
   ASSERT_TRUE((hosts[0].get())->transportSocketFactory().implementsSecureTransport());
 }
 
