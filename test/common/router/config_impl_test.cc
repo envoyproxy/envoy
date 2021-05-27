@@ -18,6 +18,7 @@
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
+#include "common/router/string_accessor_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/common/router/route_fuzz.pb.h"
@@ -1788,6 +1789,52 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
                           Pair(Http::LowerCaseString("x-vhost-header1"), "route-override")));
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-global-remove"),
                                                         Http::LowerCaseString("x-vhost-remove")));
+}
+
+TEST_F(RouteMatcherTest, TestResponseHeaderTransformsDoFormatting) {
+  factory_context_.cluster_manager_.initializeClusters({"default"}, {});
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: default
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+        route:
+          cluster: "default"
+response_headers_to_add:
+  - header:
+      key: x-has-variable
+      value: "%PER_REQUEST_STATE(testing)%"
+    append: false
+)EOF";
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl req_headers =
+      genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+  const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+  Http::TestResponseHeaderMapImpl headers;
+  route->finalizeResponseHeaders(headers, stream_info);
+
+  auto transforms = route->responseHeaderTransforms(stream_info, /*do_formatting=*/true);
+  EXPECT_THAT(transforms.headers_to_overwrite,
+              ElementsAre(Pair(Http::LowerCaseString("x-has-variable"), "test_value")));
+
+  transforms = route->responseHeaderTransforms(stream_info, /*do_formatting=*/false);
+  EXPECT_THAT(
+      transforms.headers_to_overwrite,
+      ElementsAre(Pair(Http::LowerCaseString("x-has-variable"), "%PER_REQUEST_STATE(testing)%")));
 }
 
 TEST_F(RouteMatcherTest, TestAddGlobalResponseHeaderRemoveFromRoute) {
