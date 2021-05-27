@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.retry_priorities.previous_priorities",
     deps = [
         "//source/common/protobuf:message_validator_lib",
-        "//source/extensions/retry/priority:well_known_names",
         "//source/extensions/retry/priority/previous_priorities:config",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
