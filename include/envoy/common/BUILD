@@ -21,6 +21,17 @@ envoy_basic_cc_library(
     include_prefix = "envoy/common",
 )
 
+envoy_basic_cc_library(
+    name = "base_includes_no_include_prefix",
+    hdrs = [
+        "exception.h",
+        "optref.h",
+        "platform.h",
+        "pure.h",
+    ],
+    external_deps = ["abseil_optional"],
+)
+
 envoy_cc_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
