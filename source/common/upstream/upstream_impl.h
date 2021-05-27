@@ -107,6 +107,8 @@ public:
   void metadata(MetadataConstSharedPtr new_metadata) override {
     absl::WriterMutexLock lock(&metadata_mutex_);
     metadata_ = new_metadata;
+    // Update data members dependent on metadata.
+    socket_factory_ = resolveTransportSocketFactory(address_, metadata_.get());
   }
 
   const ClusterInfo& cluster() const override { return *cluster_; }
@@ -176,7 +178,7 @@ private:
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
-  Network::TransportSocketFactory& socket_factory_;
+  std::reference_wrapper<Network::TransportSocketFactory> socket_factory_;
   const MonotonicTime creation_time_;
 };
 
