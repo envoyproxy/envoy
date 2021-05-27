@@ -397,7 +397,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToEarlyResponse) {
   upstream_request_->encodeHeaders(redirect_response_, true);
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -405,7 +405,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToEarlyResponse) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();

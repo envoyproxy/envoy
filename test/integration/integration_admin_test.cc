@@ -30,8 +30,8 @@ namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
@@ -280,19 +280,19 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   switch (GetParam().downstream_protocol) {
-  case Http::CodecClient::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     EXPECT_EQ("   Count Lookup\n"
               "\n"
               "total: 0\n",
               response->body());
     break;
-  case Http::CodecClient::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     EXPECT_EQ("   Count Lookup\n"
               "\n"
               "total: 0\n",
               response->body());
     break;
-  case Http::CodecClient::Type::HTTP3:
+  case Http::CodecType::HTTP3:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -490,7 +490,7 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {
 public:
   IntegrationAdminIpv4Ipv6Test()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -530,7 +530,7 @@ class StatsMatcherIntegrationTest
       public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  StatsMatcherIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  StatsMatcherIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(

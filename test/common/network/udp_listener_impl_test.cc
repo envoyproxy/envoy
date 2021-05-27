@@ -56,6 +56,8 @@ public:
     // Return the real version by default.
     ON_CALL(override_syscall_, supportsMmsg())
         .WillByDefault(Return(os_calls.latched().supportsMmsg()));
+    ON_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
+        .WillByDefault(Return(MAX_NUM_PACKETS_PER_EVENT_LOOP));
 
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
@@ -63,6 +65,12 @@ public:
     if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
       server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
     }
+    std::unique_ptr<Network::Socket::Options> options =
+        std::make_unique<Network::Socket::Options>();
+    options->push_back(std::make_shared<Network::SocketOptionImpl>(
+        envoy::config::core::v3::SocketOption::STATE_BOUND,
+        ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 4 * 1024 * 1024));
+    server_socket_->addOptions(std::move(options));
     envoy::config::core::v3::UdpSocketConfig config;
     if (prefer_gro) {
       config.mutable_prefer_gro()->set_value(prefer_gro);
@@ -71,11 +79,22 @@ public:
         std::make_unique<UdpListenerImpl>(dispatcherImpl(), server_socket_, listener_callbacks_,
                                           dispatcherImpl().timeSource(), config);
     udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
+    int get_recvbuf_size = 0;
+    socklen_t int_size = static_cast<socklen_t>(sizeof(get_recvbuf_size));
+    const Api::SysCallIntResult result2 =
+        server_socket_->getSocketOption(SOL_SOCKET, SO_RCVBUF, &get_recvbuf_size, &int_size);
+    EXPECT_EQ(0, result2.rc_);
+    // Kernel increases the buffer size to allow bookkeeping overhead.
+    if (get_recvbuf_size < 4 * 1024 * 1024) {
+      recvbuf_large_enough_ = false;
+    }
+
     ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));
   }
 
   NiceMock<OverrideOsSysCallsImpl> override_syscall_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&override_syscall_};
+  bool recvbuf_large_enough_{true};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
@@ -145,7 +164,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test a large datagram that gets dropped using recvmmsg if supported.
+// Test a large datagram that gets dropped using recvmsg or recvmmsg if supported.
 TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   setup();
 
@@ -172,33 +191,75 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   EXPECT_EQ(2, listener_->packetsDropped());
 }
 
-// Test a large datagram that gets dropped using recvmsg.
-TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
+TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   setup();
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    return;
+  }
+  const uint64_t num_packets_per_read =
+      Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u;
 
-  ON_CALL(override_syscall_, supportsMmsg()).WillByDefault(Return(false));
+  size_t num_packets_expected_per_loop{32u};
+  // These packets should be read in more than 3 loops.
+  const std::string payload1(10, 'a');
+  for (uint64_t i = 0; i < 2 * num_packets_expected_per_loop; ++i) {
+    client_.write(payload1, *send_to_addr_);
+  }
+  const std::string last_piece("bbb");
+  client_.write(last_piece, *send_to_addr_);
 
-  // This will get dropped.
-  const std::string first(4096, 'a');
-  client_.write(first, *send_to_addr_);
-  const std::string second("second");
-  client_.write(second, *send_to_addr_);
-  // This will get dropped.
-  const std::string third(4096, 'b');
-  client_.write(third, *send_to_addr_);
+  EXPECT_CALL(listener_callbacks_, onReadReady()).Times(testing::AtLeast(3u));
+  EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
+      .WillRepeatedly(Return(num_packets_expected_per_loop));
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, num_packets_per_read);
+        if (last_piece == data.buffer_->toString()) {
+          dispatcher_->exit();
+        }
+      }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+  num_packets_received_by_listener_ = 0u;
+  num_packets_expected_per_loop = 0u;
+  std::string payload2(10, 'c');
+  // This packet should be read.
+  client_.write(payload2, *send_to_addr_);
   EXPECT_CALL(listener_callbacks_, onReadReady());
-  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
+  EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
+      .WillRepeatedly(Return(num_packets_expected_per_loop));
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-    validateRecvCallbackParams(
-        data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u);
-    EXPECT_EQ(data.buffer_->toString(), second);
-
+    validateRecvCallbackParams(data, num_packets_per_read);
+    EXPECT_EQ(payload2, data.buffer_->toString());
     dispatcher_->exit();
   }));
-
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(2, listener_->packetsDropped());
+
+  if (!recvbuf_large_enough_) {
+    // If SO_RCVBUF failed to enlarge receive buffer to 4MB, the rest of test will likely to fail
+    // because packets may be easily dropped. Skip the rest of the test.
+    return;
+  }
+  num_packets_received_by_listener_ = 0u;
+  // Though the mocked callback wants to read more, only 6000 reads maximum are allowed.
+  num_packets_expected_per_loop = MAX_NUM_PACKETS_PER_EVENT_LOOP + 1u;
+  std::string payload3(10, 'd');
+  for (uint64_t i = 0; i < num_packets_expected_per_loop; ++i) {
+    client_.write(payload3, *send_to_addr_);
+  }
+  std::string really_last_piece("eee");
+  client_.write(really_last_piece, *send_to_addr_);
+  EXPECT_CALL(listener_callbacks_, onReadReady()).Times(testing::AtLeast(2u));
+  EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
+      .WillRepeatedly(Return(num_packets_expected_per_loop));
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, num_packets_per_read);
+        if (really_last_piece == data.buffer_->toString()) {
+          dispatcher_->exit();
+        }
+      }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 #ifdef UDP_GRO
@@ -380,13 +441,16 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   EXPECT_CALL(listener_callbacks_, onReceiveError(_))
       .WillOnce(Invoke([&](Api::IoError::IoErrorCode err) -> void {
         ASSERT_EQ(Api::IoError::IoErrorCode::NoSupport, err);
-
         dispatcher_->exit();
       }));
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, supportsMmsg());
+  EXPECT_CALL(os_sys_calls, supportsMmsg())
+      .Times(
+          (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")
+               ? 2u
+               : 1u));
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
 

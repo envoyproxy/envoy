@@ -178,10 +178,10 @@ TEST_P(CdnLoopFilterIntegrationTest, CdnLoop2Allowed3Seen) {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CdnLoopFilterIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
                              // Upstream doesn't matter, so by testing only 1,
                              // the test is twice as fast.
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace
