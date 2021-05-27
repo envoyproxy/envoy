@@ -22,13 +22,14 @@ public:
   // Server::ThreadLocal
   MOCK_METHOD(SlotPtr, allocateSlot, ());
   MOCK_METHOD(void, registerThread, (Event::Dispatcher & dispatcher, bool main_thread));
-  MOCK_METHOD(void, shutdownGlobalThreading, ());
+  void shutdownGlobalThreading() override { shutdown_ = true; }
   MOCK_METHOD(void, shutdownThread, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  bool isShutdown() const override { return shutdown_; }
 
-  SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
-  void runOnAllThreads1_(Event::PostCb cb) { cb(); }
-  void runOnAllThreads2_(Event::PostCb cb, Event::PostCb main_callback) {
+  SlotPtr allocateSlotMock() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
+  void runOnAllThreads1(Event::PostCb cb) { cb(); }
+  void runOnAllThreads2(Event::PostCb cb, Event::PostCb main_callback) {
     cb();
     main_callback();
   }

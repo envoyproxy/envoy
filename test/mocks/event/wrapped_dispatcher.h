@@ -117,6 +117,8 @@ public:
     return impl_.popTrackedObject(expected_object);
   }
 
+  bool trackedObjectStackIsEmpty() const override { return impl_.trackedObjectStackIsEmpty(); }
+
   MonotonicTime approximateMonotonicTime() const override {
     return impl_.approximateMonotonicTime();
   }

@@ -13,6 +13,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/http/filter_config_provider.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
@@ -174,6 +175,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -185,6 +187,10 @@ public:
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
     return path_with_escaped_slashes_action_;
+  }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return original_ip_detection_extensions_;
   }
 
 private:
@@ -268,6 +274,7 @@ private:
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
@@ -277,6 +284,7 @@ private:
   static const uint64_t RequestHeaderTimeoutMs = 0;
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
+  const bool strip_trailing_host_dot_;
 };
 
 /**

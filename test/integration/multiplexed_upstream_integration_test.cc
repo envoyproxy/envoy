@@ -17,14 +17,14 @@ namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // TODO(alyssawilk) move #defines into getProtocolTestParams in a follow-up
 #ifdef ENVOY_ENABLE_QUIC
 INSTANTIATE_TEST_SUITE_P(ProtocolsWithQuic, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP3})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 #endif
 
@@ -50,6 +50,10 @@ TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseCompl
 
 TEST_P(Http2UpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
   testRouterDownstreamDisconnectBeforeRequestComplete();
+
+  // Given the downstream disconnect, Envoy will reset the upstream stream.
+  EXPECT_EQ(1, upstreamTxResetCounterValue());
+  EXPECT_EQ(0, upstreamRxResetCounterValue());
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
@@ -136,6 +140,24 @@ TEST_P(Http2UpstreamIntegrationTest, LargeBidirectionalStreamingWithBufferLimits
   bidirectionalStreaming(1024 * 32);
 }
 
+uint64_t Http2UpstreamIntegrationTest::upstreamRxResetCounterValue() {
+  return test_server_
+      ->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".rx_reset"))
+      ->value();
+}
+
+uint64_t Http2UpstreamIntegrationTest::upstreamTxResetCounterValue() {
+  return test_server_
+      ->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"))
+      ->value();
+}
+uint64_t Http2UpstreamIntegrationTest::downstreamRxResetCounterValue() {
+  return test_server_->counter(absl::StrCat(downstreamProtocolStatsRoot(), ".rx_reset"))->value();
+}
+uint64_t Http2UpstreamIntegrationTest::downstreamTxResetCounterValue() {
+  return test_server_->counter(absl::StrCat(downstreamProtocolStatsRoot(), ".tx_reset"))->value();
+}
+
 TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -169,6 +191,13 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   upstream_request_->encodeResetStream();
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
+
+  // The upstream stats should reflect receiving the reset, and downstream
+  // reflect sending it on.
+  EXPECT_EQ(1, upstreamRxResetCounterValue());
+  EXPECT_EQ(0, upstreamTxResetCounterValue());
+  EXPECT_EQ(0, downstreamRxResetCounterValue());
+  EXPECT_EQ(1, downstreamTxResetCounterValue());
 }
 
 void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
@@ -309,7 +338,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
   name: pause-filter{}
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty)EOF",
-                  downstreamProtocol() == Http::CodecClient::Type::HTTP3 ? "-for-quic" : ""));
+                  downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
@@ -371,6 +400,8 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   for (uint32_t i = 1; i < num_requests; ++i) {
     ASSERT_TRUE(responses[i]->waitForReset());
   }
+
+  EXPECT_NE(0, downstreamRxResetCounterValue());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/6744
@@ -431,6 +462,13 @@ typed_config:
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+
+  // As the error was internal, Envoy should reset the upstream connection.
+  // Downstream gets an error, so no resets there.
+  EXPECT_EQ(1, upstreamTxResetCounterValue());
+  EXPECT_EQ(0, downstreamTxResetCounterValue());
+  EXPECT_EQ(0, upstreamRxResetCounterValue());
+  EXPECT_EQ(0, downstreamRxResetCounterValue());
 }
 
 // Tests the default limit for the number of response headers is 100. Results in a stream reset if
@@ -609,17 +647,19 @@ protected:
     Http2UpstreamIntegrationTest::initialize();
   }
   void createUpstreams() override {
-    ASSERT_EQ(upstreamProtocol(), FakeHttpConnection::Type::HTTP3);
+    ASSERT_EQ(upstreamProtocol(), Http::CodecType::HTTP3);
+    ASSERT_EQ(fake_upstreams_count_, 1);
+    ASSERT_FALSE(autonomous_upstream_);
+
     if (use_http2_) {
-      // Generally we always want to set these fields via accessors, which
-      // changes both the upstreams and Envoy's configuration at the same time.
-      // In this particular case, we want to change the upstreams without
-      // touching config, so edit the raw members directly.
-      upstream_config_.udp_fake_upstream_ = absl::nullopt;
-      upstream_config_.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+      auto config = configWithType(Http::CodecType::HTTP2);
+      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2);
+    } else {
+      auto config = configWithType(Http::CodecType::HTTP3);
+      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3);
     }
-    Http2UpstreamIntegrationTest::createUpstreams();
-    upstream_config_.upstream_protocol_ = FakeHttpConnection::Type::HTTP3;
   }
 
   bool use_http2_{false};
@@ -636,7 +676,7 @@ TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp2) {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, MixedUpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP3})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 #endif

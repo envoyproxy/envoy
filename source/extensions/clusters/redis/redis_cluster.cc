@@ -100,8 +100,8 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true, time_source_));
     all_new_hosts.emplace(slot.primary()->asString());
     for (auto const& replica : slot.replicas()) {
-      new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false, time_source_));
-      all_new_hosts.emplace(replica->asString());
+      new_hosts.emplace_back(new RedisHost(info(), "", replica.second, *this, false, time_source_));
+      all_new_hosts.emplace(replica.first);
     }
   }
 
