@@ -49,13 +49,12 @@ public:
 
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
-               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-               Http::CodecClient::Type type);
+               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type);
   ~HttpConnPool() override;
 
   // HTTP/3 upstreams are not supported at the moment.
   bool valid() const {
-    return conn_pool_data_.has_value() && type_ <= Http::CodecClient::Type::HTTP2;
+    return conn_pool_data_.has_value() && type_ <= Http::CodecType::HTTP2;
   }
 
   // GenericConnPool
@@ -100,7 +99,7 @@ private:
                           const Network::Address::InstanceConstSharedPtr& local_address,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfig config_;
-  Http::CodecClient::Type type_;
+  Http::CodecType type_;
   absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};

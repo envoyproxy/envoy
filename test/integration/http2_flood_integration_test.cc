@@ -131,8 +131,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          TestUtility::ipTestParamsToString);
 
 bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower upstream outbound frame limits to make tests run faster
   config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
@@ -158,8 +158,8 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
 }
 
 void Http2FloodMitigationTest::beginSession() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower outbound frame limits to make tests run faster
   config_helper_.setDownstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
@@ -1554,8 +1554,8 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
 
 // Validate that the default configuration has flood protection enabled.
 TEST_P(Http2FloodMitigationTest, UpstreamFloodDetectionIsOnByDefault) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
 
   floodClient(Http2Frame::makePingFrame(),
