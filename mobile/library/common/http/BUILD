@@ -28,6 +28,7 @@ envoy_cc_library(
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:lock_guard_lib",
         "@envoy//source/common/common:minimal_logger_lib",
+        "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/common:thread_lib",
         "@envoy//source/common/common:thread_synchronizer_lib",
         "@envoy//source/common/http:codec_helper_lib",

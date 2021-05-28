@@ -86,9 +86,9 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
           stat_name_set_ = client_scope_->symbolTable().makeSet("pulse");
           auto api_listener = server_->listenerManager().apiListener()->get().http();
           ASSERT(api_listener.has_value());
-          http_client_ = std::make_unique<Http::Client>(api_listener.value(), *dispatcher_,
-                                                        server_->serverFactoryContext().scope(),
-                                                        preferred_network_);
+          http_client_ = std::make_unique<Http::Client>(
+              api_listener.value(), *dispatcher_, server_->serverFactoryContext().scope(),
+              preferred_network_, server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
           if (callbacks_.on_engine_running != nullptr) {
             callbacks_.on_engine_running(callbacks_.context);
