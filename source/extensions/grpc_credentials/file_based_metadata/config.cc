@@ -28,7 +28,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
     switch (credential.credential_specifier_case()) {
     case envoy::config::core::v3::GrpcService::GoogleGrpc::CallCredentials::
         CredentialSpecifierCase::kFromPlugin: {
-      if (credential.from_plugin().name() == GrpcCredentialsNames::get().FileBasedMetadata) {
+      if (credential.from_plugin().name() == "envoy.grpc_credentials.file_based_metadata") {
         FileBasedMetadataGrpcCredentialsFactory file_based_metadata_credentials_factory;
         // We don't deal with validation failures here at runtime today, see
         // https://github.com/envoyproxy/envoy/issues/8010.

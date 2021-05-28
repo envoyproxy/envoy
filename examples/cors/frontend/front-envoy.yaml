@@ -33,7 +33,6 @@ static_resources:
             typed_config: {}
   clusters:
   - name: frontend_service
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

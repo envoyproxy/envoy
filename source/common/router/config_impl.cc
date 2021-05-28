@@ -626,24 +626,29 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::HeaderTransforms
-RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                             bool do_formatting) const {
   Http::HeaderTransforms transforms;
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
     // Append user-specified request headers from most to least specific: route-level headers,
     // virtual host level headers and finally global connection manager level headers.
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
   } else {
     // Most specific mutations (route-level) take precedence by being applied
     // last: if a header is specified at all levels, the last one applied wins.
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
   }
   return transforms;
 }
@@ -1047,9 +1052,10 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
-    const StreamInfo::StreamInfo& stream_info) const {
-  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info);
-  mergeTransforms(transforms, DynamicRouteEntry::responseHeaderTransforms(stream_info));
+    const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
+  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info, do_formatting);
+  mergeTransforms(transforms,
+                  DynamicRouteEntry::responseHeaderTransforms(stream_info, do_formatting));
   return transforms;
 }
 

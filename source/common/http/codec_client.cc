@@ -20,12 +20,12 @@
 namespace Envoy {
 namespace Http {
 
-CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
+CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
     : type_(type), host_(host), connection_(std::move(connection)),
       idle_timeout_(host_->cluster().idleTimeout()) {
-  if (type_ != Type::HTTP3) {
+  if (type_ != CodecType::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
     // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
     // details)
@@ -95,7 +95,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.
-  if (type_ == Type::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
+  if (type_ == CodecType::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
     onData(empty);
@@ -169,26 +169,26 @@ void CodecClient::onData(Buffer::Instance& data) {
          absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
-CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
+CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
-  case Type::HTTP1: {
+  case CodecType::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
         host->cluster().maxResponseHeadersCount());
     break;
   }
-  case Type::HTTP2: {
+  case CodecType::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
         host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   }
-  case Type::HTTP3: {
+  case CodecType::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(

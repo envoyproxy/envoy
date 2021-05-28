@@ -61,8 +61,9 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
 
     if (per_route_kill_settings) {
       is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::REQUEST;
-      envoy::type::v3::FractionalPercent probability = per_route_kill_settings->getProbability();
-      kill_request_.set_allocated_probability(&probability);
+      // Allocate the probability into kill_request in case the lifetime of
+      // per_route_kill_settings does not match that of kill_request_
+      kill_request_.mutable_probability()->CopyFrom(per_route_kill_settings->getProbability());
     }
   }
 
