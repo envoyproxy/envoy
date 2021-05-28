@@ -45,7 +45,7 @@ public:
     actions_[action.index()] = state;
   }
 
-  bool tryAllocateResource(OverloadProactiveResourceName resource_name, uint64_t increment) {
+  bool tryAllocateResource(OverloadProactiveResourceName resource_name, int64_t increment) {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource != proactive_resources_->end()) {
       if (proactive_resource->second.tryAllocateResource(increment)) {
@@ -59,7 +59,7 @@ public:
     }
   }
 
-  bool tryDeallocateResource(OverloadProactiveResourceName resource_name, uint64_t decrement) {
+  bool tryDeallocateResource(OverloadProactiveResourceName resource_name, int64_t decrement) {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource != proactive_resources_->end()) {
       if (proactive_resource->second.tryDeallocateResource(decrement)) {
@@ -382,7 +382,6 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
         throw EnvoyException(
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
       }
-      // Unified handling of proactive and regular resources here.
       resource_to_actions_.insert(std::make_pair(resource, symbol));
     }
   }
@@ -427,8 +426,8 @@ void OverloadManagerImpl::stop() {
 
   // Clear the resource map to block on any pending updates.
   resources_.clear();
-  // todo fix this in tls
-  // proactive_resources_->clear();
+
+  // TODO(nezdolik): wrap proactive monitors into atomic? and clear it here
 }
 
 bool OverloadManagerImpl::registerForAction(const std::string& action,

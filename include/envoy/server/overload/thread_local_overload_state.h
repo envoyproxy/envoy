@@ -67,10 +67,10 @@ public:
   virtual const OverloadActionState& getState(const std::string& action) PURE;
 
   virtual bool tryAllocateResource(OverloadProactiveResourceName resource_name,
-                                   uint64_t increment) PURE;
+                                   int64_t increment) PURE;
 
   virtual bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
-                                     uint64_t decrement) PURE;
+                                     int64_t decrement) PURE;
 };
 
 } // namespace Server

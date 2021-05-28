@@ -22,18 +22,18 @@ public:
    * @param increment to add to current resource usage value and compare against configured max
    * threshold.
    */
-  virtual bool tryAllocateResource(uint64_t increment) PURE;
+  virtual bool tryAllocateResource(int64_t increment) PURE;
   /**
    * Tries to deallocate resource for given resource monitor in thread safe manner.
    * Returns true if there is enough resource quota available and deallocation has succeeded, false
    * otherwise.
    * @param decrement to subtract from current resource usage value.
    */
-  virtual bool tryDeallocateResource(uint64_t decrement) PURE;
+  virtual bool tryDeallocateResource(int64_t decrement) PURE;
   /**
    * Returns current resource usage tracked by monitor.
    */
-  virtual uint64_t currentResourceUsage() const PURE;
+  virtual int64_t currentResourceUsage() const PURE;
   /**
    * Returns max resource usage configured in monitor.
    */
@@ -48,27 +48,27 @@ public:
   ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
       : max_(max_active_conns), current_(0){};
 
-  bool tryAllocateResource(uint64_t increment) {
+  bool tryAllocateResource(int64_t increment) {
     int64_t new_val = (current_ += increment);
-    if (new_val > max_ || new_val < 0) {
+    if (new_val > static_cast<int64_t>(max_) || new_val < 0) {
       current_ -= increment;
       return false;
     }
     return true;
   }
 
-  bool tryDeallocateResource(uint64_t decrement) {
+  bool tryDeallocateResource(int64_t decrement) {
     RELEASE_ASSERT(decrement <= current_,
                    "Cannot deallocate resource, current resource usage is lower than decrement");
-    int64_t new_val = (current_ -= increment);
+    int64_t new_val = (current_ -= decrement);
     if (new_val < 0) {
-      current_ += increment;
+      current_ += decrement;
       return false;
     }
     return true;
   }
 
-  uint64_t currentResourceUsage() const { return current_.load(); }
+  int64_t currentResourceUsage() const { return current_.load(); }
   uint64_t maxResourceUsage() const { return max_; };
 
 protected:
@@ -83,7 +83,7 @@ public:
       : name_(name), monitor_(std::move(monitor)),
         failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")) {}
 
-  bool tryAllocateResource(uint64_t increment) {
+  bool tryAllocateResource(int64_t increment) {
     if (monitor_->tryAllocateResource(increment)) {
       return true;
     } else {
@@ -92,7 +92,7 @@ public:
     }
   }
 
-  bool tryDeallocateResource(uint64_t decrement) {
+  bool tryDeallocateResource(int64_t decrement) {
     if (monitor_->tryDeallocateResource(decrement)) {
       return true;
     } else {
@@ -101,7 +101,7 @@ public:
     }
   }
 
-  uint64_t currentResourceUsage() { return monitor_->currentResourceUsage(); }
+  int64_t currentResourceUsage() { return monitor_->currentResourceUsage(); }
 
 private:
   const std::string name_;

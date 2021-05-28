@@ -227,7 +227,7 @@ constexpr char kRegularStateConfig[] = R"YAML(
     - name: envoy.resource_monitors.fake_resource2
     - name: envoy.resource_monitors.fake_resource3
     - name: envoy.resource_monitors.fake_resource4
-    - name: envoy.proactive_resource_monitors.global_downstream_max_connections    
+    - name: envoy.proactive_resource_monitors.global_downstream_max_connections
   actions:
     - name: envoy.overload_actions.dummy_action
       triggers:

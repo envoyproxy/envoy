@@ -11,7 +11,6 @@
 
 namespace Envoy {
 namespace Server {
-
 /**
  * Well-known overload action names.
  */
