@@ -118,6 +118,10 @@ private:
 
       return std::make_unique<AllFieldMatcher<DataType>>(std::move(sub_matchers));
     }
+    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kNotMatcher): {
+      return std::make_unique<NotFieldMatcher<DataType>>(
+          createFieldMatcher(field_predicate.not_matcher()));
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }

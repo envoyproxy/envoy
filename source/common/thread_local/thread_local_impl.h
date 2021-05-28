@@ -28,6 +28,7 @@ public:
   void shutdownGlobalThreading() override;
   void shutdownThread() override;
   Event::Dispatcher& dispatcher() override;
+  bool isShutdown() const override { return shutdown_; }
 
 private:
   // On destruction returns the slot index to the deferred delete queue (detaches it). This allows

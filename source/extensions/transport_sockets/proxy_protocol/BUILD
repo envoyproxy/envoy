@@ -13,17 +13,12 @@ envoy_cc_extension(
     name = "upstream_config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = (
-        "envoy.transport_sockets.upstream",
-    ),
-    security_posture = "robust_to_untrusted_downstream_and_upstream",  # header generated in Envoy, so can't be faked
     deps = [
         ":upstream_proxy_protocol",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg_cc_proto",
     ],
 )

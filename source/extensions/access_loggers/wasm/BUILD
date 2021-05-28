@@ -26,9 +26,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.access_loggers",
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         ":wasm_access_log_lib",
         "//include/envoy/registry",

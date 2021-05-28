@@ -89,7 +89,7 @@ TEST_P(AdsIntegrationTest, TestPrimaryClusterWarmClusterInitialization) {
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V3);
   auto loopback = Network::Test::getLoopbackAddressString(ipVersion());
-  addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+  addFakeUpstream(Http::CodecType::HTTP2);
   auto port = fake_upstreams_.back()->localAddress()->ip()->port();
 
   // This cluster will be blocked since endpoint name cannot be resolved.
@@ -366,38 +366,6 @@ TEST_P(AdsIntegrationTest, ResourceNamesOnStreamReset) {
   // a wildcard request (cluster_0 will appear in initial_resource_versions).
   EXPECT_TRUE(
       compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {"cluster_0"}, {}, {}, true));
-}
-
-// Validate that xds can support a mix of v2 and v3 type url.
-TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true");
-  initialize();
-
-  // Send initial configuration.
-  // Discovery response with v3 type url.
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-          envoy::config::core::v3::ApiVersion::V3),
-      {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
-  // Discovery response with v2 type url.
-  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
-      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
-  // Discovery response with v3 type url.
-  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      Config::getTypeUrl<envoy::config::listener::v3::Listener>(
-          envoy::config::core::v3::ApiVersion::V3),
-      {buildListener("listener_0", "route_config_0")},
-      {buildListener("listener_0", "route_config_0")}, {}, "1", false);
-  // Discovery response with v2 type url.
-  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
-      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-
-  // Validate that we can process a request.
-  makeSingleRequest();
 }
 
 // Validate that the request with duplicate listeners is rejected.
@@ -1087,7 +1055,7 @@ class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
@@ -1107,7 +1075,7 @@ public:
       ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ads_cluster->set_name("ads_cluster");
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
   }
 };
@@ -1128,7 +1096,7 @@ class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
@@ -1157,7 +1125,7 @@ public:
       eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       eds_config->mutable_ads();
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
   }
 };
@@ -1314,7 +1282,7 @@ class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParam
                                           public HttpIntegrationTest {
 public:
   AdsClusterFromFileIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
@@ -1355,7 +1323,7 @@ public:
       eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       eds_config->mutable_ads();
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
   }
 

@@ -2,7 +2,6 @@ admin:
   access_log_path: /tmp/admin_access.log
   address:
     socket_address: { address: 0.0.0.0, port_value: 9901 }
-
 static_resources:
   listeners:
   - name: listener1
@@ -74,7 +73,6 @@ static_resources:
 
   clusters:
   - name: grpc
-    connect_timeout: 1.25s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     dns_lookup_family: V4_ONLY
@@ -92,3 +90,11 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 50051
+
+layered_runtime:
+  layers:
+    - name: static-layer
+      static_layer:
+        envoy:
+          reloadable_features:
+            experimental_matching_api: true

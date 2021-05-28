@@ -1,5 +1,6 @@
 #include "common/quic/envoy_quic_dispatcher.h"
 
+#include "common/common/safe_memcpy.h"
 #include "common/http/utility.h"
 #include "common/quic/envoy_quic_server_connection.h"
 #include "common/quic/envoy_quic_server_session.h"
@@ -52,12 +53,6 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
     const quic::ParsedQuicVersion& version, absl::string_view sni) {
   quic::QuicConfig quic_config = config();
-  // TODO(danzh) setup flow control window via config.
-  quic_config.SetInitialStreamFlowControlWindowToSend(
-      Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-  quic_config.SetInitialSessionFlowControlWindowToSend(
-      1.5 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(sni), alpn);
   const Network::FilterChain* filter_chain =
@@ -90,6 +85,19 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   per_worker_stats_.downstream_cx_active_.inc();
   per_worker_stats_.downstream_cx_total_.inc();
   return quic_session;
+}
+
+quic::QuicConnectionId EnvoyQuicDispatcher::ReplaceLongServerConnectionId(
+    const quic::ParsedQuicVersion& version, const quic::QuicConnectionId& server_connection_id,
+    uint8_t expected_server_connection_id_length) const {
+  quic::QuicConnectionId new_connection_id = quic::QuicDispatcher::ReplaceLongServerConnectionId(
+      version, server_connection_id, expected_server_connection_id_length);
+  char* new_connection_id_data = new_connection_id.mutable_data();
+  const char* server_connection_id_ptr = server_connection_id.data();
+  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(server_connection_id_ptr);
+  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
+  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
+  return new_connection_id;
 }
 
 } // namespace Quic

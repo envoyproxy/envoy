@@ -55,6 +55,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "envoy_quic_session_cache_test",
+    srcs = ["envoy_quic_session_cache_test.cc"],
+    external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:envoy_quic_session_cache_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = ["envoy_quic_proof_verifier_test.cc"],
     external_deps = ["quiche_quic_platform"],
@@ -169,6 +179,7 @@ envoy_cc_test(
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
+        "//source/common/http:utility_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:envoy_quic_utils_lib",
@@ -239,12 +250,36 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "client_connection_factory_impl_test",
+    srcs = ["client_connection_factory_impl_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http/http3:conn_pool_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/common/http:common_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "quic_io_handle_wrapper_test",
     srcs = ["quic_io_handle_wrapper_test.cc"],
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],

@@ -82,6 +82,9 @@ Run Envoy with the demo configuration
 
 The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configuration.
 
+Envoy will parse the config file according to the file extension, please see the
+:option:`config path command line option <-c>` for further information.
+
 .. tabs::
 
    .. tab:: System
@@ -155,7 +158,7 @@ Check Envoy is proxying on http://localhost:10000.
    $ curl -v localhost:10000
    ...
 
-You can exit the server with `Ctrl-c`.
+You can exit the server with ``Ctrl-c``.
 
 See the :ref:`admin quick start guide <start_quick_start_admin>` for more information about the Envoy admin interface.
 
