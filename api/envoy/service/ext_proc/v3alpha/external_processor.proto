@@ -231,15 +231,18 @@ message CommonResponse {
     // stream as normal. This is the default.
     CONTINUE = 0;
 
-    // [#not-implemented-hide:]
-    // Replace the request or response with the contents
-    // of this message. If header_mutation is set, apply it to the
-    // headers. If body_mutation is set and contains a body, then add that
-    // body to the request or response, even if one does not already exist --
-    // otherwise, clear the body. Any additional body and trailers
-    // received from downstream or upstream will be ignored.
-    // This can be used to add a body to a request or response that does not
-    // have one already.
+    // Apply the specified header mutation, replace the body with the body
+    // specified in the body mutation (if present), and do not send any
+    // further messages for this request or response even if the processing
+    // mode is configured to do so.
+    //
+    // When used in response to a request_headers or response_headers message,
+    // this status makes it possible to either completely replace the body
+    // while discarding the original body, or to add a body to a message that
+    // formerly did not have one.
+    //
+    // In other words, this response makes it possible to turn an HTTP GET
+    // into a POST, PUT, or PATCH.
     CONTINUE_AND_REPLACE = 1;
   }
 

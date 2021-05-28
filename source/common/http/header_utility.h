@@ -66,6 +66,7 @@ public:
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
     const bool invert_match_;
+    bool present_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {
@@ -175,6 +176,11 @@ public:
    */
   static bool shouldCloseConnection(Http::Protocol protocol,
                                     const RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @brief Remove the trailing host dot from host/authority header.
+   */
+  static void stripTrailingHostDot(RequestHeaderMap& headers);
 
   /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
