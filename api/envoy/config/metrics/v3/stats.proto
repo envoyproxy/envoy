@@ -407,7 +407,7 @@ message HystrixSink {
   int64 num_buckets = 1;
 }
 
-// Stats configuration proto schema for *envoy.stat_sinks.graphite_statsd* sink.
+// Stats configuration proto schema for ``envoy.stat_sinks.graphite_statsd`` sink.
 // The sink emits stats with `Graphite <https://graphite.readthedocs.io/en/latest/tags.html>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
