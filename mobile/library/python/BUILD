@@ -71,7 +71,7 @@ py_wheel(
         "//bazel:darwin_arm64": "macosx_10_9_aarch64",
         "//bazel:darwin_x86_64": "macosx_10_9_x86_64",
         "//bazel:darwin": "macosx_10_9_x86_64",
-        "//bazel:linux_aarch64": "manylinux2010_aarch64",
+        "//bazel:linux_aarch64": "manylinux2014_aarch64",
         "//bazel:linux_x86_64": "manylinux2010_x86_64",
     }),
     python_tag = python_tag(),
