@@ -5,16 +5,17 @@
 # This script expects a copy of the envoy source to be located at /source
 # Alternatively, you can specify a path to the source dir with `ENVOY_SRCDIR`
 
-import ast
-import os
 import pathlib
 import re
-import subprocess
 import sys
 from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
 
 import yaml
+
+BUILTIN_EXTENSIONS = (
+    "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
+    "envoy.upstreams.http.http_protocol_options", "envoy.upstreams.http.generic")
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -86,43 +87,18 @@ EXTENSION_STATUS_VALUES = [
     "wip",
 ]
 
-# TODO(phlax): remove this
-BUILDOZER_PATH = os.path.abspath(
-    "external/com_github_bazelbuild_buildtools/buildozer/buildozer_/buildozer")
-
-# TODO(phlax): remove this
-ENVOY_SRCDIR = os.getenv('ENVOY_SRCDIR', '/source')
-
-# TODO(phlax): remove this
-if not os.path.exists(ENVOY_SRCDIR):
-    raise SystemExit(
-        "Envoy source must either be located at /source, or ENVOY_SRCDIR env var must be set")
-
 # source/extensions/extensions_build_config.bzl must have a .bzl suffix for Starlark
 # import, so we are forced to do this workaround.
 _extensions_build_config_spec = spec_from_loader(
     'extensions_build_config',
-    SourceFileLoader(
-        'extensions_build_config',
-        os.path.join(ENVOY_SRCDIR, 'source/extensions/extensions_build_config.bzl')))
+    SourceFileLoader('extensions_build_config', 'source/extensions/extensions_build_config.bzl'))
 extensions_build_config = module_from_spec(_extensions_build_config_spec)
 _extensions_build_config_spec.loader.exec_module(extensions_build_config)
 
 
-class ExtensionDbError(Exception):
-    pass
-
-
-# TODO(phlax): remove this
-def is_missing(value):
-    return value == '(missing)'
-
-
 def num_read_filters_fuzzed():
     data = pathlib.Path(
-        os.path.join(
-            ENVOY_SRCDIR,
-            'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc')).read_text()
+        'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc').read_text()
     # Hack-ish! We only search the first 50 lines to capture the filters in filterNames().
     return len(re.findall('NetworkFilterNames::get()', ''.join(data.splitlines()[:50])))
 
@@ -135,83 +111,24 @@ def num_robust_to_downstream_network_filters(db):
     ])
 
 
-# TODO(phlax): remove this
-def get_extension_metadata(target):
-    if not BUILDOZER_PATH:
-        raise ExtensionDbError('Buildozer not found!')
-    r = subprocess.run(
-        [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented category', target],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    rout = r.stdout.decode('utf-8').strip().split(' ')
-    security_posture, status, undocumented = rout[:3]
-    categories = ' '.join(rout[3:])
-    # evaluate tuples/lists
-    # wrap strings in a list
-    categories = list(
-        ast.literal_eval(categories) if ('[' in categories or '(' in categories) else [categories])
-    return {
-        'security_posture': security_posture,
-        'undocumented': False if is_missing(undocumented) else bool(undocumented),
-        'status': 'stable' if is_missing(status) else status,
-        'categories': categories,
-    }
-
-
-# TODO(phlax): remove this
-def compare_old_and_new(old_db, new_db):
-    returns = 0
-
-    if sorted(old_db.keys()) != sorted(new_db.keys()):
-        old_only = set(old_db.keys()) - set(new_db.keys())
-        new_only = set(new_db.keys()) - set(old_db.keys())
-        extra_old = (f"only old {old_only}" if old_only else "")
-        extra_new = (f"only new {new_only}" if new_only else "")
-        raise ExtensionDbError(f"Extensions list does not match - {extra_old} {extra_new}")
-
-    for k in new_db:
-        new_db[k]["undocumented"] = new_db[k].get("undocumented", False)
-        if old_db[k] != new_db[k]:
-            returns = 1
-            print(
-                f"ERROR: extension metadata in `source/extensions/extensions_metadata.yaml` does not match `BUILD` for {k}"
-            )
-            print(old_db[k])
-            print(new_db[k])
-    return returns
-
-
-# TODO(phlax): remove this
-def generate_old_extension_db():
-    extension_db = {}
-    # Include all extensions from source/extensions/extensions_build_config.bzl
-    all_extensions = {}
-    all_extensions.update(extensions_build_config.EXTENSIONS)
-    for extension, target in all_extensions.items():
-        extension_db[extension] = get_extension_metadata(target)
-    # The TLS and generic upstream extensions are hard-coded into the build, so
-    # not in source/extensions/extensions_build_config.bzl
-    # TODO(mattklein123): Read these special keys from all_extensions.bzl or a shared location to
-    # avoid duplicate logic.
-    extension_db['envoy.transport_sockets.tls'] = get_extension_metadata(
-        '//source/extensions/transport_sockets/tls:config')
-    extension_db['envoy.upstreams.http.generic'] = get_extension_metadata(
-        '//source/extensions/upstreams/http/generic:config')
-    extension_db['envoy.upstreams.tcp.generic'] = get_extension_metadata(
-        '//source/extensions/upstreams/tcp/generic:config')
-    extension_db['envoy.upstreams.http.http_protocol_options'] = get_extension_metadata(
-        '//source/extensions/upstreams/http:config')
-    extension_db['envoy.request_id.uuid'] = get_extension_metadata(
-        '//source/extensions/request_id/uuid:config')
-    return extension_db
-
-
-# TODO(phlax): move this to a checker class, remove `compare_old_and_new` and add pytests
+# TODO(phlax): move this to a checker class, and add pytests
 def validate_extensions():
     returns = 0
+
     with open("source/extensions/extensions_metadata.yaml") as f:
         metadata = yaml.safe_load(f.read())
-    returns = compare_old_and_new(generate_old_extension_db(), metadata)
+
+    all_extensions = set(extensions_build_config.EXTENSIONS.keys()) | set(BUILTIN_EXTENSIONS)
+    only_metadata = set(metadata.keys()) - all_extensions
+    missing_metadata = all_extensions - set(metadata.keys())
+
+    if only_metadata:
+        returns = 1
+        print(f"Metadata for unused extensions found: {only_metadata}")
+
+    if missing_metadata:
+        returns = 1
+        print(f"Metadata missing for extensions: {missing_metadata}")
 
     if num_robust_to_downstream_network_filters(metadata) != num_read_filters_fuzzed():
         returns = 1
