@@ -42,5 +42,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: frontendservice
+                address: frontend-service
                 port_value: 8000

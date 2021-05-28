@@ -36,7 +36,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: http_service
                 port_value: 8082
   - name: load_reporting_cluster
     type: STRICT_DNS
