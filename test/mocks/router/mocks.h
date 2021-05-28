@@ -50,7 +50,7 @@ public:
               (Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
               (const));
   MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
-              (const StreamInfo::StreamInfo& stream_info), (const));
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(std::string, newPath, (const Http::RequestHeaderMap& headers), (const));
   MOCK_METHOD(void, rewritePathHeader,
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
@@ -361,7 +361,7 @@ public:
               (Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
               (const));
   MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
-              (const StreamInfo::StreamInfo& stream_info), (const));
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(const Http::HashPolicy*, hashPolicy, (), (const));
   MOCK_METHOD(const HedgePolicy&, hedgePolicy, (), (const));
   MOCK_METHOD(const Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const));

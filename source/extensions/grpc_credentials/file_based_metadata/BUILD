@@ -24,7 +24,6 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/grpc:google_grpc_creds_lib",
-        "//source/extensions/grpc_credentials:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/grpc_credential/v3:pkg_cc_proto",
     ],

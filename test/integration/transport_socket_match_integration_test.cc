@@ -13,8 +13,7 @@ namespace Envoy {
 class TransportSockeMatchIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   TransportSockeMatchIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
-                            TestEnvironment::getIpVersionsForTest().front(),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::httpProxyConfig()) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
@@ -130,8 +129,8 @@ transport_socket:
   }
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setDownstreamProtocol(Http::CodecType::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   const uint32_t num_hosts_{2};

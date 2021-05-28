@@ -142,6 +142,9 @@ TEST_F(StreamRateLimiterTest, RateLimitOnSingleStream) {
   EXPECT_CALL(decoder_callbacks_,
               injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
   token_timer->invokeCallback();
+
+  limiter_->destroy();
+  EXPECT_EQ(limiter_->destroyed(), true);
 }
 
 } // namespace Common
