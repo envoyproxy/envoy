@@ -91,8 +91,8 @@ listener_filters:
       dns_resolution_config:
         resolvers:
         - socket_address:
-            address: "8.8.8.8"
-            port_value: 53
+            address: {}
+            port_value: {}
         dns_resolver_options:
           use_tcp_for_dns_lookups: false
           no_default_search_domain: false
