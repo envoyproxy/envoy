@@ -319,14 +319,14 @@ public:
 };
 
 FakeHttpConnection::FakeHttpConnection(
-    FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection, Type type,
+    FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection, Http::CodecType type,
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
     : FakeConnectionBase(shared_connection, time_system), type_(type) {
   ASSERT(max_request_headers_count != 0);
-  if (type == Type::HTTP1) {
+  if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
@@ -334,14 +334,14 @@ FakeHttpConnection::FakeHttpConnection(
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
-  } else if (type == Type::HTTP2) {
+  } else if (type == Http::CodecType::HTTP2) {
     envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, random_, http2_options,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
-    ASSERT(type == Type::HTTP3);
+    ASSERT(type == Http::CodecType::HTTP3);
 #ifdef ENVOY_ENABLE_QUIC
     Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
     codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
@@ -380,20 +380,20 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
 }
 
 void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
-  ASSERT(type_ >= Type::HTTP2);
+  ASSERT(type_ >= Http::CodecType::HTTP2);
   // Usually indicates connection level errors, no operations are needed since
   // the connection will be closed soon.
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", code);
 }
 
 void FakeHttpConnection::encodeGoAway() {
-  ASSERT(type_ >= Type::HTTP2);
+  ASSERT(type_ >= Http::CodecType::HTTP2);
 
   postToConnectionThread([this]() { codec_->goAway(); });
 }
 
 void FakeHttpConnection::encodeProtocolError() {
-  ASSERT(type_ >= Type::HTTP2);
+  ASSERT(type_ >= Http::CodecType::HTTP2);
 
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
@@ -513,7 +513,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)), config_(config),
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
-      listener_(*this, http_type_ == FakeHttpConnection::Type::HTTP3),
+      listener_(*this, http_type_ == Http::CodecType::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))),
       stats_scope_(stats_store_.createScope("test_server_scope")) {
   ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
@@ -541,7 +541,7 @@ void FakeUpstream::cleanUp() {
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   absl::MutexLock lock(&lock_);
-  if (read_disable_on_new_connection_ && http_type_ != FakeHttpConnection::Type::HTTP3) {
+  if (read_disable_on_new_connection_ && http_type_ != Http::CodecType::HTTP3) {
     // Disable early close detection to avoid closing the network connection before full
     // initialization is complete.
     connection.detectEarlyCloseWhenReadDisabled(false);
@@ -554,7 +554,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   // Normally we don't associate a logical network connection with a FakeHttpConnection  until
   // waitForHttpConnection is called, but QUIC needs to be set up as packets come in, so we do
   // not lazily create for HTTP/3
-  if (http_type_ == FakeHttpConnection::Type::HTTP3) {
+  if (http_type_ == Http::CodecType::HTTP3) {
     quic_connections_.push_back(std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(), http_type_, time_system_, config_.max_request_headers_kb_,
         config_.max_request_headers_count_, config_.headers_with_underscores_action_));
@@ -591,7 +591,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
 
     // As noted in createNetworkFilterChain, HTTP3 FakeHttpConnections are not
     // lazily created, so HTTP3 needs a different wait path here.
-    if (http_type_ == FakeHttpConnection::Type::HTTP3) {
+    if (http_type_ == Http::CodecType::HTTP3) {
       if (quic_connections_.empty() &&
           !waitForWithDispatcherRun(
               time_system_, lock_,
@@ -699,7 +699,7 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
   if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
-      http_type_ != FakeHttpConnection::Type::HTTP3) {
+      http_type_ != Http::CodecType::HTTP3) {
     // Re-enable read and early close detection.
     auto& connection = connection_wrapper->connection();
     connection.detectEarlyCloseWhenReadDisabled(true);

@@ -519,6 +519,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
 
   EXPECT_FALSE(headers.has(":other"));
   EXPECT_EQ("awesome value", headers.get_("x-awesome-header"));
+  EXPECT_EQ("application/json", headers.get_("content-type"));
 
   std::vector<std::string> cookies;
   headers.iterate([&cookies](const Http::HeaderEntry& entry) {
@@ -529,6 +530,40 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
   });
 
   EXPECT_THAT(cookies, ElementsAre("session-id=42; Secure; HttpOnly", "user=joe"));
+}
+
+/**
+ * encodeData() data in JSON mode should respect content-type header.
+ */
+TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeContentTypeHeader) {
+  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/});
+  filter_->resolveSettings();
+  Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
+  filter_->encodeHeaders(headers, false /*end_stream*/);
+
+  constexpr auto json_response = R"EOF(
+  {
+      "statusCode": 201,
+      "headers": {"content-type": "text/plain"}
+  }
+  )EOF";
+
+  Buffer::OwnedImpl encoded_buf;
+  encoded_buf.add(json_response);
+  auto on_modify_encoding_buffer = [&encoded_buf](std::function<void(Buffer::Instance&)> cb) {
+    cb(encoded_buf);
+  };
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buf));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
+      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+
+  auto result = filter_->encodeData(encoded_buf, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, result);
+
+  ASSERT_NE(nullptr, headers.Status());
+  EXPECT_EQ("201", headers.getStatusValue());
+  EXPECT_EQ("text/plain", headers.get_("content-type"));
 }
 
 /**

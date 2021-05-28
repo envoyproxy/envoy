@@ -237,7 +237,8 @@ private:
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
-    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                    bool) const override {
       return {};
     }
     const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
@@ -365,6 +366,8 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
+  // TODO(kbaichoo): Plumb account from owning request filter.
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

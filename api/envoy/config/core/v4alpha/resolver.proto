@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.config.core.v4alpha;
+
+import "envoy/config/core/v4alpha/address.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v4alpha";
+option java_outer_classname = "ResolverProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+
+// [#protodoc-title: Resolver]
+
+// DNS resolver configuration which includes the underlying dns resolver addresses and options.
+message DnsResolver {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.DnsResolver";
+
+  // A list of dns resolver addresses
+  // Setting this value causes failure if the
+  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
+  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
+  repeated Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
+}

@@ -9,14 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = [
-        "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
     name = "wasm_runtime_factory_interface",
     hdrs = [
         "wasm_runtime_factory.h",
@@ -38,7 +30,6 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":well_known_names",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/server:lifecycle_notifier_interface",
@@ -51,7 +42,6 @@ envoy_cc_library(
         "//source/common/version:version_includes",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@com_google_cel_cpp//eval/public:activation",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
         "@proxy_wasm_cpp_host//:include",
