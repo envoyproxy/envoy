@@ -16,7 +16,7 @@ TEST(ConfigTest, TestConfig) {
   const std::string yaml_string = R"EOF(
     name: ip
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.ip.v3.IP
+        "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.ip.v3.Ip
         cidr_ranges:
         - address_prefix: 192.0.2.0
           prefix_len: 24
@@ -38,7 +38,7 @@ TEST(ConfigTest, InvalidConfig) {
   const std::string yaml_string = R"EOF(
     name: ip
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.ip.v3.IP
+        "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.ip.v3.Ip
         cidr_ranges:
         - address_prefix: foo
           prefix_len: 10

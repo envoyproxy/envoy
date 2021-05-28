@@ -10,7 +10,7 @@ Envoy::Matcher::InputMatcherPtr
 IPConfig::createInputMatcher(const Protobuf::Message& config,
                              Server::Configuration::FactoryContext& factory_context) {
   const auto& ip_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::matching::input_matchers::ip::v3::IP&>(
+      const envoy::extensions::matching::input_matchers::ip::v3::Ip&>(
       config, factory_context.messageValidationVisitor());
 
   const auto& cidr_ranges = ip_config.cidr_ranges();

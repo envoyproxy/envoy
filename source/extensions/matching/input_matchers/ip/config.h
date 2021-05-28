@@ -24,7 +24,7 @@ public:
   std::string name() const override { return "envoy.matching.matchers.ip"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::matching::input_matchers::ip::v3::IP>();
+    return std::make_unique<envoy::extensions::matching::input_matchers::ip::v3::Ip>();
   }
 };
 } // namespace IP
