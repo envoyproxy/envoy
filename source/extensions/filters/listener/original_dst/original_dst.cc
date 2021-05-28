@@ -40,7 +40,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
       // See how to perform bind or connect redirection here:
       // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection
       if constexpr (Platform::win32SupportsOriginalDestination()) {
-        if (traffic_direction_ == envoy::config::core::v3::OUTBOUND) {
+        if (config_.traffic_direction_ == envoy::config::core::v3::OUTBOUND) {
           ENVOY_LOG(debug, "[Windows] Querying for redirect record for outbound listener");
           unsigned long redirectRecordsSize = 0;
           auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();

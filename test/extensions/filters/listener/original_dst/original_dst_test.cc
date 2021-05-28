@@ -13,7 +13,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +23,6 @@ namespace {
 using testing::Return;
 class OriginalDstTest : public testing::Test {
 public:
-  OriginalDstTest() {}
   std::unique_ptr<OriginalDstFilter> makeDefaultFilter() {
     Config default_config;
     return std::make_unique<OriginalDstFilter>(default_config);
