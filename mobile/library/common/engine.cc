@@ -31,7 +31,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
 
 envoy_status_t Engine::main(const std::string config, const std::string log_level) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
-  std::unique_ptr<MobileMainCommon> main_common;
+  std::unique_ptr<EngineCommon> main_common;
   {
     Thread::LockGuard lock(mutex_);
     try {
@@ -49,7 +49,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
                                              log_level.c_str(),
                                              nullptr};
 
-      main_common = std::make_unique<MobileMainCommon>(envoy_argv.size() - 1, envoy_argv.data());
+      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
       if (logger_.log) {

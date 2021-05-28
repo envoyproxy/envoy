@@ -5,11 +5,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "envoy_mobile_main_common_test",
-    srcs = ["envoy_mobile_main_common_test.cc"],
+    name = "engine_common_test",
+    srcs = ["engine_common_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/common:envoy_mobile_main_common_lib",
+        "//library/common:engine_common_lib",
     ],
 )
 

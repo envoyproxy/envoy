@@ -17,9 +17,9 @@ namespace Envoy {
  * This class is used instead of Envoy::MainCommon to customize logic for the Envoy Mobile setting.
  * It largely leverages Envoy::MainCommonBase.
  */
-class MobileMainCommon {
+class EngineCommon {
 public:
-  MobileMainCommon(int argc, const char* const* argv);
+  EngineCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
 
   /**
