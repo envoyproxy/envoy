@@ -411,7 +411,7 @@ message HystrixSink {
 // Stats configuration proto schema for *envoy.stat_sinks.graphite_statsd* sink.
 // The sink emits stats with `Graphite`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
-// <envoy_api_msg_config.metrics.v3.StatsConfig>`.
+// <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
 // [#extension: envoy.stat_sinks.graphite_statsd]
 message GraphiteStatsdSink {
   reserved 2;
@@ -425,7 +425,7 @@ message GraphiteStatsdSink {
   }
 
   // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
-  // <envoy_api_field_config.metrics.v3.StatsdSink.prefix>` for more details.
+  // <envoy_v3_api_field_config.metrics.v3.StatsdSink.prefix>` for more details.
   string prefix = 3;
 
   // Optional max datagram size to use when sending UDP messages. By default Envoy
