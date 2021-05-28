@@ -42,6 +42,11 @@ protected:
   std::string string_;
 };
 
+/**
+ * Helper template to implement derived class of LowerCaseStrBase with specific validator. The
+ * verification function will be used to verify the input string to ensure that it meets specific
+ * requirements, such as not containing null characters.
+ */
 template <bool (*V)(absl::string_view)> class ValidatedLowerCaseStr : public LowerCaseStrBase {
 public:
   ValidatedLowerCaseStr(LowerCaseStrBase&& rhs) noexcept : LowerCaseStrBase(std::move(rhs)) {
