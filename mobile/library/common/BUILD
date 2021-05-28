@@ -8,8 +8,8 @@ envoy_cc_library(
     name = "envoy_main_interface_lib",
     repository = "@envoy",
     deps = [
+        ":engine_common_lib_stamped",
         ":envoy_main_interface_lib_no_stamp",
-        ":envoy_mobile_main_common_lib_stamped",
     ],
 )
 
@@ -25,7 +25,7 @@ envoy_cc_library(
     hdrs = ["main_interface.h"],
     repository = "@envoy",
     deps = [
-        ":envoy_mobile_main_common_lib",
+        ":engine_common_lib",
         "//library/common/common:lambda_logger_delegate_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
@@ -39,9 +39,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_mobile_main_common_lib",
-    srcs = ["envoy_mobile_main_common.cc"],
-    hdrs = ["envoy_mobile_main_common.h"],
+    name = "engine_common_lib",
+    srcs = ["engine_common.cc"],
+    hdrs = ["engine_common.h"],
     repository = "@envoy",
     deps = [
         "@envoy//source/common/common:minimal_logger_lib",
@@ -52,10 +52,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_mobile_main_common_lib_stamped",
+    name = "engine_common_lib_stamped",
     repository = "@envoy",
     deps = [
-        ":envoy_mobile_main_common_lib",
+        ":engine_common_lib",
         "@envoy//source/exe:envoy_main_common_lib",
     ],
 )
