@@ -178,6 +178,9 @@ private:
     void readDisable(bool /*disable*/) override {}
     uint32_t bufferLimit() override { return 65000; }
     // Not applicable
+    void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+      PANIC("buffer accounts unsupported");
+    }
     void setFlushTimeout(std::chrono::milliseconds) override {}
 
     void setResponseDetails(absl::string_view response_details) {
