@@ -27,11 +27,6 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {

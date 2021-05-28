@@ -53,6 +53,9 @@ public:
   void onDatagramsDropped(uint32_t) override {
     // TODO(mattklein123): Emit a stat for this.
   }
+  size_t numPacketsExpectedPerEventLoop() const override {
+    return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
+  }
 
   // Register file event and apply socket options.
   void setUpConnectionSocket();

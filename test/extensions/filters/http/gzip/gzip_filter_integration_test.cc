@@ -14,7 +14,7 @@ class GzipIntegrationTest : public testing::TestWithParam<Network::Address::IpVe
                             public Event::SimulatedTimeSystem,
                             public HttpIntegrationTest {
 public:
-  GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  GzipIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }

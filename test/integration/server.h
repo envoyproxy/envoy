@@ -442,27 +442,24 @@ public:
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
                         Event::Dispatcher* dispatcher = nullptr) override {
     ASSERT_TRUE(
         TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher));
   }
 
-  void
-  waitForCounterGe(const std::string& name, uint64_t value,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForCounterGe(const std::string& name, uint64_t value,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void
-  waitForGaugeEq(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForGaugeEq(const std::string& name, uint64_t value,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
   }
 
-  void
-  waitForGaugeGe(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForGaugeGe(const std::string& name, uint64_t value,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
   }
 

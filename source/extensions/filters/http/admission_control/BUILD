@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -11,7 +12,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "admission_control_filter_lib",
     srcs = [
         "admission_control.cc",
@@ -21,8 +22,6 @@ envoy_cc_extension(
         "admission_control.h",
         "thread_local_controller.h",
     ],
-    category = "envoy.filters.http",
-    security_posture = "unknown",
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -41,9 +40,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         "//include/envoy/registry",
         "//source/common/common:enum_to_int",

@@ -19,7 +19,6 @@ static_resources:
 
   clusters:
   - name: postgres_cluster
-    connect_timeout: 1s
     type: STRICT_DNS
     load_assignment:
       cluster_name: postgres_cluster

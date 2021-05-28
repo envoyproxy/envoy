@@ -75,3 +75,13 @@ updates:
     directory: "/tools/testing"
     schedule:
       interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "/ci"
+    schedule:
+      interval: daily
+
+  - package-ecosystem: "docker"
+    directory: "/.devcontainer"
+    schedule:
+      interval: daily

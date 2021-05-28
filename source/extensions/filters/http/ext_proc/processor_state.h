@@ -32,7 +32,7 @@ public:
 
   explicit ProcessorState(Filter& filter)
       : filter_(filter), watermark_requested_(false), complete_body_available_(false),
-        trailers_available_(false) {}
+        trailers_available_(false), body_replaced_(false) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -43,6 +43,7 @@ public:
   bool completeBodyAvailable() const { return complete_body_available_; }
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
+  bool bodyReplaced() const { return body_replaced_; }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -53,7 +54,7 @@ public:
     return body_mode_;
   }
 
-  void setHeaders(Http::HeaderMap* headers) { headers_ = headers; }
+  void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
 
   void startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout);
@@ -95,6 +96,8 @@ protected:
   bool complete_body_available_ : 1;
   // If true, then the filter received the trailers
   bool trailers_available_ : 1;
+  // If true, then a CONTINUE_AND_REPLACE status was used on a response
+  bool body_replaced_ : 1;
 
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
@@ -104,7 +107,7 @@ protected:
   // The specific mode for body handling
   envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode body_mode_;
 
-  Http::HeaderMap* headers_ = nullptr;
+  Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
 };
