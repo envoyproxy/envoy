@@ -72,7 +72,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
   }
 }
 
-Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
+ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
     const LocalInfo::LocalInfo& local_info) {
@@ -104,11 +104,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   Network::Address::InstanceConstSharedPtr final_remote_address;
-  bool single_xff_address;
+  bool allow_trusted_address_checks = false;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
 
   if (config.useRemoteAddress()) {
-    single_xff_address = request_headers.ForwardedFor() == nullptr;
+    allow_trusted_address_checks = request_headers.ForwardedFor() == nullptr;
     // If there are any trusted proxies in front of this Envoy instance (as indicated by
     // the xff_num_trusted_hops configuration option), get the trusted client address
     // from the XFF before we append to XFF.
@@ -136,12 +136,27 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
     }
   } else {
-    // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
+    // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF
+    // or through an extension. An extension might be needed when XFF doesn't work (e.g. an
+    // irregular network).
+    //
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
-    final_remote_address = ret.address_;
-    single_xff_address = ret.single_address_;
+    OriginalIPDetectionParams params = {request_headers,
+                                        connection.addressProvider().remoteAddress()};
+    for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
+      const auto result = detection_extension->detect(params);
+
+      if (result.reject_options.has_value()) {
+        return {nullptr, result.reject_options};
+      }
+
+      if (result.detected_remote_address) {
+        final_remote_address = result.detected_remote_address;
+        allow_trusted_address_checks = result.allow_trusted_address_checks;
+        break;
+      }
+    }
   }
 
   // If the x-forwarded-proto header is not set, set it here, since Envoy uses it for determining
@@ -169,7 +184,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   //               we can't change it at this point. In the future we will likely need to add
   //               additional inference modes and make this mode legacy.
   const bool internal_request =
-      single_xff_address && final_remote_address != nullptr &&
+      allow_trusted_address_checks && final_remote_address != nullptr &&
       config.internalAddressConfig().isInternalAddress(*final_remote_address);
 
   // After determining internal request status, if there is no final remote address, due to no XFF,
@@ -187,30 +202,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.setReferenceEnvoyInternalRequest(
         Headers::get().EnvoyInternalRequestValues.True);
   } else {
-    if (edge_request) {
-      request_headers.removeEnvoyDecoratorOperation();
-      request_headers.removeEnvoyDownstreamServiceCluster();
-      request_headers.removeEnvoyDownstreamServiceNode();
-    }
-
-    request_headers.removeEnvoyRetriableStatusCodes();
-    request_headers.removeEnvoyRetriableHeaderNames();
-    request_headers.removeEnvoyRetryOn();
-    request_headers.removeEnvoyRetryGrpcOn();
-    request_headers.removeEnvoyMaxRetries();
-    request_headers.removeEnvoyUpstreamAltStatName();
-    request_headers.removeEnvoyUpstreamRequestTimeoutMs();
-    request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
-    request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
-    request_headers.removeEnvoyExpectedRequestTimeoutMs();
-    request_headers.removeEnvoyForceTrace();
-    request_headers.removeEnvoyIpTags();
-    request_headers.removeEnvoyOriginalUrl();
-    request_headers.removeEnvoyHedgeOnPerTryTimeout();
-
-    for (const LowerCaseString& header : route_config.internalOnlyHeaders()) {
-      request_headers.remove(header);
-    }
+    cleanInternalHeaders(request_headers, edge_request, route_config.internalOnlyHeaders());
   }
 
   if (config.userAgent()) {
@@ -250,7 +242,36 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   mutateXfccRequestHeader(request_headers, connection, config);
 
-  return final_remote_address;
+  return {final_remote_address, absl::nullopt};
+}
+
+void ConnectionManagerUtility::cleanInternalHeaders(
+    RequestHeaderMap& request_headers, bool edge_request,
+    const std::list<Http::LowerCaseString>& internal_only_headers) {
+  if (edge_request) {
+    request_headers.removeEnvoyDecoratorOperation();
+    request_headers.removeEnvoyDownstreamServiceCluster();
+    request_headers.removeEnvoyDownstreamServiceNode();
+  }
+
+  request_headers.removeEnvoyRetriableStatusCodes();
+  request_headers.removeEnvoyRetriableHeaderNames();
+  request_headers.removeEnvoyRetryOn();
+  request_headers.removeEnvoyRetryGrpcOn();
+  request_headers.removeEnvoyMaxRetries();
+  request_headers.removeEnvoyUpstreamAltStatName();
+  request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+  request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
+  request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
+  request_headers.removeEnvoyExpectedRequestTimeoutMs();
+  request_headers.removeEnvoyForceTrace();
+  request_headers.removeEnvoyIpTags();
+  request_headers.removeEnvoyOriginalUrl();
+  request_headers.removeEnvoyHedgeOnPerTryTimeout();
+
+  for (const LowerCaseString& header : internal_only_headers) {
+    request_headers.remove(header);
+  }
 }
 
 Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
@@ -433,25 +454,54 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
 }
 
-bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
-                                                  const ConnectionManagerConfig& config) {
+ConnectionManagerUtility::NormalizePathAction
+ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
+                                             const ConnectionManagerConfig& config) {
   if (!request_headers.Path()) {
-    return true; // It's as valid as it is going to get.
+    return NormalizePathAction::Continue; // It's as valid as it is going to get.
   }
-  bool is_valid_path = true;
-  if (config.shouldNormalizePath()) {
-    is_valid_path = PathUtil::canonicalPath(request_headers);
+
+  NormalizePathAction final_action = NormalizePathAction::Continue;
+  const auto escaped_slashes_action = config.pathWithEscapedSlashesAction();
+  ASSERT(escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::
+                                       v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT);
+  if (escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::v3::
+                                    HttpConnectionManager::KEEP_UNCHANGED) {
+    auto escaped_slashes_result = PathUtil::unescapeSlashes(request_headers);
+    if (escaped_slashes_result == PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
+      if (escaped_slashes_action == envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager::REJECT_REQUEST) {
+        return NormalizePathAction::Reject;
+      } else if (escaped_slashes_action ==
+                 envoy::extensions::filters::network::http_connection_manager::v3::
+                     HttpConnectionManager::UNESCAPE_AND_REDIRECT) {
+        final_action = NormalizePathAction::Redirect;
+      } else {
+        ASSERT(escaped_slashes_action ==
+               envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager::UNESCAPE_AND_FORWARD);
+      }
+    }
   }
+
+  if (config.shouldNormalizePath() && !PathUtil::canonicalPath(request_headers)) {
+    return NormalizePathAction::Reject;
+  }
+
   // Merge slashes after path normalization to catch potential edge cases with percent encoding.
-  if (is_valid_path && config.shouldMergeSlashes()) {
+  if (config.shouldMergeSlashes()) {
     PathUtil::mergeSlashes(request_headers);
   }
-  return is_valid_path;
+
+  return final_action;
 }
 
 absl::optional<uint32_t>
 ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config, uint32_t port) {
+  if (config.shouldStripTrailingHostDot()) {
+    HeaderUtility::stripTrailingHostDot(request_headers);
+  }
   if (config.stripPortType() == Http::StripPortType::Any) {
     return HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
   } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {

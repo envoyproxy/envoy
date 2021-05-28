@@ -35,6 +35,7 @@ HEXDIG
 HEXDIGIT
 OWS
 Preconnecting
+RCVBUF
 RTCP
 RTP
 STATNAME
@@ -445,6 +446,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -1136,6 +1139,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks

@@ -393,7 +393,7 @@ TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
 class FaultIntegrationTestHttp2 : public FaultIntegrationTest {};
 INSTANTIATE_TEST_SUITE_P(Protocols, FaultIntegrationTestHttp2,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Rate limiting with trailers received after the body has been flushed.

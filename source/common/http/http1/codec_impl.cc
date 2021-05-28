@@ -1176,17 +1176,8 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
   active_request_.value().response_encoder_.setDetails(details);
   if (!active_request_.value().response_encoder_.startedResponse()) {
-    // Note that the correctness of is_grpc_request and is_head_request is best-effort.
-    // If headers have not been fully parsed they may not be inferred correctly.
-    bool is_grpc_request = false;
-    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_) &&
-        absl::get<RequestHeaderMapPtr>(headers_or_trailers_) != nullptr) {
-      is_grpc_request =
-          Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-    }
-    active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
-                                                      CodeUtility::toString(error_code_), nullptr,
-                                                      absl::nullopt, details);
+    active_request_->request_decoder_->sendLocalReply(
+        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
   }
   return okStatus();
 }

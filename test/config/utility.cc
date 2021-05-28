@@ -69,7 +69,7 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 0
   listeners:
-    name: listener_0
+  - name: listener_0
     address:
       socket_address:
         address: 127.0.0.1
@@ -768,7 +768,8 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    protocol_options.MergeFrom(old_options);
+    old_options.MergeFrom(protocol_options);
+    protocol_options.CopyFrom(old_options);
   }
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]

@@ -197,6 +197,7 @@ public:
   // General
   WasmResult log(uint32_t level, absl::string_view message) override;
   uint64_t getCurrentTimeNanoseconds() override;
+  uint64_t getMonotonicTimeNanoseconds() override;
   absl::string_view getConfiguration() override;
   std::pair<uint32_t, absl::string_view> getStatus() override;
 
@@ -353,7 +354,9 @@ protected:
 
   struct GrpcStreamClientHandler : public Grpc::RawAsyncStreamCallbacks {
     // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap& initial_metadata) override {
+      context_->onGrpcCreateInitialMetadata(token_, initial_metadata);
+    }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
       context_->onGrpcReceiveInitialMetadataWrapper(token_, std::move(metadata));
     }
