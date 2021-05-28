@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
@@ -40,11 +41,11 @@ struct HttpClientStats {
 class Client : public Logger::Loggable<Logger::Id::http> {
 public:
   Client(ApiListener& api_listener, Event::ProvisionalDispatcher& dispatcher, Stats::Scope& scope,
-         std::atomic<envoy_network_t>& preferred_network)
+         std::atomic<envoy_network_t>& preferred_network, Random::RandomGenerator& random)
       : api_listener_(api_listener), dispatcher_(dispatcher),
         stats_(HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."))}),
         preferred_network_(preferred_network),
-        address_(std::make_shared<Network::Address::SyntheticAddressImpl>()) {}
+        address_(std::make_shared<Network::Address::SyntheticAddressImpl>()), random_(random) {}
 
   /**
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
@@ -217,7 +218,7 @@ private:
 
   DirectStreamSharedPtr getStream(envoy_stream_t stream_handle);
   void removeStream(envoy_stream_t stream_handle);
-  void setDestinationCluster(RequestHeaderMap& headers);
+  void setDestinationCluster(RequestHeaderMap& headers, bool alternate);
 
   ApiListener& api_listener_;
   Event::ProvisionalDispatcher& dispatcher_;
@@ -226,6 +227,7 @@ private:
   std::atomic<envoy_network_t>& preferred_network_;
   // Shared synthetic address across DirectStreams.
   Network::Address::InstanceConstSharedPtr address_;
+  Random::RandomGenerator& random_;
   Thread::ThreadSynchronizer synchronizer_;
 };
 

@@ -120,7 +120,8 @@ TEST_P(ClientIntegrationTest, Basic) {
   test_server_->server().dispatcher().post([this, &server_started]() -> void {
     http_client_ = std::make_unique<Http::Client>(
         test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), preferred_network_);
+        test_server_->statStore(), preferred_network_,
+        test_server_->server().api().randomGenerator());
     dispatcher_->drain(test_server_->server().dispatcher());
     server_started.setReady();
   });
@@ -197,7 +198,8 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
   test_server_->server().dispatcher().post([this, &server_started]() -> void {
     http_client_ = std::make_unique<Http::Client>(
         test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), preferred_network_);
+        test_server_->statStore(), preferred_network_,
+        test_server_->server().api().randomGenerator());
     dispatcher_->drain(test_server_->server().dispatcher());
     server_started.setReady();
   });
@@ -261,7 +263,8 @@ TEST_P(ClientIntegrationTest, BasicReset) {
   test_server_->server().dispatcher().post([this, &server_started]() -> void {
     http_client_ = std::make_unique<Http::Client>(
         test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
-        test_server_->statStore(), preferred_network_);
+        test_server_->statStore(), preferred_network_,
+        test_server_->server().api().randomGenerator());
     dispatcher_->drain(test_server_->server().dispatcher());
     server_started.setReady();
   });
