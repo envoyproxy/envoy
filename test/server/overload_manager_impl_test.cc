@@ -45,7 +45,7 @@ namespace Server {
 namespace {
 
 using TimerType = Event::ScaledTimerType;
-// TODO add fakeReactiveResourceMonitor
+// TODO add fakeProactiveResourceMonitor
 class FakeResourceMonitor : public ResourceMonitor {
 public:
   FakeResourceMonitor(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), response_(0.0) {}
@@ -93,7 +93,31 @@ private:
   absl::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
 };
 
-// TODO add fake factory for reactive resources
+template <class ConfigType>
+class FakeProactiveResourceMonitorFactory
+    : public Server::Configuration::ProactiveResourceMonitorFactory {
+public:
+  FakeProactiveResourceMonitorFactory(const std::string& name) : monitor_(nullptr), name_(name) {}
+
+  Server::ProactiveResourceMonitorPtr
+  createProactiveResourceMonitor(const Protobuf::Message&,
+                                 Server::Configuration::ResourceMonitorFactoryContext&) override {
+
+    auto monitor = std::make_unique<ActiveConnectionsResourceMonitor>(3);
+    monitor_ = monitor.get();
+    return monitor;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ConfigType()};
+  }
+
+  std::string name() const override { return name_; }
+
+  ActiveConnectionsResourceMonitor* monitor_; // not owned
+  const std::string name_;
+};
+
 template <class ConfigType>
 class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
 public:
@@ -149,8 +173,10 @@ protected:
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"),
         factory3_("envoy.resource_monitors.fake_resource3"),
-        factory4_("envoy.resource_monitors.fake_resource4"), register_factory1_(factory1_),
-        register_factory2_(factory2_), register_factory3_(factory3_), register_factory4_(factory4_),
+        factory4_("envoy.resource_monitors.fake_resource4"),
+        factory5_("envoy.proactive_resource_monitors.global_downstream_max_connections"),
+        register_factory1_(factory1_), register_factory2_(factory2_), register_factory3_(factory3_),
+        register_factory4_(factory4_), register_factory5_(factory5_),
         api_(Api::createApiForTest(stats_)) {}
 
   void setDispatcherExpectation() {
@@ -177,10 +203,12 @@ protected:
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory3_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory4_;
+  FakeProactiveResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory5_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory4_;
+  Registry::InjectFactory<Configuration::ProactiveResourceMonitorFactory> register_factory5_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::TestUtil::TestStore stats_;
@@ -199,6 +227,7 @@ constexpr char kRegularStateConfig[] = R"YAML(
     - name: envoy.resource_monitors.fake_resource2
     - name: envoy.resource_monitors.fake_resource3
     - name: envoy.resource_monitors.fake_resource4
+    - name: envoy.proactive_resource_monitors.global_downstream_max_connections    
   actions:
     - name: envoy.overload_actions.dummy_action
       triggers:
@@ -324,10 +353,6 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   EXPECT_EQ(42, pressure_gauge2.value());
 
   manager->stop();
-}
-
-TEST_F(OverloadManagerImplTest, ImmediateUpdateForReactiveResource) {
-  // TBD
 }
 
 TEST_F(OverloadManagerImplTest, ScaledTrigger) {
@@ -705,6 +730,30 @@ TEST_F(OverloadManagerImplTest, Shutdown) {
   manager->start();
 
   EXPECT_CALL(*timer_, disableTimer());
+  manager->stop();
+}
+
+TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTest) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kRegularStateConfig));
+  Stats::Counter& failed_updates =
+      stats_.counter("overload.envoy.proactive_resource_monitors.global_downstream_max_connections."
+                     "failed_updates");
+  manager->start();
+  bool resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+  EXPECT_EQ(true, resource_allocated);
+  resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 2);
+  EXPECT_EQ(false, resource_allocated);
+  EXPECT_EQ(1, failed_updates.value());
+
+  bool resource_deallocated = manager->getThreadLocalOverloadState().tryDeallocateResource(
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+  EXPECT_EQ(true, resource_deallocated);
+  EXPECT_DEATH(manager->getThreadLocalOverloadState().tryDeallocateResource(
+                   Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
+               ".*Cannot deallocate resource, current resource usage is lower than decrement.*");
   manager->stop();
 }
 

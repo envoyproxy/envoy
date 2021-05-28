@@ -31,7 +31,6 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
-
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

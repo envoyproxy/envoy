@@ -26,10 +26,13 @@ namespace Server {
  */
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
-  explicit ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table, std::unique_ptr<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>>& reactive_resources)
+  explicit ThreadLocalOverloadStateImpl(
+      const NamedOverloadActionSymbolTable& action_symbol_table,
+      std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>&
+          proactive_resources)
       : action_symbol_table_(action_symbol_table),
         actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
-        reactive_resources_(reactive_resources) {}
+        proactive_resources_(proactive_resources) {}
 
   const OverloadActionState& getState(const std::string& action) override {
     if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
@@ -42,39 +45,40 @@ public:
     actions_[action.index()] = state;
   }
 
-  bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment) {
-      const auto reactive_resource = reactive_resources_->find(resource_name);
-  if (reactive_resource != reactive_resources_->end()) {
-    if (reactive_resource->second.tryAllocateResource(increment)) {
-      return true;
+  bool tryAllocateResource(OverloadProactiveResourceName resource_name, uint64_t increment) {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource != proactive_resources_->end()) {
+      if (proactive_resource->second.tryAllocateResource(increment)) {
+        return true;
+      } else {
+        return false;
+      }
     } else {
+      ENVOY_LOG_MISC(warn, " {Failed to allocate unknown proactive resource }");
       return false;
     }
-  } else {
-    ENVOY_LOG_MISC(warn, " {Failed to allocate unknown reactive resource }");
-    return false;
-  }
   }
 
-  bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement) {
-      const auto reactive_resource = reactive_resources_->find(resource_name);
-  if (reactive_resource != reactive_resources_->end()) {
-    if (reactive_resource->second.tryDeallocateResource(decrement)) {
-      return true;
+  bool tryDeallocateResource(OverloadProactiveResourceName resource_name, uint64_t decrement) {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource != proactive_resources_->end()) {
+      if (proactive_resource->second.tryDeallocateResource(decrement)) {
+        return true;
+      } else {
+        return false;
+      }
     } else {
+      ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown proactive resource }");
       return false;
     }
-  } else {
-    ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown reactive resource }");
-    return false;
-  }
   }
 
 private:
   static const OverloadActionState always_inactive_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;
   std::vector<OverloadActionState> actions_;
-  std::unique_ptr<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>> reactive_resources_;
+  std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>
+      proactive_resources_;
 };
 
 const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
@@ -297,34 +301,37 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
-          reactive_resources_(std::make_unique<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>>()) {
+      proactive_resources_(
+          std::make_unique<
+              absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
                                                            validation_visitor);
   // We should hide impl details from users, for them there should be no distinction between
-  // reactive and regular resource monitors in configuration API. But internally we will maintain
-  // two distinct collections of reactive and regular resources. Reactive resources are not subject
-  // to periodic flushes and can be recalculated/updated on demand by invoking
+  // proactive and regular resource monitors in configuration API. But internally we will maintain
+  // two distinct collections of proactive and regular resources. Proactive resources are not
+  // subject to periodic flushes and can be recalculated/updated on demand by invoking
   // `tryAllocateResource/tryDeallocateResource` in overload manager.
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
-    // Check if it is a reactive resource.
-    auto reactive_resource_it =
-        OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.find(name);
-    if (reactive_resource_it !=
-        OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.end()) {
-      ENVOY_LOG(debug, "Adding reactive resource monitor for {}", name);
+    // Check if it is a proactive resource.
+    auto proactive_resource_it =
+        OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.find(name);
+    ENVOY_LOG(debug, "Evaluating resource {}", name);
+    if (proactive_resource_it !=
+        OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.end()) {
+      ENVOY_LOG(debug, "Adding proactive resource monitor for {}", name);
       auto& factory =
-          Config::Utility::getAndCheckFactory<Configuration::ReactiveResourceMonitorFactory>(
+          Config::Utility::getAndCheckFactory<Configuration::ProactiveResourceMonitorFactory>(
               resource);
       auto config =
           Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
-      auto monitor = factory.createReactiveResourceMonitor(*config, context);
+      auto monitor = factory.createProactiveResourceMonitor(*config, context);
 
-      auto result = reactive_resources_->try_emplace(
-          reactive_resource_it->second, name,
+      auto result = proactive_resources_->try_emplace(
+          proactive_resource_it->second, name,
           std::make_unique<Server::ActiveConnectionsResourceMonitor>(1), stats_scope);
       if (!result.second) {
-        throw EnvoyException(absl::StrCat("Duplicate reactive resource monitor ", name));
+        throw EnvoyException(absl::StrCat("Duplicate proactive resource monitor ", name));
       }
 
     } else {
@@ -366,17 +373,16 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
     for (const auto& trigger : action.triggers()) {
       const std::string& resource = trigger.name();
-      auto reactive_resource_it =
-          OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.find(resource);
+      auto proactive_resource_it =
+          OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.find(resource);
 
       if (resources_.find(resource) == resources_.end() &&
-          reactive_resource_it !=
-              OverloadReactiveResourceNames::get().reactive_action_name_to_resource_.end() &&
-          reactive_resources_.find(reactive_resource_it->second) == reactive_resources_.end()) {
+          proactive_resource_it ==
+              OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.end()) {
         throw EnvoyException(
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
       }
-      // Unified handling of reactive and regular resources here.
+      // Unified handling of proactive and regular resources here.
       resource_to_actions_.insert(std::make_pair(resource, symbol));
     }
   }
@@ -387,7 +393,8 @@ void OverloadManagerImpl::start() {
   started_ = true;
 
   tls_.set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_, std::move(reactive_resources_));
+    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_,
+                                                          proactive_resources_);
   });
 
   if (resources_.empty()) {
@@ -420,7 +427,8 @@ void OverloadManagerImpl::stop() {
 
   // Clear the resource map to block on any pending updates.
   resources_.clear();
-  reactive_resources_.clear();
+  // todo fix this in tls
+  // proactive_resources_->clear();
 }
 
 bool OverloadManagerImpl::registerForAction(const std::string& action,
@@ -554,34 +562,6 @@ void OverloadManagerImpl::Resource::onFailure(const EnvoyException& error) {
   pending_update_ = false;
   ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.what());
   failed_updates_counter_.inc();
-}
-
-OverloadManagerImpl::ReactiveResource::ReactiveResource(const std::string& name,
-                                                        ReactiveResourceMonitorPtr monitor,
-                                                        Stats::Scope& stats_scope)
-    : name_(name), monitor_(std::move(monitor)),
-      failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")) {}
-
-bool OverloadManagerImpl::ReactiveResource::tryAllocateResource(uint64_t increment) {
-  if (monitor_->tryAllocateResource(increment)) {
-    return true;
-  } else {
-    failed_updates_counter_.inc();
-    return false;
-  }
-}
-
-bool OverloadManagerImpl::ReactiveResource::tryDeallocateResource(uint64_t decrement) {
-  if (monitor_->tryDeallocateResource(decrement)) {
-    return true;
-  } else {
-    failed_updates_counter_.inc();
-    return false;
-  }
-}
-
-uint64_t OverloadManagerImpl::ReactiveResource::currentResourceUsage() {
-  return monitor_->currentResourceUsage();
 }
 
 } // namespace Server

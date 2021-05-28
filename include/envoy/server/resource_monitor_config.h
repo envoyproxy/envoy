@@ -65,24 +65,24 @@ public:
   std::string category() const override { return "envoy.resource_monitors"; }
 };
 
-class ReactiveResourceMonitorFactory : public Config::TypedFactory {
+class ProactiveResourceMonitorFactory : public Config::TypedFactory {
 public:
-  ~ReactiveResourceMonitorFactory() override = default;
+  ~ProactiveResourceMonitorFactory() override = default;
 
   /**
-   * Create a particular reactive resource monitor implementation.
-   * @param config const ProtoBuf::Message& supplies the config for the reactive resource monitor
+   * Create a particular proactive resource monitor implementation.
+   * @param config const ProtoBuf::Message& supplies the config for the proactive resource monitor
    *        implementation.
-   * @param context ReactiveResourceMonitorFactoryContext& supplies the resource monitor's context.
-   * @return ReactiveResourceMonitorPtr the resource monitor instance. Should not be nullptr.
+   * @param context ProactiveResourceMonitorFactoryContext& supplies the resource monitor's context.
+   * @return ProactiveResourceMonitorPtr the resource monitor instance. Should not be nullptr.
    * @throw EnvoyException if the implementation is unable to produce an instance with
    *        the provided parameters.
    */
-  virtual ReactiveResourceMonitorPtr
-  createReactiveResourceMonitor(const Protobuf::Message& config,
-                                ResourceMonitorFactoryContext& context) PURE;
+  virtual ProactiveResourceMonitorPtr
+  createProactiveResourceMonitor(const Protobuf::Message& config,
+                                 ResourceMonitorFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.reactive_resource_monitors"; }
+  std::string category() const override { return "envoy.proactive_resource_monitors"; }
 };
 
 } // namespace Configuration

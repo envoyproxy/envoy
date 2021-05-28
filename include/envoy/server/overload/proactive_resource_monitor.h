@@ -3,34 +3,54 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Server {
 
-class ReactiveResourceMonitor {
+class ProactiveResourceMonitor {
 public:
-  ReactiveResourceMonitor() = default;
-  virtual ~ReactiveResourceMonitor() = default;
+  ProactiveResourceMonitor() = default;
+  virtual ~ProactiveResourceMonitor() = default;
+  /**
+   * Tries to allocate resource for given resource monitor in thread safe manner.
+   * Returns true if there is enough resource quota available and allocation has succeeded, false
+   * otherwise.
+   * @param increment to add to current resource usage value and compare against configured max
+   * threshold.
+   */
   virtual bool tryAllocateResource(uint64_t increment) PURE;
+  /**
+   * Tries to deallocate resource for given resource monitor in thread safe manner.
+   * Returns true if there is enough resource quota available and deallocation has succeeded, false
+   * otherwise.
+   * @param decrement to subtract from current resource usage value.
+   */
   virtual bool tryDeallocateResource(uint64_t decrement) PURE;
+  /**
+   * Returns current resource usage tracked by monitor.
+   */
   virtual uint64_t currentResourceUsage() const PURE;
+  /**
+   * Returns max resource usage configured in monitor.
+   */
   virtual uint64_t maxResourceUsage() const PURE;
 };
 
-using ReactiveResourceMonitorPtr = std::unique_ptr<ReactiveResourceMonitor>;
+using ProactiveResourceMonitorPtr = std::unique_ptr<ProactiveResourceMonitor>;
 
-// Example of reactive resource monitor. To be removed.
-class ActiveConnectionsResourceMonitor : public ReactiveResourceMonitor {
+// Example of proactive resource monitor. To be removed.
+class ActiveConnectionsResourceMonitor : public ProactiveResourceMonitor {
 public:
   ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
       : max_(max_active_conns), current_(0){};
 
   bool tryAllocateResource(uint64_t increment) {
-    uint64_t new_val = (current_ += increment);
-    if (new_val >= max_) {
+    int64_t new_val = (current_ += increment);
+    if (new_val > max_ || new_val < 0) {
       current_ -= increment;
       return false;
     }
@@ -38,13 +58,14 @@ public:
   }
 
   bool tryDeallocateResource(uint64_t decrement) {
-    ASSERT(decrement <= current_.load());
-    // Guard against race condition.
-    if (decrement <= current_.load()) {
-      current_ -= decrement;
-      return true;
+    RELEASE_ASSERT(decrement <= current_,
+                   "Cannot deallocate resource, current resource usage is lower than decrement");
+    int64_t new_val = (current_ -= increment);
+    if (new_val < 0) {
+      current_ += increment;
+      return false;
     }
-    return false;
+    return true;
   }
 
   uint64_t currentResourceUsage() const { return current_.load(); }
@@ -52,23 +73,47 @@ public:
 
 protected:
   uint64_t max_;
-  std::atomic<uint64_t> current_;
+  std::atomic<int64_t> current_;
 };
 
-  class ReactiveResource {
-  public:
-    ReactiveResource(const std::string& name, ReactiveResourceMonitorPtr monitor,
-                     Stats::Scope& stats_scope);
+class ProactiveResource {
+public:
+  ProactiveResource(const std::string& name, ProactiveResourceMonitorPtr monitor,
+                    Stats::Scope& stats_scope)
+      : name_(name), monitor_(std::move(monitor)),
+        failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")) {}
 
-    bool tryAllocateResource(uint64_t increment);
-    bool tryDeallocateResource(uint64_t decrement);
-    uint64_t currentResourceUsage();
+  bool tryAllocateResource(uint64_t increment) {
+    if (monitor_->tryAllocateResource(increment)) {
+      return true;
+    } else {
+      failed_updates_counter_.inc();
+      return false;
+    }
+  }
 
-  private:
-    const std::string name_;
-    ReactiveResourceMonitorPtr monitor_;
-    Stats::Counter& failed_updates_counter_;
-  };
+  bool tryDeallocateResource(uint64_t decrement) {
+    if (monitor_->tryDeallocateResource(decrement)) {
+      return true;
+    } else {
+      failed_updates_counter_.inc();
+      return false;
+    }
+  }
+
+  uint64_t currentResourceUsage() { return monitor_->currentResourceUsage(); }
+
+private:
+  const std::string name_;
+  ProactiveResourceMonitorPtr monitor_;
+  Stats::Counter& failed_updates_counter_;
+
+  Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
+    Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
+                                            scope.symbolTable());
+    return scope.counterFromStatName(stat_name.statName());
+  }
+};
 
 } // namespace Server
 } // namespace Envoy

@@ -8,30 +8,28 @@
 #include "envoy/server/overload/proactive_resource_monitor.h"
 #include "envoy/thread_local/thread_local_object.h"
 
-#include "envoy/thread_local/thread_local_object.h"
-
 namespace Envoy {
 namespace Server {
 
-  enum class OverloadReactiveResourceName {
+enum class OverloadProactiveResourceName {
   GlobalDownstreamMaxConnections,
 };
 
-class OverloadReactiveResourceNameValues {
+class OverloadProactiveResourceNameValues {
 public:
   // Overload action to stop accepting new HTTP requests.
   const std::string GlobalDownstreamMaxConnections =
-      "envoy.resource_monitors.global_downstream_max_connections";
+      "envoy.proactive_resource_monitors.global_downstream_max_connections";
 
-  std::set<std::string> reactive_resource_names_{GlobalDownstreamMaxConnections};
+  std::set<std::string> proactive_resource_names_{GlobalDownstreamMaxConnections};
 
-  absl::flat_hash_map<std::string, OverloadReactiveResourceName> reactive_action_name_to_resource_ =
-      {{GlobalDownstreamMaxConnections,
-        OverloadReactiveResourceName::GlobalDownstreamMaxConnections}};
+  absl::flat_hash_map<std::string, OverloadProactiveResourceName>
+      proactive_action_name_to_resource_ = {
+          {GlobalDownstreamMaxConnections,
+           OverloadProactiveResourceName::GlobalDownstreamMaxConnections}};
 };
 
-
-using OverloadReactiveResourceNames = ConstSingleton<OverloadReactiveResourceNameValues>;  
+using OverloadProactiveResourceNames = ConstSingleton<OverloadProactiveResourceNameValues>;
 
 /**
  * Tracks the state of an overload action. The state is a number between 0 and 1 that represents the
@@ -68,9 +66,11 @@ public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
 
-  virtual bool tryAllocateResource(OverloadReactiveResourceName resource_name, uint64_t increment) PURE;
+  virtual bool tryAllocateResource(OverloadProactiveResourceName resource_name,
+                                   uint64_t increment) PURE;
 
-  virtual bool tryDeallocateResource(OverloadReactiveResourceName resource_name, uint64_t decrement) PURE;
+  virtual bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
+                                     uint64_t decrement) PURE;
 };
 
 } // namespace Server

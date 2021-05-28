@@ -173,7 +173,8 @@ private:
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
-  std::shared_ptr<absl::node_hash_map<OverloadReactiveResourceName, ReactiveResource>> reactive_resources_;
+  std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>
+      proactive_resources_;
 
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
