@@ -100,6 +100,23 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   EXPECT_EQ(RequestData(3, 3), tlc_.requestCounts());
 }
 
+// Test for function: lastSampleRequestCounts
+TEST_F(ThreadLocalControllerTest, LastSampleRequestCounts) {
+  EXPECT_EQ(0, tlc_.lastSampleRequestCounts());
+
+  tlc_.recordSuccess();
+  EXPECT_EQ(0, tlc_.lastSampleRequestCounts());
+
+  tlc_.recordFailure();
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+  tlc_.recordSuccess();
+  EXPECT_EQ(2, tlc_.lastSampleRequestCounts());
+
+  // make all samples to be stale
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
+  EXPECT_EQ(0, tlc_.lastSampleRequestCounts());
+}
+
 } // namespace
 } // namespace AdmissionControl
 } // namespace HttpFilters

@@ -24,7 +24,12 @@ The probability that the filter will reject a request is as follows:
 
 .. math::
 
-   P_{reject} = {(\frac{n_{total} - s}{n_{total} + 1})}^\frac{1}{aggression}
+  P_{reject} = \left\{
+  \begin{array}{cl}
+  0 & \ (rps < rps\_threshold) \\
+  min({(\frac{n_{total} - s}{n_{total} + 1})}^\frac{1}{aggression}\ ,\ max\_reject\_probability) & \ (rps \geq rps\_threshold)
+  \end{array} 
+  \right.
 
 where,
 
@@ -33,6 +38,7 @@ where,
    s = \frac{n_{success}}{threshold}
 
 
+- *rps_threshold* is a configurable value that when RPS is lower than it, requests will pass through the filter.
 - *n* refers to a request count gathered in the sliding window.
 - *threshold* is a configurable value that dictates the lowest request success rate at which the
   filter will **not reject** requests. The value is normalized to [0,1] for the calculation.
@@ -40,6 +46,7 @@ where,
   rejection probability as the success rate decreases. As the **aggression** increases, the
   rejection probability will be higher for higher success rates. See `Aggression`_ for a more
   detailed explanation.
+- *max_reject_probability* represents the upper limit of the rejection probability.
 
 .. note::
    The success rate calculations are performed on a per-thread basis for increased performance. In
@@ -91,6 +98,12 @@ fields can be overridden via runtime settings.
     aggression:
       default_value: 1.5
       runtime_key: "admission_control.aggression"
+    rps_threshold:
+      default_value: 5
+      runtime_key: "admission_control.rps_threshold"
+    max_rejection_probability:
+      default_value: 80.0
+      runtime_key: "admission_control.max_rejection_probability"
     success_criteria:
       http_criteria:
         http_success_status:
@@ -110,6 +123,8 @@ The above configuration can be understood as follows:
   window.
 * HTTP requests are considered successful if they are 1xx, 2xx, 3xx, or a 404.
 * gRPC requests are considered successful if they are OK or CANCELLED.
+* Requests will never be rejeted from this filter if the RPS is lower than 5.
+* Rejection probability will never exceed 80% even if the failure rate is 100%.
 
 Statistics
 ----------

@@ -117,9 +117,9 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 5%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
+  // Given the current throttling rate formula with an aggression of 1, it should result in a ~80%
+  // throttling rate (default max_rejection_probability). Allowing an error of 5%.
+  EXPECT_NEAR(throttle_count / request_count, 0.80, 0.05);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));
@@ -157,9 +157,9 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 5%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
+  // Given the current throttling rate formula with an aggression of 1, it should result in a ~80%
+  // throttling rate (default max_rejection_probability). Allowing an error of 5%.
+  EXPECT_NEAR(throttle_count / request_count, 0.80, 0.05);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));
