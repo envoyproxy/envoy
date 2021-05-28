@@ -664,6 +664,11 @@ envoy.wasm.runtime.v8:
   - envoy.wasm.runtime
   security_posture: unknown
   status: alpha
+envoy.wasm.runtime.wamr:
+  categories:
+  - envoy.wasm.runtime
+  security_posture: unknown
+  status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
