@@ -40,21 +40,21 @@ def format_utc_date(date):
 def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
     try:
         latest_release = repo.get_latest_release()
-    except github.GithubException as e:
-        print('GithubException {e} while getting latest release.')
+    except github.GithubException as err:
+        # Repositories can not have releases or if they have releases may not publish a latest releases. Return
+        print(f'GithubException {repo.name}: {err.data} {err.status} while getting latest release.')
         return
     if latest_release.created_at > release_date and latest_release.tag_name != metadata_version:
         print(
-            Fore.YELLOW
-            + f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
-            f'{latest_release.tag_name}@<{latest_release.created_at}>' + Style.RESET_ALL)
+            f'{Fore.YELLOW}*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
+            f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
 
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
 def verify_and_print_release_date(dep, github_release_date, metadata_release_date):
     mismatch = ''
     iso_release_date = format_utc_date(github_release_date)
-    print(Fore.GREEN + f'{dep} has a GitHub release date {iso_release_date}' + Style.RESET_ALL)
+    print(f'{Fore.GREEN}{dep} has a GitHub release date {iso_release_date}{Style.RESET_ALL}')
     if iso_release_date != metadata_release_date:
         raise ReleaseDateVersionError(
             f'Mismatch with metadata release date of {metadata_release_date}')
@@ -65,9 +65,10 @@ def get_tagged_release_date(repo, metadata_version, github_release):
 
     try:
         latest = repo.get_latest_release()
-    except github.GithubException as e:
-        print('GithubException {e} while getting latest release.')
+    except github.GithubException as err:
+        # Repositories can not have releases or if they have releases may not publish a latest releases. If this is the case we keep going
         latest = ''
+        print(f'GithubException {repo.name}: {err.data} {err.status} while getting latest release.')
         pass
 
     if latest and github_release.version <= latest.tag_name:
@@ -82,11 +83,9 @@ def get_tagged_release_date(repo, metadata_version, github_release):
             if not version.parse(tag.name).is_prerelease and version.parse(
                     tag.name) > version.parse(github_release.version):
                 print(
-                    Fore.YELLOW +
-                    f'*WARNING* {repo.name} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}>: '
-                    f'{tag.name}@<{tag.commit.commit.committer.date}>' + Style.RESET_ALL)
+                    f'{Fore.YELLOW}*WARNING* {repo.name} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}>: '
+                    f'{tag.name}@<{tag.commit.commit.committer.date}>{Style.RESET_ALL}')
         return current_metadata_tag_commit_date
-    return None
 
 
 # Extract release date from GitHub API for untagged releases.
@@ -99,9 +98,8 @@ def get_untagged_release_date(repo, metadata_version, github_release):
     commits = repo.get_commits(since=commit.commit.committer.date)
     if commits.totalCount > 1:
         print(
-            Fore.YELLOW +
-            f'*WARNING* {repo.name} has {str(commits.totalCount - 1)} commits since {github_release.version}@<{commit.commit.committer.date}>'
-            + Style.RESET_ALL)
+            f'{Fore.YELLOW}*WARNING* {repo.name} has {str(commits.totalCount - 1)} commits since {github_release.version}@<{commit.commit.committer.date}>{Style.RESET_ALL}'
+        )
     return commit.commit.committer.date
 
 
@@ -147,7 +145,6 @@ if __name__ == '__main__':
             spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token))
     except ReleaseDateVersionError as e:
         print(
-            Fore.RED
-            + f'An error occurred while processing {path}, please verify the correctness of the '
-            f'metadata: {e}' + Style.RESET_ALL)
+            f'{Fore.RED}An error occurred while processing {path}, please verify the correctness of the '
+            f'metadata: {e}{Style.RESET_ALL}')
         sys.exit(1)
