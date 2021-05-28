@@ -57,6 +57,10 @@ chardet==4.0.0 \
     # via
     #   -r tools/dependency/requirements.txt
     #   requests
+colorama==0.4.4 \
+    --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b \
+    --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2
+    # via -r tools/dependency/requirements.txt
 deprecated==1.2.12 \
     --hash=sha256:08452d69b6b5bc66e8330adde0a4f8642e969b9e1702904d137eeb29c8ffc771 \
     --hash=sha256:6d2de2de7931a968874481ef30208fd4e08da39177d61d3d4ebdf4366e7dbca1
@@ -69,6 +73,10 @@ idna==2.10 \
     # via
     #   -r tools/dependency/requirements.txt
     #   requests
+packaging==20.9 \
+    --hash=sha256:5b327ac1320dc863dca72f4514ecc086f31186744b84a230374cc1fd776feae5 \
+    --hash=sha256:67714da7f7bc052e064859c05c595155bd1ee9f69f76557e21f051443c20947a
+    # via -r tools/dependency/requirements.txt
 pycparser==2.20 \
     --hash=sha256:2d475327684562c3a96cc71adf7dc8c4f0565175cf86b6d7a404ff4c771f15f0 \
     --hash=sha256:7582ad22678f0fcd81102833f60ef8d0e57288b6b5fb00323d101be910e35705
@@ -107,6 +115,12 @@ pynacl==1.4.0 \
     # via
     #   -r tools/dependency/requirements.txt
     #   pygithub
+pyparsing==2.4.7 \
+    --hash=sha256:c203ec8783bf771a155b207279b9bccb8dea02d8f0c9e5f8ead507bc3246ecc1 \
+    --hash=sha256:ef9d7589ef3c200abe66653d3f1ab1033c3c419ae9b9bdb1240a85b024efc88b
+    # via
+    #   -r tools/dependency/requirements.txt
+    #   packaging
 pyyaml==5.4.1 \
     --hash=sha256:08682f6b72c722394747bddaf0aa62277e02557c0fd1c42cb853016a38f8dedf \
     --hash=sha256:0f5f5786c0e09baddcd8b4b45f20a7b5d61a7e7e99846e3c799b05c7c53fa696 \
