@@ -6,9 +6,11 @@ import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/protocol.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v4alpha";
 option java_outer_classname = "QuicConfigProto";
@@ -18,6 +20,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
+// [#next-free-field: 6]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.QuicProtocolOptions";
@@ -35,4 +38,14 @@ message QuicProtocolOptions {
   // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
   // to enabled.
   core.v4alpha.RuntimeFeatureFlag enabled = 4;
+
+  // A multiplier to number of connections which is used to determine how many packets to read per
+  // event loop. A reasonable number should allow the listener to process enough payload but not
+  // starve TCP and other UDP sockets and also prevent long event loop duration.
+  // The default value is 32. This means if there are N QUIC connections, the total number of
+  // packets to read in each read event will be 32 * N.
+  // The actual number of packets to read in total by the UDP listener is also
+  // bound by 6000, regardless of this field or how many connections there are.
+  google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5
+      [(validate.rules).uint32 = {gte: 1}];
 }

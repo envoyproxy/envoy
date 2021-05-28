@@ -54,12 +54,6 @@ public:
    * bytes.
    */
   static std::string decodeWithoutPadding(absl::string_view input);
-
-  /**
-   * Add the padding in the base64 encoded binary if the padding is missing.
-   * @param encoded is the target to complete the padding.
-   */
-  static void completePadding(std::string& encoded);
 };
 
 /**

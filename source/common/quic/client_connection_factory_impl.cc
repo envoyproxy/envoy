@@ -42,11 +42,13 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
 
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
-    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr)
+    TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr,
+    uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
-      transport_socket_factory_(transport_socket_factory), time_source_(time_source) {
+      transport_socket_factory_(transport_socket_factory), time_source_(time_source),
+      buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
 }
 
@@ -69,12 +71,10 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
 
   ASSERT(!info_impl->supported_versions_.empty());
   // QUICHE client session always use the 1st version to start handshake.
-  // TODO(alyssawilk) pass in ClusterInfo::perConnectionBufferLimitBytes() for
-  // send_buffer_limit instead of using 0.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, std::move(config), &info_impl->push_promise_index_, dispatcher,
-      /*send_buffer_limit=*/0);
+      info_impl->buffer_limit_);
   return ret;
 }
 

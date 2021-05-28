@@ -88,7 +88,7 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
   return saver.value() == str;
 }
 
-class MockScopedTrackedObject : public ScopeTrackedObject {
+class MockScopeTrackedObject : public ScopeTrackedObject {
 public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };

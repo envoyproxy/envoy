@@ -209,6 +209,24 @@ TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
                "KillRequestFilter is crashing Envoy!!!");
 }
 
+TEST_F(KillRequestFilterTest, PerRouteKillSettingFound) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  setUpTest(kill_request);
+  request_headers_.addCopy("x-envoy-kill-request", "true");
+
+  envoy::extensions::filters::http::kill_request::v3::KillRequest route_level_kill_request;
+  // Set probability to zero to make isKillRequestEnabled return false
+  route_level_kill_request.mutable_probability()->set_numerator(0);
+  route_level_kill_request.set_kill_request_header("x-custom-kill-request");
+
+  // Return valid kill setting on the REQUEST direction
+  const KillSettings kill_settings(route_level_kill_request);
+  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
+      .WillByDefault(Return(&kill_settings));
+  ASSERT_EQ(filter_->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
+}
+
 } // namespace
 } // namespace KillRequest
 } // namespace HttpFilters

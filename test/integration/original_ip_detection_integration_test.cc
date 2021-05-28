@@ -15,8 +15,7 @@ class OriginalIPDetectionIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  OriginalIPDetectionIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  OriginalIPDetectionIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void runTest(const std::string& ip) {
     useAccessLog("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
