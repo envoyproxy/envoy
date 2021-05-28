@@ -28,7 +28,7 @@ message DnsResolverOptions {
 
 // DNS resolution configuration which includes the underlying dns resolver addresses and options.
 message DnsResolutionConfig {
-  // A list of dns resolver addresses. If specified, DNS cache will perform resolution
+  // A list of dns resolver addresses. If specified, the DNS client library will perform resolution
   // via the underlying DNS resolvers. Otherwise, the default system resolvers
   // (e.g., /etc/resolv.conf) will be used.
   // Setting this value causes failure if the
