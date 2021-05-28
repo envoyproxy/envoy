@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. ../shell_utils.sh
+. tools/shell_utils.sh
 
 set -e
 
