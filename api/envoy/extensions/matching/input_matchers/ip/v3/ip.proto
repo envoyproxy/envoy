@@ -4,10 +4,7 @@ package envoy.extensions.matching.input_matchers.ip.v3;
 
 import "envoy/config/core/v3/address.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.ip.v3";
