@@ -118,8 +118,9 @@ message ClientConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.status.v3.ClientConfig";
 
-  // GenericXdsConfig is a simpler and generic version of specifying
-  // XDS config status and the dump.
+  // GenericXdsConfig is used to specify the config status and the dump
+  // of any xDS resource identified by their type URL. It is the generalized
+  // version of the now deprecated ListenersConfigDump, ClustersConfigDump etc
   // [#next-free-field: 10]
   message GenericXdsConfig {
     option (udpa.annotations.versioning).previous_message_type =
@@ -158,8 +159,8 @@ message ClientConfig {
     // [#not-implemented-hide:]
     admin.v4alpha.UpdateFailureState error_state = 8;
 
-    // Is static resource is true if it is specified in the envoy config
-    // supplied during the start.
+    // Is static resource is true if it is specified in the config supplied
+    // during at the start.
     bool is_static_resource = 9;
   }
 
