@@ -282,6 +282,44 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
   sink.flush(snapshot_);
 }
 
+TEST_F(MetricsServiceSinkTest, DefaultFlushPredicate) {
+  MetricsFlusher flusher(true, true);
+
+  auto used_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  used_counter->name_ = "used_counter";
+  used_counter->value_ = 100;
+  used_counter->used_ = true;
+  snapshot_.counters_.push_back({1, *used_counter});
+
+  auto unused_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  unused_counter->name_ = "unused_counter";
+  unused_counter->value_ = 100;
+  unused_counter->used_ = false;
+  snapshot_.counters_.push_back({1, *unused_counter});
+
+  auto metrics = flusher.flush(snapshot_);
+  EXPECT_EQ(1, metrics->size());
+}
+
+TEST_F(MetricsServiceSinkTest, OverridenFlushPredicate) {
+  MetricsFlusher flusher(true, true, [](const auto&) { return true; });
+
+  auto used_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  used_counter->name_ = "used_counter";
+  used_counter->value_ = 100;
+  used_counter->used_ = true;
+  snapshot_.counters_.push_back({1, *used_counter});
+
+  auto unused_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  unused_counter->name_ = "unused_counter";
+  unused_counter->used_ = false;
+  unused_counter->value_ = 100;
+  snapshot_.counters_.push_back({1, *unused_counter});
+
+  auto metrics = flusher.flush(snapshot_);
+  EXPECT_EQ(2, metrics->size());
+}
+
 } // namespace
 } // namespace MetricsService
 } // namespace StatSinks
