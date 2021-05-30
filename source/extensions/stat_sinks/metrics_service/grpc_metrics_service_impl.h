@@ -86,7 +86,8 @@ public:
       bool report_counters_as_deltas, bool emit_labels,
       std::function<bool(const Stats::Metric&)> predicate =
           [](const auto& metric) { return metric.used(); })
-      : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels), predicate_(predicate) {}
+      : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels),
+        predicate_(predicate) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
 
