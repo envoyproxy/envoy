@@ -168,7 +168,7 @@ message ClientConfig {
     admin.v4alpha.UpdateFailureState error_state = 8;
 
     // Is static resource is true if it is specified in the config supplied
-    // during at the start.
+    // through the file at the startup.
     bool is_static_resource = 9;
   }
 
