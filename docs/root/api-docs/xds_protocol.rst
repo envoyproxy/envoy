@@ -765,7 +765,7 @@ is present for debugging purposes only.
 
 Note that while a :ref:`response_nonce <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.response_nonce>` may
 be set on the request, the server must honor changes to the subscription state even if the nonce is stale. The nonce
-may be used to correlate an ack/nack with a server response, but should *not* used to reject stale requests.
+may be used to correlate an ack/nack with a server response, but should *not* be used to reject stale requests.
 
 In this first example the client connects and receives a first update
 that it ACKs. The second update fails and the client NACKs the update.
