@@ -161,7 +161,8 @@ TEST_F(DubboFilterConfigTest, CreateFilterChain) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboFilters::MockFilterChainFactoryCallbacks callbacks;
   ConfigImpl config(dubbo_config, context);
-  EXPECT_CALL(callbacks, addDecoderFilter(_)).Times(2);
+  EXPECT_CALL(callbacks, addDecoderFilter(_));
+  EXPECT_CALL(callbacks, addFilter(_));
   config.createFilterChain(callbacks);
 }
 
