@@ -123,6 +123,10 @@ void ActiveTcpSocket::unlink() {
   }
   // Emit logs if a connection is not established.
   if (!connected_) {
+    // In the case of connection timeout, populate the SNI into stream info.
+    if (!socket_->requestedServerName().empty()) {
+      stream_info_->setRequestedServerName(socket_->requestedServerName());
+    }
     emitLogs(*listener_.config_, *stream_info_);
   }
   listener_.parent_.dispatcher().deferredDelete(std::move(removed));
