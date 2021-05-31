@@ -286,7 +286,7 @@ TEST_F(MetricsServiceSinkTest, FlushPredicate) {
     EXPECT_EQ(2, metrics->size());
   }
 
-  // Using a predicate that rejects all metrcis, we'd flush no metrics.
+  // Using a predicate that rejects all metrics, we'd flush no metrics.
   MetricsFlusher flusher(true, true, [](const auto&) { return false; });
   auto metrics = flusher.flush(snapshot_);
   EXPECT_EQ(0, metrics->size());
