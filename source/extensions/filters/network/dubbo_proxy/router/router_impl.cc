@@ -122,33 +122,37 @@ void Router::setEncoderFilterCallbacks(DubboFilters::EncoderFilterCallbacks& cal
 }
 
 FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, ContextSharedPtr) {
-  if (metadata->hasResponseStatus() && upstream_request_ != nullptr) {
-    ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
-                     metadata->responseStatus());
+  if (!metadata->hasResponseStatus() || upstream_request_ == nullptr) {
+    return FilterStatus::Continue;
+  }
 
-    switch (metadata->responseStatus()) {
-    case ResponseStatus::Ok:
-      if (metadata->messageType() == MessageType::Exception) {
-        upstream_request_->upstream_host_->outlierDetector().putResult(
-            Upstream::Outlier::Result::ExtOriginRequestFailed);
-      } else {
-        upstream_request_->upstream_host_->outlierDetector().putResult(
-            Upstream::Outlier::Result::ExtOriginRequestSuccess);
-      }
-      break;
-    case ResponseStatus::ServerTimeout:
-      upstream_request_->upstream_host_->outlierDetector().putResult(
-          Upstream::Outlier::Result::LocalOriginTimeout);
-      break;
-    case ResponseStatus::ServiceError:
-    case ResponseStatus::ServerError:
-    case ResponseStatus::ServerThreadpoolExhaustedError:
+  ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
+                   metadata->responseStatus());
+
+  switch (metadata->responseStatus()) {
+  case ResponseStatus::Ok:
+    if (metadata->messageType() == MessageType::Exception) {
       upstream_request_->upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::ExtOriginRequestFailed);
-      break;
-    default:
-      break;
+    } else {
+      upstream_request_->upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestSuccess);
     }
+    break;
+  case ResponseStatus::ServerTimeout:
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::LocalOriginTimeout);
+    break;
+  case ResponseStatus::ServiceError:
+    FALLTHRU;
+  case ResponseStatus::ServerError:
+    FALLTHRU;
+  case ResponseStatus::ServerThreadpoolExhaustedError:
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::ExtOriginRequestFailed);
+    break;
+  default:
+    break;
   }
 
   return FilterStatus::Continue;

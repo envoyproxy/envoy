@@ -34,7 +34,6 @@ public:
 
   // DubboFilter::EncoderFilter
   void setEncoderFilterCallbacks(DubboFilters::EncoderFilterCallbacks& callbacks) override;
-
   FilterStatus onMessageEncoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) override;
 
   // Upstream::LoadBalancerContextBase
