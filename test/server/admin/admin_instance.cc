@@ -28,7 +28,7 @@ AdminInstanceTest::AdminInstanceTest()
 
 Http::Code AdminInstanceTest::runCallback(absl::string_view path_and_query,
                                           Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Chunker& response, absl::string_view method,
+                                          Chunker& response, absl::string_view method,
                                           absl::string_view body) {
   if (!body.empty()) {
     request_headers_.setReferenceContentType(Http::Headers::get().ContentTypeValues.FormUrlEncoded);
@@ -43,14 +43,14 @@ Http::Code AdminInstanceTest::runCallback(absl::string_view path_and_query,
 
 Http::Code AdminInstanceTest::getCallback(absl::string_view path_and_query,
                                           Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Chunker& response) {
+                                          Chunker& response) {
   return runCallback(path_and_query, response_headers, response,
                      Http::Headers::get().MethodValues.Get);
 }
 
 Http::Code AdminInstanceTest::postCallback(absl::string_view path_and_query,
                                            Http::ResponseHeaderMap& response_headers,
-                                           Buffer::Chunker& response) {
+                                           Chunker& response) {
   return runCallback(path_and_query, response_headers, response,
                      Http::Headers::get().MethodValues.Post);
 }

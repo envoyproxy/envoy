@@ -18,11 +18,11 @@ public:
   LogsHandler(Server::Instance& server);
 
   Http::Code handlerLogging(absl::string_view path_and_query,
-                            Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                            Http::ResponseHeaderMap& response_headers, Chunker& response,
                             AdminStream&);
 
   Http::Code handlerReopenLogs(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                               Http::ResponseHeaderMap& response_headers, Chunker& response,
                                AdminStream&);
 
 private:

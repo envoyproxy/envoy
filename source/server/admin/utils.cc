@@ -39,7 +39,7 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
 }
 
 // Helper method to get filter parameter, or report an error for an invalid regex.
-bool filterParam(Http::Utility::QueryParams params, Buffer::Chunker& response,
+bool filterParam(Http::Utility::QueryParams params, Chunker& response,
                  absl::optional<std::regex>& regex) {
   auto p = params.find("filter");
   if (p != params.end()) {

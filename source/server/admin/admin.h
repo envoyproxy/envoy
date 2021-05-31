@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include "common/buffer/buffer_impl.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
@@ -64,6 +66,7 @@ class AdminInternalAddressConfig : public Http::InternalAddressConfig {
  * Implementation of Server::Admin.
  */
 class AdminImpl : public Admin,
+                  public Chunker,
                   public Network::FilterChainManager,
                   public Network::FilterChainFactory,
                   public Http::FilterChainFactory,
@@ -73,7 +76,7 @@ public:
   AdminImpl(const std::string& profile_path, Server::Instance& server);
 
   Http::Code runCallback(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                         Http::ResponseHeaderMap& response_headers, Chunker& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutableSocket() { return *socket_; }
@@ -305,11 +308,11 @@ private:
    * URL handlers.
    */
   Http::Code handlerAdminHome(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                              Http::ResponseHeaderMap& response_headers, Chunker& response,
                               AdminStream&);
 
   Http::Code handlerHelp(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                         Http::ResponseHeaderMap& response_headers, Chunker& response,
                          AdminStream&);
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {

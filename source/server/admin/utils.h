@@ -4,6 +4,7 @@
 
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/init/manager.h"
+#include "envoy/server/admin.h"
 
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -18,7 +19,7 @@ envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
-bool filterParam(Http::Utility::QueryParams params, Buffer::Chunker& response,
+bool filterParam(Http::Utility::QueryParams params, Chunker& response,
                  absl::optional<std::regex>& regex);
 
 absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params);

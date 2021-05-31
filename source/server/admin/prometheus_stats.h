@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/server/admin.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
@@ -24,7 +25,7 @@ public:
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                                    Buffer::Chunker& response, const bool used_only,
+                                    Chunker& response, const bool used_only,
                                     const absl::optional<std::regex>& regex);
   /**
    * Format the given tags, returning a string as a comma-separated list

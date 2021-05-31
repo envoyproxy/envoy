@@ -18,23 +18,23 @@ public:
   ServerInfoHandler(Server::Instance& server);
 
   Http::Code handlerCerts(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                          Http::ResponseHeaderMap& response_headers, Chunker& response,
                           AdminStream&);
 
   Http::Code handlerServerInfo(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                               Http::ResponseHeaderMap& response_headers, Chunker& response,
                                AdminStream&);
 
   Http::Code handlerReady(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                          Http::ResponseHeaderMap& response_headers, Chunker& response,
                           AdminStream&);
 
   Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Chunker& response, AdminStream&);
+                                      Chunker& response, AdminStream&);
 
   Http::Code handlerMemory(absl::string_view path_and_query,
-                           Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                           Http::ResponseHeaderMap& response_headers, Chunker& response,
                            AdminStream&);
 };
 

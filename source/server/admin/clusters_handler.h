@@ -18,15 +18,15 @@ public:
   ClustersHandler(Server::Instance& server);
 
   Http::Code handlerClusters(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                             Http::ResponseHeaderMap& response_headers, Chunker& response,
                              AdminStream&);
 
 private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
-                      Buffer::Chunker& response);
-  void writeClustersAsJson(Buffer::Chunker& response);
-  void writeClustersAsText(Buffer::Chunker& response);
+                      Chunker& response);
+  void writeClustersAsJson(Chunker& response);
+  void writeClustersAsText(Chunker& response);
 };
 
 } // namespace Server

@@ -93,7 +93,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Chunker&,
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
@@ -120,7 +120,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Chunker&,
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
@@ -129,7 +129,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Chunker&,
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
@@ -138,7 +138,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Chunker&,
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
 
   // It's OK to have help text with HTML characters in it, but when we render the home
