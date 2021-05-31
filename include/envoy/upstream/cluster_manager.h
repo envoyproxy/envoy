@@ -12,6 +12,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -359,6 +360,8 @@ public:
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
+                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                       alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state) PURE;

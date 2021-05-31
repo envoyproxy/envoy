@@ -51,10 +51,12 @@ message TlsParameters {
 
   // If specified, the TLS listener will only support the specified `cipher list
   // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_
-  // when negotiating TLS 1.0-1.2 (this setting has no effect when negotiating TLS 1.3). If not
-  // specified, the default list will be used.
+  // when negotiating TLS 1.0-1.2 (this setting has no effect when negotiating TLS 1.3).
   //
-  // In non-FIPS builds, the default cipher list is:
+  // If not specified, a default list will be used. Defaults are different for server (downstream) and
+  // client (upstream) TLS configurations.
+  //
+  // In non-FIPS builds, the default server cipher list is:
   //
   // .. code-block:: none
   //
@@ -71,7 +73,7 @@ message TlsParameters {
   //   AES256-GCM-SHA384
   //   AES256-SHA
   //
-  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default cipher list is:
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default server cipher list is:
   //
   // .. code-block:: none
   //
@@ -87,6 +89,24 @@ message TlsParameters {
   //   ECDHE-RSA-AES256-SHA
   //   AES256-GCM-SHA384
   //   AES256-SHA
+  //
+  // In non-FIPS builds, the default client cipher list is:
+  //
+  // .. code-block:: none
+  //
+  //   [ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]
+  //   [ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]
+  //   ECDHE-ECDSA-AES256-GCM-SHA384
+  //   ECDHE-RSA-AES256-GCM-SHA384
+  //
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default client cipher list is:
+  //
+  // .. code-block:: none
+  //
+  //   ECDHE-ECDSA-AES128-GCM-SHA256
+  //   ECDHE-RSA-AES128-GCM-SHA256
+  //   ECDHE-ECDSA-AES256-GCM-SHA384
+  //   ECDHE-RSA-AES256-GCM-SHA384
   repeated string cipher_suites = 3;
 
   // If specified, the TLS connection will only support the specified ECDH
@@ -160,11 +180,11 @@ message TlsCertificate {
   config.core.v3.WatchedDirectory watched_directory = 7;
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` field. This can't be
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` field. This can't be
   // marked as ``oneof`` due to API compatibility reasons. Setting both :ref:`private_key
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` and
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` and
   // :ref:`private_key_provider
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` fields will result in an
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>` fields will result in an
   // error.
   PrivateKeyProvider private_key_provider = 6;
 
@@ -190,7 +210,7 @@ message TlsSessionTicketKeys {
   // All keys are candidates for decrypting received tickets. This allows for easy rotation of keys
   // by, for example, putting the new key first, and the previous key second.
   //
-  // If :ref:`session_ticket_keys <envoy_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`
+  // If :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`
   // is not specified, the TLS library will still support resuming sessions via tickets, but it will
   // use an internally-generated and managed key, so sessions cannot be resumed across hot restarts
   // or on different hosts.
@@ -224,7 +244,7 @@ message CertificateValidationContext {
 
     // Connections where the certificate fails verification will be permitted.
     // For HTTP connections, the result of certificate verification can be used in route matching. (
-    // see :ref:`validated <envoy_api_field_config.route.v3.RouteMatch.TlsContextMatchOptions.validated>` ).
+    // see :ref:`validated <envoy_v3_api_field_config.route.v3.RouteMatch.TlsContextMatchOptions.validated>` ).
     ACCEPT_UNTRUSTED = 1;
   }
 
@@ -237,13 +257,13 @@ message CertificateValidationContext {
   // for listeners). If not specified and a peer certificate is presented it will not be
   // verified. By default, a client certificate is optional, unless one of the additional
   // options (:ref:`require_client_certificate
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`,
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`,
   // :ref:`verify_certificate_spki
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>`,
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`, or
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`, or
   // :ref:`match_subject_alt_names
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
   // specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify
@@ -289,15 +309,15 @@ message CertificateValidationContext {
   //
   // When both:
   // :ref:`verify_certificate_hash
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>` and
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>` and
   // :ref:`verify_certificate_spki
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>` are specified,
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>` are specified,
   // a hash matching value from either of the lists will result in the certificate being accepted.
   //
   // .. attention::
   //
   //   This option is preferred over :ref:`verify_certificate_hash
-  //   <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`,
+  //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`,
   //   because SPKI is tied to a private key, so it doesn't change when the certificate
   //   is renewed using the same private key.
   repeated string verify_certificate_spki = 3
@@ -325,9 +345,9 @@ message CertificateValidationContext {
   //
   // When both:
   // :ref:`verify_certificate_hash
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>` and
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>` and
   // :ref:`verify_certificate_spki
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>` are specified,
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>` are specified,
   // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated = {items {string {min_len: 64 max_bytes: 95}}}];
@@ -336,7 +356,7 @@ message CertificateValidationContext {
   // Subject Alternative Name of the presented certificate matches one of the specified matchers.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
-  // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.v3.StringMatcher>`.
+  // configured with exact match type in the :ref:`string matcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`.
   // For example if the certificate has "\*.example.com" as DNS SAN entry, to allow only "api.example.com",
   // it should be configured as shown below.
   //
@@ -349,7 +369,7 @@ message CertificateValidationContext {
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
-  //   <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
+  //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9;
 
   // [#not-implemented-hide:] Must present signed certificate time-stamp.

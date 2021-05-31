@@ -299,7 +299,7 @@ class ScaledRangeTimerManagerTestWithScope : public ScaledRangeTimerManagerTest,
                                              public testing::WithParamInterface<bool> {
 public:
   ScopeTrackedObject* getScope() { return GetParam() ? &scope_ : nullptr; }
-  MockScopedTrackedObject scope_;
+  MockScopeTrackedObject scope_;
 };
 
 TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {

@@ -109,7 +109,7 @@ message Compressor {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // A compressor library to use for compression. Currently only
-  // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+  // :ref:`envoy.compression.gzip.compressor<envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
   // is included in Envoy.
   // [#extension-category: envoy.compression.compressor]
   config.core.v4alpha.TypedExtensionConfig compressor_library = 6

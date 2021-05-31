@@ -343,9 +343,9 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
             Event::MockDispatcher dispatcher_;
             auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
             test_session.codec_client_ = new CodecClientForTest(
-                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                test_session.codec_, nullptr,
-                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source), dispatcher_);
+                Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source),
+                dispatcher_);
             return test_session.codec_client_;
           }));
   expectStreamCreate();

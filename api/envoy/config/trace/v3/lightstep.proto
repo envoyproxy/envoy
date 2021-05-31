@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "envoy/config/core/v3/base.proto";
+
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -42,7 +45,11 @@ message LightstepConfig {
 
   // File containing the access token to the `LightStep
   // <https://lightstep.com/>`_ API.
-  string access_token_file = 2 [(validate.rules).string = {min_len: 1}];
+  string access_token_file = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Access token to the `LightStep <https://lightstep.com/>`_ API.
+  core.v3.DataSource access_token = 4;
 
   // Propagation modes to use by LightStep's tracer.
   repeated PropagationMode propagation_modes = 3

@@ -85,6 +85,14 @@ public:
     ScopedRuntimeInjector scoped_runtime(server_.runtime());
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
+
+    // TODO(snowp): There's no way to override runtime flags per example file (since we mock out the
+    // runtime loader), so temporarily enable this flag explicitly here until we flip the default.
+    // This should allow the existing configuration examples to continue working despite the feature
+    // being disabled by default.
+    ON_CALL(*snapshot_,
+            runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api"))
+        .WillByDefault(Return(true));
     ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
       return snapshot_;
     }));
@@ -156,7 +164,8 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
                                                 false};
   Random::RandomGeneratorImpl random_;
-  Runtime::SnapshotConstSharedPtr snapshot_{std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
+  std::shared_ptr<Runtime::MockSnapshot> snapshot_{
+      std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;

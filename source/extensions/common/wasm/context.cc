@@ -28,7 +28,6 @@
 
 #include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
-#include "extensions/common/wasm/well_known_names.h"
 #include "extensions/filters/common/expr/context.h"
 
 #include "absl/base/casts.h"
@@ -163,6 +162,12 @@ void Context::error(absl::string_view message) { ENVOY_LOG(trace, message); }
 uint64_t Context::getCurrentTimeNanoseconds() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
              wasm()->time_source_.systemTime().time_since_epoch())
+      .count();
+}
+
+uint64_t Context::getMonotonicTimeNanoseconds() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+             wasm()->time_source_.monotonicTime().time_since_epoch())
       .count();
 }
 
@@ -1118,7 +1123,7 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
 void Context::onGrpcCreateInitialMetadata(uint32_t /* token */,
                                           Http::RequestHeaderMap& initial_metadata) {
   if (grpc_initial_metadata_) {
-    initial_metadata = std::move(*grpc_initial_metadata_);
+    Http::HeaderMapImpl::copyFrom(initial_metadata, *grpc_initial_metadata_);
     grpc_initial_metadata_.reset();
   }
 }

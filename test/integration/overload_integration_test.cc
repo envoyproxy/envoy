@@ -168,7 +168,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 }
 
 TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
     return; // only relevant for downstream HTTP1.x connections
   }
 
@@ -305,7 +305,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_idle_timeout", 1);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  if (GetParam().downstream_protocol == Http::CodecClient::Type::HTTP1) {
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP1) {
     // For HTTP1, Envoy will start draining but will wait to close the
     // connection. If a new stream comes in, it will set the connection header
     // to "close" on the response and close the connection after.

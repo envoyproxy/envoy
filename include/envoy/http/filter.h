@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
@@ -16,6 +17,8 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "common/common/scope_tracked_object_stack.h"
 
 #include "absl/types/optional.h"
 
@@ -283,6 +286,16 @@ public:
    * @return the ScopeTrackedObject for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
+
+  /**
+   * Should be used when we continue processing a request or response by invoking a filter directly
+   * from an asynchronous callback to restore crash context. If not explicitly used by the filter
+   * itself, this gets invoked in ActiveStreamFilterBase::commonContinue().
+   *
+   * @param tracked_object_stack ScopeTrackedObjectStack where relevant ScopeTrackedObjects will be
+   * added to.
+   */
+  virtual void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) PURE;
 };
 
 /**
@@ -543,6 +556,11 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t decoderBufferLimit() PURE;
+
+  /**
+   * @return the account, if any, used by this stream.
+   */
+  virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
 
   /**
    * Takes a stream, and acts as if the headers are newly arrived.

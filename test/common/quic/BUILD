@@ -250,12 +250,36 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "client_connection_factory_impl_test",
+    srcs = ["client_connection_factory_impl_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http/http3:conn_pool_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/common/http:common_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "quic_io_handle_wrapper_test",
     srcs = ["quic_io_handle_wrapper_test.cc"],
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
