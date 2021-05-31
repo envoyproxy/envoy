@@ -51,6 +51,7 @@ EXTENSION_CATEGORIES = [
     "envoy.filters.listener",
     "envoy.filters.network",
     "envoy.filters.udp_listener",
+    "envoy.formatter",
     "envoy.grpc_credentials",
     "envoy.guarddog_actions",
     "envoy.health_checkers",

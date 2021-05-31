@@ -26,9 +26,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.formatter",
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         "//include/envoy/registry",
         "//source/extensions/formatter/req_without_query:req_without_query_lib",

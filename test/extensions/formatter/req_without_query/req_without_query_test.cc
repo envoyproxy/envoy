@@ -41,7 +41,7 @@ TEST_F(ReqWithoutQueryTest, TestStripQueryString) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   EXPECT_EQ("/request/path", formatter->format(request_headers_, response_headers_,
                                                response_trailers_, stream_info_, body_));
 }
@@ -59,7 +59,7 @@ TEST_F(ReqWithoutQueryTest, TestSelectMainHeader) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   EXPECT_EQ("/original/path", formatter->format(request_headers_, response_headers_,
                                                 response_trailers_, stream_info_, body_));
 }
@@ -77,7 +77,7 @@ TEST_F(ReqWithoutQueryTest, TestSelectAlternativeHeader) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   EXPECT_EQ("/request/path", formatter->format(request_headers_, response_headers_,
                                                response_trailers_, stream_info_, body_));
 }
@@ -95,7 +95,7 @@ TEST_F(ReqWithoutQueryTest, TestTruncateHeader) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   EXPECT_EQ("/requ", formatter->format(request_headers_, response_headers_, response_trailers_,
                                        stream_info_, body_));
 }
@@ -113,7 +113,7 @@ TEST_F(ReqWithoutQueryTest, TestNonExistingHeader) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   EXPECT_EQ("-", formatter->format(request_headers_, response_headers_, response_trailers_,
                                    stream_info_, body_));
 }
@@ -141,7 +141,7 @@ TEST_F(ReqWithoutQueryTest, TestFormatJson) {
 
   TestUtility::loadFromYaml(yaml, config_);
   auto formatter =
-      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   const std::string actual = formatter->format(request_headers_, response_headers_,
                                                response_trailers_, stream_info_, body_);
   EXPECT_TRUE(TestUtility::jsonStringEqual(actual, expected));
@@ -160,7 +160,7 @@ TEST_F(ReqWithoutQueryTest, TestParserNotRecognizingCommand) {
   TestUtility::loadFromYaml(yaml, config_);
 
   EXPECT_THROW(
-      ::Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
       EnvoyException);
 }
 
