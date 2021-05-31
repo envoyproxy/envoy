@@ -101,9 +101,35 @@ public:
 
 class MetricsServiceSinkTest : public testing::Test {
 public:
-  MetricsServiceSinkTest() = default;
+  void addCounterToSnapshot(const std::string& name, uint64_t delta, uint64_t value,
+                            bool used = true) {
+    counter_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockCounter>>());
+    counter_storage_.back()->name_ = name;
+    counter_storage_.back()->value_ = value;
+    counter_storage_.back()->used_ = used;
+
+    snapshot_.counters_.push_back({delta, *counter_storage_.back()});
+  }
+  void addGaugeToSnapshot(const std::string& name, uint64_t value, bool used = true) {
+    gauge_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockGauge>>());
+    gauge_storage_.back()->name_ = name;
+    gauge_storage_.back()->value_ = value;
+    gauge_storage_.back()->used_ = used;
+
+    snapshot_.gauges_.push_back(*gauge_storage_.back());
+  }
+  void addHistogramToSnapshot(const std::string& name, bool used = true) {
+    histogram_storage_.emplace_back(std::make_unique<NiceMock<Stats::MockParentHistogram>>());
+    histogram_storage_.back()->name_ = name;
+    histogram_storage_.back()->used_ = used;
+
+    snapshot_.histograms_.push_back(*histogram_storage_.back());
+  }
 
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
+  std::vector<std::unique_ptr<NiceMock<Stats::MockCounter>>> counter_storage_;
+  std::vector<std::unique_ptr<NiceMock<Stats::MockGauge>>> gauge_storage_;
+  std::vector<std::unique_ptr<NiceMock<Stats::MockParentHistogram>>> histogram_storage_;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer(
       Grpc::AsyncClientFactoryPtr{new NiceMock<Grpc::MockAsyncClientFactory>()})};
 };
@@ -113,21 +139,9 @@ TEST_F(MetricsServiceSinkTest, CheckSendCall) {
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, false, false);
 
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->latch_ = 1;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
-
-  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
-  gauge->name_ = "test_gauge";
-  gauge->value_ = 1;
-  gauge->used_ = true;
-  snapshot_.gauges_.push_back(*gauge);
-
-  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
-  histogram->name_ = "test_histogram";
-  histogram->used_ = true;
+  addCounterToSnapshot("test_counter", 1, 1);
+  addGaugeToSnapshot("test_gauge", 1);
+  addHistogramToSnapshot("test_histogram");
 
   EXPECT_CALL(*streamer_, send(_));
 
@@ -139,17 +153,8 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, false, false);
 
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->value_ = 100;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
-
-  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
-  gauge->name_ = "test_gauge";
-  gauge->value_ = 1;
-  gauge->used_ = true;
-  snapshot_.gauges_.push_back(*gauge);
+  addCounterToSnapshot("test_counter", 1, 100);
+  addGaugeToSnapshot("test_gauge", 1);
 
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
     EXPECT_EQ(2, metrics->size());
@@ -157,7 +162,7 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
   sink.flush(snapshot_);
 
   // Verify only newly added metrics come after endFlush call.
-  gauge->used_ = false;
+  gauge_storage_.back()->used_ = false;
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
     EXPECT_EQ(1, metrics->size());
   }));
@@ -170,11 +175,7 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, false, false);
 
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->value_ = 100;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
+  addCounterToSnapshot("test_counter", 1, 100);
 
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
     EXPECT_EQ(1, metrics->size());
@@ -189,11 +190,7 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, true, false);
 
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->value_ = 100;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
+  addCounterToSnapshot("test_counter", 1, 100);
 
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
     EXPECT_EQ(1, metrics->size());
@@ -204,28 +201,17 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
 
 // Test the behavior of tag emission based on the emit_tags_as_label flag.
 TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "full-counter-name";
-  counter->value_ = 100;
-  counter->used_ = true;
-  counter->setTagExtractedName("tag-counter-name");
-  counter->setTags({{"a", "b"}});
-  snapshot_.counters_.push_back({1, *counter});
+  addCounterToSnapshot("full-counter-name", 1, 100);
+  counter_storage_.back()->setTagExtractedName("tag-counter-name");
+  counter_storage_.back()->setTags({{"a", "b"}});
 
-  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
-  gauge->name_ = "full-gauge-name";
-  gauge->value_ = 100;
-  gauge->used_ = true;
-  gauge->setTagExtractedName("tag-gauge-name");
-  gauge->setTags({{"a", "b"}});
-  snapshot_.gauges_.push_back({*gauge});
+  addGaugeToSnapshot("full-gauge-name", 100);
+  gauge_storage_.back()->setTagExtractedName("tag-gauge-name");
+  gauge_storage_.back()->setTags({{"a", "b"}});
 
-  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
-  histogram->name_ = "full-histogram-name";
-  histogram->used_ = true;
-  histogram->setTagExtractedName("tag-histogram-name");
-  histogram->setTags({{"a", "b"}});
-  snapshot_.histograms_.push_back({*histogram});
+  addHistogramToSnapshot("full-histogram-name");
+  histogram_storage_.back()->setTagExtractedName("tag-histogram-name");
+  histogram_storage_.back()->setTags({{"a", "b"}});
 
   {
     // When the emit_tags flag is false, we don't emit the tags and use the full name.
@@ -282,42 +268,28 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
   sink.flush(snapshot_);
 }
 
-TEST_F(MetricsServiceSinkTest, DefaultFlushPredicate) {
-  MetricsFlusher flusher(true, true);
+TEST_F(MetricsServiceSinkTest, FlushPredicate) {
+  addCounterToSnapshot("used_counter", 100, 1);
+  addCounterToSnapshot("unused_counter", 100, 1, false);
 
-  auto used_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  used_counter->name_ = "used_counter";
-  used_counter->value_ = 100;
-  used_counter->used_ = true;
-  snapshot_.counters_.push_back({1, *used_counter});
+  // Default predicate only accepts used metrics.
+  {
+    MetricsFlusher flusher(true, true);
+    auto metrics = flusher.flush(snapshot_);
+    EXPECT_EQ(1, metrics->size());
+  }
 
-  auto unused_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  unused_counter->name_ = "unused_counter";
-  unused_counter->value_ = 100;
-  unused_counter->used_ = false;
-  snapshot_.counters_.push_back({1, *unused_counter});
+  // Using a predicate that accepts all metrics, we'd flush both metrics.
+  {
+    MetricsFlusher flusher(true, true, [](const auto&) { return true; });
+    auto metrics = flusher.flush(snapshot_);
+    EXPECT_EQ(2, metrics->size());
+  }
 
+  // Using a predicate that rejects all metrcis, we'd flush no metrics.
+  MetricsFlusher flusher(true, true, [](const auto&) { return false; });
   auto metrics = flusher.flush(snapshot_);
-  EXPECT_EQ(1, metrics->size());
-}
-
-TEST_F(MetricsServiceSinkTest, OverridenFlushPredicate) {
-  MetricsFlusher flusher(true, true, [](const auto&) { return true; });
-
-  auto used_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  used_counter->name_ = "used_counter";
-  used_counter->value_ = 100;
-  used_counter->used_ = true;
-  snapshot_.counters_.push_back({1, *used_counter});
-
-  auto unused_counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  unused_counter->name_ = "unused_counter";
-  unused_counter->used_ = false;
-  unused_counter->value_ = 100;
-  snapshot_.counters_.push_back({1, *unused_counter});
-
-  auto metrics = flusher.flush(snapshot_);
-  EXPECT_EQ(2, metrics->size());
+  EXPECT_EQ(0, metrics->size());
 }
 
 } // namespace
