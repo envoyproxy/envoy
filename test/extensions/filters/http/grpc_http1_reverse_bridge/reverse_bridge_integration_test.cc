@@ -26,11 +26,10 @@ namespace {
 class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
-  ReverseBridgeIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  ReverseBridgeIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void initialize() override {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     const std::string filter =
         R"EOF(
@@ -57,7 +56,7 @@ typed_config:
   void TearDown() override { fake_upstream_connection_.reset(); }
 
 protected:
-  FakeHttpConnection::Type upstream_protocol_;
+  Http::CodecType upstream_protocol_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
@@ -68,7 +67,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
 // doesn't enable the bridge.
 // Regression test of https://github.com/envoyproxy/envoy/issues/9922
 TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
-  upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+  upstream_protocol_ = Http::CodecType::HTTP2;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -103,7 +102,7 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
   response_trailers.setGrpcStatus(std::string("0"));
   upstream_request_->encodeTrailers(response_trailers);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ(response->body(), response_data.toString());
@@ -117,7 +116,7 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
 }
 
 TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
-  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  upstream_protocol_ = Http::CodecType::HTTP1;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -152,7 +151,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   Buffer::OwnedImpl response_data{"defgh"};
   upstream_request_->encodeData(response_data, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   // Ensure that we restored the content-type and that we added the length prefix.
@@ -174,7 +173,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
 }
 
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
-  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  upstream_protocol_ = Http::CodecType::HTTP1;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

@@ -35,6 +35,7 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    missing_path_rejected, The request was rejected due to a missing Path or :path header field.
    no_healthy_upstream, The request was rejected by the router filter because there was no healthy upstream found.
    overload, The request was rejected due to the Overload Manager reaching configured resource limits.
+   original_ip_detection_failed, The request was rejected because the original IP couldn't be detected.
    path_normalization_failed, "The request was rejected because path normalization was configured on and failed, probably due to an invalid path."
    request_headers_failed_strict_check, The request was rejected due to x-envoy-* headers failing strict header validation.
    request_overall_timeout, The per-stream total request timeout was exceeded.
@@ -99,3 +100,19 @@ All http2 details are rooted at *http2.*
     http2.unexpected_underscore, Envoy was configured to drop requests with header keys beginning with underscores.
     http2.unknown.nghttp2.error, An unknown error was encountered by nghttp2
     http2.violation.of.messaging.rule, The stream was in violation of a HTTP/2 messaging rule.
+
+Http3 details
+~~~~~~~~~~~~~
+
+All http3 details are rooted at *http3.*
+
+.. csv-table::
+   :header: Name, Description
+   :widths: 1, 2
+
+    http3.invalid_header_field, One of the HTTP/3 headers was invalid
+    http3.headers_too_large, The size of headers (or trailers) exceeded the configured limits
+    http3.unexpected_underscore, Envoy was configured to drop or reject requests with header keys beginning with underscores.
+    http3.too_many_headers, Either incoming request or response headers contained too many headers.
+    http3.too_many_trailers, Either incoming request or response trailers contained too many entries.
+

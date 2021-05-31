@@ -24,12 +24,6 @@ namespace Envoy {
 namespace Http {
 namespace Utility {
 
-// This is a wrapper around dispatch calls that may throw an exception or may return an error status
-// while exception removal is in migration.
-// TODO(#10878): Remove this.
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data);
-
 /**
  * Well-known HTTP ALPN values.
  */
@@ -39,6 +33,7 @@ public:
   const std::string Http11 = "http/1.1";
   const std::string Http2 = "h2";
   const std::string Http2c = "h2c";
+  const std::string Http3 = "h3";
 };
 
 using AlpnNames = ConstSingleton<AlpnNameValues>;
@@ -121,7 +116,23 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
                              const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
+namespace Http3 {
+namespace Utility {
 
+// Limits and defaults for `envoy::config::core::v3::Http3ProtocolOptions` protos.
+struct OptionsLimits {
+  // The same as kStreamReceiveWindowLimit in QUICHE which is the maximum supported by QUICHE.
+  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 16 * 1024 * 1024;
+  // The same as kSessionReceiveWindowLimit in QUICHE which is the maximum supported by QUICHE.
+  static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 24 * 1024 * 1024;
+};
+
+envoy::config::core::v3::Http3ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error);
+} // namespace Utility
+} // namespace Http3
 namespace Http {
 namespace Utility {
 
@@ -238,6 +249,14 @@ absl::string_view findQueryStringStart(const HeaderString& path);
 std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 
 /**
+ * Parse a particular value out of a set-cookie
+ * @param headers supplies the headers to get the set-cookie from.
+ * @param key the key for the particular set-cookie value to return
+ * @return std::string the parsed set-cookie value, or "" if none exists
+ **/
+std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key);
+
+/**
  * Produce the value for a Set-Cookie header with the given parameters.
  * @param key is the name of the cookie that is being set.
  * @param value the value to set the cookie to; this value is trusted.
@@ -259,6 +278,13 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
 uint64_t getResponseStatus(const ResponseHeaderMap& headers);
 
 /**
+ * Get the response status from the response headers.
+ * @param headers supplies the headers to get the status from.
+ * @return absl::optional<uint64_t> the response code or absl::nullopt if the headers are invalid.
+ */
+absl::optional<uint64_t> getResponseStatusNoThrow(const ResponseHeaderMap& headers);
+
+/**
  * Determine whether these headers are a valid Upgrade request or response.
  * This function returns true if the following HTTP headers and values are present:
  * - Connection: Upgrade
@@ -278,15 +304,6 @@ bool isH2UpgradeRequest(const RequestHeaderMap& headers);
  * - Upgrade: websocket
  */
 bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
-
-/**
- * @return Http1Settings An Http1Settings populated from the
- * envoy::config::core::v3::Http1ProtocolOptions config.
- */
-Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
-
-Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                                 const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme);
 
 struct EncodeFunctions {
   // Function to modify locally generated response headers.
@@ -340,8 +357,8 @@ void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_function
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
   Network::Address::InstanceConstSharedPtr address_;
-  // Whether this is the only address in the XFF header.
-  bool single_address_;
+  // Whether this address can be used to determine if it's an internal request.
+  bool allow_trusted_address_checks_;
 };
 
 /**

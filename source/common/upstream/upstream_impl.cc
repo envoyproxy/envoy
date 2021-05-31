@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
@@ -51,7 +52,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/network/common/utility.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -283,7 +283,7 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, address_, socket_factory_, options,
+  return {createConnection(dispatcher, cluster(), address(), transportSocketFactory(), options,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -313,8 +313,8 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
 
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
-                            : socket_factory_;
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), factory, nullptr,
+                            : transportSocketFactory();
+  return {createConnection(dispatcher, cluster(), healthCheckAddress(), factory, nullptr,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -641,7 +641,7 @@ public:
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
-        options_(c.options()) {}
+        options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -654,9 +654,29 @@ public:
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
-    // Not used.
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+
+  AccessLog::AccessLogManager& accessLogManager() override {
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return message_validation_visitor_;
+  }
+
+  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  Init::Manager& initManager() override {
+    // TODO(davinci26): Needs an implementation for this context. Currently not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   Api::Api& api() override { return api_; }
 
 private:
@@ -670,11 +690,13 @@ private:
   ThreadLocal::SlotAllocator& tls_;
   Api::Api& api_;
   const Server::Options& options_;
+  ProtobufMessage::ValidationVisitor& message_validation_visitor_;
 };
 
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
-              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options) {
+              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options,
+              ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (options) {
     return std::move(options);
   }
@@ -695,7 +717,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                  config.upstream_http_protocol_options())
            : absl::nullopt),
       config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-      config.has_http2_protocol_options());
+      config.has_http2_protocol_options(), validation_visitor);
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
@@ -708,8 +730,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
-          createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
-                                    "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"))),
+          createOptions(config,
+                        extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
+                            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
+                        factory_context.messageValidationVisitor())),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -717,7 +741,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, connect_timeout, 5000))),
       per_upstream_preconnect_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
@@ -873,12 +897,11 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      transport_socket.set_name("envoy.transport_sockets.tls");
       transport_socket.mutable_typed_config()->PackFrom(
           config.hidden_envoy_deprecated_tls_context());
     } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     }
   }
 
@@ -900,16 +923,21 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return {downstream_protocol.value()};
-  } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
-    ASSERT(!(features_ & Upstream::ClusterInfo::Features::HTTP3));
-    return {Http::Protocol::Http2, Http::Protocol::Http11};
-  } else {
-    if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
-      return {Http::Protocol::Http3};
-    }
-    return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
-                                                                 : Http::Protocol::Http11};
   }
+
+  if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    if (!(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
+      return {Http::Protocol::Http2, Http::Protocol::Http11};
+    }
+    return {Http::Protocol::Http3, Http::Protocol::Http2, Http::Protocol::Http11};
+  }
+
+  if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
+    return {Http::Protocol::Http3};
+  }
+
+  return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                               : Http::Protocol::Http11};
 }
 
 ClusterImplBase::ClusterImplBase(
@@ -945,6 +973,18 @@ ClusterImplBase::ClusterImplBase(
     throw EnvoyException(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
+  }
+
+  if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
+#if defined(ENVOY_ENABLE_QUIC)
+    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+      throw EnvoyException(
+          fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
+                      cluster.DebugString()));
+    }
+#else
+    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+#endif
   }
 
   // Create the default (empty) priority set before registering callbacks to
@@ -1137,9 +1177,9 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
 
 const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
-  try {
-    return Network::Address::resolveProtoAddress(address);
-  } catch (EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
+  END_TRY
+  catch (EnvoyException& e) {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
         info_->type() == envoy::config::cluster::v3::Cluster::EDS) {
       throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
@@ -1217,6 +1257,10 @@ Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
 
 Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
+}
+
+Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
 }
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(

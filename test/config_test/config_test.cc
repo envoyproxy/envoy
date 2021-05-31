@@ -85,6 +85,14 @@ public:
     ScopedRuntimeInjector scoped_runtime(server_.runtime());
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
+
+    // TODO(snowp): There's no way to override runtime flags per example file (since we mock out the
+    // runtime loader), so temporarily enable this flag explicitly here until we flip the default.
+    // This should allow the existing configuration examples to continue working despite the feature
+    // being disabled by default.
+    ON_CALL(*snapshot_,
+            runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api"))
+        .WillByDefault(Return(true));
     ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
       return snapshot_;
     }));
@@ -92,7 +100,7 @@ public:
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap, options);
+    Server::Configuration::InitialImpl initial_config(bootstrap, options, server_);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
@@ -156,7 +164,8 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
                                                 false};
   Random::RandomGeneratorImpl random_;
-  Runtime::SnapshotConstSharedPtr snapshot_{std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
+  std::shared_ptr<Runtime::MockSnapshot> snapshot_{
+      std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
@@ -164,8 +173,24 @@ public:
 
 void testMerge() {
   Api::ApiPtr api = Api::createApiForTest();
-
-  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  const std::string overlay = R"EOF(
+        {
+          admin: {
+            "address": {
+              "socket_address": {
+                "address": "1.2.3.4",
+                "port_value": 5678
+              }
+            }
+          },
+          static_resources: {
+            clusters: [
+              {
+                name: 'foo'
+              }
+            ]
+          }
+        })EOF";
   OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -178,6 +203,14 @@ uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
+#ifndef ENVOY_ENABLE_QUIC
+    if (filename.find("http3") != std::string::npos) {
+      ENVOY_LOG_MISC(info, "Skipping HTTP/3 config {}.\n", filename);
+      num_tested++;
+      continue;
+    }
+#endif
+
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     if (std::find_if(unsuported_win32_configs.begin(), unsuported_win32_configs.end(),
                      [filename](const absl::string_view& s) {

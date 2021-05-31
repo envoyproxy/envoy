@@ -19,7 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
-  InstanceImpl() { Thread::MainThread::init(); }
+  InstanceImpl() { Thread::MainThread::initMainThread(); }
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -28,6 +28,7 @@ public:
   void shutdownGlobalThreading() override;
   void shutdownThread() override;
   Event::Dispatcher& dispatcher() override;
+  bool isShutdown() const override { return shutdown_; }
 
 private:
   // On destruction returns the slot index to the deferred delete queue (detaches it). This allows

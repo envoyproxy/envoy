@@ -56,7 +56,7 @@ void XdsFuzzTest::updateRoute(
 XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
                          envoy::config::core::v3::ApiVersion api_version)
     : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
+          Http::CodecType::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() ==
                                              test::server::config_validation::Config::SOTW
                                          ? "GRPC"
@@ -92,7 +92,7 @@ void XdsFuzzTest::initialize() {
     ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
     ads_cluster->set_name("ads_cluster");
   });
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
   if (xds_stream_ == nullptr) {
     createXdsConnection();

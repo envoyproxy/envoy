@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
-using testing::_;
 using testing::Ref;
 using testing::Return;
 
@@ -495,7 +494,11 @@ TEST(UtilityTest, TypedStructToInvalidType) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   const std::string bootstrap_config_yaml = R"EOF(
     admin:
-      access_log_path: /dev/null
+      access_log:
+      - name: envoy.access_loggers.file
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+          path: /dev/null
       address:
         pipe:
           path: "/"

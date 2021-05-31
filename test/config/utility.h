@@ -33,6 +33,11 @@ public:
   using HttpConnectionManager =
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
   struct ServerSslOptions {
+    ServerSslOptions& setAllowExpiredCertificate(bool allow) {
+      allow_expired_certificate_ = allow;
+      return *this;
+    }
+
     ServerSslOptions& setRsaCert(bool rsa_cert) {
       rsa_cert_ = rsa_cert;
       return *this;
@@ -74,6 +79,13 @@ public:
       return *this;
     }
 
+    ServerSslOptions&
+    setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
+      san_matchers_ = san_matchers;
+      return *this;
+    }
+
+    bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
@@ -82,6 +94,7 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
+    std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
   };
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
@@ -90,7 +103,7 @@ public:
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
   ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-               const std::string& config = httpProxyConfig());
+               const std::string& config = httpProxyConfig(false));
 
   static void
   initializeTls(const ServerSslOptions& options,
@@ -103,7 +116,7 @@ public:
   static std::string baseConfig();
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static std::string baseUdpListenerConfig();
+  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
   static std::string tlsInspectorFilter();
@@ -111,7 +124,7 @@ public:
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
-  static std::string httpProxyConfig();
+  static std::string httpProxyConfig(bool downstream_use_quic = false);
   // A basic configuration for L7 proxying with QUIC transport.
   static std::string quicHttpProxyConfig();
   // A string for a basic buffer filter, which can be used with addFilter()
@@ -124,6 +137,9 @@ public:
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
+  // A cluster that uses the startTls transport socket.
+  static envoy::config::cluster::v3::Cluster buildStartTlsCluster(const std::string& address,
+                                                                  int port);
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
@@ -180,6 +196,9 @@ public:
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
 
+  // Sets a small kernel buffer for the listener send buffer
+  void setListenerSendBufLimits(uint32_t limit);
+
   // Set the idle timeout on downstream connections through the HttpConnectionManager.
   void setDownstreamHttpIdleTimeout(std::chrono::milliseconds idle_timeout);
 
@@ -213,9 +232,18 @@ public:
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                           HttpConnectionManager::CodecType type);
 
+  // Add TLS configuration for either SSL or QUIC transport socket according to listener config.
+  void configDownstreamTransportSocketWithTls(
+      envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+          configure_tls_context);
+
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
+
+  // Add the default SSL configuration for QUIC downstream.
+  void addQuicDownstreamTransportSocketConfig(bool resuse_port);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
@@ -289,6 +317,11 @@ public:
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
+
+  // Adjust the upstream route with larger timeout if running tsan. This is the duration between
+  // whole request being processed and whole response received.
+  static void adjustUpstreamTimeoutForTsan(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm);
 
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,

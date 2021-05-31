@@ -80,11 +80,13 @@ public:
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
                    std::vector<Http::Protocol>&,
+                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                       alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    TimeSource&, ClusterConnectivityState& state) override {
-    return Http::ConnectionPool::InstancePtr{
-        allocateConnPool_(host, options, transport_socket_options, state)};
+    return Http::ConnectionPool::InstancePtr{allocateConnPool_(
+        host, alternate_protocol_options, options, transport_socket_options, state)};
   }
 
   Tcp::ConnectionPool::InstancePtr
@@ -103,7 +105,8 @@ public:
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&,
+                      const xds::core::v3::ResourceLocator*, ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
@@ -117,7 +120,10 @@ public:
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
-              (HostConstSharedPtr host, Network::ConnectionSocket::OptionsSharedPtr,
+              (HostConstSharedPtr host,
+               const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                   alternate_protocol_options,
+               Network::ConnectionSocket::OptionsSharedPtr,
                Network::TransportSocketOptionsSharedPtr, ClusterConnectivityState&));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,

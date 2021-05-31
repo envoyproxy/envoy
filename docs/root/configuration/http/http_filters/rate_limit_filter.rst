@@ -18,7 +18,7 @@ If the rate limit service is called, and the response for any of the descriptors
 unless :ref:`disable_x_envoy_ratelimited_header <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.disable_x_envoy_ratelimited_header>` is
 set to true.
 
-If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` is 
+If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` is
 set to true, a 500 response is returned.
 
 .. _config_http_filters_rate_limit_composing_actions:

@@ -1,30 +1,18 @@
 #include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <deque>
-#include <functional>
-#include <string>
-#include <vector>
-
-#include "envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/registry/registry.h"
-#include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
-#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "common/common/matchers.h"
-#include "common/common/regex.h"
 #include "common/config/datasource.h"
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "extensions/transport_sockets/tls/cert_validator/utility.h"
 #include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
@@ -43,13 +31,20 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                  SslStats& stats, TimeSource& time_source)
     : stats_(stats), time_source_(time_source) {
   ASSERT(config != nullptr);
+  allow_expired_certificate_ = config->allowExpiredCertificate();
 
   SPIFFEConfig message;
   Config::Utility::translateOpaqueConfig(config->customValidatorConfig().value().typed_config(),
                                          ProtobufWkt::Struct(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 
-  auto size = message.trust_domains().size();
+  if (!config->subjectAltNameMatchers().empty()) {
+    for (const auto& matcher : config->subjectAltNameMatchers()) {
+      subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
+    }
+  }
+
+  const auto size = message.trust_domains().size();
   trust_bundle_stores_.reserve(size);
   for (auto& domain : message.trust_domains()) {
     if (trust_bundle_stores_.find(domain.name()) != trust_bundle_stores_.end()) {
@@ -159,16 +154,29 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
 
   // Set the trust bundle's certificate store on the context, and do the verification.
   store_ctx->ctx = trust_bundle;
-  auto ret = X509_verify_cert(store_ctx);
-  if (ssl_extended_info) {
-    ssl_extended_info->setCertificateValidationStatus(
-        ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
-                 : Envoy::Ssl::ClientValidationStatus::Failed);
+  if (allow_expired_certificate_) {
+    X509_STORE_CTX_set_verify_cb(store_ctx, CertValidatorUtil::ignoreCertificateExpirationCallback);
   }
+  auto ret = X509_verify_cert(store_ctx);
   if (!ret) {
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
+    }
+    stats_.fail_verify_error_.inc();
+    return 0;
+  }
+
+  // Do SAN matching.
+  const bool san_match = subject_alt_name_matchers_.empty() ? true : matchSubjectAltName(leaf_cert);
+  if (!san_match) {
     stats_.fail_verify_error_.inc();
   }
-  return ret;
+  if (ssl_extended_info) {
+    ssl_extended_info->setCertificateValidationStatus(
+        san_match ? Envoy::Ssl::ClientValidationStatus::Validated
+                  : Envoy::Ssl::ClientValidationStatus::Failed);
+  }
+  return san_match;
 }
 
 X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
@@ -201,13 +209,37 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
 bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
   // Check basic constrains and key usage.
   // https://github.com/spiffe/spiffe/blob/master/standards/X509-SVID.md#52-leaf-validation
-  auto ext = X509_get_extension_flags(leaf_cert);
+  const auto ext = X509_get_extension_flags(leaf_cert);
   if (ext & EXFLAG_CA) {
     return false;
   }
 
-  auto us = X509_get_key_usage(leaf_cert);
+  const auto us = X509_get_key_usage(leaf_cert);
   return (us & (KU_CRL_SIGN | KU_KEY_CERT_SIGN)) == 0;
+}
+
+bool SPIFFEValidator::matchSubjectAltName(X509& leaf_cert) {
+  bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
+      X509_get_ext_d2i(&leaf_cert, NID_subject_alt_name, nullptr, nullptr)));
+  // We must not have san_names == nullptr here because this function is called after the
+  // SPIFFE cert validation algorithm succeeded, which requires exactly one URI SAN in the leaf
+  // cert.
+  ASSERT(san_names != nullptr,
+         "san_names should have at least one name after SPIFFE cert validation");
+
+  // Only match against URI SAN since SPIFFE specification does not restrict values in other SAN
+  // types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
+  for (const GENERAL_NAME* general_name : san_names.get()) {
+    if (general_name->type == GEN_URI) {
+      const std::string san = Utility::generalNameAsString(general_name);
+      for (const auto& config_san_matcher : subject_alt_name_matchers_) {
+        if (config_san_matcher.match(san)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {

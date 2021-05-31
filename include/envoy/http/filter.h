@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
@@ -16,6 +17,8 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "common/common/scope_tracked_object_stack.h"
 
 #include "absl/types/optional.h"
 
@@ -226,6 +229,24 @@ public:
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
+   * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
+   *
+   * Similar to route(const Router::RouteCallback& cb), this route that is set will be
+   * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
+   * of the filter chain.
+   *
+   * NOTE: Passing nullptr in as the route parameter is equivalent to route resolution being
+   * attempted and failing to find a route. An example of when this happens is when
+   * RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers, const
+   * StreamInfo::StreamInfo& stream_info, uint64_t random_value) returns nullptr during a
+   * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
+   * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
+   * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
+   * absl::optional ptrs instead of null ptrs.
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
+
+  /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
    * view of clusterInfo after a route is picked/repicked.
@@ -265,6 +286,16 @@ public:
    * @return the ScopeTrackedObject for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
+
+  /**
+   * Should be used when we continue processing a request or response by invoking a filter directly
+   * from an asynchronous callback to restore crash context. If not explicitly used by the filter
+   * itself, this gets invoked in ActiveStreamFilterBase::commonContinue().
+   *
+   * @param tracked_object_stack ScopeTrackedObjectStack where relevant ScopeTrackedObjects will be
+   * added to.
+   */
+  virtual void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) PURE;
 };
 
 /**
@@ -525,6 +556,11 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t decoderBufferLimit() PURE;
+
+  /**
+   * @return the account, if any, used by this stream.
+   */
+  virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
 
   /**
    * Takes a stream, and acts as if the headers are newly arrived.

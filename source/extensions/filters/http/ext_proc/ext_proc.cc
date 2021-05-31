@@ -11,25 +11,42 @@ namespace ExternalProcessing {
 
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
 using envoy::service::ext_proc::v3alpha::ImmediateResponse;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
+using Http::FilterTrailersStatus;
 using Http::RequestHeaderMap;
+using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
+using Http::ResponseTrailerMap;
 
 static const std::string kErrorPrefix = "ext_proc error";
 
-void Filter::openStream() {
+void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
+  decoding_state_.setDecoderFilterCallbacks(callbacks);
+}
+
+void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
+  Http::PassThroughFilter::setEncoderFilterCallbacks(callbacks);
+  encoding_state_.setEncoderFilterCallbacks(callbacks);
+}
+
+Filter::StreamOpenState Filter::openStream() {
+  ENVOY_BUG(!processing_complete_, "openStream should not have been called");
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, config_->grpcTimeout());
+    stream_ = client_->start(*this);
     stats_.streams_started_.inc();
+    if (processing_complete_) {
+      // Stream failed while starting and either onGrpcError or onGrpcClose was already called
+      return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
+    }
   }
+  return StreamOpenState::Ok;
 }
 
 void Filter::onDestroy() {
@@ -43,122 +60,253 @@ void Filter::onDestroy() {
   }
 }
 
+FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterHeadersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterHeadersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+
+  state.setHeaders(&headers);
+  ProcessingRequest req;
+  auto* headers_req = state.mutableHeaders(req);
+  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  headers_req->set_end_of_stream(end_stream);
+  state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
+  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  ENVOY_LOG(debug, "Sending headers message");
+  stream_->send(std::move(req), false);
+  stats_.stream_msgs_sent_.inc();
+  return FilterHeadersStatus::StopIteration;
+}
+
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
-  ENVOY_BUG(request_state_ == FilterState::Idle, "Invalid filter state on request path");
+  if (end_stream) {
+    decoding_state_.setCompleteBodyAvailable(true);
+  }
 
-  if (processing_mode_.request_header_mode() == ProcessingMode::SKIP) {
-    ENVOY_LOG(trace, "decodeHeaders: Continue");
+  if (!decoding_state_.sendHeaders()) {
+    ENVOY_LOG(trace, "decodeHeaders: Skipped");
     return FilterHeadersStatus::Continue;
   }
 
-  // We're at the start, so start the stream and send a headers message
-  openStream();
-  request_headers_ = &headers;
-  ProcessingRequest req;
-  auto* headers_req = req.mutable_request_headers();
-  MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
-  headers_req->set_end_of_stream(end_stream);
-  request_state_ = FilterState::Headers;
-  ENVOY_LOG(debug, "Sending request_headers message");
-  stream_->send(std::move(req), false);
-  stats_.stream_msgs_sent_.inc();
+  const auto status = onHeaders(decoding_state_, headers, end_stream);
+  ENVOY_LOG(trace, "decodeHeaders returning {}", status);
+  return status;
+}
 
-  // Wait until we have a gRPC response before allowing any more callbacks
-  ENVOY_LOG(trace, "decodeHeaders: StopAllIterationAndWatermark");
-  return FilterHeadersStatus::StopAllIterationAndWatermark;
+FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  if (end_stream) {
+    state.setCompleteBodyAvailable(true);
+  }
+
+  if (state.bodyReplaced()) {
+    ENVOY_LOG(trace, "Clearing body chunk because CONTINUE_AND_REPLACE was returned");
+    data.drain(data.length());
+    return FilterDataStatus::Continue;
+  }
+
+  if (processing_complete_) {
+    ENVOY_LOG(trace, "Continuing (processing complete)");
+    return FilterDataStatus::Continue;
+  }
+
+  bool just_added_trailers = false;
+  Http::HeaderMap* new_trailers = nullptr;
+  if (end_stream && state.sendTrailers()) {
+    // We're at the end of the stream, but the filter wants to process trailers.
+    // According to the filter contract, this is the only place where we can
+    // add trailers, even if we will return right after this and process them
+    // later.
+    ENVOY_LOG(trace, "Creating new, empty trailers");
+    new_trailers = state.addTrailers();
+    state.setTrailersAvailable(true);
+    just_added_trailers = true;
+  }
+
+  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+    ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
+    // We don't know what to do with the body until the response comes back.
+    // We must buffer it in case we need it when that happens.
+    if (end_stream) {
+      return FilterDataStatus::StopIterationAndBuffer;
+    } else {
+      // Raise a watermark to prevent a buffer overflow until the response comes back.
+      state.requestWatermark();
+      return FilterDataStatus::StopIterationAndWatermark;
+    }
+  }
+
+  FilterDataStatus result;
+  switch (state.bodyMode()) {
+  case ProcessingMode::BUFFERED:
+    if (end_stream) {
+      switch (openStream()) {
+      case StreamOpenState::Error:
+        return FilterDataStatus::StopIterationNoBuffer;
+      case StreamOpenState::IgnoreError:
+        return FilterDataStatus::Continue;
+      case StreamOpenState::Ok:
+        // Fall through
+        break;
+      }
+
+      // The body has been buffered and we need to send the buffer
+      ENVOY_LOG(debug, "Sending request body message");
+      state.addBufferedData(data);
+      sendBodyChunk(state, *state.bufferedData(), true);
+      // Since we just just moved the data into the buffer, return NoBuffer
+      // so that we do not buffer this chunk twice.
+      result = FilterDataStatus::StopIterationNoBuffer;
+      break;
+    }
+
+    ENVOY_LOG(trace, "onData: Buffering");
+    result = FilterDataStatus::StopIterationAndBuffer;
+    break;
+
+  case ProcessingMode::BUFFERED_PARTIAL:
+  case ProcessingMode::STREAMED:
+    ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
+    result = FilterDataStatus::Continue;
+    break;
+  case ProcessingMode::NONE:
+  default:
+    result = FilterDataStatus::Continue;
+    break;
+  }
+
+  if (just_added_trailers) {
+    // If we get here, then we need to send the trailers message now
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterDataStatus::StopIterationNoBuffer;
+    case StreamOpenState::IgnoreError:
+      return FilterDataStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
+
+    sendTrailers(state, *new_trailers);
+    return FilterDataStatus::StopIterationAndBuffer;
+  }
+  return result;
 }
 
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "decodeData({}): end_stream = {}", data.length(), end_stream);
+  const auto status = onData(decoding_state_, data, end_stream);
+  ENVOY_LOG(trace, "decodeData returning {}", status);
+  return status;
+}
+
+FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& trailers) {
   if (processing_complete_) {
-    ENVOY_LOG(trace, "decodeData: Continue (complete)");
-    return FilterDataStatus::Continue;
+    ENVOY_LOG(trace, "trailers: Continue");
+    return FilterTrailersStatus::Continue;
   }
 
-  switch (processing_mode_.request_body_mode()) {
-  case ProcessingMode::BUFFERED:
-    if (end_stream) {
-      ENVOY_BUG(request_state_ == FilterState::Idle, "Invalid filter state on request path");
-      decoder_callbacks_->addDecodedData(data, false);
-      // The body has been buffered and we need to send the buffer
-      request_state_ = FilterState::BufferedBody;
-      sendBodyChunk(true, *decoder_callbacks_->decodingBuffer(), true);
-    } else {
-      ENVOY_LOG(trace, "decodeData: Buffering");
-    }
-    return FilterDataStatus::StopIterationAndBuffer;
-  case ProcessingMode::BUFFERED_PARTIAL:
-  case ProcessingMode::STREAMED:
-    ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
-    return FilterDataStatus::Continue;
-  case ProcessingMode::NONE:
-  default:
-    ENVOY_LOG(trace, "decodeData: Skipped");
-    return FilterDataStatus::Continue;
+  bool body_delivered = state.completeBodyAvailable();
+  state.setCompleteBodyAvailable(true);
+  state.setTrailersAvailable(true);
+  state.setTrailers(&trailers);
+
+  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
+      state.callbackState() == ProcessorState::CallbackState::BufferedBodyCallback) {
+    ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
+    return FilterTrailersStatus::StopIteration;
   }
+
+  if (!body_delivered && state.bodyMode() == ProcessingMode::BUFFERED) {
+    // We would like to process the body in a buffered way, but until now the complete
+    // body has not arrived. With the arrival of trailers, we now know that the body
+    // has arrived.
+    sendBufferedData(state, true);
+    return FilterTrailersStatus::StopIteration;
+  }
+
+  if (!state.sendTrailers()) {
+    ENVOY_LOG(trace, "Skipped trailer processing");
+    return FilterTrailersStatus::Continue;
+  }
+
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterTrailersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterTrailersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+
+  sendTrailers(state, trailers);
+  return FilterTrailersStatus::StopIteration;
+}
+
+FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
+  ENVOY_LOG(trace, "decodeTrailers");
+  const auto status = onTrailers(decoding_state_, trailers);
+  ENVOY_LOG(trace, "encodeTrailers returning {}", status);
+  return status;
 }
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
-  ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on  response path");
+  if (end_stream) {
+    encoding_state_.setCompleteBodyAvailable(true);
+  }
 
-  if (processing_complete_ || processing_mode_.response_header_mode() == ProcessingMode::SKIP) {
+  if (processing_complete_ || !encoding_state_.sendHeaders()) {
     ENVOY_LOG(trace, "encodeHeaders: Continue");
     return FilterHeadersStatus::Continue;
   }
 
-  // Depending on processing mode this may or may not be the first message
-  openStream();
-  response_headers_ = &headers;
-  ProcessingRequest req;
-  auto* headers_req = req.mutable_response_headers();
-  MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
-  headers_req->set_end_of_stream(end_stream);
-  response_state_ = FilterState::Headers;
-  ENVOY_LOG(debug, "Sending response_headers message");
-  stream_->send(std::move(req), false);
-  stats_.stream_msgs_sent_.inc();
-  ENVOY_LOG(trace, "encodeHeaders: StopAllIterationAndWatermark");
-  return FilterHeadersStatus::StopAllIterationAndWatermark;
+  const auto status = onHeaders(encoding_state_, headers, end_stream);
+  ENVOY_LOG(trace, "encodeHeaders returns {}", status);
+  return status;
 }
 
 FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "encodeData({}): end_stream = {}", data.length(), end_stream);
-  if (processing_complete_) {
-    ENVOY_LOG(trace, "encodeData: Continue (complete)");
-    return FilterDataStatus::Continue;
-  }
-
-  switch (processing_mode_.response_body_mode()) {
-  case ProcessingMode::BUFFERED:
-    if (end_stream) {
-      ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on response path");
-      encoder_callbacks_->addEncodedData(data, false);
-      response_state_ = FilterState::BufferedBody;
-      sendBodyChunk(false, *encoder_callbacks_->encodingBuffer(), true);
-    } else {
-      ENVOY_LOG(trace, "encodeData: Buffering");
-    }
-    return FilterDataStatus::StopIterationAndBuffer;
-  case ProcessingMode::BUFFERED_PARTIAL:
-  case ProcessingMode::STREAMED:
-    ENVOY_LOG(debug, "Ignoring unimplemented response body processing mode");
-    return FilterDataStatus::Continue;
-  case ProcessingMode::NONE:
-  default:
-    ENVOY_LOG(trace, "encodeData: Skipped");
-    return FilterDataStatus::Continue;
-  }
+  const auto status = onData(encoding_state_, data, end_stream);
+  ENVOY_LOG(trace, "encodeData returning {}", status);
+  return status;
 }
 
-void Filter::sendBodyChunk(bool request_path, const Buffer::Instance& data, bool end_stream) {
+FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
+  ENVOY_LOG(trace, "encodeTrailers");
+  const auto status = onTrailers(encoding_state_, trailers);
+  ENVOY_LOG(trace, "encodeTrailers returning {}", status);
+  return status;
+}
+
+void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
-  openStream();
+  state.setCallbackState(ProcessorState::CallbackState::BufferedBodyCallback);
+  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
   ProcessingRequest req;
-  auto* body_req = request_path ? req.mutable_request_body() : req.mutable_response_body();
+  auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
+  stream_->send(std::move(req), false);
+  stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
+  ProcessingRequest req;
+  auto* trailers_req = state.mutableTrailers(req);
+  MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
+  state.setCallbackState(ProcessorState::CallbackState::TrailersCallback);
+  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  ENVOY_LOG(debug, "Sending trailers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
@@ -177,24 +325,34 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // being invoked in line.
   if (response->has_mode_override()) {
     ENVOY_LOG(debug, "Processing mode overridden by server for this request");
-    processing_mode_ = response->mode_override();
+    decoding_state_.setProcessingMode(response->mode_override());
+    encoding_state_.setProcessingMode(response->mode_override());
   }
 
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
-    message_handled = handleRequestHeadersResponse(response->request_headers());
+    message_handled = decoding_state_.handleHeadersResponse(response->request_headers());
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    message_handled = handleResponseHeadersResponse(response->response_headers());
+    message_handled = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    message_handled = handleRequestBodyResponse(response->request_body());
+    message_handled = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    message_handled = handleResponseBodyResponse(response->response_body());
+    message_handled = encoding_state_.handleBodyResponse(response->response_body());
+    break;
+  case ProcessingResponse::ResponseCase::kRequestTrailers:
+    message_handled = decoding_state_.handleTrailersResponse(response->request_trailers());
+    break;
+  case ProcessingResponse::ResponseCase::kResponseTrailers:
+    message_handled = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    handleImmediateResponse(response->immediate_response());
+    // We won't be sending anything more to the stream after we
+    // receive this message.
+    processing_complete_ = true;
+    sendImmediateResponse(response->immediate_response());
     message_handled = true;
     break;
   default:
@@ -211,74 +369,18 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
               response->response_case());
-    cleanupState();
+    clearAsyncState();
     processing_complete_ = true;
   }
-}
-
-bool Filter::handleRequestHeadersResponse(const HeadersResponse& response) {
-  if (request_state_ == FilterState::Headers) {
-    ENVOY_LOG(debug, "applying request_headers response");
-    MutationUtils::applyCommonHeaderResponse(response, *request_headers_);
-    request_headers_ = nullptr;
-    request_state_ = FilterState::Idle;
-    decoder_callbacks_->continueDecoding();
-    return true;
-  }
-  return false;
-}
-
-bool Filter::handleResponseHeadersResponse(const HeadersResponse& response) {
-  if (response_state_ == FilterState::Headers) {
-    ENVOY_LOG(debug, "applying response_headers response");
-    MutationUtils::applyCommonHeaderResponse(response, *response_headers_);
-    response_headers_ = nullptr;
-    response_state_ = FilterState::Idle;
-    encoder_callbacks_->continueEncoding();
-    return true;
-  }
-  return false;
-}
-
-bool Filter::handleRequestBodyResponse(const BodyResponse& response) {
-  if (request_state_ == FilterState::BufferedBody) {
-    ENVOY_LOG(debug, "Applying request_body response to buffered data");
-    decoder_callbacks_->modifyDecodingBuffer([&response](Buffer::Instance& data) {
-      MutationUtils::applyCommonBodyResponse(response, data);
-    });
-    request_state_ = FilterState::Idle;
-    decoder_callbacks_->continueDecoding();
-    return true;
-  }
-  return false;
-}
-
-bool Filter::handleResponseBodyResponse(const BodyResponse& response) {
-  if (response_state_ == FilterState::BufferedBody) {
-    ENVOY_LOG(debug, "Applying response_body response to buffered data");
-    ENVOY_LOG(trace, "Buffered data is now {} bytes",
-              encoder_callbacks_->encodingBuffer()->length());
-    encoder_callbacks_->modifyEncodingBuffer([&response](Buffer::Instance& data) {
-      MutationUtils::applyCommonBodyResponse(response, data);
-    });
-    response_state_ = FilterState::Idle;
-    encoder_callbacks_->continueEncoding();
-    return true;
-  }
-  return false;
-}
-
-void Filter::handleImmediateResponse(const ImmediateResponse& response) {
-  // We don't want to process any more stream messages after this.
-  // Close the stream before sending because "sendLocalResponse" may trigger
-  // additional calls to this filter.
-  processing_complete_ = true;
-  sendImmediateResponse(response);
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
   ENVOY_LOG(debug, "Received gRPC error on stream: {}", status);
   stats_.streams_failed_.inc();
+
+  if (processing_complete_) {
+    return;
+  }
 
   if (config_->failureModeAllow()) {
     // Ignore this and treat as a successful close
@@ -287,10 +389,13 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
+    // Since the stream failed, there is no need to handle timeouts, so
+    // make sure that they do not fire now.
+    cleanUpTimers();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
-    handleImmediateResponse(errorResponse);
+    sendImmediateResponse(errorResponse);
   }
 }
 
@@ -300,18 +405,45 @@ void Filter::onGrpcClose() {
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
-  cleanupState();
+  clearAsyncState();
 }
 
-void Filter::cleanupState() {
-  if (request_state_ != FilterState::Idle) {
-    request_state_ = FilterState::Idle;
-    decoder_callbacks_->continueDecoding();
+void Filter::onMessageTimeout() {
+  ENVOY_LOG(debug, "message timeout reached");
+  stats_.message_timeouts_.inc();
+  if (config_->failureModeAllow()) {
+    // The user would like a timeout to not cause message processing to fail.
+    // However, we don't know if the external processor will send a response later,
+    // and we can't wait any more. So, as we do for a spurious message, ignore
+    // the external processor for the rest of the request.
+    processing_complete_ = true;
+    stats_.failure_mode_allowed_.inc();
+    clearAsyncState();
+
+  } else {
+    // Return an error and stop processing the current stream.
+    processing_complete_ = true;
+    decoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
+    encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
+    ImmediateResponse errorResponse;
+    errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", kErrorPrefix));
+    sendImmediateResponse(errorResponse);
   }
-  if (response_state_ != FilterState::Idle) {
-    response_state_ = FilterState::Idle;
-    encoder_callbacks_->continueEncoding();
-  }
+}
+
+// Regardless of the current filter state, reset it to "IDLE", continue
+// the current callback, and reset timers. This is used in a few error-handling situations.
+void Filter::clearAsyncState() {
+  decoding_state_.clearAsyncState();
+  encoding_state_.clearAsyncState();
+}
+
+// Regardless of the current state, ensure that the timers won't fire
+// again.
+void Filter::cleanUpTimers() {
+  decoding_state_.cleanUpTimer();
+  encoding_state_.cleanUpTimer();
 }
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
@@ -322,10 +454,11 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [&response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      MutationUtils::applyHeaderMutations(response.headers(), headers);
+      MutationUtils::applyHeaderMutations(response.headers(), headers, false);
     }
   };
 
+  sent_immediate_response_ = true;
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
                                      mutate_headers, grpc_status, response.details());
 }

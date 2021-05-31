@@ -14,6 +14,8 @@ class HttpFilterNameValues {
 public:
   // Buffer filter
   const std::string Buffer = "envoy.filters.http.buffer";
+  // Bandwidth limit filter
+  const std::string BandwidthLimit = "envoy.filters.http.bandwidth_limit";
   // Cache filter
   const std::string Cache = "envoy.filters.http.cache";
   // CDN Loop filter
@@ -22,6 +24,8 @@ public:
   const std::string Compressor = "envoy.filters.http.compressor";
   // CORS filter
   const std::string Cors = "envoy.filters.http.cors";
+  // Composite filter
+  const std::string Composite = "envoy.filters.http.composite";
   // CSRF filter
   const std::string Csrf = "envoy.filters.http.csrf";
   // Decompressor filter
@@ -86,6 +90,8 @@ public:
   const std::string KillRequest = "envoy.filters.http.kill_request";
   // External Processing filter
   const std::string ExternalProcessing = "envoy.filters.http.ext_proc";
+  // Set metadata filter
+  const std::string SetMetadata = "envoy.filters.http.set_metadata";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

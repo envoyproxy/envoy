@@ -10,6 +10,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/header_formatter.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -659,6 +660,19 @@ public:
     headers.dumpState(os);
     return os;
   }
+
+  /**
+   * Return the optional stateful formatter attached to this header map.
+   *
+   * Filters can use the non-const version to process additional header keys during operation if
+   * they wish. The sequence of events would be to first add/modify the header map, and then call
+   * processKey(), similar to what is done when headers are received by the codec.
+   *
+   * TODO(mattklein123): The above sequence will not work for headers added via route (headers to
+   * add, etc.). We can potentially add direct processKey() calls in these places as a follow up.
+   */
+  virtual StatefulHeaderKeyFormatterOptConstRef formatter() const PURE;
+  virtual StatefulHeaderKeyFormatterOptRef formatter() PURE;
 };
 
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;

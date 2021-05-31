@@ -10,13 +10,12 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
-#include "test/test_common/utility.h"
-
-//#include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -191,6 +190,13 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setUpstreamClusterInfo(cluster_info);
     EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
     EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
+
+    const std::string session_id =
+        "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+    auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
+    stream_info.setUpstreamSslConnection(ssl_info);
+    EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
   }
 }
 

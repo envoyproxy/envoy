@@ -291,7 +291,10 @@ envoy_cc_test(
     name = "udp_listener_impl_batch_writer_test",
     srcs = ["udp_listener_impl_batch_writer_test.cc"],
     # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
-    tags = ["skip_on_windows"],
+    tags = [
+        "nofips",
+        "skip_on_windows",
+    ],
     deps = [
         ":udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
@@ -300,8 +303,8 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
+        "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_lib",
         "//test/common/network:listener_impl_test_base_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
@@ -385,8 +388,34 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "udp_fuzz",
+    srcs = ["udp_fuzz.cc"],
+    corpus = "udp_corpus",
+    deps = [
+        "udp_listener_impl_test_base_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:listener_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//test/common/network:listener_impl_test_base_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

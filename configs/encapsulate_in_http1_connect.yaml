@@ -4,7 +4,6 @@
 # and running `curl --x 127.0.0.1:10000 https://www.google.com`
 
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       protocol: TCP

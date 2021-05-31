@@ -60,10 +60,11 @@ protected:
 
   void testDecodeRequestHitNoBody(CacheFilterSharedPtr filter) {
     // The filter should encode cached headers.
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               true));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       true));
 
     // The filter should not encode any data as the response has no body.
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
@@ -86,10 +87,11 @@ protected:
 
   void testDecodeRequestHitWithBody(CacheFilterSharedPtr filter, std::string body) {
     // The filter should encode cached headers.
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       false));
 
     // The filter should encode cached data.
     EXPECT_CALL(
@@ -420,10 +422,11 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -469,10 +472,11 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -521,10 +525,11 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               true));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       true));
 
     // 416 response should not have a body, so we don't expect a call to encodeData
     EXPECT_CALL(decoder_callbacks_,

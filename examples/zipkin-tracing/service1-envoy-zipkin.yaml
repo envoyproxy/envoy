@@ -74,7 +74,6 @@ static_resources:
             typed_config: {}
   clusters:
   - name: local_service
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -87,10 +86,8 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 8080
   - name: service2
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service2
       endpoints:
@@ -101,7 +98,6 @@ static_resources:
                 address: service2
                 port_value: 8000
   - name: zipkin
-    connect_timeout: 1s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -113,3 +109,9 @@ static_resources:
               socket_address:
                 address: zipkin
                 port_value: 9411
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 19000

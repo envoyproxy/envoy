@@ -71,9 +71,10 @@ struct ServerCompilationSettingsStats {
   COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(dropped_stat_flushes)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
-  GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
-  GAUGE(seconds_until_first_ocsp_response_expiring, Accumulate)                                    \
+  GAUGE(days_until_first_cert_expiring, NeverImport)                                               \
+  GAUGE(seconds_until_first_ocsp_response_expiring, NeverImport)                                   \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
   /* hot_restart_generation is an Accumulate gauge; we omit it here for testing dynamics. */       \
   GAUGE(live, NeverImport)                                                                         \
@@ -197,6 +198,7 @@ public:
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
   Init::Manager& initManager() override { return server_.initManager(); }
+  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation
@@ -383,6 +385,8 @@ private:
   ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
+
+  bool stats_flush_in_progress_ : 1;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

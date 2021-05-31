@@ -124,6 +124,22 @@ public:
 };
 
 /**
+ * Options associated with a Subscription.
+ */
+struct SubscriptionOptions {
+  /**
+   * For legacy VHDS, should an xDS resource name be treated as <namespace>/<resource name>? This is
+   * incompatible with the use of xdstp:// naming.
+   */
+  bool use_namespace_matching_{};
+
+  /**
+   * For xdstp:// resource names, should node context parameters be added at the transport layer?
+   */
+  bool add_xdstp_node_context_params_{};
+};
+
+/**
  * Invoked when raw config received from xDS wire.
  */
 class UntypedConfigUpdateCallbacks {

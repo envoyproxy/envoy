@@ -104,12 +104,17 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   // Any time an associated connection is destroyed, it increments both counters.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  tcp_client2->close();
 }
 
 // Test TLS upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   upstream_tls_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
   config_helper_.configureUpstreamTls();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -1315,7 +1320,7 @@ public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
       Network::TransportSocketFactoryPtr factory =
-          upstream_tls_ ? createUpstreamTlsContext()
+          upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
                         : Network::Test::createRawBufferSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
@@ -1464,7 +1469,7 @@ TEST_P(MysqlIntegrationTest, Preconnect) { testPreconnect(); }
 
 TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
   upstream_tls_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
   config_helper_.configureUpstreamTls();
   testPreconnect();
 }

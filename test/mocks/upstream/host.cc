@@ -37,6 +37,7 @@ MockHostDescription::MockHostDescription()
   ON_CALL(*this, address()).WillByDefault(Return(address_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+  ON_CALL(*this, locality()).WillByDefault(ReturnRef(locality_));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, healthChecker()).WillByDefault(ReturnRef(health_checker_));
   ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*socket_factory_));

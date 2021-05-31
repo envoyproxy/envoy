@@ -26,7 +26,7 @@ template <class T> class MemBlockBuilder {
 public:
   // Constructs a MemBlockBuilder allowing for 'capacity' instances of T.
   explicit MemBlockBuilder(uint64_t capacity)
-      : data_(std::make_unique<T[]>(capacity)), write_span_(data_.get(), capacity) {}
+      : data_(std::make_unique<T[]>(capacity)), write_span_(data_.get(), capacity){};
   MemBlockBuilder() = default;
 
   /**
@@ -101,6 +101,13 @@ public:
     write_span_ = absl::MakeSpan(static_cast<T*>(nullptr), 0);
     return std::move(data_);
   }
+
+  /**
+   * Returns the underlying storage as a raw pointer, clearing this.
+   *
+   * @return the transferred storage.
+   */
+  T* releasePointer() { return this->release().release(); }
 
   /**
    * @return the populated data as an absl::Span.

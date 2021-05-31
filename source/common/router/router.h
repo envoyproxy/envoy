@@ -283,7 +283,8 @@ public:
       : config_(config), final_upstream_request_(nullptr),
         downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false),
+        request_buffer_overflowed_(false) {}
 
   ~Filter() override;
 
@@ -495,7 +496,8 @@ private:
   void sendNoHealthyUpstreamResponse();
   bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                const Http::HeaderEntry& internal_redirect);
+                                                const Http::HeaderEntry& internal_redirect,
+                                                uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();
@@ -539,6 +541,8 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
+  bool request_buffer_overflowed_ : 1;
+  bool internal_redirects_with_body_enabled_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 

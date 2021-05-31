@@ -13,11 +13,11 @@ namespace {
 class WasmIntegrationTest : public HttpIntegrationTest, public testing::TestWithParam<std::string> {
 public:
   WasmIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
   }
 
   void cleanup() {
@@ -49,7 +49,7 @@ typed_config:
       value: ""
     vm_config:
       vm_id: "my_vm_id"
-      environment_variables: 
+      environment_variables:
         host_env_keys: ["NON_EXIST"]
         key_values:
           KEY: VALUE

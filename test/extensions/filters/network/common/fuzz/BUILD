@@ -12,6 +12,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    "uber_per_readfilter.cc",
+])
+
 envoy_package()
 
 envoy_proto_library(

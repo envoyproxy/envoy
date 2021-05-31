@@ -34,7 +34,11 @@ namespace Envoy {
 std::string ConfigHelper::baseConfig() {
   return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -65,7 +69,7 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 0
   listeners:
-    name: listener_0
+  - name: listener_0
     address:
       socket_address:
         address: 127.0.0.1
@@ -74,10 +78,14 @@ static_resources:
                      Platform::null_device_path, Platform::null_device_path);
 }
 
-std::string ConfigHelper::baseUdpListenerConfig() {
+std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
   return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -98,11 +106,11 @@ static_resources:
     name: listener_0
     address:
       socket_address:
-        address: 0.0.0.0
+        address: {}
         port_value: 0
         protocol: udp
 )EOF",
-                     Platform::null_device_path);
+                     Platform::null_device_path, listen_address);
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -145,7 +153,10 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::httpProxyConfig() {
+std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
+  if (downstream_use_quic) {
+    return quicHttpProxyConfig();
+  }
   return absl::StrCat(baseConfig(), fmt::format(R"EOF(
     filter_chains:
       filters:
@@ -183,7 +194,7 @@ std::string ConfigHelper::httpProxyConfig() {
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
 std::string ConfigHelper::quicHttpProxyConfig() {
-  return absl::StrCat(baseUdpListenerConfig(), fmt::format(R"EOF(
+  return absl::StrCat(baseUdpListenerConfig("127.0.0.1"), fmt::format(R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -213,12 +224,9 @@ std::string ConfigHelper::quicHttpProxyConfig() {
               domains: "*"
             name: route_config_0
     udp_listener_config:
-      listener_config:
-        name: quic_listener_config
-        typed_config:
-          "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
+      quic_options: {{}}
 )EOF",
-                                                           Platform::null_device_path));
+                                                                      Platform::null_device_path));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
@@ -276,7 +284,11 @@ std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_typ
   return fmt::format(
       R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -385,7 +397,11 @@ static_resources:
         explicit_http_config:
           http2_protocol_options: {{}}
 admin:
-  access_log_path: {3}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{3}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -551,13 +567,13 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
                                envoy::config::core::v3::ApiVersion api_version) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
-      name: {}
+      name: "{}"
       virtual_hosts:
       - name: integration
         domains: ["*"]
         routes:
         - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
+          route: {{ cluster: "{}" }}
     )EOF",
                                         name, cluster),
                             route, shouldBoost(api_version));
@@ -607,6 +623,16 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
         }
       }
     }
+  }
+
+  // Ensure we have a basic admin-capable runtime layer.
+  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
+    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    static_layer->set_name("static_layer");
+    static_layer->mutable_static_layer();
+    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    admin_layer->set_name("admin");
+    admin_layer->mutable_admin_layer();
   }
 }
 
@@ -697,6 +723,10 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
         new_protocol_options.mutable_auto_config()->mutable_http2_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http2_protocol_options());
       }
+      if (http3 || old_protocol_options.explicit_http_config().has_http3_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http3_protocol_options());
+      }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
               .PackFrom(new_protocol_options);
@@ -709,9 +739,9 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
     // The test certs are for *.lyft.com, so make sure SNI matches.
     tls_context.set_sni("foo.lyft.com");
     if (http3) {
-      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
       envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
       quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
       cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
     } else {
       cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
@@ -721,14 +751,6 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
 }
 
 void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
-  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
-    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
-    static_layer->set_name("static_layer");
-    static_layer->mutable_static_layer();
-    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
-    admin_layer->set_name("admin");
-    admin_layer->mutable_admin_layer();
-  }
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
@@ -746,7 +768,8 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    protocol_options.MergeFrom(old_options);
+    old_options.MergeFrom(protocol_options);
+    protocol_options.CopyFrom(old_options);
   }
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -921,6 +944,20 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
+  const uint32_t stream_buffer_size = std::max(
+      downstream_buffer_limit, Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+  if (Network::Utility::protobufAddressSocketType(listener->address()) ==
+          Network::Socket::Type::Datagram &&
+      listener->udp_listener_config().has_quic_options()) {
+    // QUIC stream's flow control window is configured in listener config.
+    listener->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_initial_stream_window_size()
+        // The same as kStreamReceiveWindowLimit in QUICHE which only supports stream flow control
+        // window no larger than 16MB.
+        ->set_value(std::min(16u * 1024 * 1024, stream_buffer_size));
+  }
 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
@@ -935,13 +972,22 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
                                        v3::HttpConnectionManager::HTTP2) {
-      const uint32_t size = std::max(downstream_buffer_limit,
-                                     Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       auto* options = hcm_config.mutable_http2_protocol_options();
-      options->mutable_initial_stream_window_size()->set_value(size);
+      options->mutable_initial_stream_window_size()->set_value(stream_buffer_size);
       storeHttpConnectionManager(hcm_config);
     }
   }
+}
+
+void ConfigHelper::setListenerSendBufLimits(uint32_t limit) {
+  RELEASE_ASSERT(!finalized_, "");
+  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* options = listener->add_socket_options();
+  options->set_description("SO_SNDBUF");
+  options->set_level(SOL_SOCKET);
+  options->set_int_value(limit);
+  options->set_name(SO_SNDBUF);
 }
 
 void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeout) {
@@ -1035,6 +1081,30 @@ void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_conn
   }
 }
 
+void ConfigHelper::configDownstreamTransportSocketWithTls(
+    envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+        configure_tls_context) {
+  for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
+    ASSERT(listener.filter_chains_size() > 0);
+    auto* filter_chain = listener.mutable_filter_chains(0);
+    auto* transport_socket = filter_chain->mutable_transport_socket();
+    if (listener.has_udp_listener_config() && listener.udp_listener_config().has_quic_options()) {
+      transport_socket->set_name("envoy.transport_sockets.quic");
+      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+          quic_transport_socket_config;
+      configure_tls_context(*quic_transport_socket_config.mutable_downstream_tls_context()
+                                 ->mutable_common_tls_context());
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    } else if (!listener.has_udp_listener_config()) {
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      configure_tls_context(*tls_context.mutable_common_tls_context());
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    }
+  }
+}
+
 void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -1048,6 +1118,19 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   }
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+}
+
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
+  for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
+    if (listener.udp_listener_config().has_quic_options()) {
+      listener.set_reuse_port(reuse_port);
+    }
+  }
+  configDownstreamTransportSocketWithTls(
+      bootstrap_,
+      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
+      });
 }
 
 bool ConfigHelper::setAccessLog(
@@ -1112,6 +1195,7 @@ void ConfigHelper::initializeTls(
     validation_context->add_verify_certificate_hash(
         options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
   }
+  validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
@@ -1139,6 +1223,10 @@ void ConfigHelper::initializeTls(
       tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
+  }
+  if (!options.san_matchers_.empty()) {
+    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
+                                                              options.san_matchers_.end()};
   }
 }
 
@@ -1283,6 +1371,17 @@ void ConfigHelper::setLocalReply(
   loadHttpConnectionManager(hcm_config);
   hcm_config.mutable_local_reply_config()->MergeFrom(config);
   storeHttpConnectionManager(hcm_config);
+}
+
+void ConfigHelper::adjustUpstreamTimeoutForTsan(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
+  auto* route =
+      hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+  uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
+  auto* timeout = route->mutable_timeout();
+  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
+  // upstream_response_timeout.
+  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}

@@ -27,7 +27,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
@@ -55,7 +54,7 @@ public:
         rate_limit_settings_, true);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
-        dispatcher_, init_fetch_timeout, false, false);
+        dispatcher_, init_fetch_timeout, false, SubscriptionOptions());
   }
 
   ~GrpcSubscriptionTestHarness() override {

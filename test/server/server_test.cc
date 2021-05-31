@@ -712,6 +712,57 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  options_.bootstrap_version_ = 3;
+
+  bool workers_started = false;
+  absl::Notification workers_started_fired;
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+    });
+    initialize("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+
+  // Flush three times in a row. Two of these should get dropped.
+  server_->dispatcher().post([&] {
+    server_->flushStats();
+    server_->flushStats();
+    server_->flushStats();
+  });
+
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+
+  // Trigger another flush after the first one finished. This should go through an no drops should
+  // be recorded.
+  server_->dispatcher().post([&] { server_->flushStats(); });
+
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
+
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -1115,7 +1166,7 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/invalid_layered_runtime_missing_name.yaml"),
-      EnvoyException, "RuntimeLayerValidationError.Name: \\[\"value length must be at least");
+      EnvoyException, "RuntimeLayerValidationError.Name: value length must be at least");
 }
 
 // Validate invalid layered runtime with duplicate names is rejected.
@@ -1152,8 +1203,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0.25),
-      EnvoyException,
-      "HealthCheckValidationError.Timeout: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid interval entry of a health check config entry.
@@ -1161,8 +1211,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0.5, 0),
-      EnvoyException,
-      "HealthCheckValidationError.Interval: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Interval: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid timeout and interval entry of a health check
@@ -1171,8 +1220,7 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInter
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0),
-      EnvoyException,
-      "HealthCheckValidationError.Timeout: \\[\"value must be greater than \" \"0s\"\\]");
+      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on valid interval entry of a health check config entry.
@@ -1189,13 +1237,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
   // that there is no listener.
   server_->admin().addListenerToHandler(/*handler=*/nullptr);
-}
-
-// Validate that an admin config with a server address but no access log path is rejected.
-TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/node_bootstrap_without_access_log.yaml"),
-      EnvoyException, "An admin access log path is required for a listening server.");
 }
 
 namespace {

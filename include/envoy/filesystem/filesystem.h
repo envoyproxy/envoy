@@ -16,6 +16,8 @@ namespace Filesystem {
 
 using FlagSet = std::bitset<4>;
 
+enum class DestinationType { File, Stderr, Stdout };
+
 /**
  * Abstraction for a basic file on disk.
  */
@@ -61,6 +63,11 @@ public:
    * @return string the file path
    */
   virtual std::string path() const PURE;
+
+  /**
+   * @return the type of the destination
+   */
+  virtual DestinationType destinationType() const PURE;
 };
 
 using FilePtr = std::unique_ptr<File>;
@@ -75,6 +82,20 @@ struct PathSplitResult {
 };
 
 /**
+ * Contains the file type and the path.
+ */
+struct FilePathAndType {
+  bool operator==(const FilePathAndType& rhs) const {
+    return file_type_ == rhs.file_type_ && path_ == rhs.path_;
+  }
+  FilePathAndType() = default;
+  FilePathAndType(DestinationType file_type, absl::string_view path)
+      : file_type_(file_type), path_(path) {}
+  DestinationType file_type_;
+  std::string path_;
+};
+
+/**
  * Abstraction for some basic filesystem operations
  */
 class Instance {
@@ -82,10 +103,10 @@ public:
   virtual ~Instance() = default;
 
   /**
-   *  @param path The path of the File
+   *  @param file_info The path and the type of the File
    *  @return a FilePtr. The file is not opened.
    */
-  virtual FilePtr createFile(const std::string& path) PURE;
+  virtual FilePtr createFile(const FilePathAndType& file_info) PURE;
 
   /**
    * @return bool whether a file exists on disk and can be opened for read.

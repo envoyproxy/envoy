@@ -29,19 +29,16 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    category = "envoy.filters.listener",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",

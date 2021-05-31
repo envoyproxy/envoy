@@ -13,8 +13,7 @@ class MockClient : public ExternalProcessorClient {
 public:
   MockClient();
   ~MockClient() override;
-  MOCK_METHOD(ExternalProcessorStreamPtr, start,
-              (ExternalProcessorCallbacks&, const std::chrono::milliseconds&));
+  MOCK_METHOD(ExternalProcessorStreamPtr, start, (ExternalProcessorCallbacks&));
 };
 
 class MockStream : public ExternalProcessorStream {

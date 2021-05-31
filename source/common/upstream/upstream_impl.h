@@ -45,6 +45,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/shared_pool/shared_pool.h"
@@ -112,20 +113,20 @@ public:
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
       return *health_checker_;
-    } else {
-      static HealthCheckHostMonitorNullImpl* null_health_checker =
-          new HealthCheckHostMonitorNullImpl();
-      return *null_health_checker;
     }
+
+    static HealthCheckHostMonitorNullImpl* null_health_checker =
+        new HealthCheckHostMonitorNullImpl();
+    return *null_health_checker;
   }
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
-    } else {
-      static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
-          new Outlier::DetectorHostMonitorNullImpl();
-      return *null_outlier_detector;
     }
+
+    static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
+        new Outlier::DetectorHostMonitorNullImpl();
+    return *null_outlier_detector;
   }
   HostStats& stats() const override { return stats_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
@@ -146,6 +147,21 @@ public:
   MonotonicTime creationTime() const override { return creation_time_; }
 
 protected:
+  void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
+
+  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) {
+    health_check_address_ = address;
+  }
+
+  void setHealthCheckerImpl(HealthCheckHostMonitorPtr&& health_checker) {
+    health_checker_ = std::move(health_checker);
+  }
+
+  void setOutlierDetectorImpl(Outlier::DetectorHostMonitorPtr&& outlier_detector) {
+    outlier_detector_ = std::move(outlier_detector);
+  }
+
+private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
   const std::string health_checks_hostname_;
@@ -187,7 +203,7 @@ public:
   // Upstream::Host
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
   counters() const override {
-    return stats_.counters();
+    return stats().counters();
   }
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -199,18 +215,19 @@ public:
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
-    return stats_.gauges();
+    return stats().gauges();
   }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
 
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
-    health_checker_ = std::move(health_checker);
+    setHealthCheckerImpl(std::move(health_checker));
   }
   void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
-    outlier_detector_ = std::move(outlier_detector);
+    setOutlierDetectorImpl(std::move(outlier_detector));
   }
+
   Host::Health health() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
@@ -561,6 +578,9 @@ public:
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
     return http_protocol_options_->http2_options_;
   }
+  const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const override {
+    return http_protocol_options_->http3_options_;
+  }
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
@@ -643,6 +663,11 @@ public:
     return http_protocol_options_->upstream_http_protocol_options_;
   }
 
+  const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const override {
+    return http_protocol_options_->alternate_protocol_cache_options_;
+  }
+
   absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
@@ -651,6 +676,7 @@ public:
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
+  Http::Http3::CodecStats& http3CodecStats() const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -729,6 +755,7 @@ private:
   std::vector<Network::FilterFactoryCb> filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
 };
 
 /**

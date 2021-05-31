@@ -32,9 +32,17 @@ protected:
   AccessLogManagerImplTest()
       : file_(new NiceMock<Filesystem::MockFile>), thread_factory_(Thread::threadFactoryForTest()),
         access_log_manager_(timeout_40ms_, api_, dispatcher_, lock_, store_) {
-    EXPECT_CALL(file_system_, createFile("foo"))
-        .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file_))));
-
+    EXPECT_CALL(file_system_,
+                createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
+                    Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})))
+        .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file_))))
+        .WillRepeatedly(
+            Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
+              NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
+              EXPECT_CALL(*file, path()).WillRepeatedly(Return("foo"));
+              return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
+            }));
+    EXPECT_CALL(*file_, path()).WillRepeatedly(Return("foo"));
     EXPECT_CALL(api_, fileSystem()).WillRepeatedly(ReturnRef(file_system_));
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(ReturnRef(thread_factory_));
   }
@@ -62,7 +70,9 @@ protected:
 TEST_F(AccessLogManagerImplTest, BadFile) {
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
-  EXPECT_THROW(access_log_manager_.createAccessLog("foo"), EnvoyException);
+  EXPECT_THROW(access_log_manager_.createAccessLog(
+                   Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}),
+               EnvoyException);
 }
 
 TEST_F(AccessLogManagerImplTest, OpenFileWithRightFlags) {
@@ -75,7 +85,8 @@ TEST_F(AccessLogManagerImplTest, OpenFileWithRightFlags) {
         EXPECT_TRUE(flags[Filesystem::File::Operation::Create]);
         return Filesystem::resultSuccess<bool>(true);
       }));
-  EXPECT_NE(nullptr, access_log_manager_.createAccessLog("foo"));
+  EXPECT_NE(nullptr, access_log_manager_.createAccessLog(
+                         Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}));
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
@@ -84,7 +95,8 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
-  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
   EXPECT_EQ(0UL, store_.counter("filesystem.write_completed").value());
@@ -153,7 +165,8 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
-  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
 
@@ -224,7 +237,8 @@ TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
-  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
 
@@ -256,7 +270,8 @@ TEST_F(AccessLogManagerImplTest, ReopenFile) {
   EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
@@ -313,7 +328,8 @@ TEST_F(AccessLogManagerImplTest, ReopenFileOnTimerOnly) {
   EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
@@ -367,7 +383,8 @@ TEST_F(AccessLogManagerImplTest, ReopenThrows) {
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 
-  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
   EXPECT_CALL(*file_, close_())
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -404,7 +421,8 @@ TEST_F(AccessLogManagerImplTest, ReopenThrows) {
 
 TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
@@ -449,21 +467,33 @@ TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
   EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  AccessLogFileSharedPtr log = access_log_manager_.createAccessLog("foo");
+  AccessLogFileSharedPtr log = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   NiceMock<Filesystem::MockFile>* file2 = new NiceMock<Filesystem::MockFile>;
-  EXPECT_CALL(file_system_, createFile("bar"))
-      .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))));
+  EXPECT_CALL(*file2, path()).WillRepeatedly(Return("bar"));
+  EXPECT_CALL(file_system_,
+              createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
+                  Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"})))
+      .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))))
+      .WillRepeatedly(Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
+        NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
+        EXPECT_CALL(*file, path()).WillRepeatedly(Return("bar"));
+        return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
+      }));
 
   Sequence sq2;
   EXPECT_CALL(*file2, open_(_))
       .InSequence(sq2)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  AccessLogFileSharedPtr log2 = access_log_manager_.createAccessLog("bar");
+  AccessLogFileSharedPtr log2 = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"});
 
   // Make sure that getting the access log with the same name returns the same underlying file.
-  EXPECT_EQ(log, access_log_manager_.createAccessLog("foo"));
-  EXPECT_EQ(log2, access_log_manager_.createAccessLog("bar"));
+  EXPECT_EQ(log, access_log_manager_.createAccessLog(
+                     Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}));
+  EXPECT_EQ(log2, access_log_manager_.createAccessLog(
+                      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"}));
 
   // Test that reopen reopens all of the files
   EXPECT_CALL(*file_, write_(_))

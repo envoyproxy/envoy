@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <memory>
 #include <string>
 
@@ -29,8 +28,7 @@ public:
                               const envoy::config::core::v3::GrpcService& grpc_service,
                               Stats::Scope& scope);
 
-  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
-                                   const std::chrono::milliseconds& timeout) override;
+  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks) override;
 
 private:
   Grpc::AsyncClientFactoryPtr factory_;
@@ -41,8 +39,7 @@ class ExternalProcessorStreamImpl : public ExternalProcessorStream,
                                     public Logger::Loggable<Logger::Id::filter> {
 public:
   ExternalProcessorStreamImpl(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-                              ExternalProcessorCallbacks& callbacks,
-                              const std::chrono::milliseconds& timeout);
+                              ExternalProcessorCallbacks& callbacks);
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we
   // actually closed it.

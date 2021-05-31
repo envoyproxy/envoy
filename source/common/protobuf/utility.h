@@ -9,6 +9,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/hash.h"
+#include "common/common/stl_helpers.h"
 #include "common/common/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
@@ -144,6 +145,13 @@ public:
   MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
 };
 
+class TypeUtil {
+public:
+  static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
+
+  static std::string descriptorFullNameToTypeUrl(absl::string_view type);
+};
+
 class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<std::string>& source,
@@ -153,14 +161,8 @@ public:
 
   template <class ProtoType>
   static std::string debugString(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    if (source.empty()) {
-      return "[]";
-    }
-    return std::accumulate(std::next(source.begin()), source.end(), "[" + source[0].DebugString(),
-                           [](std::string debug_string, const Protobuf::Message& message) {
-                             return debug_string + ", " + message.DebugString();
-                           }) +
-           "]";
+    return accumulateToString<ProtoType>(
+        source, [](const Protobuf::Message& message) { return message.DebugString(); });
   }
 
   // Based on MessageUtil::hash() defined below.
@@ -508,7 +510,7 @@ public:
    *
    * @param code the protobuf error code
    */
-  static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+  static std::string codeEnumToString(ProtobufUtil::StatusCode code);
 
   /**
    * Modifies a message such that all sensitive data (that is, fields annotated as
@@ -661,6 +663,25 @@ public:
    */
   static void systemClockToTimestamp(const SystemTime system_clock_time,
                                      ProtobufWkt::Timestamp& timestamp);
+};
+
+class StructUtil {
+public:
+  /**
+   * Recursively updates in-place a protobuf structure with keys from another
+   * object.
+   *
+   * The merging strategy is the following. If a key from \p other does not
+   * exists, it's just copied into \p obj. If the key exists but has a
+   * different type, it is replaced by the new value. Otherwise:
+   * - for scalar values (null, string, number, boolean) are replaced with the new value
+   * - for lists: new values are added to the current list
+   * - for structures: recursively apply this scheme
+   *
+   * @param obj the object to update in-place
+   * @param with the object to update \p obj with
+   */
+  static void update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with);
 };
 
 } // namespace Envoy

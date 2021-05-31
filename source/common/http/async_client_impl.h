@@ -237,7 +237,8 @@ private:
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
-    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                    bool) const override {
       return {};
     }
     const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
@@ -361,9 +362,12 @@ private:
   Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  void setRoute(Router::RouteConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
+  // TODO(kbaichoo): Plumb account from owning request filter.
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -427,6 +431,9 @@ private:
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
+  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
+    tracked_object_stack.add(*this);
+  }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
 

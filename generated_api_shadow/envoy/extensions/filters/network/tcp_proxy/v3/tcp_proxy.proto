@@ -10,6 +10,7 @@ import "envoy/type/v3/hash_policy.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -51,7 +52,7 @@ message TcpProxy {
       // in the upstream cluster with metadata matching what is set in this field will be considered
       // for load balancing. Note that this will be merged with what's provided in
       // :ref:`TcpProxy.metadata_match
-      // <envoy_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.metadata_match>`, with values
+      // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.metadata_match>`, with values
       // here taking precedence. The filter name should be specified as *envoy.lb*.
       config.core.v3.Metadata metadata_match = 3;
     }
@@ -173,5 +174,6 @@ message TcpProxy {
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  DeprecatedV1 hidden_envoy_deprecated_deprecated_v1 = 6 [deprecated = true];
+  DeprecatedV1 hidden_envoy_deprecated_deprecated_v1 = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }

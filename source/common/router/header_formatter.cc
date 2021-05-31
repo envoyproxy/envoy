@@ -6,6 +6,7 @@
 
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/formatter/substitution_formatter.h"
@@ -76,13 +77,15 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
   absl::string_view json = params_str.substr(1, params_str.size() - 2); // trim parens
 
   std::vector<std::string> params;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(std::string(json));
 
     for (const auto& param : parsed_params->asObjectArray()) {
       params.emplace_back(param->asString());
     }
-  } catch (Json::Exception& e) {
+  }
+  END_TRY
+  catch (Json::Exception& e) {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str, &e));
   }
 

@@ -8,6 +8,7 @@
 #include "common/common/linked_object.h"
 #include "common/conn_pool/conn_pool_base.h"
 #include "common/http/codec_client.h"
+#include "common/http/utility.h"
 
 #include "absl/strings/string_view.h"
 
@@ -52,7 +53,7 @@ public:
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                        Random::RandomGenerator& random_generator,
                        Upstream::ClusterConnectivityState& state,
-                       std::vector<Http::Protocol> protocol);
+                       std::vector<Http::Protocol> protocols);
   ~HttpConnPoolImplBase() override;
 
   // ConnectionPool::Instance
@@ -148,10 +149,12 @@ public:
                         const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                         Random::RandomGenerator& random_generator,
                         Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
-                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol)
+                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
-                             random_generator, state, protocol),
-        codec_fn_(codec_fn), client_fn_(client_fn) {}
+                             random_generator, state, protocols),
+        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]) {
+    ASSERT(protocols.size() == 1);
+  }
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
     return codec_fn_(data, this);
@@ -161,9 +164,14 @@ public:
     return client_fn_(this);
   }
 
+  absl::string_view protocolDescription() const override {
+    return Utility::getProtocolString(protocol_);
+  }
+
 protected:
   const CreateCodecFn codec_fn_;
   const CreateClientFn client_fn_;
+  const Http::Protocol protocol_;
 };
 
 /**
@@ -173,9 +181,10 @@ class MultiplexedActiveClientBase : public CodecClientCallbacks,
                                     public Http::ConnectionCallbacks,
                                     public Envoy::Http::ActiveClient {
 public:
-  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, Stats::Counter& cx_total);
-  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, Stats::Counter& cx_total,
-                              Upstream::Host::CreateConnectionData& data);
+  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t max_concurrent_streams,
+                              Stats::Counter& cx_total);
+  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t max_concurrent_streams,
+                              Stats::Counter& cx_total, Upstream::Host::CreateConnectionData& data);
   ~MultiplexedActiveClientBase() override = default;
 
   // ConnPoolImpl::ActiveClient
@@ -205,7 +214,8 @@ public:
 
 protected:
   MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
-                              Upstream::Host::CreateConnectionData& data, Stats::Counter& cx_total);
+                              Upstream::Host::CreateConnectionData& data,
+                              uint32_t max_concurrent_streams, Stats::Counter& cx_total);
 
 private:
   bool closed_with_active_rq_{};

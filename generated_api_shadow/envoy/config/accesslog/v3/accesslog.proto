@@ -11,6 +11,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -39,7 +40,8 @@ message AccessLog {
   oneof config_type {
     google.protobuf.Any typed_config = 4;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 3 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 3
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 }
 
@@ -168,8 +170,8 @@ message RuntimeFilter {
   // randomly sample based on the runtime key value alone.
   // *use_independent_randomness* can be used for logging kill switches within
   // complex nested :ref:`AndFilter
-  // <envoy_api_msg_config.accesslog.v3.AndFilter>` and :ref:`OrFilter
-  // <envoy_api_msg_config.accesslog.v3.OrFilter>` blocks that are easier to
+  // <envoy_v3_api_msg_config.accesslog.v3.AndFilter>` and :ref:`OrFilter
+  // <envoy_v3_api_msg_config.accesslog.v3.OrFilter>` blocks that are easier to
   // reason about from a probability perspective (i.e., setting to true will
   // cause the filter to behave like an independent random variable when
   // composed within logical operator filters).
@@ -318,6 +320,7 @@ message ExtensionFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 3;
 
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 }

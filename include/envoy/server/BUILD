@@ -320,15 +320,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "active_udp_listener_config_interface",
-    hdrs = ["active_udp_listener_config.h"],
-    deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/network:connection_handler_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "bootstrap_extension_config_interface",
     hdrs = ["bootstrap_extension_config.h"],
     deps = [
@@ -346,5 +337,14 @@ envoy_cc_library(
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/server:instance_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "platform_interface",
+    hdrs = ["platform.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )

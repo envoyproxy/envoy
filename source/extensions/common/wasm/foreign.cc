@@ -37,7 +37,7 @@ RegisterForeignFunction registerCompressForeignFunction(
         return WasmResult::SerializationFailure;
       }
       auto result = alloc_result(dest_len);
-      memcpy(result, b.get(), dest_len);
+      memcpy(result, b.get(), dest_len); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
     });
 
@@ -53,7 +53,7 @@ RegisterForeignFunction registerUncompressForeignFunction(
                        arguments.size());
         if (r == Z_OK) {
           auto result = alloc_result(dest_len);
-          memcpy(result, b.get(), dest_len);
+          memcpy(result, b.get(), dest_len); // NOLINT(safe-memcpy)
           return WasmResult::Ok;
         }
         if (r != Z_BUF_ERROR) {
@@ -186,7 +186,7 @@ public:
         return serialize_status;
       }
       auto output = alloc_result(result.size());
-      memcpy(output, result.data(), result.size());
+      memcpy(output, result.data(), result.size()); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
     };
     return f;

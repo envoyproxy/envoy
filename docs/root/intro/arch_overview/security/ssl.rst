@@ -103,7 +103,7 @@ Custom Certificate Validator
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The configuration explained above is used by the "default" certificate validator.
-Envoy also supports custom validators in `envoy.tls.cert_validator` extension category which can be
+Envoy also supports custom validators in ``envoy.tls.cert_validator`` extension category which can be
 configured on :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
 
 For example, Envoy can be configured to verify peer certificates following the `SPIFFE <https://github.com/spiffe/spiffe>`_ specification

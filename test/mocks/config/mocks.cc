@@ -13,14 +13,15 @@ namespace Config {
 
 MockSubscriptionFactory::MockSubscriptionFactory() {
   ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillByDefault(Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                                   Stats::Scope&, SubscriptionCallbacks& callbacks,
-                                   OpaqueResourceDecoder&, bool) -> SubscriptionPtr {
-        auto ret = std::make_unique<NiceMock<MockSubscription>>();
-        subscription_ = ret.get();
-        callbacks_ = &callbacks;
-        return ret;
-      }));
+      .WillByDefault(
+          Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                        Stats::Scope&, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder&,
+                        const SubscriptionOptions&) -> SubscriptionPtr {
+            auto ret = std::make_unique<NiceMock<MockSubscription>>();
+            subscription_ = ret.get();
+            callbacks_ = &callbacks;
+            return ret;
+          }));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
@@ -52,6 +53,8 @@ MockContextProvider::MockContextProvider() {
       .WillByDefault(Invoke([this](UpdateNotificationCb update_cb) -> Common::CallbackHandlePtr {
         return update_cb_handler_.add(update_cb);
       }));
+  ON_CALL(*this, nodeContext())
+      .WillByDefault(ReturnRef(xds::core::v3::ContextParams::default_instance()));
   ON_CALL(*this, dynamicContext(_))
       .WillByDefault(ReturnRef(xds::core::v3::ContextParams::default_instance()));
 }

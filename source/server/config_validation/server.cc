@@ -24,14 +24,16 @@ bool validateConfig(const Options& options,
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
                               component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     return false;
   }
 }
@@ -53,9 +55,9 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this) {
-  try {
-    initialize(options, local_address, component_factory);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
+  END_TRY
+  catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     shutdown();
@@ -81,17 +83,17 @@ void ValidationInstance::initialize(const Options& options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
-
   bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       stats().symbolTable(), bootstrap.node(), bootstrap.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap, options);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
+  Configuration::InitialImpl initial_config(bootstrap, options, *this);
+  admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(

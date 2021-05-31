@@ -16,10 +16,10 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
-  ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
 
     const std::string filter = fmt::format(R"EOF(
 name: dynamic_forward_proxy
@@ -96,7 +96,7 @@ typed_config:
     if (upstream_tls_) {
       addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
                                                         factory_context_),
-                      FakeHttpConnection::Type::HTTP1);
+                      Http::CodecType::HTTP1);
     } else {
       HttpIntegrationTest::createUpstreams();
     }
@@ -222,7 +222,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
       {":scheme", "http"},
       {":authority", fmt::format("localhost2", fake_upstreams_[0]->localAddress()->ip()->port())}};
   response = codec_client_->makeHeaderOnlyRequest(request_headers2);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_overflow")->value());
 }
@@ -248,7 +248,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
@@ -272,7 +272,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
@@ -292,7 +292,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
        fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ssl.fail_verify_san")->value());
@@ -310,7 +310,7 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
        fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
 
   auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
 
   EXPECT_TRUE(response->complete());

@@ -39,6 +39,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -61,7 +62,7 @@ protected:
   UpstreamImplTestBase() : api_(Api::createApiForTest(stats_, random_)) {}
 
   NiceMock<Server::MockAdmin> admin_;
-  Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -2217,7 +2218,7 @@ public:
   };
 
   Stats::TestUtil::TestStore stats_;
-  Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -2253,6 +2254,11 @@ public:
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
+
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Any&) const override {
+    return nullptr;
   }
 };
 
@@ -2604,6 +2610,20 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(3U, high_remaining_retries.value());
   cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
   EXPECT_EQ(4U, high_remaining_retries.value());
+}
+
+TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  EXPECT_FALSE(cluster_config.has_connect_timeout());
+  EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
 TEST_F(ClusterInfoImplTest, Timeouts) {
@@ -3130,8 +3150,9 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 TEST_F(ClusterInfoImplTest, Http3) {
-  const std::string yaml = R"EOF(
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3144,10 +3165,25 @@ TEST_F(ClusterInfoImplTest, Http3) {
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-  )EOF";
-
-  BazFactory baz_factory;
-  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+    transport_socket:
+      name: envoy.transport_sockets.quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              private_key:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            validation_context:
+              trusted_ca:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              match_subject_alt_names:
+              - exact: localhost
+              - exact: 127.0.0.1
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
   auto cluster1 = makeCluster(yaml);
   ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
   EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
@@ -3157,7 +3193,9 @@ TEST_F(ClusterInfoImplTest, Http3) {
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
-          http3_protocol_options: {}
+          http3_protocol_options:
+            quic_protocol_options:
+              max_concurrent_streams: 2
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";
@@ -3175,11 +3213,148 @@ TEST_F(ClusterInfoImplTest, Http3) {
   auto explicit_h3 = makeCluster(yaml + explicit_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(
+      explicit_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(),
+      2);
 
   auto downstream_h3 = makeCluster(yaml + downstream_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
+  EXPECT_FALSE(
+      downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
 }
+
+TEST_F(ClusterInfoImplTest, Http3BadConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.not_quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              private_key:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            validation_context:
+              trusted_ca:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              match_subject_alt_names:
+              - exact: localhost
+              - exact: 127.0.0.1
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
+                          "HTTP3 requires a QuicUpstreamTransport transport socket: name.*");
+}
+
+TEST_F(ClusterInfoImplTest, Http3Auto) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              private_key:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            validation_context:
+              trusted_ca:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              match_subject_alt_names:
+              - exact: localhost
+              - exact: 127.0.0.1
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+
+  const std::string auto_http3 = R"EOF(
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        auto_config:
+          http3_protocol_options:
+            quic_protocol_options:
+              max_concurrent_streams: 2
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
+
+  auto auto_h3 = makeCluster(yaml + auto_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            auto_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(
+      auto_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(), 2);
+}
+
+#else
+TEST_F(ClusterInfoImplTest, Http3BadConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
+                          "HTTP3 configured but not enabled in the build.");
+}
+#endif // ENVOY_ENABLE_QUIC
 
 // Validate empty singleton for HostsPerLocalityImpl.
 TEST(HostsPerLocalityImpl, Empty) {

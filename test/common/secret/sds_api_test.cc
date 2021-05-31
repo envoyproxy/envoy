@@ -109,7 +109,8 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
       .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
                         &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                 Stats::Scope&, Config::SubscriptionCallbacks& cbs,
-                                Config::OpaqueResourceDecoder&, bool) -> Config::SubscriptionPtr {
+                                Config::OpaqueResourceDecoder&,
+                                const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
         return std::make_unique<Config::FilesystemSubscriptionImpl>(*dispatcher_, sds_config_path,
                                                                     cbs, resource_decoder, stats,
                                                                     validation_visitor_, *api_);

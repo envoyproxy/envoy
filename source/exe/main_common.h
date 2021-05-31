@@ -2,6 +2,7 @@
 
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/platform.h"
 
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
@@ -10,7 +11,6 @@
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
-#include "exe/platform_impl.h"
 #include "exe/process_wide.h"
 
 #include "server/listener_hooks.h"
@@ -38,7 +38,7 @@ public:
   // destructed.
   MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
-                 std::unique_ptr<PlatformImpl> platform_impl,
+                 std::unique_ptr<Server::Platform> platform_impl,
                  std::unique_ptr<Random::RandomGenerator>&& random_generator,
                  std::unique_ptr<ProcessContext> process_context);
 
@@ -66,7 +66,7 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
-  std::unique_ptr<PlatformImpl> platform_impl_;
+  std::unique_ptr<Server::Platform> platform_impl_;
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having
   // an ifdef in a header file exposed in a C++ library. It is too easy to have

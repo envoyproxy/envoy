@@ -37,6 +37,11 @@ def _python_deps():
         # use_category = ["test"],
     )
     pip_install(
+        name = "deps_pip3",
+        requirements = "@envoy//tools/dependency:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "kafka_pip3",
         requirements = "@envoy//source/extensions/filters/network/kafka:requirements.txt",
         extra_pip_args = ["--require-hashes"],
@@ -77,6 +82,16 @@ def _python_deps():
         # release_date = "2021-01-20"
         # use_category = ["docs"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
+    )
+    pip_install(
+        name = "pylint_pip3",
+        requirements = "@envoy//tools/code_format:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "testing_pip3",
+        requirements = "@envoy//tools/testing:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
     )
     pip_install(
         name = "thrift_pip3",

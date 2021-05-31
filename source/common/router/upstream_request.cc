@@ -371,6 +371,9 @@ void UpstreamRequest::onPoolReady(
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
 
+  // Have the upstream use the account of the downstream.
+  upstream_->setAccount(parent_.callbacks()->account());
+
   if (parent_.requestVcluster()) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
     // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
@@ -388,6 +391,9 @@ void UpstreamRequest::onPoolReady(
 
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  parent_.callbacks()->streamInfo().setUpstreamFilterState(
+      std::make_shared<StreamInfo::FilterStateImpl>(info.filterState().parent()->parent(),
+                                                    StreamInfo::FilterState::LifeSpan::Request));
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 

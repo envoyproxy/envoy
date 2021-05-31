@@ -72,7 +72,7 @@ void ConnectionManager::dispatch() {
 
     return;
   } catch (const AppException& ex) {
-    ENVOY_LOG(error, "thrift application exception: {}", ex.what());
+    ENVOY_LOG(debug, "thrift application exception: {}", ex.what());
     if (rpcs_.empty()) {
       MessageMetadata metadata;
       sendLocalReply(metadata, ex, true);
@@ -80,7 +80,7 @@ void ConnectionManager::dispatch() {
       sendLocalReply(*(*rpcs_.begin())->metadata_, ex, true);
     }
   } catch (const EnvoyException& ex) {
-    ENVOY_CONN_LOG(error, "thrift error: {}", read_callbacks_->connection(), ex.what());
+    ENVOY_CONN_LOG(debug, "thrift error: {}", read_callbacks_->connection(), ex.what());
 
     if (rpcs_.empty()) {
       // Transport/protocol mismatch (including errors in automatic detection). Just hang up

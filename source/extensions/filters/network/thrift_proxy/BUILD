@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
+        "//source/common/common:safe_memcpy_lib",
     ],
 )
 
@@ -35,8 +36,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.network",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":app_exception_lib",
         ":auto_protocol_lib",

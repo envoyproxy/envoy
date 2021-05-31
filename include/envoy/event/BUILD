@@ -40,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/thread:thread_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

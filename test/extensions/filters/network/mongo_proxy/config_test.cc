@@ -95,8 +95,7 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
 }
 
 TEST(MongoFilterConfigTest, EmptyConfig) {
-  handleInvalidConfiguration(
-      "{}", R"(StatPrefix: \["value length must be at least " '\\x01' " runes"\])");
+  handleInvalidConfiguration("{}", "StatPrefix: value length must be at least 1 characters");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
@@ -132,7 +131,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
     fixed_delay: -1s
   )EOF";
 
-  handleInvalidConfiguration(yaml_string, R"(FixedDelay: \["value must be greater than " "0s"\])");
+  handleInvalidConfiguration(yaml_string, "FixedDelay: value must be greater than 0s");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
@@ -187,8 +186,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       fixed_delay: 0s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string,
-                               R"(FixedDelay: \["value must be greater than " "0s"\])");
+    handleInvalidConfiguration(yaml_string, "FixedDelay: value must be greater than 0s");
   }
 }
 

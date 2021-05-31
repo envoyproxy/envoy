@@ -1,7 +1,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
+#if defined(ENVOY_ENABLE_QUIC)
+#include "common/quic/quic_transport_socket_factory.h"
+#endif
 
 #include "test/server/listener_manager_impl_test.h"
 #include "test/server/utility.h"
@@ -23,6 +25,7 @@ public:
   Api::OsSysCallsImpl os_sys_calls_actual_;
 };
 
+#if defined(ENVOY_ENABLE_QUIC)
 TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryAndSslContext) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
@@ -53,12 +56,7 @@ filter_chains:
             - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  listener_config:
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
-  writer_config:
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
+  quic_options: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -127,8 +125,9 @@ udp_listener_config:
   auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
-  EXPECT_TRUE(quic_socket_factory.serverContextConfig().isReady());
+  EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
 }
+#endif
 
 TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithWrongTransportSocket) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -159,19 +158,19 @@ filter_chains:
           - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  listener_config:
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
-  writer_config:
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
+  quic_options: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
 
+#if defined(ENVOY_ENABLE_QUIC)
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
                           "wrong transport socket config specified for quic transport socket");
+#else
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
+                          "QUIC is configured but not enabled in the build.");
+#endif
 }
 
 } // namespace

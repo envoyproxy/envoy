@@ -74,6 +74,11 @@ public:
     drain_tracker();
   }
 
+  void bindAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // Not implemented.
+    ASSERT(false);
+  }
+
   void add(const void* data, uint64_t size) override {
     FUZZ_ASSERT(start_ + size_ + size <= data_.size());
     ::memcpy(mutableEnd(), data, size);
@@ -188,6 +193,7 @@ public:
     // WatermarkBuffer implementations.
     ASSERT(false);
   }
+
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 

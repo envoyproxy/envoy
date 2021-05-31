@@ -47,7 +47,7 @@ config:
   signout_path:
     path:
       exact: /signout
-  auth_scopes: 
+  auth_scopes:
   - user
   - openid
   - email
@@ -95,7 +95,7 @@ config:
   signout_path:
     path:
       exact: /signout
-  auth_scopes: 
+  auth_scopes:
   - user
   - openid
   - email

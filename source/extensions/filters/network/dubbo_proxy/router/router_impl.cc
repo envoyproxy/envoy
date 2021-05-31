@@ -4,6 +4,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,7 +77,40 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   }
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
-  upstream_request_buffer_.move(ctx->messageOriginData(), ctx->messageSize());
+
+  const auto* invocation_impl = dynamic_cast<const RpcInvocationImpl*>(&invocation);
+  ASSERT(invocation_impl);
+
+  if (invocation_impl->hasAttachment() && invocation_impl->attachment().attachmentUpdated()) {
+    constexpr size_t body_length_size = sizeof(uint32_t);
+
+    const size_t attachment_offset = invocation_impl->attachment().attachmentOffset();
+    const size_t request_header_size = ctx->headerSize();
+
+    ASSERT(attachment_offset <= ctx->originMessage().length());
+
+    // Move the other parts of the request headers except the body size to the upstream request
+    // buffer.
+    upstream_request_buffer_.move(ctx->originMessage(), request_header_size - body_length_size);
+    // Discard the old body size.
+    ctx->originMessage().drain(body_length_size);
+
+    // Re-serialize the updated attachment.
+    Buffer::OwnedImpl attachment_buffer;
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(attachment_buffer));
+    encoder.encode(invocation_impl->attachment().attachment());
+
+    size_t new_body_size = attachment_offset - request_header_size + attachment_buffer.length();
+
+    upstream_request_buffer_.writeBEInt<uint32_t>(new_body_size);
+    upstream_request_buffer_.move(ctx->originMessage(), attachment_offset - request_header_size);
+    upstream_request_buffer_.move(attachment_buffer);
+
+    // Discard the old attachment.
+    ctx->originMessage().drain(ctx->messageSize() - attachment_offset);
+  } else {
+    upstream_request_buffer_.move(ctx->originMessage(), ctx->messageSize());
+  }
 
   upstream_request_ = std::make_unique<UpstreamRequest>(
       *this, *conn_pool, metadata, callbacks_->serializationType(), callbacks_->protocolType());

@@ -87,7 +87,7 @@ public:
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
         grpc_mux_, *eds_callbacks_, resource_decoder_, subscription_stats_, type_url_, dispatcher_,
-        std::chrono::milliseconds(), false, false);
+        std::chrono::milliseconds(), false, Config::SubscriptionOptions());
   }
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure

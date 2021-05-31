@@ -42,7 +42,7 @@ fi
 
 SCRIPT_DIR="$(dirname "$0")"
 SRC_DIR="$(dirname "$SCRIPT_DIR")"
-API_DIR="${SRC_DIR}"/api
+ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
 CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
@@ -54,6 +54,8 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
+export ENVOY_SRCDIR
+
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 
@@ -61,10 +63,7 @@ pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 # files still.
 rm -rf bazel-bin/external/envoy_api_canonical
 
-EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
-rm -rf "${EXTENSION_DB_PATH}"
 GENERATED_RST_DIR="$(realpath "${GENERATED_RST_DIR}")"
-export EXTENSION_DB_PATH
 export GENERATED_RST_DIR
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
@@ -72,8 +71,7 @@ IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 BAZEL_BUILD_OPTIONS+=(
     "--remote_download_outputs=all"
     "--strategy=protodoc=sandboxed,local"
-    "--action_env=ENVOY_BLOB_SHA"
-    "--action_env=EXTENSION_DB_PATH")
+    "--action_env=ENVOY_BLOB_SHA")
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
@@ -94,11 +92,8 @@ function generate_api_rst() {
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
   # config. We only have v2 support here for version history anchors, which don't point at any empty
   # configs.
-  if [[ "${API_VERSION}" != "v2" ]]
-  then
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-      "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
-  fi
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
+        "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts
   # are nested inside source package targets).
@@ -126,28 +121,12 @@ function generate_api_rst() {
     declare DST="${GENERATED_RST_DIR}/api-${API_VERSION}/${PROTO_FILE_CANONICAL#envoy/}".rst
 
     mkdir -p "$(dirname "${DST}")"
-    if [[ "${API_VERSION}" == "v2" ]]
-    then
-      cat docs/v2-api-header.rst "${SRC}" > "$(dirname "${DST}")/$(basename "${SRC}")"
-    else
-      cp -f "${SRC}" "$(dirname "${DST}")"
-    fi
+    cp -f "${SRC}" "$(dirname "${DST}")"
   done
 }
 
-# TODO(htuch): remove v2 support once we have a good story for version history RST links that refer
-# to v2 APIs.
-generate_api_rst v2
 generate_api_rst v3
 
-# Fixup anchors and references in v3 so they form a distinct namespace.
-# TODO(htuch): Do this in protodoc generation in the future.
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
-find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
-
-# xDS protocol spec.
-mkdir -p "${GENERATED_RST_DIR}/api-docs"
-cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
 cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
@@ -159,14 +138,15 @@ copy_example_configs () {
 
 copy_example_configs
 
-rsync -rav  "${API_DIR}/diagrams" "${GENERATED_RST_DIR}/api-docs"
-
 rsync -av \
       "${SCRIPT_DIR}"/root/ \
       "${SCRIPT_DIR}"/conf.py \
       "${SCRIPT_DIR}"/redirects.txt \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
+
+# Merge generated redirects
+jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/")) | with_entries(.value |= sub("^envoy/";"api-v2/")) | to_entries[] | "\(.value)\t\t\(.key)"' docs/v2_mapping.json >> "${GENERATED_RST_DIR}"/redirects.txt
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment

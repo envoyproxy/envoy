@@ -29,17 +29,16 @@ public:
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
 
     Stats::TestUtil::forEachSampleStat(1000, [this](absl::string_view name) {
-      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, symbol_table_));
+      stat_names_.push_back(std::make_unique<Stats::StatNameManagedStorage>(name, symbol_table_));
     });
   }
 
   ~ThreadLocalStorePerf() {
-    for (auto& stat_name_storage : stat_names_) {
-      stat_name_storage->free(symbol_table_);
+    if (tls_) {
+      tls_->shutdownGlobalThreading();
     }
     store_.shutdownThreading();
     if (tls_) {
-      tls_->shutdownGlobalThreading();
       tls_->shutdownThread();
     }
     if (dispatcher_) {
@@ -72,7 +71,7 @@ private:
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   envoy::config::metrics::v3::StatsConfig stats_config_;
-  std::vector<std::unique_ptr<Stats::StatNameStorage>> stat_names_;
+  std::vector<std::unique_ptr<Stats::StatNameManagedStorage>> stat_names_;
 };
 
 } // namespace Envoy

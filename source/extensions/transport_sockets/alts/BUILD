@@ -34,21 +34,15 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    category = (
-        "envoy.transport_sockets.downstream",
-        "envoy.transport_sockets.upstream",
-    ),
     external_deps = [
         "abseil_node_hash_set",
     ],
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":tsi_handshaker",
         ":tsi_socket",
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/grpc:google_grpc_context_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/extensions/transport_sockets/alts/v3:pkg_cc_proto",
     ],
 )
@@ -97,6 +91,7 @@ envoy_cc_library(
         "//include/envoy/network:io_handle_interface",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",

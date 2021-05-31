@@ -7,18 +7,58 @@
 #include "common/http/codec_client.h"
 #include "common/http/conn_pool_base.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/client_connection_factory_impl.h"
+#include "common/quic/envoy_quic_utils.h"
+#include "common/quic/quic_transport_socket_factory.h"
+#else
+#error "http3 conn pool should not be built with QUIC disabled"
+#endif
+
 namespace Envoy {
 namespace Http {
 namespace Http3 {
 
-// TODO(#14829) the constructor of Http2::ActiveClient sets max requests per
-// connection based on HTTP/2 config. Sort out the HTTP/3 config story.
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data)
-      : MultiplexedActiveClientBase(
-            parent, parent.host()->cluster().stats().upstream_cx_http3_total_, data) {}
+      : MultiplexedActiveClientBase(parent,
+                                    parent.host()
+                                        ->cluster()
+                                        .http3Options()
+                                        .quic_protocol_options()
+                                        .max_concurrent_streams()
+                                        .value(),
+                                    parent.host()->cluster().stats().upstream_cx_http3_total_,
+                                    data) {}
+};
+
+// Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
+class Http3ConnPoolImpl : public FixedHttpConnPoolImpl {
+public:
+  Http3ConnPoolImpl(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+                    Event::Dispatcher& dispatcher,
+                    const Network::ConnectionSocket::OptionsSharedPtr& options,
+                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                    Random::RandomGenerator& random_generator,
+                    Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
+                    CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
+                    TimeSource& time_source);
+
+  ~Http3ConnPoolImpl() override;
+
+  // Set relevant fields in quic_config based on the cluster configuration
+  // supplied in cluster.
+  static void setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
+                                             quic::QuicConfig& quic_config);
+
+  Quic::PersistentQuicInfoImpl& quicInfo() { return *quic_info_; }
+
+private:
+  // Store quic helpers which can be shared between connections and must live
+  // beyond the lifetime of individual connections.
+  std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
 };
 
 ConnectionPool::InstancePtr

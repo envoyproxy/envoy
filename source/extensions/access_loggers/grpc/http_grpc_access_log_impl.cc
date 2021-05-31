@@ -5,6 +5,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
@@ -42,9 +43,10 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
     response_trailers_to_log_.emplace_back(header);
   }
 
-  tls_slot_->set([this](Event::Dispatcher&) {
+  tls_slot_->set([this, transport_version = Envoy::Config::Utility::getAndCheckTransportVersion(
+                            config_.common_config())](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
+        config_.common_config(), transport_version, Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 }
 

@@ -28,7 +28,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
     switch (credential.credential_specifier_case()) {
     case envoy::config::core::v3::GrpcService::GoogleGrpc::CallCredentials::
         CredentialSpecifierCase::kFromPlugin: {
-      if (credential.from_plugin().name() == GrpcCredentialsNames::get().FileBasedMetadata) {
+      if (credential.from_plugin().name() == "envoy.grpc_credentials.file_based_metadata") {
         FileBasedMetadataGrpcCredentialsFactory file_based_metadata_credentials_factory;
         // We don't deal with validation failures here at runtime today, see
         // https://github.com/envoyproxy/envoy/issues/8010.
@@ -69,10 +69,12 @@ FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
   if (!config_.header_key().empty()) {
     header_key = config_.header_key();
   }
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     std::string header_value = Envoy::Config::DataSource::read(config_.secret_data(), true, api_);
     metadata->insert(std::make_pair(header_key, header_prefix + header_value));
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     return grpc::Status(grpc::StatusCode::NOT_FOUND, e.what());
   }
   return grpc::Status::OK;

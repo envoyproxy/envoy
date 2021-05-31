@@ -89,13 +89,15 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      hooks_(hooks), server_contexts_(*this) {
-  try {
+      hooks_(hooks), server_contexts_(*this), stats_flush_in_progress_(false) {
+  TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
-      try {
+      TRY_ASSERT_MAIN_THREAD {
         file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
             options.logPath(), access_log_manager_, Logger::Registry::getSink());
-      } catch (const EnvoyException& e) {
+      }
+      END_TRY
+      catch (const EnvoyException& e) {
         throw EnvoyException(
             fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
       }
@@ -104,16 +106,20 @@ InstanceImpl::InstanceImpl(
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
     initialize(options, std::move(local_address), component_factory, hooks);
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     terminate();
     throw;
-  } catch (const std::exception& e) {
+  }
+  catch (const std::exception& e) {
     ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
     terminate();
     throw;
-  } catch (...) {
+  }
+  catch (...) {
     ENVOY_LOG(critical, "error initializing due to unknown exception");
     terminate();
     throw;
@@ -200,6 +206,13 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, S
 }
 
 void InstanceImpl::flushStats() {
+  if (stats_flush_in_progress_) {
+    ENVOY_LOG(debug, "skipping stats flush as flush is already in progress");
+    server_stats_->dropped_stat_flushes_.inc();
+    return;
+  }
+
+  stats_flush_in_progress_ = true;
   ENVOY_LOG(debug, "flushing stats");
   // If Envoy is not fully initialized, workers will not be started and mergeHistograms
   // completion callback is not called immediately. As a result of this server stats will
@@ -250,6 +263,8 @@ void InstanceImpl::flushStatsInternal() {
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
   }
+
+  stats_flush_in_progress_ = false;
 }
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
@@ -375,10 +390,10 @@ void InstanceImpl::initialize(const Options& options,
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
-  assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
-      [this]() { server_stats_->debug_assertion_failures_.inc(); });
-  envoy_bug_action_registration_ = Assert::setEnvoyBugFailureRecordAction(
-      [this]() { server_stats_->envoy_bug_failures_.inc(); });
+  assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
+      [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
+  envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
+      [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
 
   InstanceImpl::failHealthcheck(false);
 
@@ -417,7 +432,7 @@ void InstanceImpl::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options);
+  Configuration::InitialImpl initial_config(bootstrap_, options, *this);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
@@ -491,11 +506,7 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   if (initial_config.admin().address()) {
-    if (initial_config.admin().accessLogPath().empty()) {
-      throw EnvoyException("An admin access log path is required for a listening server.");
-    }
-    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
+    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
                               stats_store_.createScope("listener.admin."));
@@ -600,9 +611,9 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
   // Initializing can throw exceptions, so catch these.
-  try {
-    clusterManager().initializeSecondaryClusters(bootstrap_);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
+  END_TRY
+  catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
     shutdown();
   }
@@ -611,7 +622,7 @@ void InstanceImpl::onRuntimeReady() {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    try {
+    TRY_ASSERT_MAIN_THREAD {
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
@@ -622,7 +633,9 @@ void InstanceImpl::onRuntimeReady() {
           access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
           *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
           *api_, options_);
-    } catch (const EnvoyException& e) {
+    }
+    END_TRY
+    catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
     }

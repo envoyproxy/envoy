@@ -38,6 +38,7 @@ public:
   FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
   FilterTrailersStatus onResponseTrailers(uint32_t) override;
   FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
+  FilterDataStatus onResponseBody(size_t body_buffer_length, bool end_of_stream) override;
   void onLog() override;
   void onDone() override;
 
@@ -306,11 +307,14 @@ FilterTrailersStatus TestContext::onResponseTrailers(uint32_t) {
   return FilterTrailersStatus::StopIteration;
 }
 
-FilterDataStatus TestContext::onRequestBody(size_t body_buffer_length, bool) {
+FilterDataStatus TestContext::onRequestBody(size_t body_buffer_length, bool end_of_stream) {
   auto test = root()->test_;
   if (test == "headers") {
     auto body = getBufferBytes(WasmBufferType::HttpRequestBody, 0, body_buffer_length);
     logError(std::string("onBody ") + std::string(body->view()));
+    if (end_of_stream) {
+      CHECK_RESULT(addRequestTrailer("newtrailer", "request"));
+    }
   } else if (test == "metadata") {
     std::string value;
     if (!getValue({"node", "metadata", "wasm_node_get_key"}, &value)) {
@@ -335,6 +339,16 @@ FilterDataStatus TestContext::onRequestBody(size_t body_buffer_length, bool) {
   return FilterDataStatus::Continue;
 }
 
+FilterDataStatus TestContext::onResponseBody(size_t, bool end_of_stream) {
+  auto test = root()->test_;
+  if (test == "headers") {
+    if (end_of_stream) {
+      CHECK_RESULT(addResponseTrailer("newtrailer", "response"));
+    }
+  }
+  return FilterDataStatus::Continue;
+}
+
 void TestContext::onLog() {
   auto test = root()->test_;
   if (test == "headers") {
@@ -351,10 +365,10 @@ void TestContext::onLog() {
       logWarn("response bogus-trailer found");
     }
   } else if (test == "cluster_metadata") {
-      std::string cluster_metadata;
-      if (getValue({"cluster_metadata", "filter_metadata", "namespace", "key"}, &cluster_metadata)) {
-        logWarn("cluster metadata: " + cluster_metadata);
-      }
+    std::string cluster_metadata;
+    if (getValue({"cluster_metadata", "filter_metadata", "namespace", "key"}, &cluster_metadata)) {
+      logWarn("cluster metadata: " + cluster_metadata);
+    }
   } else if (test == "property") {
     setFilterState("wasm_state", "wasm_value");
     auto path = getRequestHeader(":path");

@@ -8,10 +8,10 @@ Dynamic configuration (filesystem)
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
    :ref:`jq <start_sandboxes_setup_jq>`
-	Parse ``json`` output from the upstream echo servers.
+        Parse ``json`` output from the upstream echo servers.
 
 This example walks through configuring Envoy using filesystem-based dynamic configuration.
 
@@ -90,8 +90,8 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
-   :lines: 7-15
-   :lineno-start: 7
+   :lines: 6-13
+   :lineno-start: 6
    :emphasize-lines: 8
 
 You can do this using ``sed`` inside the container:

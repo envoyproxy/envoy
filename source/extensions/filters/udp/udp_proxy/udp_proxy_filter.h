@@ -51,6 +51,7 @@ struct UdpProxyDownstreamStats {
  */
 #define ALL_UDP_PROXY_UPSTREAM_STATS(COUNTER)                                                      \
   COUNTER(sess_rx_datagrams)                                                                       \
+  COUNTER(sess_rx_datagrams_dropped)                                                               \
   COUNTER(sess_rx_errors)                                                                          \
   COUNTER(sess_tx_datagrams)                                                                       \
   COUNTER(sess_tx_errors)
@@ -71,8 +72,8 @@ public:
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         stats_(generateStats(config.stat_prefix(), root_scope)),
-        max_upstream_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            config, max_upstream_rx_datagram_size, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE)) {
+        // Default prefer_gro to true for upstream client traffic.
+        upstream_socket_config_(config.upstream_socket_config(), true) {
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
@@ -90,7 +91,9 @@ public:
   const Udp::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
-  uint64_t maxUpstreamDatagramSize() const { return max_upstream_rx_datagram_size_; }
+  const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const {
+    return upstream_socket_config_;
+  }
 
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
@@ -107,7 +110,7 @@ private:
   const bool use_original_src_ip_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
-  const uint64_t max_upstream_rx_datagram_size_;
+  const Network::ResolvedUdpSocketConfig upstream_socket_config_;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -170,7 +173,14 @@ private:
                        Network::Address::InstanceConstSharedPtr peer_address,
                        Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
     uint64_t maxDatagramSize() const override {
-      return cluster_.filter_.config_->maxUpstreamDatagramSize();
+      return cluster_.filter_.config_->upstreamSocketConfig().max_rx_datagram_size_;
+    }
+    void onDatagramsDropped(uint32_t dropped) override {
+      cluster_.cluster_stats_.sess_rx_datagrams_dropped_.add(dropped);
+    }
+    size_t numPacketsExpectedPerEventLoop() const final {
+      // TODO(mattklein123) change this to a reasonable number if needed.
+      return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
     }
 
     ClusterInfo& cluster_;

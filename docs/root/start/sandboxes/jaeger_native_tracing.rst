@@ -8,7 +8,7 @@ Jaeger native tracing
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 .. sidebar:: Compatibility
 

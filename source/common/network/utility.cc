@@ -22,6 +22,8 @@
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
@@ -420,7 +422,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find("-") != std::string::npos) {
+    if (s.find('-') != std::string::npos) {
       char dash = 0;
       ss >> min;
       ss >> dash;
@@ -575,10 +577,10 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time,
+                                                MonotonicTime receive_time, bool use_gro,
                                                 uint32_t* packets_dropped) {
 
-  if (handle.supportsUdpGro()) {
+  if (use_gro) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -693,12 +695,26 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, uint32_t& packets_dropped) {
+                                               TimeSource& time_source, bool prefer_gro,
+                                               uint32_t& packets_dropped) {
+  // Read at least one time, and attempt to read numPacketsExpectedPerEventLoop() packets unless
+  // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
+  size_t num_packets_to_read = std::min<size_t>(
+      MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
+  const bool use_gro = prefer_gro && handle.supportsUdpGro();
+  size_t num_reads =
+      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_GRO_RECEIVE)
+              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_MMSG_RECEIVE)
+                                       : num_packets_to_read);
+  // Make sure to read at least once.
+  num_reads = std::max<size_t>(1, num_reads);
+  bool honor_read_limit =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, &packets_dropped);
+        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -714,14 +730,31 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
               ? (packets_dropped - old_packets_dropped)
               : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
                  1);
-      // TODO(danzh) add stats for this.
       ENVOY_LOG_MISC(
           debug,
           "Kernel dropped {} datagram(s). Consider increasing receive buffer size and/or "
           "max datagram size.",
           delta);
+      udp_packet_processor.onDatagramsDropped(delta);
+    }
+    if (honor_read_limit) {
+      --num_reads;
+    }
+    if (num_reads == 0) {
+      return std::move(result.err_);
     }
   } while (true);
+}
+
+ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
+    const envoy::config::core::v3::UdpSocketConfig& config, bool prefer_gro_default)
+    : max_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_rx_datagram_size,
+                                                            DEFAULT_UDP_MAX_DATAGRAM_SIZE)),
+      prefer_gro_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, prefer_gro, prefer_gro_default)) {
+  if (prefer_gro_ && !Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    ENVOY_LOG_MISC(
+        warn, "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.");
+  }
 }
 
 } // namespace Network
