@@ -45,7 +45,8 @@ public:
     actions_[action.index()] = state;
   }
 
-  bool tryAllocateResource(OverloadProactiveResourceName resource_name, int64_t increment) {
+  bool tryAllocateResource(OverloadProactiveResourceName resource_name,
+                           int64_t increment) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource != proactive_resources_->end()) {
       if (proactive_resource->second.tryAllocateResource(increment)) {
@@ -59,7 +60,8 @@ public:
     }
   }
 
-  bool tryDeallocateResource(OverloadProactiveResourceName resource_name, int64_t decrement) {
+  bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
+                             int64_t decrement) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource != proactive_resources_->end()) {
       if (proactive_resource->second.tryDeallocateResource(decrement)) {
