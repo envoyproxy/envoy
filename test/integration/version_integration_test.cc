@@ -9,7 +9,7 @@ namespace {
 class VersionIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                public HttpIntegrationTest {
 public:
-  VersionIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  VersionIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, VersionIntegrationTest,

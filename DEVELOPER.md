@@ -19,6 +19,8 @@ Below is a list of additional documentation to aid the development process:
 
 - [Guide to Envoy Bazel rules (managing `BUILD` files)](https://github.com/envoyproxy/envoy/blob/main/bazel/DEVELOPER.md)
 
+- [Guide to setup development environment with Visual Studio Code](https://github.com/envoyproxy/envoy/blob/main/tools/vscode/README.md)
+
 - [Using Docker for building and testing](https://github.com/envoyproxy/envoy/tree/main/ci)
 
 - [Guide to contributing to Envoy](https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md)

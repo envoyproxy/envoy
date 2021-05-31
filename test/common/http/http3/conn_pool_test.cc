@@ -52,6 +52,7 @@ public:
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
@@ -63,6 +64,11 @@ public:
       context_};
   ConnectionPool::InstancePtr pool_;
 };
+
+TEST_F(Http3ConnPoolImplTest, CreationWithBufferLimits) {
+  EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
+  initialize();
+}
 
 TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
   // Set a couple of options from setQuicConfigFromClusterConfig to make sure they are applied.

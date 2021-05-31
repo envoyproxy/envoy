@@ -499,6 +499,9 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
 absl::optional<uint32_t>
 ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config, uint32_t port) {
+  if (config.shouldStripTrailingHostDot()) {
+    HeaderUtility::stripTrailingHostDot(request_headers);
+  }
   if (config.stripPortType() == Http::StripPortType::Any) {
     return HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
   } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
