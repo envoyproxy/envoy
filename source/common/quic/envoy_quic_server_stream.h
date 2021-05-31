@@ -54,6 +54,10 @@ public:
   void setFlushTimeout(std::chrono::milliseconds) override {
     // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
   }
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // TODO(kbaichoo): implement account tracking for QUIC.
+  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicRstStreamErrorCode error) override;
@@ -72,7 +76,7 @@ public:
 
 protected:
   // EnvoyQuicStream
-  void switchStreamBlockState(bool should_block) override;
+  void switchStreamBlockState() override;
   uint32_t streamId() override;
   Network::Connection* connection() override;
 

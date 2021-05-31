@@ -51,17 +51,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = (
-        "envoy.transport_sockets.downstream",
-        "envoy.transport_sockets.upstream",
-    ),
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/access_log:__subpackages__",
         "//test/integration:__subpackages__",
     ],
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "alpha",
     deps = [
         ":tap_config_impl",
         ":tap_lib",
@@ -70,7 +64,6 @@ envoy_cc_extension(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],

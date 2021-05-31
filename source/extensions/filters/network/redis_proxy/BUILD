@@ -90,12 +90,10 @@ envoy_cc_extension(
         "proxy_filter.h",
         "router_impl.h",
     ],
-    category = "envoy.filters.network",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:drain_decision_interface",

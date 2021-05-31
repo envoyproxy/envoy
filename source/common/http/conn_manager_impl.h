@@ -156,7 +156,8 @@ private:
                               public Tracing::Config,
                               public ScopeTrackedObject,
                               public FilterManagerCallbacks {
-    ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
+    ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
+                 Buffer::BufferMemoryAccountSharedPtr account);
     void completeRequest();
 
     const Network::Connection* connection();
@@ -187,12 +188,11 @@ private:
     const StreamInfo::StreamInfo& streamInfo() const override {
       return filter_manager_.streamInfo();
     }
-    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+    void sendLocalReply(Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
-      return filter_manager_.sendLocalReply(is_grpc_request, code, body, modify_headers,
-                                            grpc_status, details);
+      return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
 
     // Tracing::TracingConfig

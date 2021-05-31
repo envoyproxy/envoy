@@ -38,29 +38,61 @@ public:
                                  absl::optional<size_t>& max_length);
 
   /**
-   * General parse command utility. Will parse token from start position. Token is expected to end
-   * with ')'. An optional ":max_length" may be specified after the closing ')' char. Token may
-   * contain multiple values separated by "separator" string. First value will be populated in
-   * "main" and any additional sub values will be set in the vector "subitems". For example token
-   * of: "com.test.my_filter:test_object:inner_key):100" with separator of ":" will set the
-   * following:
-   * - main: com.test.my_filter
-   * - subitems: {test_object, inner_key}
-   * - max_length: 100
+   * General tokenize utility. Will parse command from start position. Command is expected to end
+   * with ')'. An optional ":max_length" may be specified after the closing ')' char. Command may
+   * contain multiple values separated by "separator" character. Those values will be places
+   * into tokens container. If no separator is found, entire command (up to ')') will be
+   * placed as only item in the container.
    *
-   * @param token the token to parse
+   * @param command the command to parse
    * @param start the index to start parsing from
    * @param separator separator between values
-   * @param main the first value
-   * @param sub_items any additional values
+   * @param tokens values found in command separated by separator
    * @param max_length optional max_length will be populated if specified
    *
    * TODO(glicht) Rewrite with a parser library. See:
    * https://github.com/envoyproxy/envoy/issues/2967
    */
-  static void parseCommand(const std::string& token, const size_t start,
-                           const std::string& separator, std::string& main,
-                           std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
+  static void tokenizeCommand(const std::string& command, const size_t start, const char separator,
+                              std::vector<absl::string_view>& tokens,
+                              absl::optional<size_t>& max_length);
+
+  /* Variadic function template which invokes tokenizeCommand method to parse the
+     token command and assigns found tokens to sequence of params.
+     params must be a sequence of std::string& with optional container storing std::string. Here are
+     examples of params:
+     - std::string& token1
+     - std::string& token1, std::string& token2
+     - std::string& token1, std::string& token2, std::vector<std::string>& remaining
+
+     If command contains more tokens than number of passed params, unassigned tokens will be
+     ignored. If command contains less tokens than number of passed params, some params will be left
+     untouched.
+  */
+  template <typename... Tokens>
+  static void parseCommand(const std::string& command, const size_t start, const char separator,
+                           absl::optional<size_t>& max_length, Tokens&&... params) {
+    std::vector<absl::string_view> tokens;
+    tokenizeCommand(command, start, separator, tokens, max_length);
+    std::vector<absl::string_view>::iterator it = tokens.begin();
+    (
+        [&](auto& param) {
+          if (it != tokens.end()) {
+            if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
+                                         std::string>) {
+              // Compile time handler for std::string.
+              param = *it;
+              it++;
+            } else {
+              // Compile time handler for container type. It will catch all remaining tokens and
+              // move iterator to the end.
+              param.insert(param.begin(), it, tokens.end());
+              it = tokens.end();
+            }
+          }
+        }(params),
+        ...);
+  }
 
   /**
    * Return a FormatterProviderPtr if a built-in command is parsed from the token. This method

@@ -114,7 +114,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 // Test TLS upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   upstream_tls_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
   config_helper_.configureUpstreamTls();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -1320,7 +1320,7 @@ public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
       Network::TransportSocketFactoryPtr factory =
-          upstream_tls_ ? createUpstreamTlsContext()
+          upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
                         : Network::Test::createRawBufferSocketFactory();
       auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(
@@ -1469,7 +1469,7 @@ TEST_P(MysqlIntegrationTest, Preconnect) { testPreconnect(); }
 
 TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
   upstream_tls_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  setUpstreamProtocol(Http::CodecType::HTTP1);
   config_helper_.configureUpstreamTls();
   testPreconnect();
 }

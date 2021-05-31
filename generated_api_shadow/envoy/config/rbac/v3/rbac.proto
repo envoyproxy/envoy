@@ -200,7 +200,7 @@ message Permission {
     //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
     //     filter is not added, and if a `FilterChainMatch` is not defined for
     //     the :ref:`server name
-    //     <envoy_api_field_config.listener.v3.FilterChainMatch.server_names>`,
+    //     <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>`,
     //     a TLS connection's requested SNI server name will be treated as if it
     //     wasn't present.
     //
@@ -265,7 +265,7 @@ message Principal {
 
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This is always the physical peer even if the
-    // :ref:`remote_ip <envoy_api_field_config.rbac.v3.Principal.remote_ip>` is
+    // :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` is
     // inferred from for example the x-forwarder-for header, proxy protocol,
     // etc.
     core.v3.CidrRange direct_remote_ip = 10;
@@ -273,7 +273,7 @@ message Principal {
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This may not be the physical peer and could be different from the
     // :ref:`direct_remote_ip
-    // <envoy_api_field_config.rbac.v3.Principal.direct_remote_ip>`. E.g, if the
+    // <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`. E.g, if the
     // remote ip is inferred from for example the x-forwarder-for header, proxy
     // protocol, etc.
     core.v3.CidrRange remote_ip = 11;

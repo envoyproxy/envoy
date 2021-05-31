@@ -125,10 +125,12 @@ private:
 
 Network::TransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
+                                                          Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store));
+  ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
@@ -177,7 +179,7 @@ sendRequestAndWaitForResponse(Event::Dispatcher& dispatcher, const std::string& 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
-                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& body, Http::CodecType type,
                                    const std::string& host, const std::string& content_type) {
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
   NiceMock<Random::MockRandomGenerator> random;
@@ -189,11 +191,10 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   TestConnectionCallbacks connection_callbacks(*dispatcher);
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster,
-      fmt::format("{}://127.0.0.1:80", (type == Http::CodecClient::Type::HTTP3 ? "udp" : "tcp")),
+      cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
       time_system)};
 
-  if (type <= Http::CodecClient::Type::HTTP2) {
+  if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(
         type,
         dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
@@ -204,12 +205,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   }
 
 #ifdef ENVOY_ENABLE_QUIC
+  Extensions::TransportSockets::Tls::ContextManagerImpl manager(time_system);
   Network::TransportSocketFactoryPtr transport_socket_factory =
-      createQuicUpstreamTransportSocketFactory(api, mock_stats_store,
+      createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
                                                "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
   persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
+      *dispatcher, *transport_socket_factory, time_system, addr, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -233,7 +235,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
-                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& body, Http::CodecType type,
                                    Network::Address::IpVersion ip_version, const std::string& host,
                                    const std::string& content_type) {
   auto addr = Network::Utility::resolveUrl(

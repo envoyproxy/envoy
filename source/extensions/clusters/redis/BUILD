@@ -42,8 +42,6 @@ envoy_cc_extension(
         "redis_cluster.cc",
         "redis_cluster.h",
     ],
-    category = "envoy.clusters",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "redis_cluster_lb",
         "//include/envoy/api:api_interface",

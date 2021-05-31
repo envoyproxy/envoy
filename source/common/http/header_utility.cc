@@ -58,6 +58,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
     header_match_type_ = HeaderMatchType::Present;
+    present_ = config.present_match();
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
     header_match_type_ = HeaderMatchType::Prefix;
@@ -76,6 +77,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     FALLTHRU;
   default:
     header_match_type_ = HeaderMatchType::Present;
+    present_ = true;
     break;
   }
 }
@@ -135,7 +137,11 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   const auto header_value = getAllOfHeaderAsString(request_headers, header_data.name_);
 
   if (!header_value.result().has_value()) {
-    return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
+    if (header_data.invert_match_) {
+      return header_data.header_match_type_ == HeaderMatchType::Present && header_data.present_;
+    } else {
+      return header_data.header_match_type_ == HeaderMatchType::Present && !header_data.present_;
+    }
   }
 
   bool match;
@@ -154,7 +160,7 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     break;
   }
   case HeaderMatchType::Present:
-    match = true;
+    match = header_data.present_;
     break;
   case HeaderMatchType::Prefix:
     match = absl::StartsWith(header_value.result().value(), header_data.value_);
@@ -210,55 +216,73 @@ bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
            headers.Method()->value() == Http::Headers::get().MethodValues.Connect));
 }
 
-void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
-  headers_to_add.iterate([&headers](const HeaderEntry& header) -> HeaderMap::Iterate {
-    HeaderString k;
-    k.setCopy(header.key().getStringView());
-    HeaderString v;
-    v.setCopy(header.value().getStringView());
-    headers.addViaMove(std::move(k), std::move(v));
-    return HeaderMap::Iterate::Continue;
-  });
-}
-
 bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
-void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
-                                      absl::optional<uint32_t> listener_port) {
+void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
+  auto host = headers.getHostValue();
+  // If the host ends in a period, remove it.
+  auto dot_index = host.rfind('.');
+  if (dot_index == std::string::npos) {
+    return;
+  } else if (dot_index == (host.size() - 1)) {
+    host.remove_suffix(1);
+    headers.setHost(host);
+    return;
+  }
+  // If the dot is just before a colon, it must be preceding the port number.
+  // IPv6 addresses may contain colons or dots, but the dot will never directly
+  // precede the colon, so this check should be sufficient to detect a trailing port number.
+  if (host[dot_index + 1] == ':') {
+    headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
+  }
+}
 
-  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
+                                                          absl::optional<uint32_t> listener_port) {
+  if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strip_port_from_connect")) {
     // According to RFC 2817 Connect method should have port part in host header.
     // In this case we won't strip it even if configured to do so.
-    return;
+    return absl::nullopt;
   }
   const absl::string_view original_host = headers.getHostValue();
-  const absl::string_view::size_type port_start = original_host.rfind(':');
+  const absl::string_view::size_type port_start = getPortStart(original_host);
   if (port_start == absl::string_view::npos) {
-    return;
+    return absl::nullopt;
+  }
+  const absl::string_view port_str = original_host.substr(port_start + 1);
+  uint32_t port = 0;
+  if (!absl::SimpleAtoi(port_str, &port)) {
+    return absl::nullopt;
+  }
+  if (listener_port.has_value() && port != listener_port) {
+    // We would strip ports only if it is specified and they are the same, as local port of the
+    // listener.
+    return absl::nullopt;
+  }
+  const absl::string_view host = original_host.substr(0, port_start);
+  headers.setHost(host);
+  return port;
+}
+
+absl::string_view::size_type HeaderUtility::getPortStart(absl::string_view host) {
+  const absl::string_view::size_type port_start = host.rfind(':');
+  if (port_start == absl::string_view::npos) {
+    return absl::string_view::npos;
   }
   // According to RFC3986 v6 address is always enclosed in "[]". section 3.2.2.
-  const auto v6_end_index = original_host.rfind("]");
+  const auto v6_end_index = host.rfind(']');
   if (v6_end_index == absl::string_view::npos || v6_end_index < port_start) {
-    if ((port_start + 1) > original_host.size()) {
-      return;
+    if ((port_start + 1) > host.size()) {
+      return absl::string_view::npos;
     }
-    const absl::string_view port_str = original_host.substr(port_start + 1);
-    uint32_t port = 0;
-    if (!absl::SimpleAtoi(port_str, &port)) {
-      return;
-    }
-    if (listener_port.has_value() && port != listener_port) {
-      // We would strip ports only if it is specified and they are the same, as local port of the
-      // listener.
-      return;
-    }
-    const absl::string_view host = original_host.substr(0, port_start);
-    headers.setHost(host);
+    return port_start;
   }
+  return absl::string_view::npos;
 }
 
 absl::optional<std::reference_wrapper<const absl::string_view>>
