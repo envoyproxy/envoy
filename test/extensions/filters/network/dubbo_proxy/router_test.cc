@@ -106,6 +106,7 @@ public:
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
     router_->setDecoderFilterCallbacks(callbacks_);
+    router_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   void initializeMetadata(MessageType msg_type) {
@@ -237,6 +238,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Network::MockClientConnection> connection_;
   NiceMock<DubboFilters::MockDecoderFilterCallbacks> callbacks_;
+  NiceMock<DubboFilters::MockEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<MockSerializer>* serializer_{};
   NiceMock<MockProtocol>* protocol_{};
   NiceMock<MockRoute>* route_{};
@@ -624,6 +626,74 @@ TEST_F(DubboRouterTest, LocalClosedWhileResponseComplete) {
   router_->onUpstreamData(buffer, false);
 
   upstream_connection_.close(Network::ConnectionCloseType::NoFlush);
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseOk) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Response);
+  response_meta->setResponseStatus(ResponseStatus::Ok);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseException) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Exception);
+  response_meta->setResponseStatus(ResponseStatus::Ok);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseServerTimeout) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Response);
+  response_meta->setResponseStatus(ResponseStatus::ServerTimeout);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
+
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, ResponseServerError) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  auto response_meta = std::make_shared<MessageMetadata>();
+  response_meta->setMessageType(MessageType::Response);
+  response_meta->setResponseStatus(ResponseStatus::ServiceError);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
 
   destroyRouter();
 }
