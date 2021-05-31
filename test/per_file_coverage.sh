@@ -33,7 +33,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/rbac:87.5"
 "source/extensions/filters/http/cache:92.4"
 "source/extensions/filters/http/cache/simple_http_cache:95.2"
-"source/extensions/filters/http/grpc_json_transcoder:95.7"
+"source/extensions/filters/http/grpc_json_transcoder:95.6"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/kill_request:85.0" # Death tests don't report LCOV
 "source/extensions/filters/listener/tls_inspector:92.4"
