@@ -361,7 +361,13 @@ public:
         }
       }
       // Perform the stream action.
-      directionalAction(request_, stream_action.request());
+      // The request_.request_encoder_ is initialized from the response_.response_decoder_.
+      // Fuzz test codec_impl_fuzz_test-5766628005642240 created a situation where the response
+      // stream was in closed state leading to the state.request_encoder_ in directionalAction()
+      // kData case no longer being a valid address.
+      if (response_.stream_state_ != HttpStream::StreamState::Closed) {
+        directionalAction(request_, stream_action.request());
+      }
       break;
     }
     case test::common::http::StreamAction::kResponse: {

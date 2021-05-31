@@ -159,7 +159,7 @@ private:
     return envoy::data::core::v3::HTTP;
   }
 
-  Http::CodecClient::Type codecClientType(const envoy::type::v3::CodecClientType& type);
+  Http::CodecType codecClientType(const envoy::type::v3::CodecClientType& type);
 
   const std::string path_;
   const std::string host_value_;
@@ -168,7 +168,7 @@ private:
   const HttpStatusChecker http_status_checker_;
 
 protected:
-  const Http::CodecClient::Type codec_client_type_;
+  const Http::CodecType codec_client_type_;
   Random::RandomGenerator& random_generator_;
 };
 

@@ -710,6 +710,11 @@ public:
    */
   virtual void appendSliceForTest(absl::string_view data);
 
+  /**
+   * @return the BufferMemoryAccount bound to this buffer, if any.
+   */
+  BufferMemoryAccountSharedPtr getAccountForTest();
+
   // Does not implement watermarking.
   // TODO(antoniovicente) Implement watermarks by merging the OwnedImpl and WatermarkBuffer
   // implementations. Also, make high-watermark config a constructor argument.

@@ -23,7 +23,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;

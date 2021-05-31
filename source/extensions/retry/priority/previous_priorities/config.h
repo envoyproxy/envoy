@@ -6,7 +6,6 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/retry/priority/previous_priorities/previous_priorities.h"
-#include "extensions/retry/priority/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,9 +19,7 @@ public:
                       ProtobufMessage::ValidationVisitor& validation_visitor,
                       uint32_t max_retries) override;
 
-  std::string name() const override {
-    return RetryPriorityValues::get().PreviousPrioritiesRetryPriority;
-  }
+  std::string name() const override { return "envoy.retry_priorities.previous_priorities"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr(new envoy::extensions::retry::priority::previous_priorities::

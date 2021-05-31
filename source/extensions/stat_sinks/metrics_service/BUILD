@@ -43,8 +43,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.stats_sinks",
-    security_posture = "data_plane_agnostic",
     deps = [
         "//include/envoy/registry",
         "//source/common/common:assert_lib",

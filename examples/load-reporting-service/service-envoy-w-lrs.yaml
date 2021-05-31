@@ -27,7 +27,6 @@ static_resources:
             typed_config: {}
   clusters:
   - name: local_service
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -37,10 +36,9 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: http_service
                 port_value: 8082
   - name: load_reporting_cluster
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
