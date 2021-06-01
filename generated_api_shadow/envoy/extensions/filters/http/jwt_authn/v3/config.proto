@@ -212,10 +212,11 @@ message JwtProvider {
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
 
+  // This field is effective only when `forward_payload_header` is specified.
   // If true, complete the padding in the forwarded JWT payload binary if needed.
   // By default, it is false and the JWT payload binary will be directly forwarded
   // without adding padding.
-  bool complete_padding_in_payload = 11;
+  bool complete_padding_in_forward_payload = 11;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

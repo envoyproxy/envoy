@@ -114,8 +114,8 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 }
 
 TEST_F(AuthenticatorTest, TestCompletePaddingInJwtPayload) {
-  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_complete_padding_in_payload(
-      true);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)]
+      .set_complete_padding_in_forward_payload(true);
   createAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
