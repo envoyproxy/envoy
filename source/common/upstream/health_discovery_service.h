@@ -23,8 +23,6 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {

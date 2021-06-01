@@ -33,9 +33,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.guarddog_actions",
-    security_posture = "data_plane_agnostic",
-    status = "alpha",
     deps = [
         ":profile_action_lib",
         "//include/envoy/registry",

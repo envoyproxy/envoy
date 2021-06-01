@@ -75,7 +75,12 @@ void UdpListenerImpl::handleReadCallback() {
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->addressProvider().localAddress(), *this, time_source_,
       config_.prefer_gro_, packets_dropped_);
-  // TODO(mattklein123): Handle no error when we limit the number of packets read.
+  if (result == nullptr) {
+    // No error. The number of reads was limited by read rate. There are more packets to read.
+    // Register to read more in the next event loop.
+    socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    return;
+  }
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     // TODO(mattklein123): When rate limited logging is implemented log this at error level
     // on a periodic basis.

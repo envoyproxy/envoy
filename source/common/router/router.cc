@@ -966,19 +966,12 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.removeFromList(upstream_requests_);
   cleanup();
 
-  if (downstream_response_started_ &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
-    callbacks_->streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
-    callbacks_->resetStream();
-  } else {
-    callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
-    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
-    callbacks_->sendLocalReply(
-        Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
-        absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
-  }
+  callbacks_->streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+  // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
+  callbacks_->sendLocalReply(
+      Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
+      absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
 }
 
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
@@ -1031,27 +1024,19 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   callbacks_->streamInfo().setResponseFlag(response_flags);
-  if (downstream_response_started_ &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
-    // This will destroy any created retry timers.
-    callbacks_->streamInfo().setResponseCodeDetails(details);
-    cleanup();
-    callbacks_->resetStream();
-  } else {
-    // This will destroy any created retry timers.
-    cleanup();
-    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
-    callbacks_->sendLocalReply(
-        code, body,
-        [dropped, this](Http::ResponseHeaderMap& headers) {
-          if (dropped && !config_.suppress_envoy_headers_) {
-            headers.addReference(Http::Headers::get().EnvoyOverloaded,
-                                 Http::Headers::get().EnvoyOverloadedValues.True);
-          }
-          modify_headers_(headers);
-        },
-        absl::nullopt, details);
-  }
+  // This will destroy any created retry timers.
+  cleanup();
+  // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
+  callbacks_->sendLocalReply(
+      code, body,
+      [dropped, this](Http::ResponseHeaderMap& headers) {
+        if (dropped && !config_.suppress_envoy_headers_) {
+          headers.addReference(Http::Headers::get().EnvoyOverloaded,
+                               Http::Headers::get().EnvoyOverloadedValues.True);
+        }
+        modify_headers_(headers);
+      },
+      absl::nullopt, details);
 }
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,

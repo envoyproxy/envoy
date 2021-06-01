@@ -72,14 +72,8 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
-  BIO* bio;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_use_io_handle_bio")) {
-    // Use custom BIO that reads from/writes to IoHandle
-    bio = BIO_new_io_handle(&callbacks_->ioHandle());
-  } else {
-    // TODO(fcoras): remove once the io_handle_bio proves to be stable
-    bio = BIO_new_socket(callbacks_->ioHandle().fdDoNotUse(), 0);
-  }
+  // Use custom BIO that reads from/writes to IoHandle
+  BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
 }
 
@@ -401,6 +395,11 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
       config_(std::move(config)), server_names_(server_names),
       ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+}
+
+Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
+  absl::ReaderMutexLock l(&ssl_ctx_mu_);
+  return ssl_ctx_;
 }
 
 Network::TransportSocketPtr

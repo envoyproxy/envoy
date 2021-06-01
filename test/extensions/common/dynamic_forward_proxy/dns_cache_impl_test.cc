@@ -1,7 +1,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/resolver.pb.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
 #include "common/config/utility.h"
+#include "common/network/resolver_impl.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
@@ -91,6 +93,10 @@ MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {
 }
 
 MATCHER(DnsHostInfoAddressIsNull, "") { return arg->address() == nullptr; }
+
+MATCHER_P(CustomDnsResolversSizeEquals, expected_resolvers, "") {
+  return expected_resolvers.size() == arg.size();
+}
 
 // Basic successful resolution and then re-resolution.
 TEST_F(DnsCacheImplTest, ResolveSuccess) {
@@ -778,6 +784,42 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   config4.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
   EXPECT_THROW_WITH_MESSAGE(cache_manager.getCache(config4), EnvoyException,
                             "config specified DNS cache 'foo' with different settings");
+}
+
+TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolverConfig) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  std::vector<Network::Address::InstanceConstSharedPtr> expectedEmptyDnsResolvers;
+  EXPECT_CALL(dispatcher, createDnsResolver(expectedEmptyDnsResolvers, _))
+      .WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
+TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolverConfig) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  envoy::config::core::v3::Address* dns_resolvers = config.mutable_dns_resolver()->add_resolvers();
+  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+
+  std::vector<Network::Address::InstanceConstSharedPtr> expected_dns_resolver_config;
+  expected_dns_resolver_config.push_back(Network::Address::resolveProtoAddress(*dns_resolvers));
+  EXPECT_CALL(dispatcher,
+              createDnsResolver(CustomDnsResolversSizeEquals(expected_dns_resolver_config), _))
+      .WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
 // Note: this test is done here, rather than a TYPED_TEST_SUITE in

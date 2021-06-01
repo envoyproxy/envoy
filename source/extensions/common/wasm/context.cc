@@ -28,7 +28,6 @@
 
 #include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
-#include "extensions/common/wasm/well_known_names.h"
 #include "extensions/filters/common/expr/context.h"
 
 #include "absl/base/casts.h"
@@ -87,8 +86,6 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 }
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
-
-constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
 
 } // namespace
 
@@ -165,6 +162,12 @@ void Context::error(absl::string_view message) { ENVOY_LOG(trace, message); }
 uint64_t Context::getCurrentTimeNanoseconds() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
              wasm()->time_source_.systemTime().time_since_epoch())
+      .count();
+}
+
+uint64_t Context::getMonotonicTimeNanoseconds() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+             wasm()->time_source_.monotonicTime().time_since_epoch())
       .count();
 }
 
@@ -1120,7 +1123,7 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
 void Context::onGrpcCreateInitialMetadata(uint32_t /* token */,
                                           Http::RequestHeaderMap& initial_metadata) {
   if (grpc_initial_metadata_) {
-    initial_metadata = std::move(*grpc_initial_metadata_);
+    Http::HeaderMapImpl::copyFrom(initial_metadata, *grpc_initial_metadata_);
     grpc_initial_metadata_.reset();
   }
 }
@@ -1584,12 +1587,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
   return WasmResult::Ok;
 }
 
+constexpr absl::string_view CloseStreamResponseDetails = "wasm_close_stream";
+
 WasmResult Context::closeStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
     if (decoder_callbacks_) {
       if (!decoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
-        decoder_callbacks_->streamInfo().setResponseCodeDetails(FailStreamResponseDetails);
+        decoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       decoder_callbacks_->resetStream();
     }
@@ -1597,7 +1602,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
   case WasmStreamType::Response:
     if (encoder_callbacks_) {
       if (!encoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
-        encoder_callbacks_->streamInfo().setResponseCodeDetails(FailStreamResponseDetails);
+        encoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       encoder_callbacks_->resetStream();
     }
@@ -1616,6 +1621,39 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;
+}
+
+constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
+
+void Context::failStream(WasmStreamType stream_type) {
+  switch (stream_type) {
+  case WasmStreamType::Request:
+    if (decoder_callbacks_) {
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                         FailStreamResponseDetails);
+    }
+    break;
+  case WasmStreamType::Response:
+    if (encoder_callbacks_) {
+      encoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
+                                         Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                         FailStreamResponseDetails);
+    }
+    break;
+  case WasmStreamType::Downstream:
+    if (network_read_filter_callbacks_) {
+      network_read_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
+    break;
+  case WasmStreamType::Upstream:
+    if (network_write_filter_callbacks_) {
+      network_write_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
+    break;
+  }
 }
 
 WasmResult Context::sendLocalResponse(uint32_t response_code, absl::string_view body_text,
@@ -1653,7 +1691,6 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, absl::string_view 
 
 Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   onCreate();
-  http_request_started_ = true;
   request_headers_ = &headers;
   end_of_stream_ = end_stream;
   auto result = convertFilterHeadersStatus(onRequestHeaders(headerSize(&headers), end_stream));
@@ -1664,7 +1701,7 @@ Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers
 }
 
 Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
   request_body_buffer_ = &data;
@@ -1688,7 +1725,7 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trailers) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterTrailersStatus::Continue;
   }
   request_trailers_ = &trailers;
@@ -1700,7 +1737,7 @@ Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trai
 }
 
 Http::FilterMetadataStatus Context::decodeMetadata(Http::MetadataMap& request_metadata) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterMetadataStatus::Continue;
   }
   request_metadata_ = &request_metadata;
@@ -1721,7 +1758,7 @@ Http::FilterHeadersStatus Context::encode100ContinueHeaders(Http::ResponseHeader
 
 Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                  bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterHeadersStatus::Continue;
   }
   response_headers_ = &headers;
@@ -1734,7 +1771,7 @@ Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
   response_body_buffer_ = &data;
@@ -1758,7 +1795,7 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterTrailersStatus::Continue;
   }
   response_trailers_ = &trailers;
@@ -1770,7 +1807,7 @@ Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& tra
 }
 
 Http::FilterMetadataStatus Context::encodeMetadata(Http::MetadataMap& response_metadata) {
-  if (!http_request_started_) {
+  if (!in_vm_context_created_) {
     return Http::FilterMetadataStatus::Continue;
   }
   response_metadata_ = &response_metadata;

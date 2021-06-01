@@ -16,8 +16,7 @@ Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveC
 
 CodecClientPtr
 HttpConnPoolImplMixed::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  auto protocol =
-      protocol_ == Protocol::Http11 ? CodecClient::Type::HTTP1 : CodecClient::Type::HTTP2;
+  auto protocol = protocol_ == Protocol::Http11 ? CodecType::HTTP1 : CodecType::HTTP2;
   CodecClientPtr codec{new CodecClientProd(protocol, std::move(data.connection_),
                                            data.host_description_, dispatcher_, random_generator_)};
   return codec;

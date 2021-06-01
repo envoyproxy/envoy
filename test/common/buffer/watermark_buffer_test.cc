@@ -18,7 +18,7 @@ const char TEN_BYTES[] = "0123456789";
 
 class WatermarkBufferTest : public testing::Test {
 public:
-  WatermarkBufferTest() { buffer_.setWatermarks(5, 10); }
+  WatermarkBufferTest() { buffer_.setWatermarks(10); }
 
   Buffer::WatermarkBuffer buffer_{[&]() -> void { ++times_low_watermark_called_; },
                                   [&]() -> void { ++times_high_watermark_called_; },
@@ -104,7 +104,7 @@ TEST_F(WatermarkBufferTest, PrependBuffer) {
   WatermarkBuffer prefixBuffer{[&]() -> void { ++prefix_buffer_low_watermark_hits; },
                                [&]() -> void { ++prefix_buffer_high_watermark_hits; },
                                [&]() -> void { ++prefix_buffer_overflow_watermark_hits; }};
-  prefixBuffer.setWatermarks(5, 10);
+  prefixBuffer.setWatermarks(10);
   prefixBuffer.add(prefix);
   prefixBuffer.add(suffix);
 
@@ -196,18 +196,18 @@ TEST_F(WatermarkBufferTest, DrainUsingExtract) {
 // Verify that low watermark callback is called on drain in the case where the
 // high watermark is non-zero and low watermark is 0.
 TEST_F(WatermarkBufferTest, DrainWithLowWatermarkOfZero) {
-  buffer_.setWatermarks(0, 10);
+  buffer_.setWatermarks(1);
 
   // Draining from above to below the low watermark does nothing if the high
   // watermark never got hit.
-  buffer_.add(TEN_BYTES, 10);
-  buffer_.drain(10);
+  buffer_.add(TEN_BYTES, 1);
+  buffer_.drain(1);
   EXPECT_EQ(0, times_high_watermark_called_);
   EXPECT_EQ(0, times_low_watermark_called_);
 
   // Go above the high watermark then drain down to just above the low watermark.
-  buffer_.add(TEN_BYTES, 11);
-  buffer_.drain(10);
+  buffer_.add(TEN_BYTES, 2);
+  buffer_.drain(1);
   EXPECT_EQ(1, buffer_.length());
   EXPECT_EQ(0, times_low_watermark_called_);
 
@@ -216,7 +216,7 @@ TEST_F(WatermarkBufferTest, DrainWithLowWatermarkOfZero) {
   EXPECT_EQ(1, times_low_watermark_called_);
 
   // Going back above should trigger the high again
-  buffer_.add(TEN_BYTES, 11);
+  buffer_.add(TEN_BYTES, 2);
   EXPECT_EQ(2, times_high_watermark_called_);
 }
 
@@ -284,18 +284,18 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
 TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.add(TEN_BYTES, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.setWatermarks(1, 9);
+  buffer_.setWatermarks(9);
   EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.setWatermarks(1, 8);
+  buffer_.setWatermarks(8);
   EXPECT_EQ(1, times_high_watermark_called_);
 
-  buffer_.setWatermarks(8, 20);
+  buffer_.setWatermarks(16);
   EXPECT_EQ(0, times_low_watermark_called_);
-  buffer_.setWatermarks(9, 20);
+  buffer_.setWatermarks(18);
   EXPECT_EQ(1, times_low_watermark_called_);
-  buffer_.setWatermarks(7, 20);
+  buffer_.setWatermarks(14);
   EXPECT_EQ(1, times_low_watermark_called_);
-  buffer_.setWatermarks(9, 20);
+  buffer_.setWatermarks(18);
   EXPECT_EQ(1, times_low_watermark_called_);
   EXPECT_EQ(0, times_overflow_watermark_called_);
 
@@ -355,7 +355,7 @@ TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   // Stick 20 bytes in buffer_ and expect the high watermark is hit.
   buffer_.add(TEN_BYTES, 10);
@@ -393,7 +393,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermark) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -439,7 +439,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -510,7 +510,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -540,25 +540,25 @@ TEST_F(WatermarkBufferTest, MoveWatermarksOverflow) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
   buffer1.add(TEN_BYTES, 9);
   EXPECT_EQ(0, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 9);
+  buffer1.setWatermarks(9);
   EXPECT_EQ(0, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 8);
+  buffer1.setWatermarks(8);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 5);
+  buffer1.setWatermarks(5);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 4);
+  buffer1.setWatermarks(4);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
 
   // Overflow is only triggered once
-  buffer1.setWatermarks(3, 6);
+  buffer1.setWatermarks(6);
   EXPECT_EQ(0, low_watermark_buffer1);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
