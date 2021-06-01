@@ -1,6 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("@docs_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
@@ -18,10 +17,10 @@ py_binary(
 
 genrule(
     name = "extensions_security_rst",
-    tools = [":generate_extensions_security_rst"],
+    srcs = ["//source/extensions:extensions_metadata.yaml"],
     outs = ["extensions_security_rst.tar"],
     cmd = (
         "$(location generate_extensions_security_rst) $(location //source/extensions:extensions_metadata.yaml) $@"
     ),
-    srcs = ["//source/extensions:extensions_metadata.yaml"],
+    tools = [":generate_extensions_security_rst"],
 )
