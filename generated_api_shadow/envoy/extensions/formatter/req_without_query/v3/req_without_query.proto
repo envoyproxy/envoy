@@ -16,6 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // works the same way as :ref:`REQ <config_access_log_format_req>` except that it will
 // remove the query string. It is used to avoid logging any sensitive information into
 // the access log.
+// See :ref:`here <config_access_log>` for more information on access log configuration.
 
 // %REQ_WITHOUT_QUERY(X?Y):Z%
 //   An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
@@ -23,6 +24,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   the HTTP request header named X first and if it's not set, then request header Y is used. If
 //   none of the headers are present '-' symbol will be in the log.
 
-// Placeholder for future configuration for the ReqWithoutQuery formatter.
+// Configuration for the request without query formatter.
 message ReqWithoutQuery {
 }
