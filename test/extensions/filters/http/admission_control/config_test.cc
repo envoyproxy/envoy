@@ -123,7 +123,7 @@ rps_threshold:
   default_value: 5
   runtime_key: "foo.rps_threshold"
 max_rejection_probability:
-  default_value: 
+  default_value:
     value: 70.0
   runtime_key: "foo.max_rejection_probability"
 success_criteria:
@@ -177,7 +177,7 @@ rps_threshold:
   default_value: 5
   runtime_key: "foo.rps_threshold"
 max_rejection_probability:
-  default_value: 
+  default_value:
     value: 70.0
   runtime_key: "foo.max_rejection_probability"
 success_criteria:

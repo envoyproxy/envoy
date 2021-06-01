@@ -28,7 +28,7 @@ The probability that the filter will reject a request is as follows:
   \begin{array}{cl}
   0 & \ (rps < rps\_threshold) \\
   min({(\frac{n_{total} - s}{n_{total} + 1})}^\frac{1}{aggression}\ ,\ max\_reject\_probability) & \ (rps \geq rps\_threshold)
-  \end{array} 
+  \end{array}
   \right.
 
 where,

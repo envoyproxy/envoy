@@ -144,7 +144,7 @@ aggression:
   default_value: 1.0
   runtime_key: "foo.aggression"
 max_rejection_probability:
-  default_value: 
+  default_value:
     value: 100.0
   runtime_key: "foo.max_rejection_probability"
 success_criteria:
@@ -335,7 +335,7 @@ aggression:
   default_value: 1.0
   runtime_key: "foo.aggression"
 max_rejection_probability:
-  default_value: 
+  default_value:
     value: 80.0
   runtime_key: "foo.max_rejection_probability"
 success_criteria:
@@ -398,7 +398,7 @@ rps_threshold:
   default_value: 0
   runtime_key: "foo.rps_threshold"
 max_rejection_probability:
-  default_value: 
+  default_value:
     value: 100.0
   runtime_key: "foo.max_rejection_probability"
 success_criteria:
