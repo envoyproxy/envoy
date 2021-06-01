@@ -14,7 +14,6 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/common/file_access_log_impl.h"
-#include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -72,7 +71,7 @@ ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
       new envoy::extensions::access_loggers::file::v3::FileAccessLog()};
 }
 
-std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }
+std::string FileAccessLogFactory::name() const { return "envoy.access_loggers.file"; }
 
 /**
  * Static registration for the file access log. @see RegisterFactory.
