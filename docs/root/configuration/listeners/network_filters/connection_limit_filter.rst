@@ -67,13 +67,13 @@ API Reference
 
 **stat_prefix**
 
-(`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, \ *REQUIRED*)
-The prefix to use when emitting \ `statistics <#_Statistics>`_.
+(`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_)
+The prefix to use when emitting statistics.
 
 **max_connections**
 
-(`uint64 <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.UInt64Value>`_,
-*REQUIRED*) The limit supplied in max connections.
+(`uint64 <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.UInt64Value>`_)
+The limit supplied in max connections.
 
 **delay**
 

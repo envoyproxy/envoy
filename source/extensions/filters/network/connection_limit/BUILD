@@ -7,7 +7,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# connection limit L4 network filter
+# Connection limit L4 network filter
 # Public docs: docs/root/configuration/network_filters/connection_limit_filter.rst
 
 envoy_extension_package()
@@ -31,8 +31,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.network",
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
