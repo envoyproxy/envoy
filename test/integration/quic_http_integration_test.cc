@@ -313,6 +313,19 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                   ->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
+  if (GetParam().first == Network::Address::IpVersion::v4) {
+    EXPECT_EQ(2u, test_server_
+                      ->counter("listener.127.0.0.1_0.downstream.peer.quic_connection_close_error_"
+                                "code_QUIC_NO_ERROR")
+                      ->value());
+  } else {
+    EXPECT_EQ(
+        2u,
+        test_server_
+            ->counter(
+                "listener.[__1]_0.downstream.peer.quic_connection_close_error_code_QUIC_NO_ERROR")
+            ->value());
+  }
 }
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndResponseWithBody) {

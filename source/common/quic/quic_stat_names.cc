@@ -3,6 +3,8 @@
 namespace Envoy {
 namespace Quic {
 
+// TODO(renjietang): Currently these stats are only available in downstream. Wire it up to upstream
+// QUIC also.
 QuicStatNames::QuicStatNames(Stats::SymbolTable& symbol_table)
     : stat_name_pool_(symbol_table), symbol_table_(symbol_table),
       downstream_(stat_name_pool_.add("downstream")), upstream_(stat_name_pool_.add("upstream")),
