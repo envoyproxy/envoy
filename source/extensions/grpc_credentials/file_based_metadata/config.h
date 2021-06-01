@@ -6,8 +6,6 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/grpc_credentials/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace GrpcCredentials {
@@ -32,7 +30,7 @@ public:
     return std::make_unique<envoy::config::grpc_credential::v3::FileBasedMetadataConfig>();
   }
 
-  std::string name() const override { return GrpcCredentialsNames::get().FileBasedMetadata; }
+  std::string name() const override { return "envoy.grpc_credentials.file_based_metadata"; }
 };
 
 class FileBasedMetadataAuthenticator : public grpc::MetadataCredentialsPlugin {

@@ -33,12 +33,7 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
     }
 
     envoy::type::matcher::v3::StringMatcher matcher_config;
-    if (config.has_hidden_envoy_deprecated_regex() ? config.hidden_envoy_deprecated_regex().value()
-                                                   : false) {
-      matcher_config.set_hidden_envoy_deprecated_regex(config.hidden_envoy_deprecated_value());
-    } else {
-      matcher_config.set_exact(config.hidden_envoy_deprecated_value());
-    }
+    matcher_config.set_exact(config.hidden_envoy_deprecated_value());
     return Matchers::StringMatcherImpl(matcher_config);
   }
   }

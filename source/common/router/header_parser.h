@@ -55,8 +55,11 @@ public:
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
    * modifying an existing HeaderMap.
    * @param stream_info contains additional information about the request.
+   * @param do_formatting whether or not to evaluate configured transformations; if false, returns
+   * original values instead.
    */
-  Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const;
+  Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                             bool do_formatting = true) const;
 
 protected:
   HeaderParser() = default;

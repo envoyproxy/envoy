@@ -110,6 +110,9 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
     // Verify the token is removed.
     EXPECT_FALSE(headers.has(Http::CustomHeaders::get().Authorization));
   }
+
+  EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.
@@ -133,6 +136,9 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
 
   // Payload not set by default
   EXPECT_EQ(out_name_, "");
+
+  EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // This test verifies the Jwt payload is set.
@@ -183,6 +189,9 @@ TEST_F(AuthenticatorTest, TestWrongIssuer) {
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(OtherGoodToken)}};
   expectVerifyStatus(Status::JwtUnknownIssuer, headers);
+
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // Jwt "iss" is "other.com", "issuer" in JwtProvider is not specified,

@@ -593,7 +593,7 @@ TEST_F(DispatcherImplTest, Timer) {
 
 TEST_F(DispatcherImplTest, TimerWithScope) {
   TimerPtr timer;
-  MockScopedTrackedObject scope;
+  MockScopeTrackedObject scope;
   dispatcher_->post([this, &timer, &scope]() {
     {
       // Expect a call to dumpState. The timer will call onFatalError during

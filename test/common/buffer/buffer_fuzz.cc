@@ -193,6 +193,7 @@ public:
     // WatermarkBuffer implementations.
     ASSERT(false);
   }
+
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 

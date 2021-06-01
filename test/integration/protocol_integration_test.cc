@@ -55,7 +55,7 @@ void setDoNotValidateRouteConfig(
 
 // TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {                                    \
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
     return;                                                                                        \
   }
 
@@ -301,7 +301,7 @@ typed_config:
   upstream_request_->encodeData(128, true);
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (upstreamProtocol() >= FakeHttpConnection::Type::HTTP2) {
+  if (upstreamProtocol() >= Http::CodecType::HTTP2) {
     EXPECT_EQ("decode", upstream_request_->trailers()
                             ->get(Http::LowerCaseString("grpc-message"))[0]
                             ->value()
@@ -309,7 +309,7 @@ typed_config:
   }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  if (downstream_protocol_ >= Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
     EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
   }
 }
@@ -335,7 +335,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
 
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
     // For QUIC, even through the headers are not sent upstream, the stream will
     // be created. Use the autonomous upstream and allow incomplete streams.
     autonomous_allow_incomplete_streams_ = true;
@@ -375,7 +375,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // TODO(danzh) re-enable after adding http3 option "allow_connect".
   EXCLUDE_DOWNSTREAM_HTTP3;
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
     // For QUIC, even through the headers are not sent upstream, the stream will
     // be created. Use the autonomous upstream and allow incomplete streams.
     autonomous_allow_incomplete_streams_ = true;
@@ -403,7 +403,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
 
-  auto response = (downstream_protocol_ == Http::CodecClient::Type::HTTP1)
+  auto response = (downstream_protocol_ == Http::CodecType::HTTP1)
                       ? std::move((codec_client_->startRequest(headers)).second)
                       : codec_client_->makeHeaderOnlyRequest(headers);
 
@@ -507,7 +507,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
                                                           std::chrono::milliseconds(500)));
@@ -526,7 +526,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(512U, response->body().size());
   Stats::Store& stats = test_server_->server().stats();
-  if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     Stats::CounterSharedPtr counter = TestUtility::findCounter(
         stats, absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"));
     ASSERT_NE(nullptr, counter);
@@ -561,7 +561,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreaming) {
   // Send back an upstream failure.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -624,7 +624,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
   });
 
   // Make sure the fake stream is reset.
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -691,7 +691,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
   // Send back an upstream failure.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -733,7 +733,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
 
   EXPECT_EQ(atoi(std::string(upstream_request_->headers().getEnvoyAttemptCountValue()).c_str()), 1);
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -804,14 +804,14 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
     // Make sure waitForNextUpstreamRequest waits for a new connection.
     fake_upstream_connection_.reset();
   }
@@ -871,7 +871,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   ASSERT_TRUE(upstream_idx.has_value());
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  if (fake_upstreams_[*upstream_idx]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[*upstream_idx]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[*upstream_idx]->waitForHttpConnection(*dispatcher_,
                                                                       fake_upstream_connection_));
@@ -971,7 +971,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
   // the 413-and-connection-close may be sent while the body is still being
   // sent, resulting in a write error and the connection being closed before the
   // response is read.
-  if (downstream_protocol_ >= Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ >= Http::CodecType::HTTP2) {
     ASSERT_TRUE(response->complete());
   }
   if (response->complete()) {
@@ -1013,7 +1013,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   // Now send an overly large response body. At some point, too much data will
   // be buffered, the stream will be reset, and the connection will disconnect.
   upstream_request_->encodeData(1024 * 65, false);
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -1109,13 +1109,13 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
   Stats::Store& stats = test_server_->server().stats();
   std::string stat_name;
   switch (downstreamProtocol()) {
-  case Http::CodecClient::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     stat_name = "http1.dropped_headers_with_underscores";
     break;
-  case Http::CodecClient::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     stat_name = "http2.dropped_headers_with_underscores";
     break;
-  case Http::CodecClient::Type::HTTP3:
+  case Http::CodecType::HTTP3:
     stat_name = "http3.dropped_headers_with_underscores";
     break;
   default:
@@ -1164,7 +1164,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
                                      {":authority", "host"},
                                      {"foo_bar", "baz"}});
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
@@ -1211,15 +1211,15 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 
   // For HTTP/1.1 http_parser is explicitly told that 304s are header-only
   // requests.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1 ||
-      upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
   } else {
     ASSERT_FALSE(response->complete());
   }
 
   upstream_request_->encodeData(2, true);
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     // Any body sent after the request is considered complete will not be handled as part of the
     // active request, but will be flagged as a protocol error for the no-longer-associated
     // connection.
@@ -1232,8 +1232,8 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
   // Only for HTTP/2 and Http/3, where streams are ended with an explicit end-stream so we
   // can differentiate between 304-with-advertised-but-absent-body and
   // 304-with-body, is there a protocol error on the active stream.
-  if (downstream_protocol_ >= Http::CodecClient::Type::HTTP2 &&
-      upstreamProtocol() >= FakeHttpConnection::Type::HTTP2) {
+  if (downstream_protocol_ >= Http::CodecType::HTTP2 &&
+      upstreamProtocol() >= Http::CodecType::HTTP2) {
     ASSERT_TRUE(response->waitForReset());
   }
 }
@@ -1244,7 +1244,7 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     // The http1 codec won't send illegal status codes so send raw HTTP/1.1
     FakeRawConnectionPtr fake_upstream_connection;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1273,13 +1273,13 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     FakeRawConnectionPtr fake_upstream_connection;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
     ASSERT(fake_upstream_connection != nullptr);
     ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 OK\r\n", false));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  } else if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
     FakeRawConnectionPtr fake_upstream_connection;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
     Http::Http2::Http2Frame::SettingsFlags settings_flags =
@@ -1307,7 +1307,7 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // QUICHE Qpack splits concatenated cookies into crumbs to increase
     // compression ratio. On the receiver side, the total size of these crumbs
     // may be larger than coalesced cookie headers. Increase the max request
@@ -1319,7 +1319,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
           hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(8000);
         });
   }
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
     setMaxRequestHeadersKb(96);
     setMaxRequestHeadersCount(8000);
   }
@@ -1386,7 +1386,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
     test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
@@ -1422,14 +1422,14 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
                                                                  {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1450,7 +1450,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1481,14 +1481,14 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
                                                                  {"content-length", "3,2"}});
   auto response = std::move(encoder_decoder.second);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
   }
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1612,7 +1612,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
@@ -1735,7 +1735,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
@@ -1743,8 +1743,8 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
-    ASSERT(downstreamProtocol() >= Http::CodecClient::Type::HTTP2);
-    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT(downstreamProtocol() >= Http::CodecType::HTTP2);
+    if (upstreamProtocol() == Http::CodecType::HTTP1) {
       auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
       ASSERT_TRUE(
           fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -1752,7 +1752,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("400", response->headers().getStatusValue());
     } else {
-      ASSERT(upstreamProtocol() >= FakeHttpConnection::Type::HTTP2);
+      ASSERT(upstreamProtocol() >= Http::CodecType::HTTP2);
       auto response =
           sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
       EXPECT_TRUE(response->complete());
@@ -1950,7 +1950,7 @@ name: encode-headers-return-stop-all-filter
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
-  int times_added = upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ? 1 : 2;
+  int times_added = upstreamProtocol() == Http::CodecType::HTTP1 ? 1 : 2;
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
@@ -1994,7 +1994,7 @@ name: encode-headers-return-stop-all-filter
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
-  int times_added = upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ? 1 : 2;
+  int times_added = upstreamProtocol() == Http::CodecType::HTTP1 ? 1 : 2;
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
@@ -2076,13 +2076,13 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
 
   EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     codec_client_->close();
   } else {
     codec_client_->sendReset(encoder_decoder.first);
   }
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -2170,7 +2170,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TestPreconnect) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   FakeHttpConnectionPtr fake_upstream_connection_two;
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     // For HTTP/1.1 there should be a preconnected connection.
     ASSERT_TRUE(
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_two));
@@ -2232,7 +2232,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
                                                  {":authority", "ho|st|"}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // For HTTP/1 this is handled by the HCM, which sends a full 400 response.
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
@@ -2253,7 +2253,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // Because CONNECT requests for HTTP/1 do not include a path, they will fail
     // to find a route match and return a 404.
     ASSERT_TRUE(response->waitForEndStream());
@@ -2270,7 +2270,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   // TODO(danzh) add "allow_connect" to http3 options.
   EXCLUDE_DOWNSTREAM_HTTP3;
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
   config_helper_.addConfigModifier(
