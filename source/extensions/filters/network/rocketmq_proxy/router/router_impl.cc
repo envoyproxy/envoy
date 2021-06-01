@@ -53,7 +53,7 @@ void RouterImpl::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(trace, "Ignore event type");
     return;
   }
-  active_message_->onReset();
+    active_message_->onReset();
 }
 
 const Envoy::Router::MetadataMatchCriteria* RouterImpl::metadataMatchCriteria() {

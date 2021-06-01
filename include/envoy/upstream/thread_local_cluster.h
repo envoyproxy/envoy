@@ -11,7 +11,7 @@ namespace Upstream {
 // HttpPoolData returns information about a given pool as well as a function
 // to create streams on that pool.
 class HttpPoolData {
- public:
+public:
   using OnNewStreamFn = std::function<void()>;
 
   HttpPoolData(OnNewStreamFn on_new_stream, Http::ConnectionPool::Instance* pool)
@@ -36,7 +36,7 @@ private:
 // Tcp pool returns information about a given pool, as well as a function to
 // create connections on that pool.
 class TcpPoolData {
- public:
+public:
   using OnNewConnectionFn = std::function<void()>;
 
   TcpPoolData(OnNewConnectionFn on_new_connection, Tcp::ConnectionPool::Instance* pool)
