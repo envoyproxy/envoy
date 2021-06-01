@@ -62,6 +62,7 @@ def envoy_cc_extension(
     )
     cc_library(
         name = ext_name,
+        tags = tags,
         deps = select({
             ":is_enabled": [":" + name],
             "//conditions:default": [],
