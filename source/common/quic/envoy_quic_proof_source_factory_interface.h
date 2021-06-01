@@ -24,7 +24,7 @@ namespace Quic {
 // A factory interface to provide quic::ProofSource.
 class EnvoyQuicProofSourceFactoryInterface : public Config::TypedFactory {
 public:
-  virtual ~EnvoyQuicProofSourceFactoryInterface() = default;
+  ~EnvoyQuicProofSourceFactoryInterface() override = default;
 
   std::string category() const override { return "envoy.quic.proof_source"; }
 

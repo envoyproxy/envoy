@@ -259,7 +259,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
 
   // Initialize crypto stream factory.
-  envoy::config::listener::v3::QuicCryptoStream crypto_stream;
+  envoy::config::core::v3::TypedExtensionConfig crypto_stream;
   if (!config.has_crypto_stream()) {
     // If not specified, use the quic crypto stream created by QUICHE.
     crypto_stream.set_name("quic.quiche_crypto_server_stream");
@@ -273,7 +273,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           crypto_stream);
 
   // Initialize proof source factory.
-  envoy::config::listener::v3::QuicProofSource proof_source;
+  envoy::config::core::v3::TypedExtensionConfig proof_source;
   if (!config.has_proof_source()) {
     proof_source.set_name("envoy.quic.filter_chain_proof_source");
     envoy::extensions::quic::v3::ProofSourceConfig proof_source_config;

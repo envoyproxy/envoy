@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 
 import "google/protobuf/any.proto";
@@ -19,22 +20,6 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC listener config]
-
-// Configuration specific to QUIC crypto stream.
-message QuicCryptoStream {
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // [#extension-category: envoy.quic.server.crypto_stream]
-  google.protobuf.Any typed_config = 2;
-}
-
-// Configuration specific to QUIC proof source.
-message QuicProofSource {
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // [#extension-category: envoy.quic.proof_source]
-  google.protobuf.Any typed_config = 2;
-}
 
 // Configuration specific to the UDP QUIC listener.
 // [#next-free-field: 8]
@@ -66,11 +51,11 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5
       [(validate.rules).uint32 = {gte: 1}];
 
-  // The implementation of quic::QuicCryptoClientStreamBase used for this listener.
-  // If not specified the :ref:`QUICHE default one<envoy_v3_api_msg_extensions.quic.v3.CryptoServerStreamConfig>` will be used.
-  QuicCryptoStream crypto_stream = 6;
+  // Configure which implementation of quic::QuicCryptoClientStreamBase to be used for this listener.
+  // If not specified the :ref:`QUICHE default one configured by <envoy_v3_api_msg_extensions.quic.v3.CryptoServerStreamConfig>` will be used.
+  core.v3.TypedExtensionConfig crypto_stream = 6;
 
-  // The implementation of quic::ProofSource used for this listener.
-  // If not specified the :ref:`default one<envoy_v3_api_msg_extensions.quic.v3.ProofSourceConfig>` will be used.
-  QuicProofSource proof_source = 7;
+  // Configure which implementation of quic::ProofSource to be used for this listener.
+  // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.v3.ProofSourceConfig>` will be used.
+  core.v3.TypedExtensionConfig proof_source = 7;
 }

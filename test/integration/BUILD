@@ -1721,7 +1721,6 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:quic_factory_lib",
         "//source/extensions/resource_monitors/injected_resource:config",
-        "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
         "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/common/quic:test_utils_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
