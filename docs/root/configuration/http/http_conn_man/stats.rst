@@ -87,12 +87,12 @@ the following statistics:
 Per listener statistics
 -----------------------
 
-Per listener statistics are rooted at *listener.<address>.
+Per listener statistics are rooted at *listener.<address>*.
 
 Http per listener statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Additional HTTP statistics are of the form http.<stat_prefix>.* with the
+Additional HTTP statistics are of the form *http.<stat_prefix>.* with the
 following statistics:
 
 .. csv-table::
@@ -109,13 +109,13 @@ following statistics:
 Http3 per listener statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Http3 statistics with the form of http3.downstream.<stat_prefix>.*:
+Http3 statistics with the form of *http3.downstream.<stat_prefix>.*:
 
 .. csv-table::
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   tx/rx.quic_connection_close_error_code_[error_code], Counter, A collection of counters that are lazily initialized to record each quic connection close error code that's present.
+   <tx/rx>.quic_connection_close_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each quic connection close error code that's present.
 
 
 .. _config_http_conn_man_stats_per_codec:
