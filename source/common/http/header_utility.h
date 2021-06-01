@@ -207,7 +207,7 @@ public:
   static Http::Status checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /* Does a common header check ensuring required response headers are present.
-   * Current required request headers only includes :status.
+   * Current required response headers only includes :status.
    * @return Status containing the result. If failed, message includes details on which header was
    * missing.
    */
