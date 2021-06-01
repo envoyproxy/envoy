@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/stream_reset_handler.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/non_copyable.h"
@@ -849,7 +850,10 @@ using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
  */
 class BufferMemoryAccountImpl : public BufferMemoryAccount {
 public:
-  BufferMemoryAccountImpl() = default;
+  // Used to create the account, and complete wiring with the factory
+  // and shared_this_.
+  static BufferMemoryAccountSharedPtr createAccount(WatermarkFactory* factory,
+                                                    Http::StreamResetHandler* reset_handler);
   ~BufferMemoryAccountImpl() override { ASSERT(buffer_memory_allocated_ == 0); }
 
   // Make not copyable
@@ -860,20 +864,35 @@ public:
   BufferMemoryAccountImpl(BufferMemoryAccountImpl&&) = delete;
   BufferMemoryAccountImpl& operator=(BufferMemoryAccountImpl&&) = delete;
 
-  uint64_t balance() const { return buffer_memory_allocated_; }
-  void charge(uint64_t amount) override {
-    // Check overflow
-    ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
-    buffer_memory_allocated_ += amount;
-  }
+  uint64_t balance() const override { return buffer_memory_allocated_; }
+  void charge(uint64_t amount) override;
+  void credit(uint64_t amount) override;
 
-  void credit(uint64_t amount) override {
-    ASSERT(buffer_memory_allocated_ >= amount);
-    buffer_memory_allocated_ -= amount;
+  void clearDownstream() override;
+
+  void resetStream(Http::StreamResetReason reason) override {
+    if (reset_handler_ != nullptr) {
+      reset_handler_->resetStream(reason);
+    }
   }
 
 private:
+  BufferMemoryAccountImpl(WatermarkFactory* factory, Http::StreamResetHandler* reset_handler)
+      : factory_(factory), reset_handler_(reset_handler) {}
   uint64_t buffer_memory_allocated_ = 0;
+  // TODO(kbaichoo): we can refactor this to be a thread_local
+  // static since all memory accounts of a particular thread will point to the
+  // same factory.
+  WatermarkFactory* factory_ = nullptr;
+
+  Http::StreamResetHandler* reset_handler_ = nullptr;
+  // Keep a copy of the shared_ptr pointing to this account. We opted to go this
+  // route rather than enable_shared_from_this to avoid wasteful atomic
+  // operations e.g. when updating the tracking of the account.
+  // This is set through the createAccount static method which is the only way to
+  // instantiate an instance of this class. This should is cleared when
+  // unregistering from the factory.
+  BufferMemoryAccountSharedPtr shared_this_ = nullptr;
 };
 
 } // namespace Buffer

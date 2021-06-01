@@ -33,6 +33,7 @@ public:
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
+  ~EnvoyQuicServerStream() override;
 
   void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
 
@@ -55,9 +56,6 @@ public:
     // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
   }
 
-  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
-    // TODO(kbaichoo): implement account tracking for QUIC.
-  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicRstStreamErrorCode error) override;

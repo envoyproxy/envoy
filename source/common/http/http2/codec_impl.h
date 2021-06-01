@@ -387,6 +387,8 @@ protected:
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
         : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
 
+    ~ServerStreamImpl() override;
+
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;

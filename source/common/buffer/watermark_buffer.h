@@ -3,6 +3,8 @@
 #include <functional>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
+
 #include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
@@ -71,16 +73,30 @@ private:
 };
 
 using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
+using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>, 8>;
 
 class WatermarkBufferFactory : public WatermarkFactory {
 public:
   // Buffer::WatermarkFactory
-  InstancePtr create(std::function<void()> below_low_watermark,
-                     std::function<void()> above_high_watermark,
-                     std::function<void()> above_overflow_watermark) override {
+  InstancePtr createBuffer(std::function<void()> below_low_watermark,
+                           std::function<void()> above_high_watermark,
+                           std::function<void()> above_overflow_watermark) override {
     return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
                                              above_overflow_watermark);
   }
+
+  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) override;
+  void onAccountBalanceUpdate(const BufferMemoryAccountSharedPtr& account,
+                              uint64_t prior_balance) override;
+  void unregisterAccount(const BufferMemoryAccountSharedPtr& account) override;
+
+protected:
+  // Enable subclasses to inspect the mapping.
+  MemoryClassesToAccountsSet size_class_account_sets_;
+
+private:
+  // Helper to go from balance to index into size_class_account_sets_.
+  int accountBalanceToClassIndex(uint64_t balance);
 };
 
 } // namespace Buffer

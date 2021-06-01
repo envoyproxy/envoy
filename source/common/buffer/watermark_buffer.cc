@@ -1,5 +1,9 @@
 #include "source/common/buffer/watermark_buffer.h"
 
+#include <memory>
+
+#include "envoy/buffer/buffer.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -134,6 +138,68 @@ void WatermarkBuffer::checkHighAndOverflowWatermarks() {
     above_overflow_watermark_called_ = true;
     above_overflow_watermark_();
   }
+}
+
+BufferMemoryAccountSharedPtr
+WatermarkBufferFactory::createAccount(Http::StreamResetHandler* reset_handler) {
+  return BufferMemoryAccountImpl::createAccount(this, reset_handler);
+}
+
+void WatermarkBufferFactory::onAccountBalanceUpdate(const BufferMemoryAccountSharedPtr& account,
+                                                    uint64_t prior_balance) {
+
+  int prev_idx = accountBalanceToClassIndex(prior_balance);
+  int new_idx = accountBalanceToClassIndex(account->balance());
+
+  // No need for update, the expected common case.
+  if (prev_idx == new_idx) {
+    return;
+  }
+
+  // Take out of prior bucket if previously tracked.
+  BufferMemoryAccountSharedPtr account_in_bucket = nullptr;
+
+  if (prev_idx >= 0) {
+    ASSERT(size_class_account_sets_[prev_idx].contains(account));
+    // Extract to reuse the existing shared_ptr
+    account_in_bucket = std::move(size_class_account_sets_[prev_idx].extract(account).value());
+  }
+
+  // Place into new bucket if will track
+  if (new_idx >= 0) {
+    ASSERT(!size_class_account_sets_[new_idx].contains(account));
+    if (account_in_bucket == nullptr) {
+      size_class_account_sets_[new_idx].insert(account);
+    } else {
+      size_class_account_sets_[new_idx].insert(std::move(account_in_bucket));
+    }
+  }
+}
+
+void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account) {
+  int idx = accountBalanceToClassIndex(account->balance());
+  if (idx >= 0) {
+    ASSERT(size_class_account_sets_[idx].contains(account));
+    size_class_account_sets_[idx].erase(account);
+  }
+}
+
+int WatermarkBufferFactory::accountBalanceToClassIndex(uint64_t balance) {
+  uint64_t shifted_balance = balance >> 20; // shift by 1MB.
+
+  if (shifted_balance == 0) {
+    return -1; // Not worth tracking anything < 1MB.
+  }
+  int class_idx = 0;
+  shifted_balance >>= 1;
+
+  const int last_idx = size_class_account_sets_.size() - 1;
+  while (shifted_balance > 0 && class_idx < last_idx) {
+    shifted_balance >>= 1;
+    ++class_idx;
+  }
+
+  return class_idx;
 }
 
 } // namespace Buffer

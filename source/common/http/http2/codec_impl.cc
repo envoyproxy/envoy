@@ -131,11 +131,11 @@ template <typename T> static T* removeConst(const void* object) {
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
     : parent_(parent),
-      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingRecvBufferLowWatermark(); },
           [this]() -> void { this->pendingRecvBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
@@ -155,6 +155,18 @@ void ConnectionImpl::StreamImpl::destroy() {
   disarmStreamIdleTimer();
   parent_.stats_.streams_active_.dec();
   parent_.stats_.pending_send_bytes_.sub(pending_send_data_->length());
+}
+
+ConnectionImpl::ServerStreamImpl::~ServerStreamImpl() {
+  // Only the downstream stream should clear the downstream of the
+  // memory account.
+  //
+  // There are cases where a corresponding upstream stream dtor might
+  // be called, but the downstream stream isn't going to terminate soon
+  // such as StreamDecoderFilterCallbacks::recreateStream().
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
 }
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {

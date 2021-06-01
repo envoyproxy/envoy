@@ -65,6 +65,18 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
+EnvoyQuicServerStream::~EnvoyQuicServerStream() {
+  // Only the downstream stream should clear the downstream of the
+  // memory account.
+  //
+  // There are cases where a corresponding upstream stream dtor might
+  // be called, but the downstream stream isn't going to terminate soon
+  // such as StreamDecoderFilterCallbacks::recreateStream().
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+}
+
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);

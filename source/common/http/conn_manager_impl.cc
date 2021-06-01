@@ -278,7 +278,9 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // accounting are implemented.
   Buffer::BufferMemoryAccountSharedPtr downstream_request_account;
   if (Runtime::runtimeFeatureEnabled("envoy.test_only.per_stream_buffer_accounting")) {
-    downstream_request_account = std::make_shared<Buffer::BufferMemoryAccountImpl>();
+    // Create account, wiring the stream to use it.
+    auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
+    downstream_request_account = buffer_factory.createAccount(&response_encoder.getStream());
     response_encoder.getStream().setAccount(downstream_request_account);
   }
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
