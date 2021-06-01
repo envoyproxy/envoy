@@ -5,7 +5,7 @@ set -e
 # BoringSSL build as described in the Security Policy for BoringCrypto module (2020-07-02):
 # https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf
 # Despite this script supporting building on CentOS, note that the certification only allows for FIPS crypto modules to be 
-# built on Ubuntu and Debian (Section 8). FIPS Envoy will work on CentOS, but isn't certified on that Operational Environment.
+# built on Ubuntu and Debian (Section 8).  FIPS Envoy will work on CentOS, but isn't certified on that Operational Environment.
 
 # This works only on Linux-x86_64.
 if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
