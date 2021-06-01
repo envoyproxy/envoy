@@ -3,18 +3,18 @@
 # Generate RST lists of extensions grouped by their security posture.
 
 from collections import defaultdict
-import json
 import os
 import pathlib
-import subprocess
+
+import yaml
 
 
 def format_item(extension, metadata):
-    if metadata['undocumented']:
+    if metadata.get('undocumented'):
         item = '* %s' % extension
     else:
         item = '* :ref:`%s <extension_%s>`' % (extension, extension)
-    if metadata['status'] == 'alpha':
+    if metadata.get('status') == 'alpha':
         item += ' (alpha)'
     return item
 
@@ -27,14 +27,8 @@ if __name__ == '__main__':
             "Path to an output directory must be specified with GENERATED_RST_DIR env var")
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
 
-    try:
-        extension_db_path = os.environ["EXTENSION_DB_PATH"]
-    except KeyError:
-        raise SystemExit(
-            "Path to a json extension db must be specified with EXTENSION_DB_PATH env var")
-    if not os.path.exists(extension_db_path):
-        subprocess.run("tools/extensions/generate_extension_db".split(), check=True)
-    extension_db = json.loads(pathlib.Path(extension_db_path).read_text())
+    with open("source/extensions/extensions_metadata.yaml") as f:
+        extension_db = yaml.safe_load(f.read())
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
 
@@ -47,5 +41,5 @@ if __name__ == '__main__':
         content = '\n'.join(
             format_item(extension, extension_db[extension])
             for extension in sorted(extensions)
-            if extension_db[extension]['status'] != 'wip')
+            if extension_db[extension].get('status') != 'wip')
         output_path.write_text(content)

@@ -26,14 +26,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.resource_monitors",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",
         "//test/common/quic/integration:__subpackages__",
     ],
-    security_posture = "data_plane_agnostic",
-    status = "alpha",
     deps = [
         ":injected_resource_monitor",
         "//include/envoy/registry",

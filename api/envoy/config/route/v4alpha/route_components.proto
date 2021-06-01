@@ -1837,8 +1837,8 @@ message HeaderMatcher {
     //   "-1somestring"
     type.v3.Int64Range range_match = 6;
 
-    // If specified, header match will be performed based on whether the header is in the
-    // request.
+    // If specified as true, header match will be performed based on whether the header is in the
+    // request. If specified as false, header match will be performed based on whether the header is absent.
     bool present_match = 7;
 
     // If specified, header match will be performed based on the prefix of the header value.
