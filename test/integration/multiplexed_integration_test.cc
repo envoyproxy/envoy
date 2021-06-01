@@ -147,7 +147,8 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
 }
 
 TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // Need to support keepalive.
+  // TODO(#16751) Need to support keepalive.
+  EXCLUDE_DOWNSTREAM_HTTP3;
   constexpr uint64_t interval_ms = 1;
   constexpr uint64_t timeout_ms = 250;
   config_helper_.addConfigModifier(

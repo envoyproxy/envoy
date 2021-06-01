@@ -248,7 +248,6 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options;
   if (!http2_options.has_value()) {
     http2_options = Http2::Utility::initializeAndValidateOptions(
         envoy::config::core::v3::Http2ProtocolOptions());
@@ -256,25 +255,11 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     http2_options.value().set_allow_metadata(true);
 #ifdef ENVOY_ENABLE_QUIC
   } else {
-    if (http2_options->has_initial_stream_window_size() &&
-        http2_options->initial_stream_window_size().value() < quic::kStreamReceiveWindowLimit) {
-      // Set http3 stream flow control window only if the configured http2 stream flow control
-      // window is smaller than the upper limit of flow control window supported by QUICHE which is
-      // also the default for http3 streams.
-      http3_options.mutable_quic_protocol_options()
-          ->mutable_initial_stream_window_size()
-          ->set_value(http2_options->initial_stream_window_size().value());
-    }
-    if (http2_options.value().has_override_stream_error_on_invalid_http_message()) {
-      http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
-          http2_options.value().override_stream_error_on_invalid_http_message().value());
-    } else if (http2_options.value().stream_error_on_invalid_http_messaging()) {
-      http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
-    }
+    cluster->http3_options_ = ConfigHelper::Http2ToHttp3ProtocolOptions(
+        http2_options.value(), quic::kStreamReceiveWindowLimit);
 #endif
   }
   cluster->http2_options_ = http2_options.value();
-  cluster->http3_options_ = http3_options;
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
