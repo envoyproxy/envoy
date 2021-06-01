@@ -14,9 +14,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["simple_http_cache.cc"],
     hdrs = ["simple_http_cache.h"],
-    category = "envoy.filters.http.cache",
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
-    status = "wip",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/runtime:runtime_interface",

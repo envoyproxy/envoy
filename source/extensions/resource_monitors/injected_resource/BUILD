@@ -26,9 +26,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.resource_monitors",
-    security_posture = "data_plane_agnostic",
-    status = "alpha",
     deps = [
         ":injected_resource_monitor",
         "//include/envoy/registry",

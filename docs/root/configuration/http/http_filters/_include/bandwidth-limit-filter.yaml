@@ -38,7 +38,6 @@ static_resources:
 
   clusters:
   - name: service_protected_by_bandwidth_limit
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -51,7 +50,6 @@ static_resources:
                 address: web_service
                 port_value: 9000
   - name: web_service
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

@@ -331,172 +331,6 @@ most_specific_header_mutations_wins: {0}
 
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
 
-// When removing legacy fields this test can be removed.
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestLegacyRoutes)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: regex
-  domains:
-  - bat.com
-  routes:
-  - match:
-      regex: "/t[io]c"
-    route:
-      cluster: clock
-  - match:
-      safe_regex:
-        google_re2: {}
-        regex: "/baa+"
-    route:
-      cluster: sheep
-  - match:
-      regex: ".*/\\d{3}$"
-    route:
-      cluster: three_numbers
-      prefix_rewrite: "/rewrote"
-  - match:
-      regex: ".*"
-    route:
-      cluster: regex_default
-- name: regex2
-  domains:
-  - bat2.com
-  routes:
-  - match:
-      regex: ''
-    route:
-      cluster: nothingness
-  - match:
-      regex: ".*"
-    route:
-      cluster: regex_default
-- name: default
-  domains:
-  - "*"
-  routes:
-  - match:
-      prefix: "/"
-    route:
-      cluster: instant-server
-      timeout: 30s
-  virtual_clusters:
-  - pattern: "^/rides$"
-    method: POST
-    name: ride_request
-  - pattern: "^/rides/\\d+$"
-    method: PUT
-    name: update_ride
-  - pattern: "^/users/\\d+/chargeaccounts$"
-    method: POST
-    name: cc_add
-  - pattern: "^/users/\\d+/chargeaccounts/(?!validate)\\w+$"
-    method: PUT
-    name: cc_add
-  - pattern: "^/users$"
-    method: POST
-    name: create_user_login
-  - pattern: "^/users/\\d+$"
-    method: PUT
-    name: update_user
-  )EOF";
-
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters(
-      {"clock", "sheep", "three_numbers", "regex_default", "nothingness", "instant-server"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  // Regular Expression matching
-  EXPECT_EQ("clock",
-            config.route(genHeaders("bat.com", "/tic", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("clock",
-            config.route(genHeaders("bat.com", "/toc", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("regex_default",
-            config.route(genHeaders("bat.com", "/tac", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("regex_default",
-            config.route(genHeaders("bat.com", "", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("regex_default",
-            config.route(genHeaders("bat.com", "/tick", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("regex_default",
-            config.route(genHeaders("bat.com", "/tic/toc", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("sheep",
-            config.route(genHeaders("bat.com", "/baa", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ(
-      "sheep",
-      config.route(genHeaders("bat.com", "/baaaaaaaaaaaa", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("regex_default",
-            config.route(genHeaders("bat.com", "/ba", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("nothingness",
-            config.route(genHeaders("bat2.com", "", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("regex_default",
-            config.route(genHeaders("bat2.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("regex_default",
-            config.route(genHeaders("bat2.com", " ", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_TRUE(config.route(genPathlessHeaders("bat2.com", "GET"), 0) == nullptr);
-
-  // Regular Expression matching with query string params
-  EXPECT_EQ(
-      "clock",
-      config.route(genHeaders("bat.com", "/tic?tac=true", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ(
-      "regex_default",
-      config.route(genHeaders("bat.com", "/tac?tic=true", "GET"), 0)->routeEntry()->clusterName());
-
-  // Virtual cluster testing.
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "GET");
-    EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/blah", "POST");
-    EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "POST");
-    EXPECT_EQ("ride_request", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123", "PUT");
-    EXPECT_EQ("update_ride", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123/456", "POST");
-    EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers =
-        genHeaders("api.lyft.com", "/users/123/chargeaccounts", "POST");
-    EXPECT_EQ("cc_add", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers =
-        genHeaders("api.lyft.com", "/users/123/chargeaccounts/hello123", "PUT");
-    EXPECT_EQ("cc_add", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers =
-        genHeaders("api.lyft.com", "/users/123/chargeaccounts/validate", "PUT");
-    EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/foo/bar", "PUT");
-    EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users", "POST");
-    EXPECT_EQ("create_user_login",
-              virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123", "PUT");
-    EXPECT_EQ("update_user", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
-    EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-}
-
 TEST_F(RouteMatcherTest, TestConnectRoutes) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -1315,41 +1149,6 @@ virtual_hosts:
             config.route(genHeaders("example.com", "/", "GET"), 0)->routeEntry()->clusterName());
 }
 
-// When deprecating regex: this test can be removed.
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestRoutesWithInvalidRegexLegacy)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  std::string invalid_route = R"EOF(
-virtual_hosts:
-  - name: regex
-    domains: ["*"]
-    routes:
-      - match: { regex: "/(+invalid)" }
-        route: { cluster: "regex" }
-  )EOF";
-
-  std::string invalid_virtual_cluster = R"EOF(
-virtual_hosts:
-  - name: regex
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: "regex" }
-    virtual_clusters:
-      - pattern: "^/(+invalid)"
-        name: "invalid"
-  )EOF";
-
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"regex"}, {});
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(invalid_route), factory_context_, true),
-      EnvoyException, "Invalid regex '/\\(\\+invalid\\)':");
-
-  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(invalid_virtual_cluster),
-                                         factory_context_, true),
-                          EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
-}
-
 TEST_F(RouteMatcherTest, TestRoutesWithInvalidRegex) {
   std::string invalid_route = R"EOF(
 virtual_hosts:
@@ -1407,7 +1206,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"regex"}, {});
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "virtual clusters must define either 'pattern' or 'headers'");
+      "virtual clusters must define 'headers'");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
@@ -2167,45 +1966,6 @@ virtual_hosts:
 }
 
 // Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
-// When removing regex_match this test can be removed entirely.
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(InvalidHeaderMatchedRoutingConfigLegacy)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  std::string value_with_regex_chars = R"EOF(
-virtual_hosts:
-  - name: local_service
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/"
-          headers:
-            - name: test_header
-              exact_match: "(+not a regex)"
-        route: { cluster: "local_service" }
-  )EOF";
-
-  std::string invalid_regex = R"EOF(
-virtual_hosts:
-  - name: local_service
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/"
-          headers:
-            - name: test_header
-              regex_match: "(+invalid regex)"
-        route: { cluster: "local_service" }
-  )EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"local_service"}, {});
-  EXPECT_NO_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(value_with_regex_chars),
-                                 factory_context_, true));
-
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(invalid_regex), factory_context_, true),
-      EnvoyException, "Invalid regex");
-}
-
-// Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
 TEST_F(RouteMatcherTest, InvalidHeaderMatchedRoutingConfig) {
   std::string value_with_regex_chars = R"EOF(
 virtual_hosts:
@@ -2244,9 +2004,7 @@ virtual_hosts:
       EnvoyException, "no argument for repetition operator");
 }
 
-// When removing value: simply remove that section of the config and the relevant test.
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(QueryParamMatchedRouting)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
+TEST_F(RouteMatcherTest, QueryParamMatchedRouting) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -2257,18 +2015,13 @@ virtual_hosts:
       prefix: "/"
       query_parameters:
       - name: id
-        value: "\\d+[02468]"
-        regex: true
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: "\\d+[02468]"
       - name: debug
     route:
       cluster: local_service_with_multiple_query_parameters
-  - match:
-      prefix: "/"
-      query_parameters:
-      - name: param
-        value: test
-    route:
-      cluster: local_service_with_query_parameter
   - match:
       prefix: "/"
       query_parameters:
@@ -2298,7 +2051,7 @@ virtual_hosts:
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters(
-      {"local_service_with_multiple_query_parameters", "local_service_with_query_parameter",
+      {"local_service_with_multiple_query_parameters",
        "local_service_with_valueless_query_parameter",
        "local_service_with_present_match_query_parameter",
        "local_service_with_string_match_query_parameter", "local_service_without_query_parameters"},
@@ -2320,12 +2073,6 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("example.com", "/?param=testing", "GET");
     EXPECT_EQ("local_service_without_query_parameters",
-              config.route(headers, 0)->routeEntry()->clusterName());
-  }
-
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("example.com", "/?param=test", "GET");
-    EXPECT_EQ("local_service_with_query_parameter",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
 
@@ -2355,56 +2102,10 @@ virtual_hosts:
 
   {
     Http::TestRequestHeaderMapImpl headers =
-        genHeaders("example.com", "/?param=test&debug&id=01", "GET");
-    EXPECT_EQ("local_service_with_query_parameter",
-              config.route(headers, 0)->routeEntry()->clusterName());
-  }
-
-  {
-    Http::TestRequestHeaderMapImpl headers =
         genHeaders("example.com", "/?param=test&debug&id=02", "GET");
     EXPECT_EQ("local_service_with_multiple_query_parameters",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
-}
-
-// When removing value: this test can be removed.
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(InvalidQueryParamMatchedRoutingConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  std::string value_with_regex_chars = R"EOF(
-virtual_hosts:
-  - name: local_service
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/"
-          query_parameters:
-            - name: test_param
-              value: "(+not a regex)"
-        route: { cluster: "local_service" }
-  )EOF";
-
-  std::string invalid_regex = R"EOF(
-virtual_hosts:
-  - name: local_service
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/"
-          query_parameters:
-            - name: test_param
-              value: "(+invalid regex)"
-              regex: true
-        route: { cluster: "local_service" }
-  )EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"local_service"}, {});
-  EXPECT_NO_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(value_with_regex_chars),
-                                 factory_context_, true));
-
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(invalid_regex), factory_context_, true),
-      EnvoyException, "Invalid regex");
 }
 
 class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestBase {
@@ -5885,18 +5586,12 @@ virtual_hosts:
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
-// When allow_origin: and allow_origin_regex: are removed, simply remove them
-// and the relevant checks below.
-TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestVHostCorsConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
+TEST_F(RoutePropertyTest, TestVHostCorsConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
     domains: ["*"]
     cors:
-      allow_origin: ["test-origin"]
-      allow_origin_regex:
-      - .*\.envoyproxy\.io
       allow_origin_string_match:
       - safe_regex:
           google_re2: {}
@@ -5944,7 +5639,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
-  EXPECT_EQ(3, cors_policy->allowOrigins().size());
+  EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -6000,87 +5695,6 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
-  EXPECT_EQ(1, cors_policy->allowOrigins().size());
-  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
-  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
-  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
-  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
-  EXPECT_EQ(cors_policy->allowCredentials(), true);
-}
-
-// When allow-origin: is removed, this test can be removed.
-TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestVHostCorsLegacyConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: default
-  domains:
-  - "*"
-  cors:
-    allow_origin:
-    - test-origin
-    allow_methods: test-methods
-    allow_headers: test-headers
-    expose_headers: test-expose-headers
-    max_age: test-max-age
-    allow_credentials: true
-  routes:
-  - match:
-      prefix: "/api"
-    route:
-      cluster: ats
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"ats"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
-          ->routeEntry()
-          ->virtualHost()
-          .corsPolicy();
-
-  EXPECT_EQ(cors_policy->enabled(), true);
-  EXPECT_EQ(cors_policy->shadowEnabled(), false);
-  EXPECT_EQ(1, cors_policy->allowOrigins().size());
-  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
-  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
-  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
-  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
-  EXPECT_EQ(cors_policy->allowCredentials(), true);
-}
-
-// When allow-origin: is removed, this test can be removed.
-TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestRouteCorsLegacyConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: default
-  domains:
-  - "*"
-  routes:
-  - match:
-      prefix: "/api"
-    route:
-      cluster: ats
-      cors:
-        allow_origin:
-        - test-origin
-        allow_methods: test-methods
-        allow_headers: test-headers
-        expose_headers: test-expose-headers
-        max_age: test-max-age
-        allow_credentials: true
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"ats"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
-
-  EXPECT_EQ(cors_policy->enabled(), true);
-  EXPECT_EQ(cors_policy->shadowEnabled(), false);
   EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
