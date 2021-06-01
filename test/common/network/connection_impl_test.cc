@@ -2968,8 +2968,8 @@ protected:
   StrictMock<MockConnectionCallbacks> client_callbacks_;
 };
 
-// Validate we skip setting source address.
-TEST_F(InternalClientConnectionImplTest, SkipSourceAddress) {
+TEST_F(InternalClientConnectionImplTest,
+       CannotCreateConnectionToInternalAddressWithInternalAddressEnabled) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.internal_address", "true"}});
@@ -2981,16 +2981,14 @@ TEST_F(InternalClientConnectionImplTest, SkipSourceAddress) {
   MockInternalListenerManager internal_listener_manager;
 
   dispatcher_->registerInternalListenerManager(internal_listener_manager);
-  EXPECT_CALL(internal_listener_manager, findByAddress(address)).WillOnce(Return(absl::nullopt));
-  ClientConnectionPtr connection =
-      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          Network::Test::createRawBufferSocket(), nullptr);
-  connection->addConnectionCallbacks(client_callbacks_);
-  connection->connect();
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  connection->close(ConnectionCloseType::NoFlush);
+  // Not implemented yet.
+  ASSERT_DEATH(
+      {
+        ClientConnectionPtr connection =
+            dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr);
+      },
+      "panic: not implemented");
 }
 
 } // namespace

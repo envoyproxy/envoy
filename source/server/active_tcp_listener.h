@@ -48,7 +48,8 @@ public:
  */
 struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
                              public Event::DeferredDeletable,
-                             public Network::ConnectionCallbacks {
+                             public Network::ConnectionCallbacks,
+                             Logger::Loggable<Logger::Id::conn_handler> {
   ActiveTcpConnection(ActiveConnections& active_connections,
                       Network::ConnectionPtr&& new_connection, TimeSource& time_system,
                       std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);

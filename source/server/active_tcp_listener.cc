@@ -256,8 +256,7 @@ ActiveTcpConnection::~ActiveTcpConnection() {
 
 // Network::ConnectionCallbacks
 void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
-  FANCY_LOG(info, "lambdai: tcp connection on event {}", static_cast<int>(event));
-
+  ENVOY_LOG(trace, "[C{}] connection on event {}", connection_->id(), static_cast<int>(event));
   // Any event leads to destruction of the connection.
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {

@@ -1,7 +1,5 @@
 #include "server/listener_impl.h"
 
-#include <memory>
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"

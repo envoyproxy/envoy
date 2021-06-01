@@ -27,9 +27,6 @@
 #include "common/network/udp_listener_impl.h"
 #include "common/runtime/runtime_features.h"
 
-// internal address
-#include "extensions/io_socket/user_space/io_handle_impl.h"
-
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -153,47 +150,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        Network::Address::InstanceConstSharedPtr source_address,
                                        Network::TransportSocketPtr&& transport_socket,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  FANCY_LOG(info, "lambdai: create client connection to {} from {}",
-            address != nullptr ? address->asStringView() : "nullptr",
-            source_address != nullptr ? source_address->asStringView() : "nullptr");
   ASSERT(isThreadSafe());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
-      address->type() == Network::Address::Type::EnvoyInternal) {
-    Network::IoHandlePtr io_handle_client;
-    Network::IoHandlePtr io_handle_server;
-
-    std::tie(io_handle_client, io_handle_server) =
-        Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
-
-    auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
-        *this, std::move(io_handle_client), address, source_address, std::move(transport_socket),
-        options);
-    // TODO(lambdai): refactor nested if.
-    auto internal_listener_manager = getInternalListenerManagerForTest();
-    if (internal_listener_manager.has_value()) {
-      // It's either in main thread or the worker is not yet started.
-      auto internal_listener = internal_listener_manager.value().get().findByAddress(address);
-      if (internal_listener.has_value()) {
-        auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
-            std::move(io_handle_server), address, source_address);
-        // TODO: also check if disabled
-        internal_listener.value().get().onAccept(std::move(accepted_socket));
-        FANCY_LOG(info, "lambdai: find internal listener {} ", address->asStringView());
-      } else {
-        FANCY_LOG(info, "lambdai: cannot find internal listener {} from internal listener manager",
-                  address->asStringView());
-        // injected error into client_conn;
-        io_handle_server->close();
-      }
-    } else {
-      FANCY_LOG(info, "lambdai: cannot find from internal listener manager while connecting to {}",
-                address->asStringView());
-      // injected error into client_conn;
-      io_handle_server->close();
-    }
-
-    return client_conn;
-  }
   return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
                                                          std::move(transport_socket), options);
 }
@@ -263,7 +220,7 @@ void DispatcherImpl::registerInternalListenerManager(
   internal_listener_manager_ = internal_listener_manager;
 }
 
-Network::InternalListenerManagerOptRef DispatcherImpl::getInternalListenerManagerForTest() {
+Network::InternalListenerManagerOptRef DispatcherImpl::getInternalListenerManager() {
   return internal_listener_manager_;
 }
 

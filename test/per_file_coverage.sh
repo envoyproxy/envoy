@@ -9,7 +9,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/common:96.3"
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
-"source/common/event:93.9" # Emulated edge events guards don't report LCOV
+"source/common/event:94.2" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2"
 "source/common/json:90.9"
 "source/common/network:95.0"  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV

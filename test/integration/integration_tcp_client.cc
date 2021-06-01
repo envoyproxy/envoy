@@ -16,13 +16,6 @@
 #include "common/common/fmt.h"
 #include "common/network/utility.h"
 
-/* begin internal connection */
-#include "common/stream_info/stream_info_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/connection_impl.h"
-#include "extensions/io_socket/user_space/io_handle_impl.h"
-/* end internal connection */
-
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -74,44 +67,6 @@ IntegrationTcpClient::IntegrationTcpClient(
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(payload_reader_);
   connection_->connect();
-}
-
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
-                                           MockBufferFactory& factory,
-                                           Network::Address::InstanceConstSharedPtr,
-                                           bool enable_half_close,
-                                           const Network::ConnectionSocket::OptionsSharedPtr&,
-                                           Network::Address::InstanceConstSharedPtr)
-    : payload_reader_(new WaitForPayloadReader(dispatcher)),
-      callbacks_(new ConnectionCallbacks(*this)) {
-  EXPECT_CALL(factory, create_(_, _, _))
-      .Times(AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        return client_write_buffer_;
-      }))
-      .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                                std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
-  auto [io_handle_client, io_handle_server] =
-      Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
-  StreamInfo::StreamInfoImpl stream_info(dispatcher.timeSource(), nullptr);
-  Network::ConnectionImpl client_connection(dispatcher,
-                                            std::make_unique<Network::ConnectionSocketImpl>(
-                                                std::move(io_handle_client), nullptr, nullptr),
-                                            Network::Test::createRawBufferSocket(), stream_info,
-                                            false);
-
-  ON_CALL(*client_write_buffer_, drain(_))
-      .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-  EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
-
-  connection_->enableHalfClose(enable_half_close);
-  connection_->addConnectionCallbacks(*callbacks_);
-  connection_->addReadFilter(payload_reader_);
 }
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }

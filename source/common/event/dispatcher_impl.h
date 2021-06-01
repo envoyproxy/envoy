@@ -81,7 +81,7 @@ public:
 
   void registerInternalListenerManager(
       Network::InternalListenerManager& internal_listener_manager) override;
-  Network::InternalListenerManagerOptRef getInternalListenerManagerForTest() override;
+  Network::InternalListenerManagerOptRef getInternalListenerManager() override;
 
   TimerPtr createTimer(TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override;

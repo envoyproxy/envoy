@@ -199,7 +199,7 @@ TEST_P(InternalTcpProxyIntegrationTest, DISABLED_TcpProxyUpstreamWritesFirst) {
 
   worker_dispatcher_->post([&]() mutable {
     auto internal_listener =
-        worker_dispatcher_->getInternalListenerManagerForTest().value().get().findByAddress(
+        worker_dispatcher_->getInternalListenerManager().value().get().findByAddress(
             server_address);
     std::unique_ptr<Network::IoHandle> io_handle = std::move(io_handle_server);
     auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
