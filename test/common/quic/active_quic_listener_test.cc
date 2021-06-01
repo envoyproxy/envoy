@@ -27,6 +27,7 @@
 #include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/quic/active_quic_listener.h"
+#include "common/http/utility.h"
 #include "test/common/quic/test_utils.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
@@ -124,9 +125,12 @@ protected:
               return std::make_unique<Network::UdpDefaultWriter>(io_handle);
 #endif
             }));
+  }
 
+  void initialize() {
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
-    EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager_));
+    EXPECT_CALL(listener_config_, filterChainManager())
+        .WillRepeatedly(ReturnRef(filter_chain_manager_));
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
             0, connection_handler_, *dispatcher_, listener_config_));
@@ -155,9 +159,9 @@ protected:
   }
 
   void maybeConfigureMocks(int connection_count) {
-    if (quic_version_.UsesTls()) {
-      return;
-    }
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+        .Times(connection_count)
+        .WillRepeatedly(Return(filter_chain_));
     EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
@@ -167,8 +171,10 @@ protected:
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
         }));
-    EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .Times(connection_count);
+    if (!quic_version_.UsesTls()) {
+      EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+          .Times(connection_count);
+    }
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
@@ -254,11 +260,16 @@ protected:
 
 protected:
   virtual std::string yamlForQuicConfig() {
-    return R"EOF(
+    return fmt::format(R"EOF(
+    quic_protocol_options:
+      initial_connection_window_size: {}
+      initial_stream_window_size: {}
     enabled:
       default_value: true
       runtime_key: quic.enabled
-)EOF";
+    packets_to_read_to_connection_count_ratio: 50
+)EOF",
+                       connection_window_size_, stream_window_size_);
   }
 
   Network::Address::IpVersion version_;
@@ -298,43 +309,100 @@ protected:
   std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
   quic::ParsedQuicVersion quic_version_;
+  uint32_t connection_window_size_{1024u};
+  uint32_t stream_window_size_{1024u};
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
                          testing::ValuesIn(generateTestParam()), testParamsToString);
 
 TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
+  initialize();
   auto option = std::make_unique<Network::MockSocketOption>();
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(false));
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
   quic_listener_.reset();
-  EXPECT_THROW_WITH_REGEX(
-      (void)std::make_unique<ActiveQuicListener>(
-          0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
-          options, false,
-          ActiveQuicListenerFactoryPeer::runtimeEnabled(
-              static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),
-      Network::CreateListenerException, "Failed to apply socket options.");
+  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
+                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
+                              listener_config_, quic_config_, options, false,
+                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
+                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
+                              32u),
+                          Network::CreateListenerException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
+  initialize();
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);
-  sendCHLO(quic::test::TestConnectionId(1));
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
+              quic_listener_->numPacketsExpectedPerEventLoop());
+  }
+  const quic::QuicSession* session =
+      quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
+  ASSERT(session != nullptr);
+  // 1024 is too small for QUICHE, should be adjusted to the minimum supported by QUICHE.
+  EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
+                                                     ->config()
+                                                     ->GetInitialSessionFlowControlWindowToSend());
+  // IETF Quic supports low flow control limit. But Google Quic only supports flow control window no
+  // smaller than 16kB.
+  if (GetParam().second == QuicVersionType::Iquic) {
+    EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
+                                       ->config()
+                                       ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  } else {
+    EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
+                                                       ->config()
+                                                       ->GetInitialStreamFlowControlWindowToSend());
+  }
+  readFromClientSockets();
+}
+
+TEST_P(ActiveQuicListenerTest, ConfigureReasonableInitialFlowControlWindow) {
+  // These initial flow control windows should be accepted by both Google QUIC and IETF QUIC.
+  connection_window_size_ = 64 * 1024;
+  stream_window_size_ = 32 * 1024;
+  initialize();
+  maybeConfigureMocks(/* connection_count = */ 1);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  const quic::QuicSession* session =
+      quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
+  ASSERT(session != nullptr);
+  EXPECT_EQ(connection_window_size_, const_cast<quic::QuicSession*>(session)
+                                         ->config()
+                                         ->GetInitialSessionFlowControlWindowToSend());
+  EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
+                                     ->config()
+                                     ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
   readFromClientSockets();
 }
 
 TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
+  initialize();
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
-  maybeConfigureMocks(count);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    maybeConfigureMocks(count + 1);
+    // Create 1 session to increase number of packet to read in the next read event.
+    sendCHLO(quic::test::TestConnectionId());
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  } else {
+    maybeConfigureMocks(count);
+  }
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= count; ++i) {
@@ -352,10 +420,16 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
+              quic_listener_->numPacketsExpectedPerEventLoop());
+  }
+
   readFromClientSockets();
 }
 
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
+  initialize();
   maybeConfigureMocks(/* connection_count = */ 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   sendCHLO(quic::test::TestConnectionId(1));
@@ -379,6 +453,7 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {
 protected:
   std::string yamlForQuicConfig() override {
+    // Do not config flow control windows.
     return R"EOF(
     quic_protocol_options:
       max_concurrent_streams: 10
@@ -392,14 +467,28 @@ INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerEmptyFlagConfigTests,
 
 // Quic listener should be enabled by default, if not enabled explicitly in config.
 TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
+  initialize();
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);
-  sendCHLO(quic::test::TestConnectionId(1));
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
+  const quic::QuicSession* session =
+      quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
+  ASSERT(session != nullptr);
+  // Check defaults stream and connection flow control window to send.
+  EXPECT_EQ(Http3::Utility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+            const_cast<quic::QuicSession*>(session)
+                ->config()
+                ->GetInitialSessionFlowControlWindowToSend());
+  EXPECT_EQ(Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
+            const_cast<quic::QuicSession*>(session)
+                ->config()
+                ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
   readFromClientSockets();
 }
 

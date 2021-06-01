@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.common.dynamic_forward_proxy.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
+import "envoy/config/core/v3/resolver.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -27,7 +28,7 @@ message DnsCacheCircuitBreakers {
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -101,4 +102,9 @@ message DnsCacheConfig {
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
   // server startup. Apple' API only uses UDP for DNS resolution.
   bool use_tcp_for_dns_lookups = 8;
+
+  // DNS resolver configuration
+  // If specified, DNS cache will perform resolution via the underlying DNS resolvers.
+  // Otherwise, the default system resolvers (e.g., /etc/resolv.conf) will be used.
+  config.core.v3.DnsResolver dns_resolver = 9;
 }

@@ -43,13 +43,12 @@ public:
       ::google::jwt_verify::CheckAudience* check_audience = nullptr,
       const absl::optional<std::string>& provider = absl::make_optional<std::string>(ProviderName),
       bool allow_failed = false, bool allow_missing = false) {
-    filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
+    filter_config_ = std::make_unique<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
     auth_ = Authenticator::create(
-        check_audience, provider, allow_failed, allow_missing,
-        filter_config_->getCache().getJwksCache(), filter_config_->cm(),
-        [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
+        check_audience, provider, allow_failed, allow_missing, filter_config_->getJwksCache(),
+        filter_config_->cm(), [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
         filter_config_->timeSource());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
@@ -109,6 +108,9 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
     // Verify the token is removed.
     EXPECT_FALSE(headers.has(Http::CustomHeaders::get().Authorization));
   }
+
+  EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.
@@ -132,6 +134,9 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
 
   // Payload not set by default
   EXPECT_EQ(out_name_, "");
+
+  EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // This test verifies the Jwt payload is set.
@@ -182,6 +187,9 @@ TEST_F(AuthenticatorTest, TestWrongIssuer) {
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(OtherGoodToken)}};
   expectVerifyStatus(Status::JwtUnknownIssuer, headers);
+
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // Jwt "iss" is "other.com", "issuer" in JwtProvider is not specified,

@@ -178,6 +178,10 @@ private:
     void onDatagramsDropped(uint32_t dropped) override {
       cluster_.cluster_stats_.sess_rx_datagrams_dropped_.add(dropped);
     }
+    size_t numPacketsExpectedPerEventLoop() const final {
+      // TODO(mattklein123) change this to a reasonable number if needed.
+      return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+    }
 
     ClusterInfo& cluster_;
     const bool use_original_src_ip_;

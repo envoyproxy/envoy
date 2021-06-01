@@ -23,6 +23,7 @@ public:
   void pause(const std::string& type_url);
   void resume(const std::string& type_url);
   bool paused(const std::string& type_url) const;
+  void clear();
 
 private:
   // It's ok for non-existent subs to be paused/resumed. The cleanest way to support that is to give

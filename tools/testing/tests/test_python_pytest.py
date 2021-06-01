@@ -77,17 +77,7 @@ def test_pytest_run(patches, cov_data):
             == [(m_py_args.return_value,), {}])
 
 
-def test_pytest_main():
-    class_mock = patch("tools.testing.python_pytest.PytestRunner")
-
-    with class_mock as m_class:
-        assert (
-            python_pytest.main("arg0", "arg1", "arg2")
-            == m_class.return_value.run.return_value)
-
-    assert (
-        list(m_class.call_args)
-        == [('arg0', 'arg1', 'arg2'), {}])
-    assert (
-        list(m_class.return_value.run.call_args)
-        == [(), {}])
+def test_pytest_main(command_main):
+    command_main(
+        python_pytest.main,
+        "tools.testing.python_pytest.PytestRunner")
