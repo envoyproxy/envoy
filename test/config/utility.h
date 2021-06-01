@@ -330,7 +330,7 @@ public:
 
   // Populate and return a Http3ProtocolOptions instance based on http2_options.
   static envoy::config::core::v3::Http3ProtocolOptions
-  Http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+  http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                               size_t http3_max_stream_receive_window);
 
 private:

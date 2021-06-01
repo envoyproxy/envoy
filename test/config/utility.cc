@@ -1384,7 +1384,7 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 
-envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::Http2ToHttp3ProtocolOptions(
+envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::http2ToHttp3ProtocolOptions(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     size_t http3_max_stream_receive_window) {
   envoy::config::core::v3::Http3ProtocolOptions http3_options;

@@ -255,7 +255,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     http2_options.value().set_allow_metadata(true);
 #ifdef ENVOY_ENABLE_QUIC
   } else {
-    cluster->http3_options_ = ConfigHelper::Http2ToHttp3ProtocolOptions(
+    cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
         http2_options.value(), quic::kStreamReceiveWindowLimit);
 #endif
   }
