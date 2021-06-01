@@ -21,7 +21,7 @@ public:
 
 private:
   // Find the actual counter in |scope| and increment it.
-  // An example counter name: "downstream.self.quic_connection_close_error_code_QUIC_NO_ERROR".
+  // An example counter name: "http3.downstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR".
   void incCounter(Stats::Scope& scope, const Stats::StatNameVec& names);
 
   Stats::StatName connectionCloseStatName(quic::QuicErrorCode error_code);

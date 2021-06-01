@@ -8,8 +8,8 @@ namespace Quic {
 QuicStatNames::QuicStatNames(Stats::SymbolTable& symbol_table)
     : stat_name_pool_(symbol_table), symbol_table_(symbol_table),
       http3_prefix_(stat_name_pool_.add("http3")), downstream_(stat_name_pool_.add("downstream")),
-      upstream_(stat_name_pool_.add("upstream")), from_self_(stat_name_pool_.add("self")),
-      from_peer_(stat_name_pool_.add("peer")) {
+      upstream_(stat_name_pool_.add("upstream")), from_self_(stat_name_pool_.add("tx")),
+      from_peer_(stat_name_pool_.add("rx")) {
   // Preallocate most used counters
   // Most popular in client initiated connection close.
   connectionCloseStatName(quic::QUIC_NETWORK_IDLE_TIMEOUT);

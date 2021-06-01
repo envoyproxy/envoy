@@ -109,13 +109,13 @@ following statistics:
 Http3 per listener statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Http3 statistics with the form of http3.<stat_prefix>.*:
+Http3 statistics with the form of http3.downstream.<stat_prefix>.*:
 
 .. csv-table::
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   [direction].[source].quic_connection_close_error_code_[error_code], Counter, A collection of counters that are lazily initialized to record each quic connection close error code that's present. direction could be *upstream* or *downstream*. source could be *self* or *peer*.
+   tx/rx.quic_connection_close_error_code_[error_code], Counter, A collection of counters that are lazily initialized to record each quic connection close error code that's present.
 
 
 .. _config_http_conn_man_stats_per_codec:

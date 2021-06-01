@@ -21,9 +21,9 @@ public:
 TEST_F(QuicStatNamesTest, QuicConnectionCloseStats) {
   quic_stat_names_.chargeQuicConnectionCloseStats(scope_, quic::QUIC_NO_ERROR,
                                                   quic::ConnectionCloseSource::FROM_SELF, false);
-  EXPECT_EQ(1U,
-            scope_.counter("http3.downstream.self.quic_connection_close_error_code_QUIC_NO_ERROR")
-                .value());
+  EXPECT_EQ(
+      1U,
+      scope_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR").value());
 }
 
 } // namespace Quic
