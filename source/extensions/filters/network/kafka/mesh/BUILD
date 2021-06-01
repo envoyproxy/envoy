@@ -9,7 +9,7 @@ load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
 licenses(["notice"])  # Apache 2
 
 # Kafka-mesh network filter.
-# Mesh filter public docs: ADAM WAS HERE
+# Mesh filter public docs: docs/root/configuration/listeners/network_filters/kafka_mesh_filter.rst
 
 envoy_extension_package()
 
@@ -17,9 +17,6 @@ envoy_cc_extension(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.network",
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "wip",
     deps = [
         "//include/envoy/registry",
         "//source/extensions/filters/network:well_known_names",

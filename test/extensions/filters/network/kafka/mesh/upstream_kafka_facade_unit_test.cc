@@ -42,7 +42,7 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateProducerOnlyOnceForTheSameCluster) {
   EXPECT_CALL(configuration, computeClusterConfigForTopic(topic2)).WillOnce(Return(cluster_config));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
-      .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
+      .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlotMock));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   UpstreamKafkaFacadeImpl testee = {configuration, slot_allocator, thread_factory};
 
@@ -70,7 +70,7 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateDifferentProducersForDifferentClusters
       .WillOnce(Return(cluster_config2));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
-      .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
+      .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlotMock));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   UpstreamKafkaFacadeImpl testee = {configuration, slot_allocator, thread_factory};
 
@@ -92,7 +92,7 @@ TEST(UpstreamKafkaFacadeTest, shouldThrowIfThereIsNoConfigurationForGivenTopic) 
   EXPECT_CALL(configuration, computeClusterConfigForTopic(topic)).WillOnce(Return(absl::nullopt));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
-      .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
+      .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlotMock));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   UpstreamKafkaFacadeImpl testee = {configuration, slot_allocator, thread_factory};
 
