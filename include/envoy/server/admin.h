@@ -57,17 +57,7 @@ public:
   virtual Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
-class Chunker {
-public:
-  virtual ~Chunker() = default;
-
-  /**
-   * Copy data into the buffer.
-
-   * @param data supplies the data..
-   */
-  virtual void add(absl::string_view data) PURE;
-};
+using Chunker = Buffer::Instance;
 
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds

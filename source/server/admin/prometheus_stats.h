@@ -3,7 +3,6 @@
 #include <regex>
 #include <string>
 
-#include "envoy/buffer/buffer.h"
 #include "envoy/server/admin.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"

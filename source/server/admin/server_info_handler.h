@@ -30,8 +30,8 @@ public:
                           AdminStream&);
 
   Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Chunker& response, AdminStream&);
+                                      Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                      AdminStream&);
 
   Http::Code handlerMemory(absl::string_view path_and_query,
                            Http::ResponseHeaderMap& response_headers, Chunker& response,

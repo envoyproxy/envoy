@@ -93,8 +93,9 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
@@ -120,8 +121,9 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
@@ -129,8 +131,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
@@ -138,8 +141,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Chunker&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
 
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.

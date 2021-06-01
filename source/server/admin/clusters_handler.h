@@ -23,8 +23,7 @@ public:
 
 private:
   void addOutlierInfo(const std::string& cluster_name,
-                      const Upstream::Outlier::Detector* outlier_detector,
-                      Chunker& response);
+                      const Upstream::Outlier::Detector* outlier_detector, Chunker& response);
   void writeClustersAsJson(Chunker& response);
   void writeClustersAsText(Chunker& response);
 };

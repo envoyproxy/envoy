@@ -79,8 +79,7 @@ Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
 }
 
 Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
-                                                Chunker& response,
-                                                AdminStream& admin_stream) {
+                                                Chunker& response, AdminStream& admin_stream) {
   Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
   if (params.empty()) {
     // Check if the params are in the request's body.

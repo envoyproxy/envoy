@@ -18,12 +18,12 @@ public:
   ListenersHandler(Server::Instance& server);
 
   Http::Code handlerDrainListeners(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
-                                   Chunker& response, AdminStream&);
+                                   Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                   AdminStream&);
 
   Http::Code handlerListenerInfo(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Chunker& response, AdminStream&);
+                                 Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                 AdminStream&);
 
 private:
   /**

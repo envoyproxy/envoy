@@ -18,16 +18,16 @@ public:
   ServerCmdHandler(Server::Instance& server);
 
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
-                                 Chunker& response, AdminStream&);
+                                 Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                 AdminStream&);
 
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
-                                    Chunker& response, AdminStream&);
+                                    Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                    AdminStream&);
 
   Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Chunker& response, AdminStream&);
+                                  Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                  AdminStream&);
 };
 
 } // namespace Server

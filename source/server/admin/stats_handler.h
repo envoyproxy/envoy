@@ -23,11 +23,11 @@ public:
   StatsHandler(Server::Instance& server);
 
   Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Chunker& response, AdminStream&);
+                                  Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                  AdminStream&);
   Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
-                                       Http::ResponseHeaderMap& response_headers,
-                                       Chunker& response, AdminStream&);
+                                       Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                       AdminStream&);
   Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
                                             Http::ResponseHeaderMap& response_headers,
                                             Chunker& response, AdminStream&);
@@ -41,8 +41,8 @@ public:
                           Http::ResponseHeaderMap& response_headers, Chunker& response,
                           AdminStream&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
-                                    Chunker& response, AdminStream&);
+                                    Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                    AdminStream&);
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers, Chunker& response,
                                AdminStream&);

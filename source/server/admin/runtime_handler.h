@@ -21,8 +21,8 @@ public:
                             Http::ResponseHeaderMap& response_headers, Chunker& response,
                             AdminStream&);
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
-                                  Chunker& response, AdminStream&);
+                                  Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                  AdminStream&);
 };
 
 } // namespace Server

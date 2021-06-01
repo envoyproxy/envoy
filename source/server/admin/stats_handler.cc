@@ -68,8 +68,8 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 }
 
 Http::Code StatsHandler::handlerStats(absl::string_view url,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Chunker& response, AdminStream& admin_stream) {
+                                      Http::ResponseHeaderMap& response_headers, Chunker& response,
+                                      AdminStream& admin_stream) {
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
