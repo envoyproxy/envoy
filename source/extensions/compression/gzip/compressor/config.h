@@ -8,7 +8,6 @@
 
 #include "extensions/compression/common/compressor/factory_base.h"
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

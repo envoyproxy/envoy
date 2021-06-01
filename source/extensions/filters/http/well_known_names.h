@@ -44,8 +44,6 @@ public:
   const std::string GrpcHttp1ReverseBridge = "envoy.filters.http.grpc_http1_reverse_bridge";
   // GRPC telemetry
   const std::string GrpcStats = "envoy.filters.http.grpc_stats";
-  // Gzip filter
-  const std::string EnvoyGzip = "envoy.filters.http.gzip";
   // IP tagging filter
   const std::string IpTagging = "envoy.filters.http.ip_tagging";
   // Rate limit filter
