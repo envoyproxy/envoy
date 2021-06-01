@@ -182,7 +182,7 @@ struct ResponseCodeDetailValues {
   // The request was rejected because configured filters erroneously removed required request
   // headers.
   const std::string FilterRemovedRequiredRequestHeaders = "filter_removed_required_request_headers";
-  // The request was rejected because configured filters erroneously removed required reseponse
+  // The request was rejected because configured filters erroneously removed required response
   // headers.
   const std::string FilterRemovedRequiredResponseHeaders =
       "filter_removed_required_response_headers";
