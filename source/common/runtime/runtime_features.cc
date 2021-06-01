@@ -56,7 +56,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
-    "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
@@ -76,6 +75,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
+    "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
@@ -86,6 +86,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
+    "envoy.reloadable_features.udp_per_event_loop_read_limit",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
     "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.vhds_heartbeats",
@@ -106,12 +107,12 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
     "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
-    // TODO(alyssawilk) flip true after the release.
-    "envoy.reloadable_features.new_tcp_connection_pool",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // TODO(kbaichoo): Remove when this is no longer test only.
+    "envoy.test_only.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
 };

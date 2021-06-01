@@ -218,11 +218,20 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
+  # Temporariliy exclude some extensions from the envoy binary to address build failures
+  # due to long command line. Tests will still run.
+  BAZEL_BUILD_OPTIONS+=(
+    "--test_env=HEAPCHECK="
+    "--//source/extensions/filters/network/rocketmq_proxy:enabled=False"
+    "--//source/extensions/filters/http/admission_control:enabled=False"
+    "--//source/extensions/filters/http/dynamo:enabled=False"
+    "--//source/extensions/filters/http/header_to_metadata:enabled=False"
+    "--//source/extensions/filters/http/on_demand:enabled=False")
   setup_gcc_toolchain
 
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  # Disable //test/config_test:example_configs_test so it does not fail because of excluded extensions above
+  echo "Testing ${TEST_TARGETS[*]} -//test/config_test:example_configs_test"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}" -//test/config_test:example_configs_test
 
   echo "bazel release build with gcc..."
   bazel_binary_build fastbuild
@@ -325,6 +334,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
 
   # Building all the dependencies from scratch to link them against libc++.
+  echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+
   echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 

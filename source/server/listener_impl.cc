@@ -32,7 +32,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "common/quic/active_quic_listener.h"

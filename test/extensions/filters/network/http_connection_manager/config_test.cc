@@ -1152,6 +1152,59 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
   EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
+// Validated that by default we don't remove host's trailing dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(false, config.shouldStripTrailingHostDot());
+}
+
+// Validated that when configured, we remove host's trailing dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_trailing_host_dot: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(true, config.shouldStripTrailingHostDot());
+}
+
+// Validated that when explicitly set false, then we don't remove trailing host dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_trailing_host_dot: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(false, config.shouldStripTrailingHostDot());
+}
+
 // Validated that by default we allow requests with header names containing underscores.
 TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
   const std::string yaml_string = R"EOF(
@@ -1740,6 +1793,33 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
                           "Didn't find a registered implementation for type");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnknownHttpFilterWithException) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.unknown
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnknownOptionalHttpFilterWithIgnore) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.unknown
+    is_optional: true
+  )EOF";
+
+  createHttpConnectionManagerConfig(yaml_string);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -1780,6 +1860,89 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_FALSE(request_id_extension->packTraceReason());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Original IP detection extension not found: "
+                          "'envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension'");
+}
+
+namespace {
+
+class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
+public:
+  Http::OriginalIPDetectionSharedPtr
+  createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
+    return nullptr;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::UInt32Value>();
+  }
+
+  std::string name() const override {
+    return "envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated";
+  }
+};
+
+} // namespace
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) {
+  OriginalIPDetectionExtensionNotCreatedFactory factory;
+  Registry::InjectFactory<Http::OriginalIPDetectionFactory> registration(factory);
+
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Original IP detection extension could not be created: "
+      "'envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.custom_header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  const auto& original_ip_detection_extensions = config.originalIpDetectionExtensions();
+  EXPECT_EQ(1, original_ip_detection_extensions.size());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {

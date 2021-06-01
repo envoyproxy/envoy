@@ -45,6 +45,7 @@ statistics:
    downstream_rq_http2_total, Counter, Total HTTP/2 requests
    downstream_rq_http3_total, Counter, Total HTTP/3 requests
    downstream_rq_active, Gauge, Total active requests
+   downstream_rq_rejected_via_ip_detection, Counter, Total requests rejected because the original IP detection failed
    downstream_rq_response_before_rq_complete, Counter, Total responses sent before the request was complete
    downstream_rq_rx_reset, Counter, Total request resets received
    downstream_rq_tx_reset, Counter, Total request resets sent
@@ -158,6 +159,24 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
   The HTTP/2 `streams_active` gauge may be greater than the HTTP connection manager
   `downstream_rq_active` gauge due to differences in stream accounting between the codec and the
   HTTP connection manager.
+
+Http3 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~
+
+On the downstream side all http3 statistics are rooted at *http3.*
+
+On the upstream side all http3 statistics are rooted at *cluster.<name>.http3.*
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   dropped_headers_with_underscores, Counter, Total number of dropped headers with names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   rx_reset, Counter, Total number of reset stream frames received by Envoy
+   tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
+   metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/3 encoding
+
 
 Tracing statistics
 ------------------

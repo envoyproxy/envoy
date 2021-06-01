@@ -40,6 +40,14 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
+#if defined(ENVOY_CONFIG_COVERAGE)
+#define DISABLE_UNDER_COVERAGE return
+#else
+#define DISABLE_UNDER_COVERAGE                                                                     \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 namespace Envoy {
 namespace Quic {
 
@@ -62,7 +70,7 @@ void updateResource(AtomicFileUpdater& updater, double pressure) {
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
   QuicHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
+      : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_([]() {
           if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
@@ -105,7 +113,7 @@ public:
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
-        persistent_info.server_id_, persistent_info.crypto_config_.get(), &push_promise_index_,
+        persistent_info.server_id_, persistent_info.cryptoConfig(), &push_promise_index_,
         *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
@@ -307,104 +315,6 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   codec_client_->close();
 }
 
-TEST_P(QuicHttpIntegrationTest, GetRequestAndResponseWithBody) {
-  initialize();
-  sendRequestAndVerifyResponse(default_request_headers_, /*request_size=*/0,
-                               default_response_headers_, /*response_size=*/1024,
-                               /*backend_index*/ 0);
-}
-
-TEST_P(QuicHttpIntegrationTest, PostRequestAndResponseWithBody) {
-  testRouterRequestAndResponseWithBody(1024, 512, false);
-}
-
-TEST_P(QuicHttpIntegrationTest, PostRequestWithBigHeadersAndResponseWithBody) {
-  testRouterRequestAndResponseWithBody(1024, 512, true);
-}
-
-TEST_P(QuicHttpIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete();
-}
-
-TEST_P(QuicHttpIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete();
-  EXPECT_EQ(Http::StreamResetReason::RemoteReset, client_codec_callback_.last_stream_reset_reason_);
-}
-
-TEST_P(QuicHttpIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete();
-}
-
-TEST_P(QuicHttpIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete();
-}
-
-TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
-  testRouterUpstreamResponseBeforeRequestComplete();
-}
-
-TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
-
-TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
-  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
-  config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
-  testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
-                                       false, false, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
-}
-
-TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
-  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
-  config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
-  testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024, /*response_size=*/1024,
-                                       false);
-}
-
-TEST_P(QuicHttpIntegrationTest, LargeFlowControlOnAndGiantBody) {
-  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
-  config_helper_.setBufferLimits(/*upstream_buffer_limit=*/128 * 1024,
-                                 /*downstream_buffer_limit=*/128 * 1024);
-  testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024,
-                                       /*response_size=*/10 * 1024 * 1024, false, false, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
-}
-
-// Tests that a connection idle times out after 1s and starts delayed close.
-TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
-  config_helper_.setBufferLimits(1024, 1024);
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        // 200ms.
-        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
-        hcm.mutable_drain_timeout()->set_seconds(1);
-        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->set_seconds(1);
-      });
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  // The delayed close timeout should trigger since client is not closing the connection.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
-  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
-            1);
-}
-
 // Ensure multiple quic connections work, regardless of platform BPF support
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
   testMultipleQuicConnections();
@@ -537,7 +447,7 @@ TEST_P(QuicHttpIntegrationTest, NoNewStreamsWhenOverloaded) {
 }
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
-  testAdminDrain(Http::CodecClient::Type::HTTP1);
+  testAdminDrain(Http::CodecType::HTTP1);
 }
 
 TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
@@ -553,18 +463,6 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
             "(ENCRYPTION_HANDSHAKE) 46: "
             "certificate unknown";
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
-}
-
-TEST_P(QuicHttpIntegrationTest, RequestResponseWithTrailers) {
-  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-  testTrailers(/*request_size=*/10, /*response_size=*/10, /*request_trailers_present=*/true,
-               /*response_trailers_present=*/true);
-}
-
-// Multiple 1xx before the request completes.
-TEST_P(QuicHttpIntegrationTest, EnvoyProxyingEarlyMultiple1xx) {
-  testEnvoyProxying1xx(/*continue_before_upstream_complete=*/true, /*with_encoder_filter=*/false,
-                       /*with_multiple_1xx_headers=*/true);
 }
 
 // HTTP3 doesn't support 101 SwitchProtocol response code, the client should
@@ -608,39 +506,6 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   codec_client_->close();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
-}
-
-TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeaders) {
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/dynamo/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"},
-                                                                 {"cookie", "a=b"},
-                                                                 {"cookie", "c=d"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(*request_encoder_, 0, true);
-  waitForNextUpstreamRequest();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(),
-              "a=b; c=d");
-  }
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                                   {"set-cookie", "foo"},
-                                                                   {"set-cookie", "bar"}},
-                                   true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  const auto out = response->headers().get(Http::LowerCaseString("set-cookie"));
-  ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0]->value().getStringView(), "foo");
-  ASSERT_EQ(out[1]->value().getStringView(), "bar");
 }
 
 } // namespace Quic
