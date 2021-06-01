@@ -11,7 +11,7 @@ import github
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-Maintainers = {
+MAINTAINERS = {
     'alyssawilk': 'U78RP48V9',
     'mattklein123': 'U5CALEVSL',
     'lizan': 'U79E51EQ6',
@@ -99,7 +99,7 @@ def track_prs():
         has_maintainer_assignee = False
         for assignee_info in pr_info.assignees:
             assignee = assignee_info.login
-            if assignee not in Maintainers:
+            if assignee not in MAINTAINERS:
                 continue
             has_maintainer_assignee = True
             if assignee not in maintainers_and_prs.keys():
@@ -139,11 +139,11 @@ def post_to_maintainers(client, maintainers_and_messages):
 
         # Only send messages if we have the maintainer UID
         # if key not in ['alyssawilk']:  # Use this line for debugging.
-        if key not in Maintainers:
+        if key not in MAINTAINERS:
             # Right now we skip "unassigned" but eventually that should go to #maintainers
             print("Skipping key %s " % key)
             continue
-        uid = Maintainers[key]
+        uid = MAINTAINERS[key]
 
         # Ship messages off to slack.
         try:
