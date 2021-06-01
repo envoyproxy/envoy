@@ -67,6 +67,7 @@ EXTENSIONS = {
     "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:config",
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
+    "envoy.filters.http.bandwidth_limit":               "//source/extensions/filters/http/bandwidth_limit:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
     "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
@@ -244,6 +245,7 @@ EXTENSIONS = {
 
     "envoy.wasm.runtime.null":                          "//source/extensions/wasm_runtime/null:config",
     "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
+    "envoy.wasm.runtime.wamr":                          "//source/extensions/wasm_runtime/wamr:config",
     "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
     "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
 

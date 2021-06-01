@@ -10,6 +10,15 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_mock(
+    name = "alternate_protocols_cache_mocks",
+    srcs = ["alternate_protocols_cache.cc"],
+    hdrs = ["alternate_protocols_cache.h"],
+    deps = [
+        "//include/envoy/http:alternate_protocols_cache_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "api_listener_mocks",
     srcs = ["api_listener.cc"],
     hdrs = ["api_listener.h"],

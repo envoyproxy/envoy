@@ -50,7 +50,7 @@ The [`ConfigHelper`](../config/utility.h) has utilities for common alterations s
 
 ```c++
 // Set the default protocol to HTTP2
-setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+setDownstreamProtocol(Http::CodecType::HTTP2);
 ```
 
 or

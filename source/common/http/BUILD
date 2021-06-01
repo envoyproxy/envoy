@@ -176,6 +176,7 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:resource_manager_interface",
+        "//source/common/common:logger_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -296,6 +297,7 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/match_wrapper:config",
+        "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_rds_lib",

@@ -10,6 +10,7 @@ HTTP filters
   admission_control_filter
   aws_lambda_filter
   aws_request_signing_filter
+  bandwidth_limit_filter
   buffer_filter
   cdn_loop_filter
   compressor_filter

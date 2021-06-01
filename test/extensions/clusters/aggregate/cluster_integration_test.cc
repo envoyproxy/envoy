@@ -124,8 +124,7 @@ static_resources:
 class AggregateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
 public:
-  AggregateIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), config()) {
+  AggregateIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), config()) {
     use_lds_ = false;
   }
 
@@ -133,14 +132,14 @@ public:
 
   void initialize() override {
     use_lds_ = false;
-    setUpstreamCount(2);                                  // the CDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+    setUpstreamCount(2);                         // the CDS cluster
+    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
 
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));

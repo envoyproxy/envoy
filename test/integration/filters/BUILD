@@ -235,6 +235,7 @@ envoy_cc_test_library(
     srcs = [
         "pause_filter_for_quic.cc",
     ],
+    tags = ["nofips"],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/registry",

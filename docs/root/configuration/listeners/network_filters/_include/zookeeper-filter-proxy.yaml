@@ -18,7 +18,6 @@ static_resources:
             cluster: local_zk_server
   clusters:
     - name: local_zk_server
-      connect_timeout: 120s
       type: LOGICAL_DNS
       lb_policy: ROUND_ROBIN
       typed_extension_protocol_options:

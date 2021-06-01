@@ -136,6 +136,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -197,7 +198,7 @@ public:
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
-  MockStream stream_;
+  NiceMock<MockStream> stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
@@ -230,6 +231,7 @@ public:
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_{
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
               KEEP_UNCHANGED};
+  bool strip_trailing_host_dot_ = false;
 };
 
 } // namespace Http
